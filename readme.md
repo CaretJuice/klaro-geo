@@ -118,11 +118,37 @@ The plugin supports different Klaro script variants:
 
 When using the "No CSS" variant, the plugin will automatically load the Klaro CSS file separately, which you can then override with your own styles.
 
-## Google Tag Manager
+## Google Tag Manager Integration
 
-The plugin is designed to manage the loading of Google Tag Manager via Klaro.
+The plugin directly loads Google Tag Manager in a Klaro-compatible way, ensuring proper consent management.
 
-To this end, the plugin defaults with some custom `onInit` and `onAccept` scripts that manage the loading of Google Tag Manager. You can override these by adding your own `onInit` and/or `onAccept` functions in the Google Tag Manager service settings.
+### How to Set Up GTM
+
+1. Go to **Klaro Geo > Settings**
+2. Enter your Google Tag Manager ID (e.g., GTM-XXXXXX) in the Google Tag Manager section
+3. Save your settings
+
+The plugin will automatically:
+- Add the GTM script to your site's header with the proper Klaro attributes
+- Add the GTM noscript iframe to your site's body with the proper Klaro attributes
+- Configure consent callbacks to manage GTM's consent mode
+
+### How It Works
+
+When a user visits your site:
+
+1. GTM scripts are initially blocked (using `type="text/plain"` and `data-type="application/javascript"`)
+2. When the user gives consent, Klaro enables the scripts
+3. The `onInit` script sets up default consent values (all denied)
+4. The `onAccept` script updates consent values based on user choices
+
+### Customizing GTM Integration
+
+You can customize the Google Tag Manager integration in the Services settings:
+
+1. Go to **Klaro Geo > Services**
+2. Edit the Google Tag Manager service
+3. Customize the callback scripts as needed
 
 The default scripts will likely need to be customized to suit your needs.
 

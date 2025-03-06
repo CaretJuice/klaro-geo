@@ -90,17 +90,17 @@ function get_klaro_default_values() {
         $defaults = array(
             'gtm_oninit' => <<<JS
             window.dataLayer = window.dataLayer || [];
-            window.gtag = function(){dataLayer.push(arguments)}
-            gtag('consent', 'default', {'ad_storage': 'denied', 'analytics_storage': 'denied', 'ad_user_data': 'denied', 'ad_personalization': 'denied'})
-            gtag('set', 'ads_data_redaction', true)
+            window.gtag = function() { dataLayer.push(arguments); };
+            gtag('consent', 'default', {'ad_storage': 'denied', 'analytics_storage': 'denied', 'ad_user_data': 'denied', 'ad_personalization': 'denied'});
+            gtag('set', 'ads_data_redaction', true);
             JS,
-            
+
             'gtm_onaccept' => <<<JS
-            if (opts.consents.analytics || opts.consents.advertising) { 
+            if (opts.consents.analytics || opts.consents.advertising) {
                 for(let k of Object.keys(opts.consents)){
                     if (opts.consents[k]){
-                        let eventName = 'klaro-'+k+'-accepted'
-                        dataLayer.push({'event': eventName})
+                        let eventName = 'klaro-'+k+'-accepted';
+                        dataLayer.push({'event': eventName});
                     }
                 }
             }
@@ -460,6 +460,17 @@ function klaro_geo_settings_page_content() {
                             <option value="klaro-no-css.js" <?php selected(get_option('klaro_geo_js_variant', 'klaro.js'), 'klaro-no-css.js'); ?>>No CSS (klaro-no-css.js)</option>
                         </select>
                         <p class="description">Choose which Klaro script variant to load. The "No CSS" option is useful if you want to use your own styles.</p>
+                    </td>
+                </tr>
+            </table>
+
+            <h2>Google Tag Manager</h2>
+            <table class="form-table">
+                <tr valign="top">
+                    <th scope="row"><label for="klaro_geo_gtm_id">Google Tag Manager ID</label></th>
+                    <td>
+                        <input type="text" name="klaro_geo_gtm_id" id="klaro_geo_gtm_id" value="<?php echo esc_attr(get_option('klaro_geo_gtm_id', '')); ?>" placeholder="GTM-XXXXXX" />
+                        <p class="description">Enter your Google Tag Manager container ID (e.g., GTM-XXXXXX). Leave empty to disable GTM integration.</p>
                     </td>
                 </tr>
             </table>
@@ -939,8 +950,18 @@ function klaro_geo_register_settings() {
     register_setting('klaro_geo_settings_group', 'klaro_geo_analytics_purposes');
     register_setting('klaro_geo_settings_group', 'klaro_geo_ad_purposes');
     
-    // GTM settings are now handled in the services section
-    
+    // GTM settings
+    register_setting('klaro_geo_settings_group', 'klaro_geo_gtm_id', [
+        'type' => 'string',
+        'sanitize_callback' => function($input) {
+            // Validate GTM ID format (GTM-XXXXXX)
+            if (empty($input) || preg_match('/^GTM-[A-Z0-9]+$/', $input)) {
+                return $input;
+            }
+            return '';
+        }
+    ]);
+
     // Other settings
     register_setting('klaro_geo_settings_group', 'klaro_geo_js_version');
     register_setting('klaro_geo_settings_group', 'klaro_geo_js_variant');

@@ -6,10 +6,44 @@
 
 // Function to show the Klaro consent modal
 function showKlaroModal() {
-    if (typeof window.klaro !== 'undefined') {
+    console.log('Attempting to show Klaro modal');
+
+    // Try multiple ways to show the Klaro modal
+    if (typeof window.klaro !== 'undefined' && typeof window.klaro.show === 'function') {
+        console.log('Using window.klaro.show()');
         window.klaro.show();
+    } else if (typeof window.klaroManager !== 'undefined' && typeof window.klaroManager.show === 'function') {
+        console.log('Using window.klaroManager.show()');
+        window.klaroManager.show();
+    } else if (typeof window.klaroApi !== 'undefined' && typeof window.klaroApi.openConsentManager === 'function') {
+        console.log('Using window.klaroApi.openConsentManager()');
+        window.klaroApi.openConsentManager();
     } else {
-        console.error('Klaro is not loaded or available');
+        console.error('Klaro is not loaded or available. Checking for config...');
+
+        // If Klaro isn't loaded but config is, try to manually trigger it
+        if (typeof window.klaroConfig !== 'undefined') {
+            console.log('Config found, attempting to manually initialize Klaro');
+
+            // Create a script element to reload Klaro
+            const script = document.createElement('script');
+            script.setAttribute('defer', '');
+            script.setAttribute('data-config', 'klaroConfig');
+            script.setAttribute('src', 'https://cdn.kiprotect.com/klaro/v' +
+                (window.klaroVersion || '0.7') + '/klaro.js');
+
+            // Add event listener to show the modal once loaded
+            script.onload = function() {
+                console.log('Klaro script loaded, attempting to show modal');
+                if (typeof window.klaro !== 'undefined' && typeof window.klaro.show === 'function') {
+                    window.klaro.show();
+                }
+            };
+
+            document.body.appendChild(script);
+        } else {
+            console.error('Klaro config not found');
+        }
     }
 }
 

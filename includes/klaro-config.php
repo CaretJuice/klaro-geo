@@ -145,8 +145,8 @@ function klaro_geo_generate_config_file() {
 
             // Get default values from the function
             $defaults = function_exists('get_klaro_default_values') ? get_klaro_default_values() : array(
-                'gtm_oninit' => 'window.dataLayer = window.dataLayer || []; window.gtag = function(){dataLayer.push(arguments)} gtag(\'consent\', \'default\', {\'ad_storage\': \'denied\', \'analytics_storage\': \'denied\', \'ad_user_data\': \'denied\', \'ad_personalization\': \'denied\'}) gtag(\'set\', \'ads_data_redaction\', true)',
-                'gtm_onaccept' => 'if (opts.consents.analytics || opts.consents.advertising) { for(let k of Object.keys(opts.consents)){ if (opts.consents[k]){ let eventName = \'klaro-\'+k+\'-accepted\'; dataLayer.push({\'event\': eventName}) } } }',
+                'gtm_oninit' => 'window.dataLayer = window.dataLayer || []; window.gtag = function() { dataLayer.push(arguments); }; gtag(\'consent\', \'default\', {\'ad_storage\': \'denied\', \'analytics_storage\': \'denied\', \'ad_user_data\': \'denied\', \'ad_personalization\': \'denied\'}); gtag(\'set\', \'ads_data_redaction\', true);',
+                'gtm_onaccept' => 'if (opts.consents.analytics || opts.consents.advertising) { for(let k of Object.keys(opts.consents)){ if (opts.consents[k]){ let eventName = \'klaro-\'+k+\'-accepted\'; dataLayer.push({\'event\': eventName}); } } }',
                 'gtm_ondecline' => ''
             );
 
