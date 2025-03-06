@@ -1,0 +1,116 @@
+services:
+  wordpress_test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    entrypoint: ["/usr/local/bin/docker-entrypoint-test.sh"]  # Use absolute path
+    user: "root:root"
+    command: ["vendor/bin/phpunit", "--configuration", "/var/www/html/wp-content/plugins/klaro-geo/phpunit.xml"]
+    tty: true
+    stdin_open: true
+    volumes:
+      - type: bind
+        source: ${PWD}/..
+        target: /var/www/html/wp-content/plugins/klaro-geo
+        consistency: delegated
+      - type: bind
+        source: ${PWD}/../tests
+        target: /var/www/html/wp-content/plugins/klaro-geo/tests
+        consistency: delegated
+      - type: bind
+        source: ${PWD}/logs
+        target: /var/www/html/wp-content/plugins/klaro-geo/docker/logs/
+        consistency: delegated
+      - ./php.ini:/usr/local/etc/php/php.ini
+    environment:
+      WORDPRESS_DB_HOST: db_test
+      WORDPRESS_DB_NAME: wordpress_test
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      PHP_MEMORY_LIMIT: 256M
+      WP_CLI_MEMORY_LIMIT: 512M
+      WORDPRESS_TABLE_PREFIX: wp_
+    depends_on:
+      db_test:
+        condition: service_healthy
+
+
+  wordpress:
+    image: wordpress:latest
+    ports:
+      - "8000:80"
+    user: "root:root"
+    command: bash -c "
+      if [ ! -d /var/www/html/wp-content/plugins/geoip-detect ]; then
+        mkdir -p /var/www/html/wp-content/plugins &&
+        cd /var/www/html/wp-content/plugins &&
+        curl -L https://downloads.wordpress.org/plugin/geoip-detect.latest-stable.zip -o geoip-detect.zip &&
+        unzip geoip-detect.zip &&
+        rm geoip-detect.zip;
+      fi &&
+      chown -R www-data:www-data /var/www/html/wp-content/plugins/klaro-geo /var/www/html/wp-content/plugins/geoip-detect 2>/dev/null || true &&
+      chmod -R a+w /var/www/html/wp-content/plugins/klaro-geo /var/www/html/wp-content/plugins/geoip-detect &&
+      docker-entrypoint.sh apache2-foreground"
+    volumes:
+      - wordpress_data:/var/www/html
+      - type: bind
+        source: ${PWD}/..
+        target: /var/www/html/wp-content/plugins/klaro-geo
+        consistency: delegated
+      - type: bind
+        source: ${PWD}/logs
+        target: /var/www/html/wp-content/plugins/klaro-geo/docker/logs/
+        consistency: delegated
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DEBUG: 1
+      WORDPRESS_CONFIG_EXTRA: |
+        define( 'WP_DEBUG', true );
+        define( 'WP_DEBUG_LOG', '/var/www/html/wp-content/plugins/klaro-geo/docker/logs/debug_dev.log' );
+        define( 'WP_DEBUG_DISPLAY', false );
+    depends_on:
+      db:
+        condition: service_healthy
+
+
+  db_test:
+    image: mysql:5.7
+    platform: linux/amd64
+    environment:
+      MYSQL_ROOT_PASSWORD: somewordpress
+      MYSQL_DATABASE: wordpress_test
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: wordpress
+    volumes:
+      - db_test_data:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-psomewordpress"]
+      timeout: 5s
+      retries: 10
+
+  db:
+    image: mysql:5.7
+    platform: linux/amd64
+    volumes:
+      - db_data:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: somewordpress
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: wordpress
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-psomewordpress"]
+      timeout: 5s
+      retries: 10
+    command: --default-authentication-plugin=mysql_native_password
+
+
+volumes:
+  wordpress_test_data:  
+  wordpress_data:
+  db_data:
+  db_test_data:

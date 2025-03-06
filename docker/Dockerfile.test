@@ -1,0 +1,87 @@
+FROM wordpress:latest
+
+# Accept build arguments for user/group IDs with defaults
+ARG UID=1000
+ARG GID=1000
+
+# Set PHP memory limit early
+RUN echo "memory_limit = 512M" > /usr/local/etc/php/conf.d/memory-limit.ini
+
+# Install basic tools, MySQL client, Composer, PHPUnit, WP-CLI, Node.js, and npm
+RUN apt-get update && apt-get install -y \
+    git \
+    unzip \
+    subversion \
+    wget \
+    default-mysql-client \
+    curl \
+    && curl -fsSL https://deb.nodesource.com/setup_14.x | bash - \
+    && apt-get install -y nodejs \
+    && apt-get install -y npm \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer \
+    && wget -O /usr/local/bin/phpunit https://phar.phpunit.de/phpunit-9.phar \
+    && chmod +x /usr/local/bin/phpunit \
+    && curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar \
+    && chmod +x wp-cli.phar \
+    && mv wp-cli.phar /usr/local/bin/wp
+
+# Verify Node.js and npm installation
+RUN node -v && npm -v && which npm
+
+# Debug: Show current directory contents
+RUN pwd && ls -la
+
+# Copy entrypoint script
+COPY docker-entrypoint-test.sh /usr/local/bin/
+RUN ls -la /usr/local/bin/docker-entrypoint-test.sh || echo "Script not found"
+RUN chmod +x /usr/local/bin/docker-entrypoint-test.sh
+
+# More debug output
+RUN echo "Contents of /usr/local/bin:" && ls -la /usr/local/bin/
+
+# Copy WordPress core files from the base image
+RUN cp -a /usr/src/wordpress/. /var/www/html/ \
+    && chown -R www-data:www-data /var/www/html
+
+# Set up WordPress test library
+ENV WP_TESTS_DIR=/tmp/wordpress-tests-lib
+RUN mkdir -p $WP_TESTS_DIR \
+    && svn co --quiet https://develop.svn.wordpress.org/tags/6.4.3/tests/phpunit/includes/ $WP_TESTS_DIR/includes \
+    && svn co --quiet https://develop.svn.wordpress.org/tags/6.4.3/tests/phpunit/data/ $WP_TESTS_DIR/data \
+    && cp -r $WP_TESTS_DIR/includes/. $WP_TESTS_DIR/ \
+    && rm -rf $WP_TESTS_DIR/includes \
+    && chown -R www-data:www-data $WP_TESTS_DIR
+
+# Create wp-tests-config.php
+RUN echo "<?php \n\
+define('DB_NAME', 'wordpress_test'); \n\
+define('DB_USER', 'wordpress'); \n\
+define('DB_PASSWORD', 'wordpress'); \n\
+define('DB_HOST', 'db_test'); \n\
+define('DB_CHARSET', 'utf8'); \n\
+define('DB_COLLATE', ''); \n\
+\$table_prefix = 'wptests_'; \n\
+define('WP_TESTS_DOMAIN', 'example.org'); \n\
+define('WP_TESTS_EMAIL', 'admin@example.org'); \n\
+define('WP_TESTS_TITLE', 'Test Blog'); \n\
+define('WP_PHP_BINARY', 'php'); \n\
+define('WPLANG', ''); \n\
+define('ABSPATH', '/var/www/html/'); \n\
+define('WP_DEBUG', true); \n\
+" > $WP_TESTS_DIR/wp-tests-config.php
+
+# Set working directory
+WORKDIR /var/www/html/wp-content/plugins/klaro-geo
+
+# Set ownership and permissions
+RUN chown -R www-data:www-data /var/www/html/ $WP_TESTS_DIR \
+    && find /var/www/html/ -type d -exec chmod 755 {} \; \
+    && find /var/www/html/ -type f -exec chmod 644 {} \; \
+    && find $WP_TESTS_DIR -type d -exec chmod 755 {} \; \
+    && find $WP_TESTS_DIR -type f -exec chmod 644 {} \;
+
+# Expose the port Apache is running on
+EXPOSE 80
+
+CMD ["apache2-foreground"]

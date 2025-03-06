@@ -1,0 +1,44 @@
+.klaro-consent-button {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 999;
+    padding: 10px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 14px;
+    border: none;
+    box-shadow: 0 4px 6px 0 rgba(0, 0, 0, 0.2), 5px 5px 10px 0 rgba(0, 0, 0, 0.19);
+    transition: all 0.2s ease;
+}
+
+/* Light theme */
+.klaro-consent-button.light {
+    background-color: #5c5c5c;
+    color: #fff;
+}
+
+.klaro-consent-button.light:hover {
+    background-color: #333;
+}
+
+/* Dark theme */
+.klaro-consent-button.dark {
+    background-color: #333;
+    color: #fafafa;
+}
+
+.klaro-consent-button.dark:hover {
+    background-color: #1a1a1a;
+}
+
+/* Success button style (green) */
+.klaro-consent-button.success {
+    background-color: #1a936f;
+    color: #fff;
+}
+
+.klaro-consent-button.success:hover {
+    background-color: #147a5e;
+}
