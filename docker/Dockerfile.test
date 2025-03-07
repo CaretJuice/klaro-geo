@@ -15,6 +15,9 @@ RUN apt-get update && apt-get install -y \
     wget \
     default-mysql-client \
     curl \
+    zip \
+    libzip-dev \
+    && docker-php-ext-install zip \
     && curl -fsSL https://deb.nodesource.com/setup_14.x | bash - \
     && apt-get install -y nodejs \
     && apt-get install -y npm \

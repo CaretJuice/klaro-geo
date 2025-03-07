@@ -120,6 +120,24 @@ function klaro_geo_generate_config_file() {
             'onDecline' => $service['onDecline'] ?? ''
         );
 
+        // Add optional fields if they exist
+        if (isset($service['optOut'])) {
+            $service_config['optOut'] = filter_var($service['optOut'], FILTER_VALIDATE_BOOLEAN);
+        }
+
+        if (isset($service['onlyOnce'])) {
+            $service_config['onlyOnce'] = filter_var($service['onlyOnce'], FILTER_VALIDATE_BOOLEAN);
+        }
+
+        if (isset($service['contextualConsentOnly'])) {
+            $service_config['contextualConsentOnly'] = filter_var($service['contextualConsentOnly'], FILTER_VALIDATE_BOOLEAN);
+        }
+
+        // Add translations if they exist
+        if (isset($service['translations']) && !empty($service['translations'])) {
+            $service_config['translations'] = $service['translations'];
+        }
+
         klaro_geo_debug_log('Processing service: ' . print_r($service_config, true));
 
         // Add consent updates based on purposes
@@ -223,7 +241,12 @@ function klaro_geo_generate_config_file() {
             
     // Generate the JavaScript content
     $klaro_config_content = "// Detected/Debug Country Code: " . esc_js($user_country) . "\n\n";
+
+    // Format the klaroConfig variable in a way that's easy to parse for tests
     $klaro_config_content .= 'var klaroConfig = ' . wp_json_encode($klaro_config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . ";\n\n";
+
+    // Add a clear separator comment to help with parsing
+    $klaro_config_content .= "// ===== END OF KLARO CONFIG =====\n\n";
 
     // Add dataLayer push for debugging
     $dataLayer_push = array(

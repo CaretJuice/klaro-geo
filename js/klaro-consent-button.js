@@ -1,85 +1,209 @@
 /**
- * Klaro Consent Button
- * 
- * Handles the creation and functionality of consent buttons
+ * Klaro Geo Consent Button JavaScript Tests
  */
 
-// Function to show the Klaro consent modal
-function showKlaroModal() {
-    console.log('Attempting to show Klaro modal');
+describe('Klaro Consent Button', function() {
+    
+    beforeEach(function() {
+        // Set up the test environment
+        document.body.innerHTML = `
+            <div id="menu-container">
+                <ul id="menu">
+                    <li class="menu-item"><a href="#">Home</a></li>
+                    <li class="menu-item"><a href="#">About</a></li>
+                    <li class="menu-item"><a href="#" class="open-klaro-modal">Manage Consent Settings</a></li>
+                </ul>
+            </div>
+        `;
 
-    // Try multiple ways to show the Klaro modal
-    if (typeof window.klaro !== 'undefined' && typeof window.klaro.show === 'function') {
-        console.log('Using window.klaro.show()');
-        window.klaro.show();
-    } else if (typeof window.klaroManager !== 'undefined' && typeof window.klaroManager.show === 'function') {
-        console.log('Using window.klaroManager.show()');
-        window.klaroManager.show();
-    } else if (typeof window.klaroApi !== 'undefined' && typeof window.klaroApi.openConsentManager === 'function') {
-        console.log('Using window.klaroApi.openConsentManager()');
-        window.klaroApi.openConsentManager();
-    } else {
-        console.error('Klaro is not loaded or available. Checking for config...');
+        // Mock Klaro object
+        window.klaro = {
+            show: jest.fn()
+        };
 
-        // If Klaro isn't loaded but config is, try to manually trigger it
-        if (typeof window.klaroConfig !== 'undefined') {
-            console.log('Config found, attempting to manually initialize Klaro');
-
-            // Create a script element to reload Klaro
-            const script = document.createElement('script');
-            script.setAttribute('defer', '');
-            script.setAttribute('data-config', 'klaroConfig');
-            script.setAttribute('src', 'https://cdn.kiprotect.com/klaro/v' +
-                (window.klaroVersion || '0.7') + '/klaro.js');
-
-            // Add event listener to show the modal once loaded
-            script.onload = function() {
-                console.log('Klaro script loaded, attempting to show modal');
-                if (typeof window.klaro !== 'undefined' && typeof window.klaro.show === 'function') {
-                    window.klaro.show();
-                }
+        // Clear any previous module cache
+        jest.resetModules();
+    });
+    
+    afterEach(function() {
+        // Clean up
+        document.body.innerHTML = '';
+        jest.clearAllMocks();
+        delete window.klaro;
+        delete global.jQuery;
+        delete global.$;
+        delete global.clickHandler;
+    });
+    
+    test('should register click handler for open-klaro-modal class', function() {
+        // Create a completely new jQuery mock that tracks the document.on call
+        let onCalled = false;
+        let onEvent = '';
+        let onSelector = '';
+        
+        // Create a new jQuery mock
+        global.$ = global.jQuery = function(selector) {
+            if (selector === document) {
+                return {
+                    ready: function(callback) {
+                        callback();
+                        return this;
+                    },
+                    on: function(event, selector, handler) {
+                        onCalled = true;
+                        onEvent = event;
+                        onSelector = selector;
+                        global.clickHandler = handler;
+                        return this;
+                    }
+                };
+            }
+            
+            // Default object with common methods
+            return {
+                ready: function(callback) {
+                    if (callback) callback();
+                    return this;
+                },
+                on: function() { return this; }
             };
-
-            document.body.appendChild(script);
-        } else {
-            console.error('Klaro config not found');
-        }
-    }
-}
-
-// Function to initialize the consent buttons
-function initConsentButtons() {
-    // Get all consent buttons and attach click event
-    const consentButtons = document.querySelectorAll('.klaro-consent-button, .klaro-menu-consent-button');
-    consentButtons.forEach(function(button) {
-        button.addEventListener('click', function(e) {
-            e.preventDefault();
-            showKlaroModal();
-        });
+        };
+        
+        // Load the script
+        require('../../js/klaro-consent-button.js');
+        
+        // The on method should be called with click and .open-klaro-modal
+        expect(onCalled).toBe(true);
+        expect(onEvent).toBe('click');
+        expect(onSelector).toBe('.open-klaro-modal');
     });
 
-    // Create and append the floating button if enabled
-    if (window.klaroConsentButtonData && window.klaroConsentButtonData.floatingButtonEnabled) {
-        const floatingButton = document.createElement('button');
-        floatingButton.className = 'klaro-consent-button ' + window.klaroConsentButtonData.theme;
-        floatingButton.textContent = window.klaroConsentButtonData.buttonText;
-        floatingButton.addEventListener('click', showKlaroModal);
-        document.body.appendChild(floatingButton);
-    }
-}
+    test('should show Klaro modal when open-klaro-modal link is clicked', function() {
+        // Create a jQuery mock that stores the click handler
+        global.$ = global.jQuery = function(selector) {
+            if (selector === document) {
+                return {
+                    ready: function(callback) {
+                        callback();
+                        return this;
+                    },
+                    on: function(event, selector, handler) {
+                        global.clickHandler = handler;
+                        return this;
+                    }
+                };
+            }
+            return {
+                ready: function(callback) { if (callback) callback(); return this; },
+                on: function() { return this; }
+            };
+        };
+        
+        // Load the script
+        require('../../js/klaro-consent-button.js');
+        
+        // Create a mock event
+        const mockEvent = {
+            preventDefault: jest.fn()
+        };
+        
+        // Call the click handler
+        global.clickHandler(mockEvent);
+        
+        // preventDefault should be called
+        expect(mockEvent.preventDefault).toHaveBeenCalled();
+        
+        // Klaro.show should be called
+        expect(window.klaro.show).toHaveBeenCalled();
+    });
 
-// Initialize on DOMContentLoaded
-document.addEventListener('DOMContentLoaded', initConsentButtons);
+    test('should handle case when Klaro is not loaded', function() {
+        // Remove Klaro object
+        delete window.klaro;
+        
+        // Create a jQuery mock that stores the click handler
+        global.$ = global.jQuery = function(selector) {
+            if (selector === document) {
+                return {
+                    ready: function(callback) {
+                        callback();
+                        return this;
+                    },
+                    on: function(event, selector, handler) {
+                        global.clickHandler = handler;
+                        return this;
+                    }
+                };
+            }
+            return {
+                ready: function(callback) { if (callback) callback(); return this; },
+                on: function() { return this; }
+            };
+        };
+        
+        // Mock console.error
+        console.error = jest.fn();
+        
+        // Load the script
+        require('../../js/klaro-consent-button.js');
+        
+        // Create a mock event
+        const mockEvent = {
+            preventDefault: jest.fn()
+        };
+        
+        // Call the click handler
+        global.clickHandler(mockEvent);
+        
+        // preventDefault should be called
+        expect(mockEvent.preventDefault).toHaveBeenCalled();
+        
+        // Console.error should be called
+        expect(console.error).toHaveBeenCalledWith('Klaro is not initialized or show() function is missing.');
+    });
 
-// Export functions for testing
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        showKlaroModal,
-        initConsentButtons
-    };
-}
-
-// Auto-initialize in test environment
-if (typeof jest !== 'undefined' && typeof window !== 'undefined' && window.klaroConsentButtonData) {
-    initConsentButtons();
-}
+    test('should handle case when Klaro is loaded but show method is missing', function() {
+        // Set up Klaro without show method
+        window.klaro = {};
+        
+        // Create a jQuery mock that stores the click handler
+        global.$ = global.jQuery = function(selector) {
+            if (selector === document) {
+                return {
+                    ready: function(callback) {
+                        callback();
+                        return this;
+                    },
+                    on: function(event, selector, handler) {
+                        global.clickHandler = handler;
+                        return this;
+                    }
+                };
+            }
+            return {
+                ready: function(callback) { if (callback) callback(); return this; },
+                on: function() { return this; }
+            };
+        };
+        
+        // Mock console.error
+        console.error = jest.fn();
+        
+        // Load the script
+        require('../../js/klaro-consent-button.js');
+        
+        // Create a mock event
+        const mockEvent = {
+            preventDefault: jest.fn()
+        };
+        
+        // Call the click handler
+        global.clickHandler(mockEvent);
+        
+        // preventDefault should be called
+        expect(mockEvent.preventDefault).toHaveBeenCalled();
+        
+        // Console.error should be called
+        expect(console.error).toHaveBeenCalledWith('Klaro is not initialized or show() function is missing.');
+    });
+});

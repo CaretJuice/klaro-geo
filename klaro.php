@@ -68,6 +68,11 @@ if (!isset($GLOBALS['default_services'])) {
 
 if (is_admin() || (defined('WP_TESTS_DOMAIN') && WP_TESTS_DOMAIN)) {
     require_once plugin_dir_path(__FILE__) . 'includes/klaro-admin.php';
+
+    // Include tests in admin only
+    if (isset($_GET['klaro_geo_run_tests']) || isset($_GET['page']) && $_GET['page'] === 'klaro-geo-tests') {
+        require_once plugin_dir_path(__FILE__) . 'includes/klaro-tests.php';
+    }
 }
 require_once plugin_dir_path(__FILE__) . 'includes/klaro-config.php';
 require_once plugin_dir_path(__FILE__) . 'includes/klaro-geoip.php';
@@ -408,11 +413,10 @@ add_filter('sanitize_option_klaro_geo_debug_geo', 'klaro_geo_sanitize_debug_geo'
 register_activation_hook(__FILE__, 'klaro_geo_create_templates');
 
 function klaro_geo_create_templates() {
-    $existing_templates = get_option('klaro_geo_templates');
-    if (!empty($existing_templates)) {
-        return;
-    }
+    // Get existing templates
+    $existing_templates = get_option('klaro_geo_templates', array());
 
+    // Always ensure the default template exists and has the correct name
     $default_template = array(
         'name' => 'Default Template',
         'inherit_from' => 'none',
@@ -459,7 +463,19 @@ function klaro_geo_create_templates() {
         )
     );
 
-    update_option('klaro_geo_templates', array('default' => $default_template));
+    // If templates exist but default is missing or has no name, fix it
+    if (!empty($existing_templates)) {
+        if (!isset($existing_templates['default']) || !isset($existing_templates['default']['name'])) {
+            $existing_templates['default'] = $default_template;
+            update_option('klaro_geo_templates', $existing_templates);
+        } else if ($existing_templates['default']['name'] !== 'Default Template') {
+            $existing_templates['default']['name'] = 'Default Template';
+            update_option('klaro_geo_templates', $existing_templates);
+        }
+    } else {
+        // No templates exist, create the default one
+        update_option('klaro_geo_templates', array('default' => $default_template));
+    }
 }
 
 
@@ -524,6 +540,9 @@ function klaro_geo_validate_services() {
     // Return decoded services
     return $services;
 }
+
+// Add action to validate services on init
+add_action('init', 'klaro_geo_validate_services');
 
 
 function klaro_geo_get_user_location() {

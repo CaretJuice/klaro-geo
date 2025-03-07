@@ -1,0 +1,108 @@
+/**
+ * Styles for Klaro Geo translations interface
+ */
+
+/* Tabs container */
+.translations-container {
+    margin-top: 20px;
+    border: 1px solid #ddd;
+    background: #fff;
+}
+
+/* Tabs navigation */
+.translations-tabs-nav {
+    display: flex;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    background: #f7f7f7;
+    border-bottom: 1px solid #ddd;
+}
+
+.translations-tabs-nav li {
+    margin: 0;
+}
+
+.translations-tabs-nav li a {
+    display: block;
+    padding: 10px 15px;
+    text-decoration: none;
+    color: #555;
+    font-weight: 500;
+    border-right: 1px solid #ddd;
+}
+
+.translations-tabs-nav li a:hover,
+.translations-tabs-nav li a:focus {
+    background: #fafafa;
+    color: #23282d;
+}
+
+.translations-tabs-nav li a.ui-tabs-active {
+    background: #fff;
+    color: #0073aa;
+    border-bottom: 2px solid #0073aa;
+    margin-bottom: -1px;
+}
+
+/* Tab content */
+.translation-tab {
+    padding: 20px;
+}
+
+.translation-tab h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+/* Highlight the fallback tab */
+#tab-zz h4,
+#service-tab-zz h4 {
+    color: #d54e21;
+}
+
+#tab-zz .description,
+#service-tab-zz .description {
+    color: #d54e21;
+    font-style: italic;
+}
+
+/* Add language tab */
+#tab-add,
+#service-tab-add {
+    background: #fafafa;
+}
+
+/* Form elements in tabs */
+.translation-tab .form-table th {
+    width: 200px;
+}
+
+.translation-tab input[type="text"],
+.translation-tab textarea {
+    width: 100%;
+}
+
+/* Responsive adjustments */
+@media screen and (max-width: 782px) {
+    .translations-tabs-nav {
+        flex-wrap: wrap;
+    }
+    
+    .translations-tabs-nav li {
+        flex: 1 0 33.33%;
+    }
+    
+    .translations-tabs-nav li a {
+        text-align: center;
+        padding: 8px 5px;
+        font-size: 12px;
+    }
+    
+    .translation-tab .form-table th {
+        width: 100%;
+        display: block;
+    }
+}

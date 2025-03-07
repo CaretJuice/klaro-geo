@@ -93,15 +93,19 @@ If you wanted to only allow consent by purpose without individual service option
 
 ## WordPress Menu Integration
 
-You can add a consent management button to any WordPress menu:
+You can add a consent management button to any WordPress menu using a custom link:
 
 1. Go to **Appearance > Menus** in your WordPress admin
 2. Create a new menu or edit an existing one
-3. Look for the "Klaro Consent Button" box in the left sidebar (you may need to click "Screen Options" at the top and enable it)
-4. Click "Add Consent Button" to add it to your menu
-5. Save the menu
+3. In the "Custom Links" section, add a link with:
+   - **URL**: # (just a hash symbol)
+   - **Link Text**: "Manage Cookies" or whatever text you prefer
+4. Click "Add to Menu"
+5. Expand the newly added menu item
+6. In the "CSS Classes (optional)" field, add the class `open-klaro-modal`
+7. Save the menu
 
-The button will use the text configured in the Klaro Geo settings.
+When clicked, this menu item will open the Klaro consent management popup, allowing users to update their consent preferences at any time.
 
 ## Customizing Klaro Appearance
 

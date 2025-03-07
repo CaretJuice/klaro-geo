@@ -8,6 +8,100 @@ jQuery(document).ready(function($) {
     // Debug log
     console.log('klaroGeo loaded:', klaroGeo);
 
+    // Function to get language name from code
+    function getLanguageName(langCode) {
+        var langName;
+        switch(langCode) {
+            case 'en': langName = 'English'; break;
+            case 'de': langName = 'German'; break;
+            case 'fr': langName = 'French'; break;
+            case 'es': langName = 'Spanish'; break;
+            case 'it': langName = 'Italian'; break;
+            case 'nl': langName = 'Dutch'; break;
+            case 'pt': langName = 'Portuguese'; break;
+            default: langName = 'Custom'; break;
+        }
+        return langName;
+    }
+
+    // Function to add language tab for service translations
+    function addLanguageTab(langCode) {
+        // Check if this language already exists
+        if ($("#service-tab-" + langCode).length > 0) {
+            return; // Tab already exists
+        }
+
+        var langName = getLanguageName(langCode);
+
+        // Add new tab
+        var newTab = $('<li><a href="#service-tab-' + langCode + '">' + langName + ' (' + langCode + ')</a></li>');
+        newTab.appendTo($(".translations-tabs-nav"));
+
+        // Clone the fallback tab content as a starting point
+        var newContent = $("#service-tab-zz").clone();
+        newContent.attr('id', 'service-tab-' + langCode);
+        newContent.find('h4').text(langName + ' Translations (' + langCode + ')');
+
+        // Update all input names and IDs to use the new language code
+        newContent.find('input, textarea').each(function() {
+            var name = $(this).attr('name');
+            var id = $(this).attr('id');
+
+            name = name.replace('[zz]', '[' + langCode + ']');
+            id = id.replace('_zz_', '_' + langCode + '_');
+
+            $(this).attr('name', name);
+            $(this).attr('id', id);
+        });
+
+        // Add the new tab content
+        newContent.appendTo("#service-translations-tabs");
+
+        // Refresh tabs
+        $("#service-translations-tabs").tabs("refresh");
+    }
+
+    // Initialize translation tabs
+    $("#service-translations-tabs").tabs();
+
+    // Function to load languages from templates
+    function loadLanguagesFromTemplates() {
+        console.log('Loading languages from templates...');
+
+        if (typeof window.klaroTemplates === 'undefined') {
+            console.error('klaroTemplates not defined');
+            return;
+        }
+
+        // Extract all language codes from templates
+        var languageCodes = new Set(['zz']); // Always include fallback
+
+        Object.values(window.klaroTemplates).forEach(function(template) {
+            if (template.config && template.config.translations) {
+                Object.keys(template.config.translations).forEach(function(langCode) {
+                    if (langCode !== 'zz') { // Skip fallback as we already have it
+                        languageCodes.add(langCode);
+                    }
+                });
+            }
+        });
+
+        console.log('Found languages in templates:', Array.from(languageCodes));
+
+        // Add tabs for each language
+        languageCodes.forEach(function(langCode) {
+            if (langCode !== 'zz') { // Skip fallback as we already have it
+                addLanguageTab(langCode);
+            }
+        });
+    }
+
+    // Load languages from templates
+    loadLanguagesFromTemplates();
+
+    // Make the function available globally for debugging
+    window.loadLanguagesFromTemplates = loadLanguagesFromTemplates;
+
     // Populate purposes checkboxes
     function populatePurposes() {
         var container = $('#service_purposes_container');
@@ -37,6 +131,11 @@ jQuery(document).ready(function($) {
         // Clear cookies
         $('.cookie-group').remove();
         
+        // Clear advanced settings
+        $('#service_optout').prop('checked', false);
+        $('#service_onlyonce').prop('checked', false);
+        $('#service_contextual').prop('checked', false);
+
         // Clear callback scripts
         $('#service_oninit').val('');
         $('#service_onaccept').val('');
@@ -88,11 +187,53 @@ jQuery(document).ready(function($) {
             });
         }
         
+        // Set advanced settings
+        $('#service_optout').prop('checked', service.optOut === true);
+        $('#service_onlyonce').prop('checked', service.onlyOnce === true);
+        $('#service_contextual').prop('checked', service.contextualConsentOnly === true);
+
         // Set callback scripts
         $('#service_oninit').val(service.onInit || '');
         $('#service_onaccept').val(service.onAccept || '');
         $('#service_ondecline').val(service.onDecline || '');
-        
+
+        // Clear existing translation fields
+        $('input[name^="service_translations"], textarea[name^="service_translations"]').val('');
+
+        // Set translations if they exist
+        if (service.translations) {
+            // Handle existing languages
+            Object.keys(service.translations).forEach(function(langCode) {
+                var langTranslation = service.translations[langCode];
+
+                // No need to skip any language - we want to allow all languages from templates
+
+                // If this is a language we don't have a tab for yet (except zz), create one
+                if (langCode !== 'zz' && !$("#service-tab-" + langCode).length) {
+                    // Use our addLanguageTab function to create the tab
+                    addLanguageTab(langCode);
+                }
+
+                // Set the values for this language
+                $('#service_translations_' + langCode + '_title').val(langTranslation.title || '');
+                $('#service_translations_' + langCode + '_description').val(langTranslation.description || '');
+
+                // Set nested values if they exist
+                if (langTranslation.optOut) {
+                    $('#service_translations_' + langCode + '_optOut_title').val(langTranslation.optOut.title || '(opt-out)');
+                    $('#service_translations_' + langCode + '_optOut_description').val(langTranslation.optOut.description || 'This services is loaded by default (but you can opt out)');
+                }
+
+                if (langTranslation.required) {
+                    $('#service_translations_' + langCode + '_required_title').val(langTranslation.required.title || '(always required)');
+                    $('#service_translations_' + langCode + '_required_description').val(langTranslation.required.description || 'This services is always required');
+                }
+
+                $('#service_translations_' + langCode + '_purpose').val(langTranslation.purpose || 'purpose');
+                $('#service_translations_' + langCode + '_purposes').val(langTranslation.purposes || 'purposes');
+            });
+        }
+
         // Show the form
         $('#service-form-container').show();
     });
@@ -184,11 +325,82 @@ jQuery(document).ready(function($) {
             }
         });
         
+        // Get advanced settings
+        var optOut = $('#service_optout').prop('checked');
+        var onlyOnce = $('#service_onlyonce').prop('checked');
+        var contextualConsentOnly = $('#service_contextual').prop('checked');
+
         // Get callback scripts
         var onInit = $('#service_oninit').val();
         var onAccept = $('#service_onaccept').val();
         var onDecline = $('#service_ondecline').val();
-        
+
+        // Collect translations
+        var translations = {};
+        var hasTranslations = false;
+
+        // Get all language tabs
+        $("#service-translations-tabs .translation-tab").each(function() {
+            var tabId = $(this).attr('id');
+            if (!tabId || tabId === 'service-tab-add') return; // Skip the "Add Language" tab
+
+            var langCode = tabId.replace('service-tab-', '');
+            var langTranslation = {};
+
+            // Get basic fields
+            var title = $('#service_translations_' + langCode + '_title').val();
+            var description = $('#service_translations_' + langCode + '_description').val();
+
+            if (title || description) {
+                langTranslation.title = title;
+                langTranslation.description = description;
+                hasTranslations = true;
+            }
+
+            // Get opt-out fields
+            var optOutTitle = $('#service_translations_' + langCode + '_optOut_title').val();
+            var optOutDescription = $('#service_translations_' + langCode + '_optOut_description').val();
+
+            if (optOutTitle || optOutDescription) {
+                langTranslation.optOut = {
+                    title: optOutTitle,
+                    description: optOutDescription
+                };
+                hasTranslations = true;
+            }
+
+            // Get required fields
+            var requiredTitle = $('#service_translations_' + langCode + '_required_title').val();
+            var requiredDescription = $('#service_translations_' + langCode + '_required_description').val();
+
+            if (requiredTitle || requiredDescription) {
+                langTranslation.required = {
+                    title: requiredTitle,
+                    description: requiredDescription
+                };
+                hasTranslations = true;
+            }
+
+            // Get purpose fields
+            var purpose = $('#service_translations_' + langCode + '_purpose').val();
+            var purposes = $('#service_translations_' + langCode + '_purposes').val();
+
+            if (purpose) {
+                langTranslation.purpose = purpose;
+                hasTranslations = true;
+            }
+
+            if (purposes) {
+                langTranslation.purposes = purposes;
+                hasTranslations = true;
+            }
+
+            // Add this language to translations if it has any values
+            if (Object.keys(langTranslation).length > 0) {
+                translations[langCode] = langTranslation;
+            }
+        });
+
         // Create service object
         var service = {
             name: name,
@@ -200,6 +412,16 @@ jQuery(document).ready(function($) {
             onAccept: onAccept,
             onDecline: onDecline
         };
+
+        // Add translations if we have any
+        if (hasTranslations) {
+            service.translations = translations;
+        }
+
+        // Add optional fields only if they're true
+        if (optOut) service.optOut = true;
+        if (onlyOnce) service.onlyOnce = true;
+        if (contextualConsentOnly) service.contextualConsentOnly = true;
         
         // Update or add service
         if (index !== '') {

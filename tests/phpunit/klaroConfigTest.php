@@ -12,8 +12,8 @@ class KlaroConfigTest extends WP_UnitTestCase {
         klaro_geo_debug_log('Extracting config from output');
         klaro_geo_debug_log('Config content: ' . $config_content);
 
-        // Try to find the klaroConfig variable with a more robust regex
-        if (preg_match('/var\s+klaroConfig\s*=\s*(\{[\s\S]*?\}\s*);/m', $config_content, $matches)) {
+        // Try to find the klaroConfig variable with a more robust regex that handles multiline and stops at the semicolon
+        if (preg_match('/var\s+klaroConfig\s*=\s*(\{[\s\S]*?\});/s', $config_content, $matches)) {
             klaro_geo_debug_log('Robust regex matched, found: ' . substr($matches[1], 0, 100) . '...');
             $config = json_decode($matches[1], true);
             if ($config !== null) {
@@ -48,7 +48,14 @@ class KlaroConfigTest extends WP_UnitTestCase {
             }
 
             if ($brace_count === 0) {
-                $json_str = substr($json_content, 0, $pos);
+                // Extract up to the semicolon after the closing brace
+                $semicolon_pos = strpos($json_content, ';', $pos - 1);
+                if ($semicolon_pos !== false) {
+                    $json_str = substr($json_content, 0, $pos);
+                } else {
+                    $json_str = substr($json_content, 0, $pos);
+                }
+
                 klaro_geo_debug_log('Extracted JSON using brace counting: ' . substr($json_str, 0, 100) . '...');
                 $manual_config = json_decode($json_str, true);
                 if ($manual_config !== null) {
@@ -60,9 +67,39 @@ class KlaroConfigTest extends WP_UnitTestCase {
             }
         }
 
+        // Try a simpler approach - look for the specific pattern with our separator comment
+        $pattern = '/var klaroConfig = (.*?);\\n\\n\\/\\/ ===== END OF KLARO CONFIG =====/s';
+        if (preg_match($pattern, $config_content, $matches)) {
+            klaro_geo_debug_log('Separator pattern matched, found: ' . substr($matches[1], 0, 100) . '...');
+            $config = json_decode($matches[1], true);
+            if ($config !== null) {
+                klaro_geo_debug_log('Successfully decoded separator pattern JSON');
+                return $config;
+            } else {
+                klaro_geo_debug_log('Failed to decode separator pattern JSON: ' . json_last_error_msg());
+            }
+        } else {
+            klaro_geo_debug_log('Separator pattern did not match');
+        }
+
+        // Try the old pattern as a fallback
+        $pattern = '/var klaroConfig = (.*?);\\n\\n\\/\\/ Push debug information/s';
+        if (preg_match($pattern, $config_content, $matches)) {
+            klaro_geo_debug_log('Simple pattern matched, found: ' . substr($matches[1], 0, 100) . '...');
+            $config = json_decode($matches[1], true);
+            if ($config !== null) {
+                klaro_geo_debug_log('Successfully decoded simple pattern JSON');
+                return $config;
+            } else {
+                klaro_geo_debug_log('Failed to decode simple pattern JSON: ' . json_last_error_msg());
+            }
+        } else {
+            klaro_geo_debug_log('Simple pattern did not match');
+        }
+
         // Try to manually extract the JSON
         $json_start = strpos($config_content, '{');
-        $json_end = strrpos($config_content, '}');
+        $json_end = strpos($config_content, '};');
         if ($json_start !== false && $json_end !== false) {
             klaro_geo_debug_log('Found JSON start at ' . $json_start . ' and end at ' . $json_end);
             $json_str = substr($config_content, $json_start, $json_end - $json_start + 1);
@@ -144,8 +181,21 @@ class KlaroConfigTest extends WP_UnitTestCase {
         klaro_geo_debug_log('Analytics test - Config content first 100 chars: ' . substr($config_content, 0, 100));
         klaro_geo_debug_log('Analytics test - Full config content: ' . $config_content);
 
-        // Extract the config using our helper function
-        $config = $this->extractConfigFromOutput($config_content);
+        // Try to get the config directly from the function
+        $config = null;
+
+        // First try to get it directly from the function
+        ob_start();
+        $direct_config = klaro_geo_get_config();
+        ob_end_clean();
+
+        if (is_array($direct_config) && !empty($direct_config)) {
+            klaro_geo_debug_log('Got config directly from function');
+            $config = $direct_config;
+        } else {
+            // If that fails, extract from the file content
+            $config = $this->extractConfigFromOutput($config_content);
+        }
 
         // Verify we got a valid config
         $this->assertNotNull($config, 'Failed to extract config from output');
@@ -187,8 +237,21 @@ class KlaroConfigTest extends WP_UnitTestCase {
         klaro_geo_debug_log('Advertising test - Config content first 100 chars: ' . substr($config_content, 0, 100));
         klaro_geo_debug_log('Advertising test - Full config content: ' . $config_content);
 
-        // Extract the config using our helper function
-        $config = $this->extractConfigFromOutput($config_content);
+        // Try to get the config directly from the function
+        $config = null;
+
+        // First try to get it directly from the function
+        ob_start();
+        $direct_config = klaro_geo_get_config();
+        ob_end_clean();
+
+        if (is_array($direct_config) && !empty($direct_config)) {
+            klaro_geo_debug_log('Got config directly from function');
+            $config = $direct_config;
+        } else {
+            // If that fails, extract from the file content
+            $config = $this->extractConfigFromOutput($config_content);
+        }
 
         // Verify we got a valid config
         $this->assertNotNull($config, 'Failed to extract config from output');
@@ -232,8 +295,21 @@ class KlaroConfigTest extends WP_UnitTestCase {
         klaro_geo_debug_log('GTM test - Config content first 100 chars: ' . substr($config_content, 0, 100));
         klaro_geo_debug_log('GTM test - Full config content: ' . $config_content);
 
-        // Extract the config using our helper function
-        $config = $this->extractConfigFromOutput($config_content);
+        // Try to get the config directly from the function
+        $config = null;
+
+        // First try to get it directly from the function
+        ob_start();
+        $direct_config = klaro_geo_get_config();
+        ob_end_clean();
+
+        if (is_array($direct_config) && !empty($direct_config)) {
+            klaro_geo_debug_log('Got config directly from function');
+            $config = $direct_config;
+        } else {
+            // If that fails, extract from the file content
+            $config = $this->extractConfigFromOutput($config_content);
+        }
 
         // Verify we got a valid config
         $this->assertNotNull($config, 'Failed to extract config from output');

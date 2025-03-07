@@ -105,6 +105,25 @@ cd /var/www/html/wp-content/plugins/klaro-geo
 echo "Checking directory contents and permissions:"
 ls -la /var/www/html/wp-content/plugins/klaro-geo
 
+# Install Composer dependencies if they don't exist
+if [ ! -f "/var/www/html/wp-content/plugins/klaro-geo/vendor/autoload.php" ]; then
+  echo "Installing Composer dependencies..."
+  cd /var/www/html/wp-content/plugins/klaro-geo
+  composer install --no-interaction
+  # Fix permissions on vendor directory
+  chown -R www-data:www-data /var/www/html/wp-content/plugins/klaro-geo/vendor
+  chmod -R 755 /var/www/html/wp-content/plugins/klaro-geo/vendor
+  echo "Composer dependencies installed successfully"
+fi
+
+# Verify autoload.php exists
+if [ -f "/var/www/html/wp-content/plugins/klaro-geo/vendor/autoload.php" ]; then
+  echo "autoload.php exists"
+else
+  echo "ERROR: autoload.php still missing after composer install"
+  ls -la /var/www/html/wp-content/plugins/klaro-geo/vendor
+fi
+
 # Store the command to execute
 test_command="$@"
 

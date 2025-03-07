@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.test
-    entrypoint: ["/usr/local/bin/docker-entrypoint-test.sh"]  # Use absolute path
+    entrypoint: ["/usr/local/bin/docker-entrypoint-test.sh"]
     user: "root:root"
     command: ["vendor/bin/phpunit", "--configuration", "/var/www/html/wp-content/plugins/klaro-geo/phpunit.xml"]
     tty: true
@@ -22,6 +22,8 @@ services:
         target: /var/www/html/wp-content/plugins/klaro-geo/docker/logs/
         consistency: delegated
       - ./php.ini:/usr/local/etc/php/php.ini
+      # Create a named volume for vendor to persist between runs
+      - klaro_vendor:/var/www/html/wp-content/plugins/klaro-geo/vendor
     environment:
       WORDPRESS_DB_HOST: db_test
       WORDPRESS_DB_NAME: wordpress_test
@@ -40,6 +42,9 @@ services:
     ports:
       - "8000:80"
     user: "root:root"
+    restart: unless-stopped
+    tty: true
+    stdin_open: true
     command: bash -c "
       if [ ! -d /var/www/html/wp-content/plugins/geoip-detect ]; then
         mkdir -p /var/www/html/wp-content/plugins &&
@@ -110,7 +115,8 @@ services:
 
 
 volumes:
-  wordpress_test_data:  
+  wordpress_test_data:
   wordpress_data:
   db_data:
   db_test_data:
+  klaro_vendor:

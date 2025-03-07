@@ -34,7 +34,7 @@ function klaro_geo_admin_scripts($hook) {
             true // Load in footer
         );
     }
-    // Enqueue the CSS file for country settings
+    // Enqueue the CSS files for Klaro Geo admin
     if (strpos($hook, 'klaro-geo') !== false) {
         wp_enqueue_style(
             'klaro-geo-admin',
@@ -42,6 +42,25 @@ function klaro_geo_admin_scripts($hook) {
             array(),
             KLARO_GEO_VERSION
         );
+
+        // Add jQuery UI styles for tabs
+        wp_enqueue_style(
+            'jquery-ui-style',
+            'https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css',
+            array(),
+            '1.12.1'
+        );
+
+        // Add translations CSS
+        wp_enqueue_style(
+            'klaro-geo-translations',
+            plugins_url('../css/klaro-geo-translations.css', __FILE__),
+            array('jquery-ui-style'),
+            KLARO_GEO_VERSION
+        );
+
+        // Enqueue jQuery UI tabs
+        wp_enqueue_script('jquery-ui-tabs');
         wp_register_script(
             'klaro-geo-admin',
             plugins_url('js/klaro-geo-admin.js', dirname(__FILE__)),
@@ -804,6 +823,25 @@ function klaro_geo_services_page_content() {
         true
     );
 
+    // Get templates for language detection
+    $templates = get_option('klaro_geo_templates', array());
+
+    // Ensure templates have translations
+    foreach ($templates as $key => $template) {
+        if (!isset($template['config']['translations'])) {
+            $templates[$key]['config']['translations'] = array(
+                'zz' => array(
+                    'consentModal' => array(
+                        'title' => 'Privacy Settings',
+                        'description' => ''
+                    ),
+                    'acceptAll' => 'Accept All',
+                    'declineAll' => 'Decline All'
+                )
+            );
+        }
+    }
+
     wp_localize_script(
         'klaro-geo-services-js',
         'klaroGeo',
@@ -811,8 +849,17 @@ function klaro_geo_services_page_content() {
             'ajaxurl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('klaro_geo_nonce'),
             'purposes' => $purposes,
-            'services' => $services ? $services : []
+            'services' => $services ? $services : [],
+            'templates' => $templates
         )
+    );
+
+    // Also make templates available globally with a unique timestamp to prevent caching issues
+    wp_add_inline_script(
+        'klaro-geo-services-js',
+        'window.klaroTemplates = ' . wp_json_encode($templates) . ';' .
+        'window.klaroTemplatesTimestamp = ' . time() . ';',
+        'before'
     );
     ?>
     <div class="wrap">
@@ -827,6 +874,7 @@ function klaro_geo_services_page_content() {
                     <th>Required</th>
                     <th>Default</th>
                     <th>Purposes</th>
+                    <th>Advanced</th>
                     <th>Cookies</th>
                     <th>Callbacks</th>
                     <th>Actions</th>
@@ -836,7 +884,7 @@ function klaro_geo_services_page_content() {
                  <?php
                 if (empty($services)) {
 
-                    echo "<tr><td colspan='7'>No services configured yet.</td></tr>"; // Updated colspan for the new callbacks column
+                    echo "<tr><td colspan='8'>No services configured yet.</td></tr>"; // Updated colspan for the new advanced column
                 } else {
                     foreach ($services as $index => $service) {
                         klaro_geo_debug_log('Processing service in admin loop: ' . print_r($service, true));
@@ -848,7 +896,13 @@ function klaro_geo_services_page_content() {
                         // Handle purposes (ensure it's an array)
                         $purposes = isset($service['purposes']) ? $service['purposes'] : array();
                         $purposes_str = !empty($purposes) && is_array($purposes) ? esc_html(implode(', ', $purposes)) : "N/A";
-                         
+
+                        // Handle advanced settings
+                        $advanced = array();
+                        if (isset($service['optOut']) && $service['optOut']) $advanced[] = 'Opt-Out';
+                        if (isset($service['onlyOnce']) && $service['onlyOnce']) $advanced[] = 'Only Once';
+                        if (isset($service['contextualConsentOnly']) && $service['contextualConsentOnly']) $advanced[] = 'Contextual Only';
+                        $advanced_str = !empty($advanced) ? implode(', ', $advanced) : 'None';
 
                         // Handle cookies
                         $cookies = isset($service['cookies']) ? $service['cookies'] : array();
@@ -868,7 +922,8 @@ function klaro_geo_services_page_content() {
                         echo "<td>" . $name . "</td>"; //Corrected to $name
                         echo "<td>" . $required . "</td>";
                         echo "<td>" . $default . "</td>";
-                        echo "<td>" . $purposes_str . "</td>"; //Corrected output.
+                        echo "<td>" . $purposes_str . "</td>";
+                        echo "<td>" . $advanced_str . "</td>";
                         echo "<td>" . $cookies_str . "</td>";
                         echo "<td>" . $callbacks_str . "</td>";
                         echo "<td>";
@@ -914,6 +969,27 @@ function klaro_geo_services_page_content() {
                 <label for="service_cookies">Cookies:</label><br>
                 <div id="service_cookies_container0"></div>
 
+                <h3>Advanced Settings</h3>
+                <div class="advanced-settings">
+                    <label for="service_optout">
+                        <input type="checkbox" id="service_optout" name="service_optout" value="1">
+                        Opt-Out
+                    </label>
+                    <p class="description">If enabled, this service will be loaded even before the user gives explicit consent. <strong>We strongly advise against this</strong> as it may violate privacy regulations.</p>
+
+                    <label for="service_onlyonce">
+                        <input type="checkbox" id="service_onlyonce" name="service_onlyonce" value="1">
+                        Only Once
+                    </label>
+                    <p class="description">If enabled, the service will only be executed once regardless of how often the user toggles it on and off. This is useful for tracking scripts that would generate new page view events every time they are re-enabled.</p>
+
+                    <label for="service_contextual">
+                        <input type="checkbox" id="service_contextual" name="service_contextual" value="1">
+                        Contextual Consent Only
+                    </label>
+                    <p class="description">If enabled, this service will only be shown in the consent modal when it's actually used on the page (e.g., embedded YouTube videos).</p>
+                </div>
+
                 <h3>Callback Scripts</h3>
                 <div class="callback-scripts">
                     <label for="service_oninit">onInit Script:</label><br>
@@ -927,6 +1003,98 @@ function klaro_geo_services_page_content() {
                     <label for="service_ondecline">onDecline Script:</label><br>
                     <textarea id="service_ondecline" name="service_ondecline" rows="4" cols="50"></textarea>
                     <p class="description">JavaScript to execute when the user declines this service.</p>
+                </div>
+
+                <h3>Service Translations</h3>
+                <div class="translations">
+                    <p class="description">Configure translations for this service. The "zz" language code is used as a fallback for any missing translations.</p>
+                    <p class="description"><strong>Note:</strong> Languages are automatically pulled from the Templates section. To add new languages, please add them in the Templates page first.</p>
+
+                    <div id="service-translations-tabs" class="translations-container">
+                        <ul class="translations-tabs-nav">
+                            <li><a href="#service-tab-zz">Fallback</a></li>
+                            <!-- Additional language tabs will be dynamically added based on templates -->
+                        </ul>
+
+                        <div id="service-tab-zz" class="translation-tab">
+                            <h4>Fallback Translations (zz)</h4>
+                            <p class="description">These translations will be used when a specific language translation is not available.</p>
+
+                            <table class="form-table">
+                                <tr>
+                                    <th scope="row">Title</th>
+                                    <td>
+                                        <input type="text" id="service_translations_zz_title" name="service_translations[zz][title]" class="regular-text">
+                                        <p class="description">The name of the service as displayed to users.</p>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Description</th>
+                                    <td>
+                                        <textarea id="service_translations_zz_description" name="service_translations[zz][description]" rows="4" cols="50" class="large-text"></textarea>
+                                        <p class="description">A description of what this service does and what data it collects.</p>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row" colspan="2"><h4>Opt-Out Message</h4></th>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Title</th>
+                                    <td>
+                                        <input type="text" id="service_translations_zz_optOut_title" name="service_translations[zz][optOut][title]" value="(opt-out)" class="regular-text">
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Description</th>
+                                    <td>
+                                        <input type="text" id="service_translations_zz_optOut_description" name="service_translations[zz][optOut][description]" value="This services is loaded by default (but you can opt out)" class="regular-text">
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row" colspan="2"><h4>Required Message</h4></th>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Title</th>
+                                    <td>
+                                        <input type="text" id="service_translations_zz_required_title" name="service_translations[zz][required][title]" value="(always required)" class="regular-text">
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Description</th>
+                                    <td>
+                                        <input type="text" id="service_translations_zz_required_description" name="service_translations[zz][required][description]" value="This services is always required" class="regular-text">
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row" colspan="2"><h4>Purposes</h4></th>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Purpose (singular)</th>
+                                    <td>
+                                        <input type="text" id="service_translations_zz_purpose" name="service_translations[zz][purpose]" value="purpose" class="regular-text">
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Purposes (plural)</th>
+                                    <td>
+                                        <input type="text" id="service_translations_zz_purposes" name="service_translations[zz][purposes]" value="purposes" class="regular-text">
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <!-- Additional language tabs will be dynamically added here -->
+                    </div>
                 </div>
 
                 <br> <button type="submit" class="button button-primary">Save Service</button>
@@ -1055,8 +1223,6 @@ function klaro_geo_delete_service() {
     wp_die();
 }
 
-// Add action to validate services on init
-add_action('init', 'klaro_geo_validate_services');
 
 
 // Add AJAX handler for template creation
@@ -1123,6 +1289,49 @@ function klaro_geo_templates_page() {
         return;
     }
 
+    // Ensure default template exists and has the correct name
+    klaro_geo_create_templates();
+
+    // Enqueue script to handle template translations
+    wp_enqueue_script(
+        'klaro-geo-template-translations',
+        plugins_url('../js/klaro-geo-template-translations.js', __FILE__),
+        array('jquery', 'jquery-ui-tabs'),
+        time(), // Use time for cache busting during development
+        true
+    );
+
+    // Add custom CSS for the template translations
+    wp_add_inline_style('wp-admin', '
+        .translation-json-buttons {
+            margin-top: 10px;
+            margin-bottom: 10px;
+        }
+        .translation-json-buttons .button {
+            margin-right: 10px;
+        }
+        #translations_json_editor {
+            font-family: monospace;
+            resize: vertical;
+        }
+        .translations-container {
+            margin-bottom: 20px;
+        }
+    ');
+
+    // Get templates for JavaScript
+    $templates = get_option('klaro_geo_templates', array());
+
+    // Pass templates to JavaScript
+    wp_localize_script(
+        'klaro-geo-template-translations',
+        'klaroGeoTemplates',
+        array(
+            'templates' => $templates,
+            'timestamp' => time() // Add timestamp to prevent caching issues
+        )
+    );
+
     // Save template changes
     if (isset($_POST['submit_template'])) {
         check_admin_referer('klaro_geo_template_nonce');
@@ -1134,21 +1343,27 @@ function klaro_geo_templates_page() {
         if (isset($_POST['template_config']) && is_array($_POST['template_config'])) {
             $template_config = array();
 
-            // Process translations_json separately if it exists
+            // Process translations_json if it exists
             if (isset($_POST['template_config']['translations_json'])) {
                 $translations_json = $_POST['template_config']['translations_json'];
-
-                // Store the raw JSON string
-                $template_config['translations_json'] = $translations_json;
 
                 // Try to decode it to use in the config
                 $decoded_translations = json_decode($translations_json, true);
                 if (json_last_error() === JSON_ERROR_NONE && is_array($decoded_translations)) {
                     // If valid JSON, use it for the translations
                     $template_config['translations'] = $decoded_translations;
-                    // Remove from the array so we don't process it again below
-                    unset($_POST['template_config']['translations_json']);
+                } else {
+                    // If invalid JSON, log an error and use the form data instead
+                    klaro_geo_debug_log('Invalid JSON in translations_json: ' . json_last_error_msg());
+
+                    // If we have translations in the form, use those
+                    if (isset($_POST['template_config']['translations']) && is_array($_POST['template_config']['translations'])) {
+                        $template_config['translations'] = $_POST['template_config']['translations'];
+                    }
                 }
+
+                // Remove from the array so we don't process it again below
+                unset($_POST['template_config']['translations_json']);
             }
 
             // Sanitize the rest of the config values
@@ -1215,7 +1430,21 @@ function klaro_geo_templates_page() {
             <?php wp_nonce_field('klaro_geo_template_nonce'); ?>
             
             <select name="current_template" id="template_selector">
-                <?php foreach ($templates as $key => $template) : ?>
+                <?php
+                // Ensure default template is always first in the list
+                if (isset($templates['default'])) {
+                    $default_name = isset($templates['default']['name']) ? $templates['default']['name'] : 'Default Template';
+                    ?>
+                    <option value="default" <?php selected($current_template, 'default'); ?>>
+                        <?php echo esc_html($default_name); ?>
+                    </option>
+                    <?php
+                }
+
+                // Add all other templates
+                foreach ($templates as $key => $template) :
+                    if ($key === 'default') continue; // Skip default as we already added it
+                ?>
                     <option value="<?php echo esc_attr($key); ?>" <?php selected($current_template, $key); ?>>
                         <?php echo esc_html($template['name']); ?>
                     </option>
@@ -1476,92 +1705,521 @@ function klaro_geo_templates_page() {
                         </tr>
                     </table>
 
-                    <h3>Basic Text Settings</h3>
-                    <table class="form-table">
-                        <tr>
-                            <th scope="row">Modal Title</th>
-                            <td>
-                                <input type="text" name="template_config[translations][en][consentModal][title]"
-                                       value="<?php echo esc_attr($current_config['translations']['en']['consentModal']['title'] ?? 'Privacy Settings'); ?>">
-                                <p class="description">The title of the consent modal (English).</p>
-                            </td>
-                        </tr>
-                        <tr>
-                            <th scope="row">Modal Description</th>
-                            <td>
-                                <textarea name="template_config[translations][en][consentModal][description]" rows="4" cols="50"><?php
-                                    echo esc_textarea($current_config['translations']['en']['consentModal']['description'] ?? '');
-                               ?></textarea>
-                               <p class="description">The description text in the consent modal (English).</p>
-                            </td>
-                        </tr>
-                        <tr>
-                            <th scope="row">Accept All Button</th>
-                            <td>
-                                <input type="text" name="template_config[translations][en][acceptAll]"
-                                       value="<?php echo esc_attr($current_config['translations']['en']['acceptAll'] ?? 'Accept All'); ?>">
-                                <p class="description">Text for the "Accept All" button (English).</p>
-                            </td>
-                        </tr>
-                        <tr>
-                            <th scope="row">Decline All Button</th>
-                            <td>
-                                <input type="text" name="template_config[translations][en][declineAll]"
-                                       value="<?php echo esc_attr($current_config['translations']['en']['declineAll'] ?? 'Decline All'); ?>">
-                                <p class="description">Text for the "Decline All" button (English).</p>
-                            </td>
-                        </tr>
-                    </table>
+<!-- Basic Text Settings section removed -->
 
-                    <h3>Advanced Translations (JSON)</h3>
+                    <h3>Translations</h3>
                     <p class="description">
-                        Use this field to add advanced translations for multiple languages. This will override the basic text settings above.
+                        Configure translations for multiple languages. The "zz" language code is used as a fallback for any missing translations.
+                    </p>
+
+                    <div id="translations-tabs" class="translations-container">
+                        <ul class="translations-tabs-nav">
+                            <li><a href="#tab-zz">Fallback</a></li>
+                            <li><a href="#tab-add">+ Add Language</a></li>
+                        </ul>
+
+                        <div id="tab-zz" class="translation-tab">
+                            <h4>Fallback Translations</h4>
+                            <p class="description">These translations will be used when a specific language translation is not available.</p>
+
+                            <table class="form-table">
+                                <tr>
+                                    <th scope="row">Privacy Policy URL</th>
+                                    <td>
+                                        <input type="text" name="template_config[translations][zz][privacyPolicyUrl]"
+                                            value="<?php echo esc_attr($current_config['translations']['zz']['privacyPolicyUrl'] ?? '/privacy'); ?>" class="regular-text">
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Accept All</th>
+                                    <td>
+                                        <input type="text" name="template_config[translations][zz][acceptAll]"
+                                            value="<?php echo esc_attr($current_config['translations']['zz']['acceptAll'] ?? 'Accept all'); ?>" class="regular-text">
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Accept Selected</th>
+                                    <td>
+                                        <input type="text" name="template_config[translations][zz][acceptSelected]"
+                                            value="<?php echo esc_attr($current_config['translations']['zz']['acceptSelected'] ?? 'Accept selected'); ?>" class="regular-text">
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Close</th>
+                                    <td>
+                                        <input type="text" name="template_config[translations][zz][close]"
+                                            value="<?php echo esc_attr($current_config['translations']['zz']['close'] ?? 'Close'); ?>" class="regular-text">
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Decline</th>
+                                    <td>
+                                        <input type="text" name="template_config[translations][zz][decline]"
+                                            value="<?php echo esc_attr($current_config['translations']['zz']['decline'] ?? 'I decline'); ?>" class="regular-text">
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">OK</th>
+                                    <td>
+                                        <input type="text" name="template_config[translations][zz][ok]"
+                                            value="<?php echo esc_attr($current_config['translations']['zz']['ok'] ?? 'That\'s ok'); ?>" class="regular-text">
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Powered By</th>
+                                    <td>
+                                        <input type="text" name="template_config[translations][zz][poweredBy]"
+                                            value="<?php echo esc_attr($current_config['translations']['zz']['poweredBy'] ?? 'Realized with Klaro!'); ?>" class="regular-text">
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Save</th>
+                                    <td>
+                                        <input type="text" name="template_config[translations][zz][save]"
+                                            value="<?php echo esc_attr($current_config['translations']['zz']['save'] ?? 'Save'); ?>" class="regular-text">
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row" colspan="2"><h4>Consent Modal</h4></th>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Title</th>
+                                    <td>
+                                        <input type="text" name="template_config[translations][zz][consentModal][title]"
+                                            value="<?php echo esc_attr($current_config['translations']['zz']['consentModal']['title'] ?? 'Services we would like to use'); ?>" class="regular-text">
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Description</th>
+                                    <td>
+                                        <textarea name="template_config[translations][zz][consentModal][description]" rows="4" cols="50" class="large-text"><?php
+                                            echo esc_textarea($current_config['translations']['zz']['consentModal']['description'] ?? 'Here you can assess and customize the services that we\'d like to use on this website. You\'re in charge! Enable or disable services as you see fit.');
+                                        ?></textarea>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row" colspan="2"><h4>Consent Notice</h4></th>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Title</th>
+                                    <td>
+                                        <input type="text" name="template_config[translations][zz][consentNotice][title]"
+                                            value="<?php echo esc_attr($current_config['translations']['zz']['consentNotice']['title'] ?? 'Cookie Consent'); ?>" class="regular-text">
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Description</th>
+                                    <td>
+                                        <textarea name="template_config[translations][zz][consentNotice][description]" rows="4" cols="50" class="large-text"><?php
+                                            echo esc_textarea($current_config['translations']['zz']['consentNotice']['description'] ?? 'Hi! Could we please enable some additional services for {purposes}? You can always change or withdraw your consent later.');
+                                        ?></textarea>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Change Description</th>
+                                    <td>
+                                        <input type="text" name="template_config[translations][zz][consentNotice][changeDescription]"
+                                            value="<?php echo esc_attr($current_config['translations']['zz']['consentNotice']['changeDescription'] ?? 'There were changes since your last visit, please renew your consent.'); ?>" class="regular-text">
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Learn More</th>
+                                    <td>
+                                        <input type="text" name="template_config[translations][zz][consentNotice][learnMore]"
+                                            value="<?php echo esc_attr($current_config['translations']['zz']['consentNotice']['learnMore'] ?? 'Let me choose'); ?>" class="regular-text">
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row" colspan="2"><h4>Privacy Policy</h4></th>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Name</th>
+                                    <td>
+                                        <input type="text" name="template_config[translations][zz][privacyPolicy][name]"
+                                            value="<?php echo esc_attr($current_config['translations']['zz']['privacyPolicy']['name'] ?? 'privacy policy'); ?>" class="regular-text">
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Text</th>
+                                    <td>
+                                        <input type="text" name="template_config[translations][zz][privacyPolicy][text]"
+                                            value="<?php echo esc_attr($current_config['translations']['zz']['privacyPolicy']['text'] ?? 'To learn more, please read our {privacyPolicy}.'); ?>" class="regular-text">
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row" colspan="2"><h4>Contextual Consent</h4></th>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Accept Always</th>
+                                    <td>
+                                        <input type="text" name="template_config[translations][zz][contextualConsent][acceptAlways]"
+                                            value="<?php echo esc_attr($current_config['translations']['zz']['contextualConsent']['acceptAlways'] ?? 'Always'); ?>" class="regular-text">
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Accept Once</th>
+                                    <td>
+                                        <input type="text" name="template_config[translations][zz][contextualConsent][acceptOnce]"
+                                            value="<?php echo esc_attr($current_config['translations']['zz']['contextualConsent']['acceptOnce'] ?? 'Yes'); ?>" class="regular-text">
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Description</th>
+                                    <td>
+                                        <input type="text" name="template_config[translations][zz][contextualConsent][description]"
+                                            value="<?php echo esc_attr($current_config['translations']['zz']['contextualConsent']['description'] ?? 'Do you want to load external content supplied by {title}?'); ?>" class="regular-text">
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Description Empty Store</th>
+                                    <td>
+                                        <input type="text" name="template_config[translations][zz][contextualConsent][descriptionEmptyStore]"
+                                            value="<?php echo esc_attr($current_config['translations']['zz']['contextualConsent']['descriptionEmptyStore'] ?? 'To agree to this service permanently, you must accept {title} in the {link}.'); ?>" class="regular-text">
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Modal Link Text</th>
+                                    <td>
+                                        <input type="text" name="template_config[translations][zz][contextualConsent][modalLinkText]"
+                                            value="<?php echo esc_attr($current_config['translations']['zz']['contextualConsent']['modalLinkText'] ?? 'Consent Manager'); ?>" class="regular-text">
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row" colspan="2"><h4>Services</h4></th>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Service (singular)</th>
+                                    <td>
+                                        <input type="text" name="template_config[translations][zz][purposeItem][service]"
+                                            value="<?php echo esc_attr($current_config['translations']['zz']['purposeItem']['service'] ?? 'service'); ?>" class="regular-text">
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Services (plural)</th>
+                                    <td>
+                                        <input type="text" name="template_config[translations][zz][purposeItem][services]"
+                                            value="<?php echo esc_attr($current_config['translations']['zz']['purposeItem']['services'] ?? 'services'); ?>" class="regular-text">
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row" colspan="2"><h4>Purposes</h4></th>
+                                </tr>
+
+                                <?php
+                                // Get the purposes from the main settings
+                                $purposes = explode(',', get_option('klaro_geo_purposes', 'functional,analytics,advertising'));
+
+                                // Loop through each purpose and create form fields
+                                foreach ($purposes as $purpose) {
+                                    $purpose_key = sanitize_key($purpose);
+                                    $purpose_title = ucfirst($purpose);
+
+                                    // Default descriptions based on purpose
+                                    $default_description = '';
+                                    switch ($purpose_key) {
+                                        case 'functional':
+                                            $default_description = 'These services are essential for the correct functioning of this website. You cannot disable them here as the service would not work correctly otherwise.';
+                                            break;
+                                        case 'analytics':
+                                            $default_description = 'These services process personal information to help us understand how visitors interact with the website.';
+                                            break;
+                                        case 'advertising':
+                                            $default_description = 'These services process personal information to show you personalized or interest-based advertisements.';
+                                            break;
+                                        default:
+                                            $default_description = 'These services process personal information for ' . $purpose . ' purposes.';
+                                    }
+
+                                    // Title field
+                                    ?>
+                                    <tr>
+                                        <th scope="row"><?php echo esc_html($purpose_title); ?> Title</th>
+                                        <td>
+                                            <input type="text"
+                                                name="template_config[translations][zz][purposes][<?php echo esc_attr($purpose_key); ?>][title]"
+                                                value="<?php echo esc_attr($current_config['translations']['zz']['purposes'][$purpose_key]['title'] ?? $purpose_title); ?>"
+                                                class="regular-text">
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <th scope="row"><?php echo esc_html($purpose_title); ?> Description</th>
+                                        <td>
+                                            <textarea
+                                                name="template_config[translations][zz][purposes][<?php echo esc_attr($purpose_key); ?>][description]"
+                                                rows="3"
+                                                cols="50"
+                                                class="large-text"><?php
+                                                echo esc_textarea($current_config['translations']['zz']['purposes'][$purpose_key]['description'] ?? $default_description);
+                                            ?></textarea>
+                                        </td>
+                                    </tr>
+                                <?php } ?>
+                            </table>
+                        </div>
+
+
+
+                        <div id="tab-add" class="translation-tab">
+                            <h4>Add New Language</h4>
+                            <p>Select a language code to add:</p>
+                            <select id="new-language-code">
+                                <option value="en">English (en)</option>
+                                <option value="de">German (de)</option>
+                                <option value="fr">French (fr)</option>
+                                <option value="es">Spanish (es)</option>
+                                <option value="it">Italian (it)</option>
+                                <option value="nl">Dutch (nl)</option>
+                                <option value="pt">Portuguese (pt)</option>
+                                <option value="custom">Custom...</option>
+                            </select>
+                            <div id="custom-language-code" style="display:none; margin-top: 10px;">
+                                <label for="custom-code">Enter custom language code:</label>
+                                <input type="text" id="custom-code" placeholder="e.g., ja, zh, ru" maxlength="5">
+                            </div>
+                            <button type="button" id="add-language-btn" class="button button-secondary" style="margin-top: 10px;">Add Language</button>
+                        </div>
+                    </div>
+
+                    <h3>Translations JSON</h3>
+                    <p class="description">
+                        Edit translations directly in JSON format or copy/paste between templates.
                         <a href="https://kiprotect.github.io/klaro/annotated/translations/" target="_blank">See documentation</a> for examples.
                     </p>
                     <table class="form-table">
                         <tr>
                             <th scope="row">Translations JSON</th>
                             <td>
-                                <textarea name="template_config[translations_json]" rows="15" cols="80" class="large-text code"><?php
-                                    // If we have a translations_json field, use that
-                                    if (isset($current_config['translations_json'])) {
-                                        echo esc_textarea($current_config['translations_json']);
-                                    }
-                                    // Otherwise, try to convert the existing translations to JSON
-                                    else if (isset($current_config['translations']) && is_array($current_config['translations'])) {
+                                <textarea id="translations_json_editor" name="template_config[translations_json]" rows="15" cols="80" class="large-text code"><?php
+                                    // Always convert the existing translations to JSON
+                                    if (isset($current_config['translations']) && is_array($current_config['translations'])) {
                                         echo esc_textarea(wp_json_encode($current_config['translations'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+                                    } else {
+                                        echo '{}';
                                     }
                                 ?></textarea>
+                                <div class="translation-json-buttons">
+                                    <button type="button" id="update_from_json" class="button">Update Form from JSON</button>
+                                    <button type="button" id="update_to_json" class="button">Update JSON from Form</button>
+                                </div>
                                 <p class="description">
-                                    Enter translations in JSON format. Example:<br>
-<pre>{
-  "zz": {
-    "privacyPolicyUrl": "/privacy"
-  },
-  "en": {
-    "privacyPolicyUrl": "/privacy",
-    "consentModal": {
-      "title": "Privacy Settings",
-      "description": "Here you can see and customize the information that we collect about you."
-    },
-    "purposes": {
-      "analytics": {
-        "title": "Analytics"
-      }
-    }
-  },
-  "de": {
-    "privacyPolicyUrl": "/datenschutz",
-    "consentModal": {
-      "title": "Datenschutz-Einstellungen",
-      "description": "Hier können Sie einsehen und anpassen, welche Information wir über Sie sammeln."
-    }
-  }
-}</pre>
+                                    Changes in the form fields will automatically update this JSON. You can also paste JSON here and click "Update Form from JSON" to update the form fields.
                                 </p>
                             </td>
                         </tr>
-                    </table>                
+                    </table>
+
+                    <script>
+                    jQuery(document).ready(function($) {
+                        // Initialize tabs
+                        $("#translations-tabs").tabs();
+
+                        // Load existing languages from the template
+                        function loadExistingLanguages() {
+                            <?php
+                            // Get current template
+                            $current_template = isset($_GET['template']) ? sanitize_text_field($_GET['template']) : 'default';
+                            $templates = get_option('klaro_geo_templates', array());
+
+                            if (isset($templates[$current_template]) &&
+                                isset($templates[$current_template]['config']) &&
+                                isset($templates[$current_template]['config']['translations'])) {
+
+                                $translations = $templates[$current_template]['config']['translations'];
+
+                                // Output JavaScript to add tabs for each language
+                                foreach ($translations as $lang_code => $translation) {
+                                    // Skip fallback language as it already exists
+                                    if ($lang_code === 'zz') continue;
+
+                                    // Get language name
+                                    $lang_names = array(
+                                        'en' => 'English',
+                                        'de' => 'German',
+                                        'fr' => 'French',
+                                        'es' => 'Spanish',
+                                        'it' => 'Italian',
+                                        'nl' => 'Dutch',
+                                        'pt' => 'Portuguese'
+                                    );
+
+                                    $lang_name = isset($lang_names[$lang_code]) ? $lang_names[$lang_code] : 'Custom';
+
+                                    echo "addLanguageTab('$lang_code', '$lang_name');\n";
+                                }
+                            }
+                            ?>
+                        }
+
+                        // Function to add a language tab
+                        function addLanguageTab(langCode, langName) {
+                            // Check if this language already exists
+                            if ($("#tab-" + langCode).length > 0) {
+                                return; // Tab already exists
+                            }
+
+                            // Add new tab
+                            var newTab = $('<li><a href="#tab-' + langCode + '">' + langName + ' (' + langCode + ')</a></li>');
+                            newTab.insertBefore($(".translations-tabs-nav li:last"));
+
+                            // Clone the fallback tab content as a starting point
+                            var newContent = $("#tab-zz").clone();
+                            newContent.attr('id', 'tab-' + langCode);
+
+                            // Add delete button to the heading
+                            var heading = newContent.find('h4');
+                            heading.text(langName + ' Translations (' + langCode + ')');
+                            heading.append(' <button type="button" class="button button-small delete-language-btn" data-lang="' + langCode + '">Delete Language</button>');
+
+                            // Update all input names to use the new language code
+                            newContent.find('input, textarea').each(function() {
+                                var name = $(this).attr('name');
+                                name = name.replace('[zz]', '[' + langCode + ']');
+                                $(this).attr('name', name);
+                            });
+
+                            // Add the new tab content
+                            newContent.appendTo("#translations-tabs");
+
+                            // Refresh tabs
+                            $("#translations-tabs").tabs("refresh");
+                        }
+
+                        // Make the function available globally
+                        window.addLanguageTab = addLanguageTab;
+
+                        // Load existing languages
+                        loadExistingLanguages();
+
+                        // Handle custom language code selection
+                        $("#new-language-code").change(function() {
+                            if ($(this).val() === 'custom') {
+                                $("#custom-language-code").show();
+                            } else {
+                                $("#custom-language-code").hide();
+                            }
+                        });
+
+                        // Handle adding a new language
+                        $("#add-language-btn").click(function() {
+                            var langCode;
+                            if ($("#new-language-code").val() === 'custom') {
+                                langCode = $("#custom-code").val().trim().toLowerCase();
+                                if (!langCode || langCode.length > 5) {
+                                    alert("Please enter a valid language code (1-5 characters)");
+                                    return;
+                                }
+                            } else {
+                                langCode = $("#new-language-code").val();
+                            }
+
+                            // Check if this language already exists
+                            if ($("#tab-" + langCode).length > 0) {
+                                alert("This language is already added");
+                                return;
+                            }
+
+                            // Get language name
+                            var langName;
+                            switch(langCode) {
+                                case 'en': langName = 'English'; break;
+                                case 'de': langName = 'German'; break;
+                                case 'fr': langName = 'French'; break;
+                                case 'es': langName = 'Spanish'; break;
+                                case 'it': langName = 'Italian'; break;
+                                case 'nl': langName = 'Dutch'; break;
+                                case 'pt': langName = 'Portuguese'; break;
+                                default: langName = 'Custom'; break;
+                            }
+
+                            // Add new tab with delete button
+                            var newTab = $('<li><a href="#tab-' + langCode + '">' + langName + ' (' + langCode + ')</a></li>');
+                            newTab.insertBefore($(".translations-tabs-nav li:last"));
+
+                            // Clone the fallback tab content as a starting point
+                            var newContent = $("#tab-zz").clone();
+                            newContent.attr('id', 'tab-' + langCode);
+
+                            // Add delete button to the heading
+                            var heading = newContent.find('h4');
+                            heading.text(langName + ' Translations (' + langCode + ')');
+                            heading.append(' <button type="button" class="button button-small delete-language-btn" data-lang="' + langCode + '">Delete Language</button>');
+
+                            // Update all input names to use the new language code
+                            newContent.find('input, textarea').each(function() {
+                                var name = $(this).attr('name');
+                                name = name.replace('[zz]', '[' + langCode + ']');
+                                $(this).attr('name', name);
+                            });
+
+                            // Add the new tab content
+                            newContent.appendTo("#translations-tabs");
+
+                            // Refresh tabs
+                            $("#translations-tabs").tabs("refresh");
+
+                            // Switch to the new tab
+                            $("#translations-tabs").tabs("option", "active", $(".translations-tabs-nav li").length - 2);
+                        });
+
+                        // Handle deleting a language
+                        $(document).on('click', '.delete-language-btn', function(e) {
+                            e.preventDefault();
+                            var langCode = $(this).data('lang');
+
+                            if (confirm('Are you sure you want to delete the ' + langCode + ' language? This action cannot be undone.')) {
+                                // Remove the tab and its content
+                                var tabIndex = $(".translations-tabs-nav a[href='#tab-" + langCode + "']").parent().index();
+                                $("#tab-" + langCode).remove();
+                                $(".translations-tabs-nav li").eq(tabIndex).remove();
+
+                                // Refresh tabs and switch to fallback tab
+                                $("#translations-tabs").tabs("refresh");
+                                $("#translations-tabs").tabs("option", "active", 0);
+                            }
+                        });
+
+                        // Add delete buttons to existing language tabs (except fallback)
+                        $(".translation-tab").each(function() {
+                            var tabId = $(this).attr('id');
+                            if (tabId && tabId !== 'tab-zz' && tabId !== 'tab-add') {
+                                var langCode = tabId.replace('tab-', '');
+                                var heading = $(this).find('h4');
+                                if (!heading.find('.delete-language-btn').length) {
+                                    heading.append(' <button type="button" class="button button-small delete-language-btn" data-lang="' + langCode + '">Delete Language</button>');
+                                }
+                            }
+                        });
+                    });
+                    </script>                
                 </div>
             </div>
             
