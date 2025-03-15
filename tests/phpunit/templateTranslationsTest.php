@@ -11,7 +11,7 @@ defined('ABSPATH') or die('No script kiddies please!');
 /**
  * Test Template Translations
  */
-class Klaro_Geo_Template_Translations_Test {
+class templateTranslationsTest {
     /**
      * Run all tests
      */

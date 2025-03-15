@@ -70,7 +70,7 @@ describe('Klaro Consent Button', function() {
         };
         
         // Load the script
-        require('../../js/klaro-consent-button.js');
+        require('../../js/klaro-geo-consent-button.js');
         
         // The on method should be called with click and .open-klaro-modal
         expect(onCalled).toBe(true);
@@ -100,7 +100,7 @@ describe('Klaro Consent Button', function() {
         };
         
         // Load the script
-        require('../../js/klaro-consent-button.js');
+        require('../../js/klaro-geo-consent-button.js');
         
         // Create a mock event
         const mockEvent = {
@@ -145,7 +145,7 @@ describe('Klaro Consent Button', function() {
         console.error = jest.fn();
         
         // Load the script
-        require('../../js/klaro-consent-button.js');
+        require('../../js/klaro-geo-consent-button.js');
         
         // Create a mock event
         const mockEvent = {
@@ -190,7 +190,7 @@ describe('Klaro Consent Button', function() {
         console.error = jest.fn();
         
         // Load the script
-        require('../../js/klaro-consent-button.js');
+        require('../../js/klaro-geo-consent-button.js');
         
         // Create a mock event
         const mockEvent = {
@@ -205,5 +205,115 @@ describe('Klaro Consent Button', function() {
         
         // Console.error should be called
         expect(console.error).toHaveBeenCalledWith('Klaro is not initialized or show() function is missing.');
+    });
+
+    test('should create floating button when enabled in settings', function() {
+        // Mock klaroGeo object with floating button enabled
+        window.klaroGeo = {
+            enableFloatingButton: true,
+            floatingButtonText: 'Privacy Settings',
+            floatingButtonTheme: 'blue',
+            floatingButtonPosition: 'bottom-right'
+        };
+        
+        // Track DOM elements added
+        let appendedElements = [];
+        
+        // Create jQuery mock
+        global.$ = global.jQuery = function(selector) {
+            if (selector === document) {
+                return {
+                    ready: function(callback) {
+                        callback();
+                        return this;
+                    },
+                    on: function() { return this; }
+                };
+            } else if (selector === 'body') {
+                return {
+                    append: function(element) {
+                        appendedElements.push(element);
+                        return this;
+                    }
+                };
+            } else if (typeof selector === 'object') {
+                return selector;
+            } else if (selector.startsWith('<')) {
+                // Creating a new element
+                const element = {
+                    type: selector.replace(/[<>]/g, ''),
+                    attributes: {},
+                    appendTo: function(target) {
+                        appendedElements.push(this);
+                        return this;
+                    }
+                };
+                return element;
+            }
+            
+            return {
+                ready: function(callback) { if (callback) callback(); return this; },
+                on: function() { return this; }
+            };
+        };
+        
+        // Load the script
+        require('../../js/klaro-geo-consent-button.js');
+        
+        // Check if button was created
+        expect(appendedElements.length).toBeGreaterThan(0);
+        
+        // Find the button element
+        const buttonElement = appendedElements.find(el => 
+            el.attributes && el.attributes.class && 
+            el.attributes.class.includes('klaro-floating-button')
+        );
+        
+        // Verify button properties
+        expect(buttonElement).toBeDefined();
+        expect(buttonElement.attributes.class).toContain('klaro-theme-blue');
+        expect(buttonElement.attributes.class).toContain('klaro-position-bottom-right');
+        expect(buttonElement.attributes.text).toBe('Privacy Settings');
+    });
+
+    test('should not create floating button when disabled in settings', function() {
+        // Mock klaroGeo object with floating button disabled
+        window.klaroGeo = {
+            enableFloatingButton: false
+        };
+        
+        // Track DOM elements added
+        let appendedElements = [];
+        
+        // Create jQuery mock
+        global.$ = global.jQuery = function(selector) {
+            if (selector === document) {
+                return {
+                    ready: function(callback) {
+                        callback();
+                        return this;
+                    },
+                    on: function() { return this; }
+                };
+            } else if (selector === 'body') {
+                return {
+                    append: function(element) {
+                        appendedElements.push(element);
+                        return this;
+                    }
+                };
+            }
+            
+            return {
+                ready: function(callback) { if (callback) callback(); return this; },
+                on: function() { return this; }
+            };
+        };
+        
+        // Load the script
+        require('../../js/klaro-geo-consent-button.js');
+        
+        // Check that no button was created
+        expect(appendedElements.length).toBe(0);
     });
 });

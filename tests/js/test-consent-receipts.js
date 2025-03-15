@@ -61,7 +61,7 @@ describe('Klaro Consent Receipts', function() {
         });
         
         // Load the script and get the exported functions
-        consentModule = require('../../js/klaro-consent-receipts.js');
+        consentModule = require('../../js/klaro-geo-consent-receipts.js');
     });
     
     afterEach(function() {

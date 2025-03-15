@@ -72,7 +72,7 @@ class ConsentReceiptsIntegrationTest extends IgnoreDeprecatedTestCase {
         $footer_output = ob_get_clean();
 
         // Check if the consent receipts script is enqueued
-        $this->assertStringContainsString('klaro-consent-receipts.js', $footer_output, 'Consent receipts script should be enqueued');
+        $this->assertStringContainsString('klaro-geo-consent-receipts.js', $footer_output, 'Consent receipts script should be enqueued');
 
         // Check if the klaroConsentData object is added
         $this->assertStringContainsString('klaroConsentData', $head_output . $footer_output, 'klaroConsentData object should be added');
@@ -223,6 +223,6 @@ class ConsentReceiptsIntegrationTest extends IgnoreDeprecatedTestCase {
         $GLOBALS['wp_filter']['deprecated_function_trigger_error'] = $old_filter;
 
         // Check that the consent receipts script is not enqueued
-        $this->assertStringNotContainsString('klaro-consent-receipts.js', $footer_output, 'Consent receipts script should not be enqueued');
+        $this->assertStringNotContainsString('klaro-geo-consent-receipts.js', $footer_output, 'Consent receipts script should not be enqueued');
     }
 }

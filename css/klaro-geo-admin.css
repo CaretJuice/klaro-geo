@@ -1,23 +1,286 @@
+/**
+ * Admin styles for Klaro Geo
+ */
+
+/* Modal styles */
 .klaro-modal {
-    display: none;
     position: fixed;
-    z-index: 1000;
-    left: 0;
     top: 0;
+    left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0,0,0,0.4);
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 9999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 .klaro-modal-content {
-    background-color: #fefefe;
-    margin: 15% auto;
+    background-color: #fff;
     padding: 20px;
-    border: 1px solid #888;
-    width: 80%;
-    max-width: 600px;
-    max-height: 70vh;
+    border-radius: 5px;
+    max-width: 900px;
+    max-height: 80%;
     overflow-y: auto;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+}
+
+/* Region settings table */
+.region-settings-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.region-settings-table th,
+.region-settings-table td {
+    padding: 8px;
+    text-align: left;
+}
+
+.region-settings-table select.region-template-select {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.region-modal-actions {
+    margin-top: 15px;
+    text-align: right;
+}
+
+.region-modal-actions button {
+    margin-left: 10px;
+}
+
+/* Status messages */
+.saving, .success, .error {
+    margin-top: 10px;
+    padding: 8px;
+    border-radius: 4px;
+}
+
+.saving {
+    background-color: #f8f9fa;
+    border: 1px solid #ddd;
+}
+
+.success {
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+.error {
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+
+/* Form styles */
+.form-table th {
+    width: 200px;
+}
+
+.form-table .description {
+    font-style: italic;
+    color: #666;
+}
+
+/* Tabs */
+.tabs-container {
+    margin-top: 20px;
+}
+
+.ui-tabs-nav {
+    margin: 0;
+    padding: 0;
+    border-bottom: 1px solid #ccc;
+}
+
+.ui-tabs-nav li {
+    display: inline-block;
+    margin: 0;
+    padding: 0;
+}
+
+.ui-tabs-nav li a {
+    display: block;
+    padding: 10px 15px;
+    text-decoration: none;
+    border: 1px solid transparent;
+    border-bottom: none;
+}
+
+.ui-tabs-nav li.ui-tabs-active a {
+    border-color: #ccc;
+    border-bottom-color: #fff;
+    background: #fff;
+    margin-bottom: -1px;
+}
+
+.ui-tabs-panel {
+    padding: 15px;
+    border: 1px solid #ccc;
+    border-top: none;
+}
+
+/* Template creation form */
+.template-creation-form {
+    margin: 20px 0;
+    padding: 15px;
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.template-creation-buttons {
+    margin-top: 15px;
+}
+
+.template-creation-buttons button {
+    margin-right: 10px;
+}
+
+/* Service form */
+#service-form-container {
+    margin-top: 20px;
+    padding: 20px;
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+#service-form label {
+    font-weight: bold;
+    margin-top: 10px;
+    display: block;
+}
+
+#service-form input[type="text"],
+#service-form select,
+#service-form textarea {
+    width: 100%;
+    max-width: 500px;
+}
+
+#service-form .description {
+    font-style: italic;
+    color: #666;
+    margin: 5px 0 15px;
+}
+
+/* Translations */
+.translations-container {
+    margin-top: 20px;
+}
+
+.translations-tabs-nav {
+    margin: 0;
+    padding: 0;
+    border-bottom: 1px solid #ccc;
+}
+
+.translations-tabs-nav li {
+    display: inline-block;
+    margin: 0;
+    padding: 0;
+}
+
+.translations-tabs-nav li a {
+    display: block;
+    padding: 10px 15px;
+    text-decoration: none;
+    border: 1px solid transparent;
+    border-bottom: none;
+}
+
+.translations-tabs-nav li.ui-tabs-active a {
+    border-color: #ccc;
+    border-bottom-color: #fff;
+    background: #fff;
+    margin-bottom: -1px;
+}
+
+.translation-tab {
+    padding: 15px;
+    border: 1px solid #ccc;
+    border-top: none;
+}
+
+/* Country list */
+.country-list {
+    max-height: 400px;
+    overflow-y: auto;
+    margin: 15px 0;
+    padding: 10px;
+    border: 1px solid #ddd;
+    background: #f9f9f9;
+}
+
+.country-item {
+    margin-bottom: 5px;
+}
+
+.modal-actions {
+    margin-top: 15px;
+    text-align: right;
+}
+
+.modal-actions button {
+    margin-left: 10px;
+}
+
+/* Regions list */
+.regions-list {
+    font-size: 12px;
+    color: #666;
+}
+
+.no-regions {
+    font-style: italic;
+    color: #999;
+}
+
+/* Advanced settings toggle */
+.toggle-advanced {
+    margin: 10px 0;
+    cursor: pointer;
+    color: #0073aa;
+    text-decoration: underline;
+}
+
+.advanced-settings {
+    margin-top: 15px;
+    padding: 15px;
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+/* Callback scripts */
+.callback-scripts {
+    margin-top: 15px;
+}
+
+.callback-scripts textarea {
+    font-family: monospace;
+    resize: vertical;
+}
+
+/* JSON editor */
+#translations_json_editor {
+    font-family: monospace;
+    resize: vertical;
+}
+
+.translation-json-buttons {
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+.translation-json-buttons .button {
+    margin-right: 10px;
 }
 
 .country-list {
@@ -97,24 +360,6 @@
     }
 .country-item {
     padding: 5px 0;
-}
-.klaro-modal {
-    display: none;
-    position: fixed;
-    z-index: 1000;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0,0,0,0.4);
-}
-.klaro-modal-content {
-    background-color: #fefefe;
-    margin: 15% auto;
-    padding: 20px;
-    border: 1px solid #888;
-    width: 50%;
-    max-width: 500px;
 }
 .modal-actions {
     margin-top: 20px;

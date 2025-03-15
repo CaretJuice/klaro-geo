@@ -45,17 +45,8 @@ services:
     restart: unless-stopped
     tty: true
     stdin_open: true
-    command: bash -c "
-      if [ ! -d /var/www/html/wp-content/plugins/geoip-detect ]; then
-        mkdir -p /var/www/html/wp-content/plugins &&
-        cd /var/www/html/wp-content/plugins &&
-        curl -L https://downloads.wordpress.org/plugin/geoip-detect.latest-stable.zip -o geoip-detect.zip &&
-        unzip geoip-detect.zip &&
-        rm geoip-detect.zip;
-      fi &&
-      chown -R www-data:www-data /var/www/html/wp-content/plugins/klaro-geo /var/www/html/wp-content/plugins/geoip-detect 2>/dev/null || true &&
-      chmod -R a+w /var/www/html/wp-content/plugins/klaro-geo /var/www/html/wp-content/plugins/geoip-detect &&
-      docker-entrypoint.sh apache2-foreground"
+    # Use a dedicated entrypoint script
+    entrypoint: ["/bin/bash", "-c", "chmod +x /usr/local/bin/docker-entrypoint-wordpress.sh && /usr/local/bin/docker-entrypoint-wordpress.sh"]
     volumes:
       - wordpress_data:/var/www/html
       - type: bind
@@ -66,19 +57,42 @@ services:
         source: ${PWD}/logs
         target: /var/www/html/wp-content/plugins/klaro-geo/docker/logs/
         consistency: delegated
+      - type: bind
+        source: ${PWD}/docker-entrypoint-wordpress.sh
+        target: /usr/local/bin/docker-entrypoint-wordpress.sh
     environment:
       WORDPRESS_DB_HOST: db
       WORDPRESS_DB_USER: wordpress
       WORDPRESS_DB_PASSWORD: wordpress
       WORDPRESS_DB_NAME: wordpress
       WORDPRESS_DEBUG: 1
+      # Increase PHP memory limits
+      PHP_MEMORY_LIMIT: 512M
+      WP_MEMORY_LIMIT: 512M
+      WP_MAX_MEMORY_LIMIT: 512M
       WORDPRESS_CONFIG_EXTRA: |
         define( 'WP_DEBUG', true );
         define( 'WP_DEBUG_LOG', '/var/www/html/wp-content/plugins/klaro-geo/docker/logs/debug_dev.log' );
         define( 'WP_DEBUG_DISPLAY', false );
+        define( 'WP_MEMORY_LIMIT', '512M' );
+        define( 'WP_MAX_MEMORY_LIMIT', '512M' );
     depends_on:
       db:
         condition: service_healthy
+    # Add resource limits to prevent OOM issues
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+    # Add healthcheck to monitor container status
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/wp-admin/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
 
   db_test:

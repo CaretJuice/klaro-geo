@@ -79,9 +79,29 @@ fi
 
 # Make sure wp-content directory is writable
 mkdir -p /var/www/html/wp-content
+chown -R www-data:www-data /var/www/html/wp-content
+
+# Create and set permissions for debug log
 touch /var/www/html/wp-content/debug.log
 chmod 666 /var/www/html/wp-content/debug.log
 chown www-data:www-data /var/www/html/wp-content/debug.log
+
+# Also create a debug log in the root directory (some configurations write here)
+touch /var/www/html/debug.log
+chmod 666 /var/www/html/debug.log
+chown www-data:www-data /var/www/html/debug.log
+
+# Create logs directory in the plugin with proper permissions
+mkdir -p /var/www/html/wp-content/plugins/klaro-geo/docker/logs
+chmod -R 777 /var/www/html/wp-content/plugins/klaro-geo/docker/logs
+chown -R www-data:www-data /var/www/html/wp-content/plugins/klaro-geo/docker/logs
+
+# Print debug information
+echo "Debug log permissions:"
+ls -la /var/www/html/wp-content/debug.log
+ls -la /var/www/html/debug.log
+echo "Logs directory permissions:"
+ls -la /var/www/html/wp-content/plugins/klaro-geo/docker/logs
 
 # Install geoip-detect plugin if it doesn't exist
 if [ ! -d /var/www/html/wp-content/plugins/geoip-detect ]; then
@@ -135,20 +155,62 @@ else
   su -s /bin/bash www-data -c "export PATH=$PATH:/usr/local/bin && $test_command"
 fi
 
-echo "List wp-content before copying debug.log:"
-ls -la /var/www/html/wp-content
-# Copy debug.log after tests finish
-if [ -f /var/www/html/wp-content/debug.log ]; then
-  echo "Debug log found, copying to logs directory..."
-  mkdir -p /var/www/html/wp-content/plugins/klaro-geo/docker/logs/
-  chmod 777 /var/www/html/wp-content
-  cp /var/www/html/wp-content/debug.log /var/www/html/wp-content/plugins/klaro-geo/docker/logs/debug_test.log
-  echo "Debug log copied to /var/www/html/wp-content/plugins/klaro-geo/docker/logs/debug_test.log"
-  # Note: The docker cp command won't work from inside the container
-  # It will be handled by the host when the container exits
+echo "Copying debug logs after test execution..."
+
+# Define the target log file
+TARGET_LOG="/var/www/html/wp-content/plugins/klaro-geo/docker/logs/debug_test.log"
+
+# Create a fresh log file with a header
+echo "=== Klaro Geo Test Logs $(date) ===" > "$TARGET_LOG"
+echo "" >> "$TARGET_LOG"
+
+# Check if the WordPress debug log exists and copy it
+WP_DEBUG_LOG="/var/www/html/wp-content/debug.log"
+if [ -f "$WP_DEBUG_LOG" ]; then
+    echo "Found WordPress debug log at $WP_DEBUG_LOG"
+    echo "=== WordPress Debug Log ===" >> "$TARGET_LOG"
+    cat "$WP_DEBUG_LOG" >> "$TARGET_LOG"
+    echo "" >> "$TARGET_LOG"
+    echo "WordPress debug log copied successfully."
 else
-  echo "No debug.log file found at /var/www/html/wp-content/debug.log"
-  # Create an empty log file if it doesn't exist
-  echo "Creating empty debug log file"
-  echo "Debug log was empty" > /var/www/html/wp-content/plugins/klaro-geo/docker/logs/debug_test.log
+    echo "WARNING: WordPress debug log not found at $WP_DEBUG_LOG"
+    echo "=== WordPress Debug Log Not Found ===" >> "$TARGET_LOG"
+    echo "The debug log file was not found at $WP_DEBUG_LOG" >> "$TARGET_LOG"
+    echo "" >> "$TARGET_LOG"
+fi
+
+# Also check for a debug log in the WordPress root directory
+ROOT_DEBUG_LOG="/var/www/html/debug.log"
+if [ -f "$ROOT_DEBUG_LOG" ]; then
+    echo "Found root debug log at $ROOT_DEBUG_LOG"
+    echo "=== Root Debug Log ===" >> "$TARGET_LOG"
+    cat "$ROOT_DEBUG_LOG" >> "$TARGET_LOG"
+    echo "" >> "$TARGET_LOG"
+    echo "Root debug log copied successfully."
+fi
+
+# Add system information
+echo "=== System Information ===" >> "$TARGET_LOG"
+echo "Date: $(date)" >> "$TARGET_LOG"
+echo "PHP Version: $(php -v | head -n 1)" >> "$TARGET_LOG"
+echo "" >> "$TARGET_LOG"
+
+# Add file permissions information
+echo "=== File Permissions ===" >> "$TARGET_LOG"
+echo "Debug log permissions:" >> "$TARGET_LOG"
+ls -la "$WP_DEBUG_LOG" 2>/dev/null >> "$TARGET_LOG"
+ls -la "$ROOT_DEBUG_LOG" 2>/dev/null >> "$TARGET_LOG"
+echo "" >> "$TARGET_LOG"
+
+# Make sure the target log file has the right permissions
+chmod 666 "$TARGET_LOG"
+chown www-data:www-data "$TARGET_LOG"
+
+echo "Log file saved to $TARGET_LOG"
+
+# Verify the log file exists and has content
+if [ -s "$TARGET_LOG" ]; then
+    echo "Log file created successfully with $(wc -l < "$TARGET_LOG") lines."
+else
+    echo "WARNING: Log file is empty or was not created properly."
 fi

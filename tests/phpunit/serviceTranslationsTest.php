@@ -11,7 +11,7 @@ defined('ABSPATH') or die('No script kiddies please!');
 /**
  * Test Service Translations
  */
-class Klaro_Geo_Service_Translations_Test {
+class serviceTranslationsTest {
     /**
      * Run all tests
      */

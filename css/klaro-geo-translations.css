@@ -1,4 +1,132 @@
 /**
+ * Styles for Klaro Geo translations
+ */
+
+/* Tabs container */
+.translations-container {
+    margin-bottom: 20px;
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+    padding: 20px;
+}
+
+/* Tabs navigation */
+.translations-tabs-nav {
+    margin: 0;
+    padding: 0;
+    border-bottom: 1px solid #ccc;
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.translations-tabs-nav li {
+    margin: 0 0 -1px 0;
+    padding: 0;
+    list-style: none;
+    display: inline-block;
+}
+
+.translations-tabs-nav li a {
+    display: block;
+    padding: 10px 15px;
+    text-decoration: none;
+    color: #555;
+    border: 1px solid transparent;
+    border-bottom: none;
+}
+
+.translations-tabs-nav li a:hover {
+    background-color: #f5f5f5;
+}
+
+.translations-tabs-nav li.ui-tabs-active a {
+    background-color: #fff;
+    border-color: #ccc;
+    border-bottom-color: #fff;
+    color: #000;
+}
+
+/* Tab content */
+.translation-tab {
+    padding: 20px 0;
+}
+
+.translation-tab h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+/* Delete language button */
+.delete-language-btn,
+.delete-service-language-btn {
+    margin-left: 10px !important;
+    color: #a00 !important;
+}
+
+.delete-language-btn:hover,
+.delete-service-language-btn:hover {
+    color: #dc3232 !important;
+}
+
+/* JSON editor */
+#translations_json_editor {
+    font-family: monospace;
+    resize: vertical;
+    width: 100%;
+    min-height: 200px;
+    margin-top: 15px;
+}
+
+/* JSON buttons */
+.translation-json-buttons {
+    margin-top: 20px;
+    margin-bottom: 10px;
+}
+
+.translation-json-buttons .button {
+    margin-right: 10px;
+}
+
+/* Advanced Translations section */
+.advanced-translations-section {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #ddd;
+}
+
+.advanced-translations-section h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+}
+
+/* Form fields */
+.translation-tab .form-table th {
+    width: 200px;
+}
+
+.translation-tab .form-table td input[type="text"],
+.translation-tab .form-table td textarea {
+    width: 100%;
+}
+
+/* Service translations specific styles */
+#service-translations-tabs {
+    margin-top: 15px;
+}
+
+#service-translations-tabs .translation-tab {
+    padding: 15px;
+    background: #f9f9f9;
+    border: 1px solid #e5e5e5;
+    border-top: none;
+}
+
+#service-translations-tabs .form-table th {
+    width: 150px;
+}/**
  * Styles for Klaro Geo translations interface
  */
 

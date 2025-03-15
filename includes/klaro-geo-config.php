@@ -24,9 +24,22 @@ function klaro_geo_generate_config_file() {
     $klaro_config = array();
 
     // Get settings using new nested structure
-    $settings = json_decode(get_option('klaro_geo_settings'), true);
-    if (empty($settings)) {
+    $settings_option = get_option('klaro_geo_country_settings');
+
+    // Check if the option is already an array (not JSON encoded)
+    if (is_array($settings_option)) {
+        $settings = $settings_option;
+        klaro_geo_debug_log('Country settings already an array, no decoding needed');
+    } else {
+        // Try to decode the JSON string
+        $settings = json_decode($settings_option, true);
+        klaro_geo_debug_log('Decoded country settings from JSON string');
+    }
+
+    // If empty or invalid, use default settings
+    if (empty($settings) || !is_array($settings)) {
         $settings = klaro_geo_get_default_geo_settings();
+        klaro_geo_debug_log('Using default geo settings');
     }
 
     // Get user location
@@ -39,7 +52,7 @@ function klaro_geo_generate_config_file() {
     // Get effective settings for the location
     $effective_settings = klaro_geo_get_effective_settings($user_country . ($user_region ? '-' . $user_region : ''));
 
-    // Determine template source
+    // Determine template source for dataLayer
     $template_source = 'fallback';
     if (isset($effective_settings['source'])) {
         $template_source = $effective_settings['source'];
@@ -164,9 +177,7 @@ function klaro_geo_generate_config_file() {
             // Get default values from the function
             $defaults = function_exists('get_klaro_default_values') ? get_klaro_default_values() : array(
                 'gtm_oninit' => 'window.dataLayer = window.dataLayer || []; window.gtag = function() { dataLayer.push(arguments); }; gtag(\'consent\', \'default\', {\'ad_storage\': \'denied\', \'analytics_storage\': \'denied\', \'ad_user_data\': \'denied\', \'ad_personalization\': \'denied\'}); gtag(\'set\', \'ads_data_redaction\', true);',
-                'gtm_onaccept' => 'if (opts.consents.analytics || opts.consents.advertising) { for(let k of Object.keys(opts.consents)){ if (opts.consents[k]){ let eventName = \'klaro-\'+k+\'-accepted\'; dataLayer.push({\'event\': eventName}); } } }',
-                'gtm_ondecline' => ''
-            );
+                'gtm_onaccept' => 'if (opts.consents.analytics || opts.consents.advertising) { for(let k of Object.keys(opts.consents)){ if (opts.consents[k]){ let eventName = \'klaro-\'+k+\'-accepted\'; dataLayer.push({\'event\': eventName}); } } }'            );
 
             klaro_geo_debug_log('Processing GTM settings with default values');
 
@@ -177,10 +188,6 @@ function klaro_geo_generate_config_file() {
 
             if (empty($service_config['onAccept'])) {
                 $service_config['onAccept'] = $defaults['gtm_onaccept'];
-            }
-
-            if (empty($service_config['onDecline'])) {
-                $service_config['onDecline'] = $defaults['gtm_ondecline'];
             }
         }
 

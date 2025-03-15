@@ -3,11 +3,18 @@
 class KlaroGeoSettingsTest extends WP_UnitTestCase {
     public function setUp(): void {
         parent::setUp();
-        delete_option('klaro_geo_settings');
+        delete_option('klaro_geo_country_settings');
     }
 
     public function tearDown(): void {
-        delete_option('klaro_geo_settings');
+        delete_option('klaro_geo_country_settings');
+
+        // Remove the filter if it was added
+        if (isset($this->template_filter_callback)) {
+            remove_filter('klaro_geo_default_templates', $this->template_filter_callback, 10);
+            unset($this->template_filter_callback);
+        }
+
         parent::tearDown();
     }
 
@@ -25,7 +32,7 @@ class KlaroGeoSettingsTest extends WP_UnitTestCase {
                 )
             )
         );
-        update_option('klaro_geo_settings', $test_settings);
+        update_option('klaro_geo_country_settings', wp_json_encode($test_settings));
 
         // Test country settings
         $us_settings = klaro_geo_get_location_settings('US');
@@ -53,7 +60,9 @@ class KlaroGeoSettingsTest extends WP_UnitTestCase {
         $this->assertTrue($result);
 
         // Verify settings were saved correctly
-        $all_settings = get_option('klaro_geo_settings');
+        $all_settings_json = get_option('klaro_geo_country_settings');
+        $all_settings = json_decode($all_settings_json, true); // Decode JSON to array.
+
         $this->assertEquals('us_template', $all_settings['countries']['US']['template']);
         $this->assertEquals('california_template', $all_settings['countries']['US']['regions']['CA']['template']);
     }
@@ -71,7 +80,7 @@ class KlaroGeoSettingsTest extends WP_UnitTestCase {
                 )
             )
         );
-        update_option('klaro_geo_settings', $test_settings);
+        update_option('klaro_geo_country_settings', wp_json_encode($test_settings));
 
         // Test getting regions
         $regions = klaro_geo_get_country_regions('US');
@@ -98,7 +107,7 @@ class KlaroGeoSettingsTest extends WP_UnitTestCase {
                 )
             )
         );
-        update_option('klaro_geo_settings', $test_settings);
+        update_option('klaro_geo_country_settings', wp_json_encode($test_settings));
 
         // Get region settings
         $ca_settings = klaro_geo_get_location_settings('US-CA');
@@ -111,6 +120,32 @@ class KlaroGeoSettingsTest extends WP_UnitTestCase {
     }
 
     public function test_get_effective_settings() {
+        // Add a filter to make our test templates available to the function
+        $filter_callback = function($templates) {
+            // Add our test templates to the list
+            return array_merge($templates, array(
+                'us_template' => array(
+                    'name' => 'US Template',
+                    'config' => array(
+                        'default' => false,
+                        'required' => false
+                    )
+                ),
+                'california_template' => array(
+                    'name' => 'California Template',
+                    'config' => array(
+                        'default' => false,
+                        'required' => false
+                    )
+                )
+            ));
+        };
+
+        // Store the callback for removal in tearDown
+        $this->template_filter_callback = $filter_callback;
+
+        add_filter('klaro_geo_default_templates', $filter_callback, 10, 1);
+
         // Set up test data with inheritance and default template
         $test_settings = array(
             'default_template' => 'default',
@@ -125,18 +160,18 @@ class KlaroGeoSettingsTest extends WP_UnitTestCase {
                 )
             )
         );
-        update_option('klaro_geo_settings', wp_json_encode($test_settings));
+        update_option('klaro_geo_country_settings', wp_json_encode($test_settings));
 
         // Test country settings
         $us_settings = klaro_geo_get_effective_settings('US');
-        $this->assertEquals('us_template', $us_settings['template']);
+        $this->assertEquals('us_template', $us_settings['template'], 'US template should be us_template');
 
         // Test region settings
         $ca_settings = klaro_geo_get_effective_settings('US-CA');
-        $this->assertEquals('california_template', $ca_settings['template']);
+        $this->assertEquals('california_template', $ca_settings['template'], 'California template should be california_template');
 
         // Test non-existent location falls back to defaults
         $default_settings = klaro_geo_get_effective_settings('XX');
-        $this->assertEquals('default', $default_settings['template']);
+        $this->assertEquals('default', $default_settings['template'], 'Default template should be default');
     }
 }

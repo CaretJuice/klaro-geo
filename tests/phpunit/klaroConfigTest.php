@@ -122,10 +122,9 @@ class KlaroConfigTest extends WP_UnitTestCase {
         parent::setUp();
 
         // Include the main plugin file (this is CRUCIAL)
-        require_once(plugin_dir_path(dirname(__DIR__)) . 'klaro.php');
-        require_once(plugin_dir_path(dirname(__DIR__)) . 'includes/klaro-admin.php');
-        require_once(plugin_dir_path(dirname(__DIR__)) . 'includes/klaro-config.php');
-        require_once(plugin_dir_path(dirname(__DIR__)) . 'includes/klaro-defaults.php');
+        require_once(plugin_dir_path(dirname(__DIR__)) . 'klaro-geo.php');
+        require_once(plugin_dir_path(dirname(__DIR__)) . 'includes/klaro-geo-config.php');
+        require_once(plugin_dir_path(dirname(__DIR__)) . 'includes/admin/klaro-geo-admin.php');
 
         // Reset options to defaults and set up the default services
         klaro_geo_activate();
@@ -145,7 +144,7 @@ class KlaroConfigTest extends WP_UnitTestCase {
         update_option('klaro_geo_services', wp_json_encode($default_services));
 
         // Clean up other options
-        delete_option('klaro_geo_settings');
+        delete_option('klaro_geo_country_settings');
         delete_option('klaro_geo_gtm_oninit');
         delete_option('klaro_geo_gtm_onaccept');
         delete_option('klaro_geo_gtm_ondecline');
@@ -332,12 +331,13 @@ class KlaroConfigTest extends WP_UnitTestCase {
         $this->assertNotNull($gtm_service, 'Google Tag Manager service not found');
         $this->assertArrayHasKey('onInit', $gtm_service, 'GTM service does not have onInit key');
         $this->assertArrayHasKey('onAccept', $gtm_service, 'GTM service does not have onAccept key');
-        $this->assertArrayHasKey('onDecline', $gtm_service, 'GTM service does not have onDecline key');
+        // onDecline is no longer included in the default configuration
+        // $this->assertArrayHasKey('onDecline', $gtm_service, 'GTM service does not have onDecline key');
 
         // Instead of checking for exact values, just verify they're not empty
         // since we now use default values from the code
         $this->assertNotEmpty($gtm_service['onInit'], 'GTM onInit script is empty');
         $this->assertNotEmpty($gtm_service['onAccept'], 'GTM onAccept script is empty');
-        // onDecline might be empty, so we don't check it
+        // onDecline is no longer included in the default configuration
     }
 }

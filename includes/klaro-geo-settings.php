@@ -35,7 +35,7 @@ function klaro_geo_save_visible_countries_ajax() {
 
 function klaro_geo_get_location_settings($location_code) {
     klaro_geo_debug_log('Getting location settings for: ' . $location_code);
-    $settings = get_option('klaro_geo_settings', array());
+    $settings = get_option('klaro_geo_country_settings', array());
     if (is_string($settings)) {
         $settings = json_decode($settings, true) ?: array();
     }
@@ -94,8 +94,14 @@ function klaro_geo_get_location_settings($location_code) {
  * @return bool Success status
  */
 function klaro_geo_update_location_settings($location_code, $new_settings) {
-    $settings = get_option('klaro_geo_settings', array());
-    
+    $settings_json = get_option('klaro_geo_country_settings', json_encode(array()));
+    $settings = json_decode($settings_json, true);
+
+    if (!is_array($settings)) { //ensure that we always have an array.
+        $settings = array();
+    }
+
+
     // Split into country and region if region code is provided
     $parts = explode('-', $location_code);
     $country_code = $parts[0];
@@ -129,7 +135,7 @@ function klaro_geo_update_location_settings($location_code, $new_settings) {
         }
     }
     
-    return update_option('klaro_geo_settings', $settings);
+    return update_option('klaro_geo_country_settings', wp_json_encode($settings));
 }
 
 /**
@@ -157,7 +163,7 @@ function klaro_geo_get_country_regions($country_code) {
             return;
         }
     }
-    $settings = get_option('klaro_geo_settings', array());
+    $settings = get_option('klaro_geo_country_settings', array());
     if (!is_array($settings)) {
         $settings = json_decode($settings, true) ?: array();
     }
@@ -240,43 +246,111 @@ function klaro_geo_get_country_regions($country_code) {
 function klaro_geo_get_effective_settings($location_code) {
     klaro_geo_debug_log('Getting effective settings for location: ' . $location_code);
 
-    $settings = klaro_geo_get_location_settings($location_code);
-    klaro_geo_debug_log('Location settings returned: ' . print_r($settings, true));
-    $geo_settings = get_option('klaro_geo_settings', array());
-    klaro_geo_debug_log('Global settings: ' . print_r($geo_settings, true));
-
-    if (is_string($geo_settings)) {
-        $geo_settings = json_decode($geo_settings, true) ?: array();
-    }
-
-    // Default settings
-    $effective_settings = array(
-        'template' => $geo_settings['default_template'] ?? 'default',
-        'fallback_behavior' => $geo_settings['fallback_behavior'] ?? 'default'
-    );
-
     // Split location code to check if it's a region request
     $parts = explode('-', $location_code);
     $country_code = $parts[0];
     $region_code = isset($parts[1]) ? $parts[1] : null;
 
-    // Get country settings
-    $country_settings = isset($geo_settings['countries'][$country_code]) ? $geo_settings['countries'][$country_code] : null;
+    klaro_geo_debug_log('Parsed location - Country: ' . $country_code . ', Region: ' . ($region_code ?? 'none'));
 
-    if ($region_code && $country_settings && isset($country_settings['regions'][$region_code]['template'])) {
-        // If region exists and has a template, use it
-        klaro_geo_debug_log('Using region template');
-        $effective_settings['template'] = $country_settings['regions'][$region_code]['template'];
-    } elseif ($country_settings && isset($country_settings['template'])) {
-        // If no region match but country exists and has template, use country template
-        klaro_geo_debug_log('Using country template');
-        $effective_settings['template'] = $country_settings['template'];
-    } else {
-        // Fall back to default template
-        klaro_geo_debug_log('Using default template');
-        // Default template already set in $effective_settings
+    // Get global settings
+    $geo_settings = get_option('klaro_geo_country_settings', array());
+
+    // If it's a string (JSON encoded), decode it
+    if (is_string($geo_settings)) {
+        $geo_settings = json_decode($geo_settings, true) ?: array();
+        klaro_geo_debug_log('Decoded global settings from JSON');
     }
 
-    klaro_geo_debug_log('Effective settings: ' . print_r($effective_settings, true));
+    klaro_geo_debug_log('Global settings: ' . print_r($geo_settings, true));
+
+    // Default settings
+    $effective_settings = array(
+        'template' => $geo_settings['default_template'] ?? 'default',
+        'fallback_behavior' => $geo_settings['fallback_behavior'] ?? 'default',
+        'source' => 'default' // Track where the template came from
+    );
+
+    // Get visible countries
+    $default_visible_countries = array(
+        // EU countries
+        'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR',
+        'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL',
+        'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE',
+        // Other major countries
+        'US', 'GB', 'BR', 'CA', 'CN', 'IN', 'JP', 'AU', 'KR'
+    );
+    $visible_countries = get_option('klaro_geo_visible_countries', $default_visible_countries);
+
+    // Check if the country is in the visible countries list
+    if (in_array($country_code, $visible_countries)) {
+        // If the country is not in the settings, it means it's using the default template
+        if (!isset($geo_settings[$country_code])) {
+            // Country is using default template
+            klaro_geo_debug_log('Country ' . $country_code . ' not found in settings, using default template');
+            $effective_settings['template'] = $geo_settings['default_template'] ?? 'default';
+            $effective_settings['source'] = 'default';
+        } else {
+            // Country has specific settings
+            klaro_geo_debug_log('Country ' . $country_code . ' found in settings');
+            $effective_settings['template'] = $geo_settings[$country_code]['template'] ?? $effective_settings['template'];
+            $effective_settings['source'] = 'country';
+
+            // Check for region override
+            if ($region_code && isset($geo_settings[$country_code]['regions']) &&
+                isset($geo_settings[$country_code]['regions'][$region_code])) {
+                klaro_geo_debug_log('Region ' . $region_code . ' found in settings');
+                $effective_settings['template'] = $geo_settings[$country_code]['regions'][$region_code];
+                $effective_settings['source'] = 'region';
+            }
+        }
+    }
+
+    // For backward compatibility, also check the old location_settings method
+    $location_settings = klaro_geo_get_location_settings($location_code);
+    klaro_geo_debug_log('Location settings returned: ' . print_r($location_settings, true));
+
+    // If location_settings returned something, use it (it has precedence)
+    if ($location_settings) {
+        if (isset($location_settings['is_region']) && $location_settings['is_region']) {
+            // This is a region, use its template
+            klaro_geo_debug_log('Using region template from location settings');
+            $effective_settings['template'] = $location_settings['template'];
+            $effective_settings['source'] = 'region';
+        } else {
+            // This is a country, use its template
+            klaro_geo_debug_log('Using country template from location settings');
+            $effective_settings['template'] = $location_settings['template'];
+            $effective_settings['source'] = 'country';
+        }
+    }
+
+    // Allow filtering of effective settings before template verification
+    $effective_settings = apply_filters('klaro_geo_effective_settings', $effective_settings);
+
+    // Get the template configuration to verify it exists
+    $templates = klaro_geo_get_default_templates();
+
+    // Allow filtering of templates
+    $templates = apply_filters('klaro_geo_default_templates', $templates);
+
+    if (isset($templates[$effective_settings['template']])) {
+        klaro_geo_debug_log('Template "' . $effective_settings['template'] . '" exists in available templates');
+
+        // Log the default setting for this template
+        $default_setting = isset($templates[$effective_settings['template']]['config']['default']) ?
+            ($templates[$effective_settings['template']]['config']['default'] ? 'true' : 'false') : 'not set';
+        klaro_geo_debug_log('Template "' . $effective_settings['template'] . '" default setting: ' . $default_setting);
+    } else {
+        klaro_geo_debug_log('WARNING: Template "' . $effective_settings['template'] . '" not found in available templates!');
+        klaro_geo_debug_log('Available templates: ' . implode(', ', array_keys($templates)));
+
+        // Fall back to default template if the selected one doesn't exist
+        $effective_settings['template'] = 'default';
+        $effective_settings['source'] = 'fallback';
+        klaro_geo_debug_log('Falling back to default template');
+    }
+
+    klaro_geo_debug_log('Final effective settings: ' . print_r($effective_settings, true));
     return $effective_settings;
 }

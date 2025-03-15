@@ -11,11 +11,31 @@ This directory contains all Docker-related files for the Klaro Geo plugin develo
 - `copy-debug-log.sh` - Script to copy debug logs from the container
 - `debug-database.sh` - Script to debug database issues
 - `run-mock-tests.sh` - Script to run tests with mock database
+- `fix-npm-permissions.sh` - Script to fix npm permissions issues
+- `make-scripts-executable.sh` - Script to make all scripts executable
 - `logs/` - Directory for storing debug logs
 
 ## Getting Started
 
 For basic setup instructions, see the [main README.md](../readme.md) and [readme-dev.md](../readme-dev.md) files in the plugin root directory.
+
+### Making Scripts Executable
+
+To make all scripts executable at once, you can use the fix-permissions.sh script:
+
+```bash
+# Run this from the project root directory
+bash fix-permissions.sh
+```
+
+This will set the executable permission on all .sh files in the project.
+
+Alternatively, you can make individual scripts executable:
+
+```bash
+chmod +x run-tests.sh
+chmod +x docker/fix-npm-permissions.sh
+```
 
 ## Running Tests
 
@@ -44,6 +64,22 @@ To run the JavaScript tests:
 ```bash
 chmod +x run-tests.sh
 ./run-tests.sh js
+```
+
+If you encounter npm permissions issues, you can fix them with:
+
+```bash
+# If you've already made the script executable
+./docker/fix-npm-permissions.sh
+
+# Or run it directly with bash
+bash docker/fix-npm-permissions.sh
+```
+
+To run a specific JavaScript test file:
+
+```bash
+./run-tests.sh js test-file-name.js
 ```
 
 ### Tests with Mock Database

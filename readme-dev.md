@@ -22,7 +22,7 @@ This document provides instructions for setting up a development environment for
 
 ## Key Files
 
-- `klaro.php` - Main plugin file
+- `klaro-geo.php` - Main plugin file
 - `klaro-config.js` - Generated Klaro configuration
 - `readme.md` - User documentation
 - `readme-dev.md` - Developer documentation (this file)
@@ -190,7 +190,7 @@ When you're ready to create a production version of the plugin:
 1. Run the JavaScript tests to ensure everything works
 2. Ensure all PHP tests pass
 3. Update version numbers in:
-   - `klaro.php` (Plugin header)
+   - `klaro-geo.php` (Plugin header)
    - `readme.md` (if applicable)
 4. Create a zip file of the plugin directory, excluding development files:
    ```bash

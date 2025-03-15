@@ -57,7 +57,7 @@ require_once $_tests_dir . '/includes/functions.php';
 
 function _manually_load_plugin() {
     // Load main plugin file
-    require dirname(dirname(__DIR__)) . '/klaro.php';
+    require dirname(dirname(__DIR__)) . '/klaro-geo.php';
 }
 
 tests_add_filter('muplugins_loaded', '_manually_load_plugin');

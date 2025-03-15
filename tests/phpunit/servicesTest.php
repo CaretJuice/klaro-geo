@@ -20,7 +20,7 @@ class ServicesTest extends WP_UnitTestCase {
      */
     public function test_default_services_on_activation() {
         // Make sure we have access to default services
-        require_once(plugin_dir_path(dirname(dirname(__FILE__))) . 'klaro.php');
+        require_once(plugin_dir_path(dirname(dirname(__FILE__))) . 'klaro-geo.php');
 
         // Verify the default services are defined in GLOBALS
         $this->assertArrayHasKey('default_services', $GLOBALS);

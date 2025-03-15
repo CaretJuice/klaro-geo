@@ -2,7 +2,7 @@
 
 This plugin integrates the [Klaro](https://github.com/KIProtect/klaro) consent management tool with the [GeoIP2 PHP API](https://dev.maxmind.com/geoip/geoip2/geolite2/) to allow you to target different consent banners using Klaro.
 
-It is designed to work with Google Tag Manager with Klaro controlling the loading of Google Tag Manager. 
+It is designed to work with Google Tag Manager with Klaro controlling the loading of Google Tag Manager. It is best to load Google Tag Manager via the Klaro Geo settings page rather than adding it manually to your site as integrating Google Tag Manager with Klaro requires customization of the Google Tag Manager Javascript snippet.
 
 It allows you to create and manage multiple consent banner templates, customize them based on user location, and track consent decisions for compliance purposes.
 
@@ -33,6 +33,23 @@ This plugin gives you a lot of control over how consent is managed and tracked a
 4. Configure Klaro Geo settings under the 'Klaro Geo' menu in the WordPress admin
 
 ## Configuration
+
+### Quick Start Guide
+
+1. Go to the main settings page **Klaro Geo > Klaro Geo** and ensure the following settings are configured correctly:
+  - Google Tag Manager ID is set
+  - Purposes are configured as desired
+  - Advanced Consent Mode settings are assigned to the desired purposes
+2. Go to the templates page **Klaro Geo > Templates** and customize the default template and create other desired templates
+  - Ensure that your templates have the **Default** setting set the desired opt-in or opt-out behavior
+3. Go to the countries page **Klaro Geo > Country Settings** and assign your templates to your desired countries or regions
+4. Go to the services page **Klaro Geo > Services** and configure your services require consent
+  - Be sure any **Required** or **Default** service-level overrides of the template-level **Required** or **Default** settings are set as needed
+  - Assign each service to one or more purposes
+5. Go to Google Tag Manager and use the Klaro-generated events to fire your tags 
+  - A Google Analytics tag, for example, would create a google-analytics event in the tag manager dataLayer
+  - Create a google-analytics Custom Event in tag manager and use that to trigger the Google Analytics Google Tag
+  - Create Trigger Groups that fires off of the google-analytics event and the desired trigger (like a click trigger for measuring click events for example)
 
 ### General Settings
 
@@ -91,7 +108,11 @@ Klaro lets you group consent by purpose and Klaro-Geo supports this configuratio
 
 If you wanted to only allow consent by purpose without individual service options, you could configure your purposes as services, so you might create and `analytics` service, an `advertising` service, and a `functional` service, and then trigger tags in Google Tag Manager off of those purposes. However, grouping by purpose is the only way that you can support consent by purpose while still using templates to allow other consent settings in different regions.
 
-## WordPress Menu Integration
+## Adding Consent Buttons
+
+There are multiple ways to add consent management buttons to your site:
+
+### WordPress Menu Integration
 
 You can add a consent management button to any WordPress menu using a custom link:
 
@@ -106,6 +127,30 @@ You can add a consent management button to any WordPress menu using a custom lin
 7. Save the menu
 
 When clicked, this menu item will open the Klaro consent management popup, allowing users to update their consent preferences at any time.
+
+### Shortcode
+
+You can use the `[klaro_consent_button]` shortcode to add a consent button anywhere shortcodes are supported:
+
+```
+[klaro_consent_button text="Manage Cookie Settings" class="my-custom-class" style="button"]
+```
+
+Parameters:
+- **text**: (Optional) The button text. Defaults to the text configured in settings.
+- **class**: (Optional) Additional CSS classes to add to the button.
+- **style**: (Optional) Set to "link" for a text link instead of a button.
+
+Examples:
+```
+[klaro_consent_button]
+[klaro_consent_button text="Privacy Settings" style="link"]
+[klaro_consent_button class="button button-primary" text="Cookie Settings"]
+```
+
+### Floating Button
+
+The plugin also provides a floating button option that can be enabled in the settings. This button appears at the bottom right of your site and is always accessible to visitors.
 
 ## Customizing Klaro Appearance
 

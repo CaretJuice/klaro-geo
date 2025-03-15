@@ -1,0 +1,61 @@
+/**
+ * Frontend styles for Klaro Geo
+ */
+
+/* Floating button */
+.klaro-floating-button {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+}
+
+.klaro-floating-button button {
+    padding: 10px 15px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+/* Button themes */
+.klaro-floating-button-light button {
+    background-color: #f8f9fa;
+    color: #212529;
+    border: 1px solid #dee2e6;
+}
+
+.klaro-floating-button-dark button {
+    background-color: #343a40;
+    color: #fff;
+}
+
+.klaro-floating-button-success button {
+    background-color: #28a745;
+    color: #fff;
+}
+
+/* Shortcode button */
+.open-klaro-modal {
+    cursor: pointer;
+}
+
+/* Custom styling for Klaro modal */
+.klaro .cookie-modal,
+.klaro .cookie-notice {
+    font-family: inherit;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .klaro-floating-button {
+        bottom: 10px;
+        right: 10px;
+    }
+    
+    .klaro-floating-button button {
+        padding: 8px 12px;
+        font-size: 12px;
+    }
+}

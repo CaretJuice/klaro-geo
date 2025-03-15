@@ -4,7 +4,7 @@ function klaro_geo_determine_template() {
     klaro_geo_debug_log('Starting GeoIP lookup...');
 
     // Get settings using new nested structure
-    $settings = get_option('klaro_geo_settings', array());
+    $settings = get_option('klaro_geo_country_settings', array());
     if (is_string($settings)) {
         $settings = json_decode($settings, true) ?: array();
     }

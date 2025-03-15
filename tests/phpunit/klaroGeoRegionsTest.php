@@ -10,13 +10,13 @@ class KlaroGeoRegionsTest extends WP_UnitTestCase {
     public function setUp(): void {
         parent::setUp();
         // Reset options before each test
-        delete_option('klaro_geo_settings');
+        delete_option('klaro_geo_country_settings');
     }
 
     public function tearDown(): void {
         parent::tearDown();
         // Clean up after each test
-        delete_option('klaro_geo_settings');
+        delete_option('klaro_geo_country_settings');
     }
 
     /**
@@ -68,8 +68,8 @@ class KlaroGeoRegionsTest extends WP_UnitTestCase {
             )
         );
 
-        update_option('klaro_geo_settings', wp_json_encode($settings));
-        $stored_settings = get_option('klaro_geo_settings');
+        update_option('klaro_geo_country_settings', wp_json_encode($settings));
+        $stored_settings = get_option('klaro_geo_country_settings');
         $this->assertNotFalse($stored_settings, 'Settings should be stored');
 
         $decoded_settings = json_decode($stored_settings, true);
@@ -95,8 +95,8 @@ class KlaroGeoRegionsTest extends WP_UnitTestCase {
             )
         );
         // Store settings and verify they are stored correctly
-        update_option('klaro_geo_settings', wp_json_encode($settings));
-        $stored = get_option('klaro_geo_settings');
+        update_option('klaro_geo_country_settings', wp_json_encode($settings));
+        $stored = get_option('klaro_geo_country_settings');
         $this->assertNotFalse($stored, 'Settings should be stored');
         $decoded = json_decode($stored, true);
         $this->assertNotNull($decoded, 'Settings should be valid JSON');
