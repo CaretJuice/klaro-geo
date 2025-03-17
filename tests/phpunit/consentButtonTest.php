@@ -5,15 +5,17 @@ class ConsentButtonTest extends WP_UnitTestCase {
         parent::setUp();
         // Delete the options before each test
         delete_option('klaro_geo_enable_floating_button');
-        delete_option('klaro_geo_button_text');
-        delete_option('klaro_geo_button_theme');
+        delete_option('klaro_geo_floating_button_text');
+        delete_option('klaro_geo_floating_button_theme');
+        delete_option('klaro_geo_floating_button_position');
     }
 
     public function tearDown(): void {
         // Clean up after each test
         delete_option('klaro_geo_enable_floating_button');
-        delete_option('klaro_geo_button_text');
-        delete_option('klaro_geo_button_theme');
+        delete_option('klaro_geo_floating_button_text');
+        delete_option('klaro_geo_floating_button_theme');
+        delete_option('klaro_geo_floating_button_position');
         parent::tearDown();
     }
 
@@ -25,11 +27,13 @@ class ConsentButtonTest extends WP_UnitTestCase {
         // - Floating button enabled (true)
         // - Button text: "Manage Consent Settings"
         // - Button theme: "light"
-        
+        // - Button position: "bottom-right"
+
         // Check default values when options don't exist
         $this->assertTrue(get_option('klaro_geo_enable_floating_button', true));
-        $this->assertEquals('Manage Consent Settings', get_option('klaro_geo_button_text', 'Manage Consent Settings'));
-        $this->assertEquals('light', get_option('klaro_geo_button_theme', 'light'));
+        $this->assertEquals('Manage Consent', get_option('klaro_geo_floating_button_text', 'Manage Consent'));
+        $this->assertEquals('light', get_option('klaro_geo_floating_button_theme', 'light'));
+        $this->assertEquals('bottom-right', get_option('klaro_geo_floating_button_position', 'bottom-right'));
     }
 
     /**
@@ -52,19 +56,19 @@ class ConsentButtonTest extends WP_UnitTestCase {
         $custom_text = 'Custom Consent Settings';
 
         // Test setting custom button text
-        update_option('klaro_geo_button_text', $custom_text);
-        $this->assertEquals($custom_text, get_option('klaro_geo_button_text'));
+        update_option('klaro_geo_floating_button_text', $custom_text);
+        $this->assertEquals($custom_text, get_option('klaro_geo_floating_button_text'));
 
         // Test with empty text
-        update_option('klaro_geo_button_text', '');
+        update_option('klaro_geo_floating_button_text', '');
 
         // When the option exists but is empty, it returns an empty string
-        $this->assertEquals('', get_option('klaro_geo_button_text'));
+        $this->assertEquals('', get_option('klaro_geo_floating_button_text'));
 
         // When we provide a default value as the second parameter, it's only used if the option doesn't exist
         // So we need to delete the option first to test the default value
-        delete_option('klaro_geo_button_text');
-        $this->assertEquals('Manage Consent Settings', get_option('klaro_geo_button_text', 'Manage Consent Settings'));
+        delete_option('klaro_geo_floating_button_text');
+        $this->assertEquals('Manage Consent', get_option('klaro_geo_floating_button_text', 'Manage Consent'));
     }
 
     /**
@@ -72,21 +76,47 @@ class ConsentButtonTest extends WP_UnitTestCase {
      */
     public function test_button_theme_option() {
         // Test light theme
-        update_option('klaro_geo_button_theme', 'light');
-        $this->assertEquals('light', get_option('klaro_geo_button_theme'));
-        
+        update_option('klaro_geo_floating_button_theme', 'light');
+        $this->assertEquals('light', get_option('klaro_geo_floating_button_theme'));
+
         // Test dark theme
-        update_option('klaro_geo_button_theme', 'dark');
-        $this->assertEquals('dark', get_option('klaro_geo_button_theme'));
-        
+        update_option('klaro_geo_floating_button_theme', 'dark');
+        $this->assertEquals('dark', get_option('klaro_geo_floating_button_theme'));
+
         // Test success theme
-        update_option('klaro_geo_button_theme', 'success');
-        $this->assertEquals('success', get_option('klaro_geo_button_theme'));
-        
+        update_option('klaro_geo_floating_button_theme', 'success');
+        $this->assertEquals('success', get_option('klaro_geo_floating_button_theme'));
+
         // Test invalid theme (should be sanitized to default)
-        update_option('klaro_geo_button_theme', 'invalid_theme');
-        $this->assertEquals('invalid_theme', get_option('klaro_geo_button_theme'));
+        update_option('klaro_geo_floating_button_theme', 'invalid_theme');
+        $this->assertEquals('invalid_theme', get_option('klaro_geo_floating_button_theme'));
         // Note: In a real implementation, we would add sanitization to prevent invalid themes
+    }
+
+    /**
+     * Test setting and retrieving the button position option
+     */
+    public function test_button_position_option() {
+        // Test bottom-right position
+        update_option('klaro_geo_floating_button_position', 'bottom-right');
+        $this->assertEquals('bottom-right', get_option('klaro_geo_floating_button_position'));
+
+        // Test bottom-left position
+        update_option('klaro_geo_floating_button_position', 'bottom-left');
+        $this->assertEquals('bottom-left', get_option('klaro_geo_floating_button_position'));
+
+        // Test top-right position
+        update_option('klaro_geo_floating_button_position', 'top-right');
+        $this->assertEquals('top-right', get_option('klaro_geo_floating_button_position'));
+
+        // Test top-left position
+        update_option('klaro_geo_floating_button_position', 'top-left');
+        $this->assertEquals('top-left', get_option('klaro_geo_floating_button_position'));
+
+        // Test invalid position (should be sanitized to default)
+        update_option('klaro_geo_floating_button_position', 'invalid_position');
+        $this->assertEquals('invalid_position', get_option('klaro_geo_floating_button_position'));
+        // Note: In a real implementation, we would add sanitization to prevent invalid positions
     }
 
     /**
@@ -102,8 +132,9 @@ class ConsentButtonTest extends WP_UnitTestCase {
     public function test_enqueue_scripts() {
         // Set up the test environment
         update_option('klaro_geo_enable_floating_button', true);
-        update_option('klaro_geo_button_text', 'Test Button');
-        update_option('klaro_geo_button_theme', 'dark');
+        update_option('klaro_geo_floating_button_text', 'Test Button');
+        update_option('klaro_geo_floating_button_theme', 'dark');
+        update_option('klaro_geo_floating_button_position', 'bottom-right');
 
         // Trigger the wp_enqueue_scripts action
         do_action('wp_enqueue_scripts');
@@ -111,20 +142,20 @@ class ConsentButtonTest extends WP_UnitTestCase {
         // Check if the CSS file is enqueued
         $this->assertTrue(wp_style_is('klaro-consent-button-css', 'registered'));
 
-        // Check if the JS file is enqueued
-        $this->assertTrue(wp_script_is('klaro-consent-button-js', 'registered'));
+        // The button script is now added via wp_footer in klaro-geo.php
+        // So we need to trigger the wp_footer action to enqueue it
+        ob_start();
+        do_action('wp_footer');
+        $footer_output = ob_get_clean();
 
-        // Check if the localized data is correct
-        global $wp_scripts;
-        $data = $wp_scripts->get_data('klaro-consent-button-js', 'data');
+        // Check if the script tag is in the footer output
+        $this->assertStringContainsString('klaro-geo-consent-button.js', $footer_output);
 
-        $this->assertNotFalse($data);
-        $this->assertStringContainsString('klaroConsentButtonData', $data);
-
-        // In PHP, when a boolean true is converted to JSON, it becomes "1" (as a string)
-        // So we need to check for "1" instead of "true"
-        $this->assertStringContainsString('"floatingButtonEnabled":"1"', $data); // floatingButtonEnabled
-        $this->assertStringContainsString('Test Button', $data); // buttonText
-        $this->assertStringContainsString('dark', $data); // theme
+        // Check if the settings are in the footer output
+        $this->assertStringContainsString('window.klaroGeo', $footer_output);
+        $this->assertStringContainsString('enableFloatingButton', $footer_output);
+        $this->assertStringContainsString('Test Button', $footer_output);
+        $this->assertStringContainsString('dark', $footer_output);
+        $this->assertStringContainsString('bottom-right', $footer_output);
     }
 }

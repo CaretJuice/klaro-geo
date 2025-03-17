@@ -4,10 +4,17 @@
 
 function klaro_geo_services_page_content() {
     $purposes = explode(',', get_option('klaro_geo_purposes', 'functional,analytics,advertising')); // Get available purposes from settings
-    $services = klaro_geo_validate_services(); // Use our validation function
+
+    // Initialize the service settings class
+    $service_settings = new Klaro_Geo_Service_Settings();
+    $services = $service_settings->get();
     klaro_geo_debug_log('Services page content - services: ' . print_r($services, true));
 
     // Scripts are now enqueued in klaro-geo-admin-scripts.php
+
+    // Get templates
+    $template_settings = new Klaro_Geo_Template_Settings();
+    $templates = $template_settings->get();
 
     // Also make templates available globally with a unique timestamp to prevent caching issues
     wp_add_inline_script(
@@ -267,6 +274,8 @@ function klaro_geo_save_services(){
     klaro_geo_debug_log('$_POST: ' . print_r($_POST, true));
 
     if (isset($_POST['services'])) {
+        // Initialize the service settings class
+        $service_settings = new Klaro_Geo_Service_Settings();
 
         // Use wp_unslash() to remove escaping, only if necessary.
         $services = json_decode(wp_unslash($_POST['services']), true);
@@ -284,8 +293,10 @@ function klaro_geo_save_services(){
                 }
             }
 
-            // Save the services array to the database
-            update_option('klaro_geo_services', wp_json_encode($services));
+            // Save the services using the service settings class
+            $service_settings->set($services);
+            $service_settings->save();
+
             wp_send_json_success();
         } else {
             wp_send_json_error('Invalid services JSON or not an array');
@@ -301,22 +312,24 @@ function klaro_geo_save_services(){
 add_action('wp_ajax_delete_klaro_service', 'klaro_geo_delete_service');
 
 function klaro_geo_delete_service() {
-
     $index = isset($_POST['index']) ? intval($_POST['index']) : -1;
     if ($index < 0) {
         wp_send_json_error(['message' => 'Invalid service index.']);
         wp_die(); // Always wp_die() after wp_send_json_error()
     }
 
-    // Get the existing services and decode once using wp_unslash() on the raw POST data
-    $services_json = get_option('klaro_geo_services', '[]');
-    $services = json_decode($services_json, true);
+    // Initialize the service settings class
+    $service_settings = new Klaro_Geo_Service_Settings();
+
+    // Get the existing services
+    $services = $service_settings->get();
 
     if (is_array($services) && isset($services[$index])) {
         array_splice($services, $index, 1); // Remove the service
 
-        $updated_services_json = wp_json_encode($services);  // No wp_slash() needed!
-        update_option('klaro_geo_services', $updated_services_json); //Update DB
+        // Update the services using the service settings class
+        $service_settings->set($services);
+        $service_settings->save();
 
         wp_send_json_success($services);  // Send the updated services data
     } else {

@@ -67,6 +67,13 @@ if (is_admin() || (defined('WP_TESTS_DOMAIN') && WP_TESTS_DOMAIN)) {
         require_once plugin_dir_path(__FILE__) . 'includes/klaro-tests.php';
     }
 }
+// Include base classes
+require_once plugin_dir_path(__FILE__) . 'includes/class-klaro-geo-option.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-klaro-geo-country-settings.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-klaro-geo-template-settings.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-klaro-geo-service-settings.php';
+
+// Include legacy files for backward compatibility
 require_once plugin_dir_path(__FILE__) . 'includes/klaro-geo-config.php';
 require_once plugin_dir_path(__FILE__) . 'includes/klaro-geo-geoip.php';
 require_once plugin_dir_path(__FILE__) . 'includes/klaro-geo-settings.php';
@@ -84,6 +91,7 @@ function klaro_geo_enqueue_scripts() {
 
     wp_enqueue_style('klaro-css', plugins_url('klaro.css', __FILE__), array(), KLARO_GEO_VERSION);
     wp_enqueue_style('klaro-consent-button-css', plugins_url('css/klaro-consent-button.css', __FILE__), array(), KLARO_GEO_VERSION);
+    wp_enqueue_style('klaro-embedded-css', plugins_url('css/klaro-embedded.css', __FILE__), array(), KLARO_GEO_VERSION);
 
     klaro_geo_generate_config_file();
     $klaro_version = get_option('klaro_geo_js_version', '0.7');
@@ -144,6 +152,8 @@ function klaro_geo_enqueue_scripts() {
                         }
                     } else {
                         console.log('Klaro initialized successfully');
+                        // Dispatch a custom event to notify that Klaro is ready
+                        document.dispatchEvent(new CustomEvent('klaro-ready'));
                     }
                 }, 500);
             } else {
@@ -389,6 +399,74 @@ function klaro_geo_admin_bar_menu($wp_admin_bar) {
     }
 }
 add_action('admin_bar_menu', 'klaro_geo_admin_bar_menu', 999); // High priority to ensure it shows
+
+/**
+ * Shortcode for embedding Klaro consent manager in a page or post
+ *
+ * Usage: [klaro_embedded]
+ *
+ * This shortcode allows you to embed the Klaro consent manager directly into a page or post.
+ * It works best when the template has the "embedded" setting enabled.
+ */
+function klaro_geo_embedded_shortcode($atts) {
+    // Parse attributes
+    $atts = shortcode_atts(array(
+        'id' => 'klaro-embedded-container',
+        'class' => 'klaro-embedded',
+        'style' => 'width: 100%; min-height: 300px;'
+    ), $atts, 'klaro_embedded');
+
+    // Get the current template
+    $template_settings = new Klaro_Geo_Template_Settings();
+    $templates = $template_settings->get();
+
+    // Get user location
+    $location = klaro_geo_get_user_location();
+    $user_country = $location['country'];
+    $user_region = $location['region'];
+
+    // Get effective settings
+    $effective_settings = klaro_geo_get_effective_settings($user_country . ($user_region ? '-' . $user_region : ''));
+    $template_to_use = $effective_settings['template'] ?? 'default';
+
+    // Check if the template has embedded mode enabled
+    $template_config = $templates[$template_to_use]['config'] ?? array();
+    $embedded_enabled = isset($template_config['embedded']) && $template_config['embedded'] === true;
+
+    // Create container for the embedded consent manager
+    $output = '<div id="' . esc_attr($atts['id']) . '" class="' . esc_attr($atts['class']) . '" style="' . esc_attr($atts['style']) . '">';
+
+    if ($embedded_enabled) {
+        // Add a message that this is where Klaro will be embedded
+        $output .= '<div class="klaro-placeholder">Loading consent manager...</div>';
+
+        // Add JavaScript to initialize Klaro in this container
+        $output .= '<script type="text/javascript">
+            document.addEventListener("DOMContentLoaded", function() {
+                if (typeof window.klaro !== "undefined") {
+                    // If Klaro is already loaded, show it in the container
+                    window.klaro.show("' . esc_attr($atts['id']) . '");
+                } else {
+                    // If Klaro is not loaded yet, wait for it
+                    document.addEventListener("klaro-ready", function() {
+                        window.klaro.show("' . esc_attr($atts['id']) . '");
+                    });
+                }
+            });
+        </script>';
+    } else {
+        // Show a message that embedded mode is not enabled
+        $output .= '<div class="klaro-error">
+            <p>Klaro embedded mode is not enabled in the current template settings.</p>
+            <p>Please enable the "Embedded Mode" setting in the Klaro Templates page for template: ' . esc_html($template_to_use) . '</p>
+        </div>';
+    }
+
+    $output .= '</div>';
+
+    return $output;
+}
+add_shortcode('klaro_embedded', 'klaro_geo_embedded_shortcode');
 
 
 

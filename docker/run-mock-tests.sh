@@ -16,8 +16,14 @@ fi
 echo "Running tests with mock database..."
 docker compose exec wordpress_test bash -c "cd /var/www/html/wp-content/plugins/klaro-geo && vendor/bin/phpunit --bootstrap tests/phpunit/bootstrap-mock.php tests/phpunit/ConsentReceiptsTest.php tests/phpunit/ConsentReceiptsAdminTest.php tests/phpunit/ConsentReceiptsIntegrationTest.php"
 
-# Copy the debug log
-echo "Copying debug log..."
-docker compose exec wordpress_test bash -c "cat /var/www/html/wp-content/debug.log" > logs/debug_test.log
+# Copy and view the logs
+echo "Copying and viewing logs..."
+if [ -f "$(dirname "$0")/logs.sh" ]; then
+  bash "$(dirname "$0")/logs.sh" both
+else
+  # Fallback if logs.sh is not found
+  docker compose exec wordpress_test bash -c "cat /var/www/html/wp-content/debug.log" > logs/debug_test.log
+  echo "Logs copied to logs/debug_test.log"
+fi
 
 echo "Tests completed."

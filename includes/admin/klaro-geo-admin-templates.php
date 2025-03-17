@@ -2,14 +2,22 @@
 // Exit if accessed directly
 if (!defined('ABSPATH')) exit;
 
+// Include the template settings class if not already included
+if (!class_exists('Klaro_Geo_Template_Settings')) {
+    require_once dirname(dirname(__FILE__)) . '/class-klaro-geo-template-settings.php';
+}
+
 // Templates page content
 function klaro_geo_templates_page() {
     if (!current_user_can('manage_options')) {
         return;
     }
 
-    // Ensure default template exists and has the correct name
-    klaro_geo_create_templates();
+    // Initialize the template settings class
+    $template_settings = new Klaro_Geo_Template_Settings();
+
+    // Ensure the template settings are saved
+    $template_settings->save();
 
     // Scripts are now enqueued in klaro-geo-admin-scripts.php
 
@@ -55,7 +63,7 @@ function klaro_geo_templates_page() {
     ');
 
     // Get templates for JavaScript
-    $templates = get_option('klaro_geo_templates', array());
+    $templates = $template_settings->get();
 
     // Pass templates to JavaScript
     wp_localize_script(
@@ -74,16 +82,15 @@ function klaro_geo_templates_page() {
     if (isset($_POST['submit_template'])) {
         check_admin_referer('klaro_geo_template_nonce');
         klaro_geo_debug_log('Saving template changes...');
-        
-        $templates = get_option('klaro_geo_templates', array());
+
         $current_template = sanitize_text_field($_POST['current_template']);
         klaro_geo_debug_log('Current template: ' . $current_template);
-        
+
         // Get the template configuration from POST data
         if (isset($_POST['template_config']) && is_array($_POST['template_config'])) {
             $template_config = $_POST['template_config']; // Assign the whole array
             klaro_geo_debug_log('Received template config: ' . print_r($template_config, true));
-        
+
             // Check if translations_json is present in the POST data
             if (isset($template_config['translations_json']) && !empty($template_config['translations_json'])) {
                 // Parse the JSON data
@@ -123,7 +130,7 @@ function klaro_geo_templates_page() {
                 $translations_json = str_replace('we"d like to use', 'we\'d like to use', $translations_json);
                 $translations_json = str_replace('You"re in charge', 'You\'re in charge', $translations_json);
                 $translations_json = str_replace('That"s ok', 'That\'s ok', $translations_json);
-                
+
 
                 try {
                     // Log the JSON before attempting to decode
@@ -183,8 +190,9 @@ function klaro_geo_templates_page() {
                                 klaro_geo_debug_log('Fixed JSON parsed successfully: ' . print_r($translations, true));
                             } else {
                                 // Keep existing translations if available
-                                if (isset($templates[$current_template]['config']['translations'])) {
-                                    $template_config['translations'] = $templates[$current_template]['config']['translations'];
+                                $existing_template = $template_settings->get_template($current_template);
+                                if ($existing_template && isset($existing_template['config']['translations'])) {
+                                    $template_config['translations'] = $existing_template['config']['translations'];
                                     klaro_geo_debug_log('Using existing translations due to JSON parse error');
                                 } else {
                                     // Create default translations
@@ -207,8 +215,9 @@ function klaro_geo_templates_page() {
                 } catch (Exception $e) {
                     klaro_geo_debug_log('Exception parsing translations JSON: ' . $e->getMessage());
                     // Keep existing translations if available
-                    if (isset($templates[$current_template]['config']['translations'])) {
-                        $template_config['translations'] = $templates[$current_template]['config']['translations'];
+                    $existing_template = $template_settings->get_template($current_template);
+                    if ($existing_template && isset($existing_template['config']['translations'])) {
+                        $template_config['translations'] = $existing_template['config']['translations'];
                         klaro_geo_debug_log('Using existing translations due to exception');
                     } else {
                         // Create default translations
@@ -232,8 +241,9 @@ function klaro_geo_templates_page() {
             } else {
                 klaro_geo_debug_log('No translations received. Using existing translations if available.');
                 // Keep existing translations if available
-                if (isset($templates[$current_template]['config']['translations'])) {
-                    $template_config['translations'] = $templates[$current_template]['config']['translations'];
+                $existing_template = $template_settings->get_template($current_template);
+                if ($existing_template && isset($existing_template['config']['translations'])) {
+                    $template_config['translations'] = $existing_template['config']['translations'];
                     klaro_geo_debug_log('Using existing translations');
                 } else {
                     // Create default translations if none exist
@@ -274,8 +284,8 @@ function klaro_geo_templates_page() {
                 }
             }
 
-            // Update the template configuration
-            $templates[$current_template]['config'] = $template_config;
+            // Update the template configuration using the class method
+            $template_settings->set_template_config($current_template, $template_config);
         }
 
         // Get WordPress settings
@@ -285,23 +295,36 @@ function klaro_geo_templates_page() {
             // Process enable_consent_logging setting
             $wordpress_settings['enable_consent_logging'] = isset($_POST['wordpress_settings']['enable_consent_logging']);
 
+            // Get the existing template
+            $template = $template_settings->get_template($current_template);
+
             // Update the WordPress settings
-            $templates[$current_template]['wordpress_settings'] = $wordpress_settings;
+            if ($template) {
+                $template['wordpress_settings'] = $wordpress_settings;
+                $template_settings->set_template($current_template, $template);
+            }
         } else {
             // Set default WordPress settings if not provided
-            $templates[$current_template]['wordpress_settings'] = array(
-                'enable_consent_logging' => true
-            );
+            $template = $template_settings->get_template($current_template);
+            if ($template) {
+                $template['wordpress_settings'] = array(
+                    'enable_consent_logging' => true
+                );
+                $template_settings->set_template($current_template, $template);
+            }
         }
-
-        update_option('klaro_geo_templates', $templates);
 
         // Update inheritance
         if (isset($_POST['inherit_from'])) {
-            $templates[$current_template]['inherit_from'] = sanitize_text_field($_POST['inherit_from']);
+            $template = $template_settings->get_template($current_template);
+            if ($template) {
+                $template['inherit_from'] = sanitize_text_field($_POST['inherit_from']);
+                $template_settings->set_template($current_template, $template);
+            }
         }
 
-        update_option('klaro_geo_templates', $templates);
+        // Save all changes
+        $template_settings->save();
 
         // Add success message
         add_settings_error(
@@ -315,7 +338,7 @@ function klaro_geo_templates_page() {
         $current_template = sanitize_text_field($_POST['current_template']);
 
         // Ensure the template data is properly loaded after saving
-        $templates = get_option('klaro_geo_templates', array());
+        $templates = $template_settings->get();
 
         // Force a redirect to ensure the page is properly refreshed with the new data
         if (!headers_sent()) {
@@ -330,7 +353,7 @@ function klaro_geo_templates_page() {
     }
 
     // Get current templates
-    $templates = get_option('klaro_geo_templates', array());
+    $templates = $template_settings->get();
     $current_template = isset($_GET['template']) ? sanitize_text_field($_GET['template']) : 'default';
 
     ?>
@@ -825,11 +848,27 @@ function klaro_geo_templates_page() {
                         </td>
                     </tr>
                     <tr>
-                        <th><label for="template_config_embedded">No Auto Load:</label></th>
+                        <th><label for="template_config_embedded">Embedded Mode:</label></th>
                         <td>
                             <input type="checkbox" name="template_config[embedded]" id="template_config_embedded"
                                 <?php checked(isset($current_config['embedded']) ? $current_config['embedded'] : false); ?>>
-                            <p class="description">If enabled, Klaro will not automatically load and show the consent notice.</p>
+                            <p class="description">If enabled, Klaro will render without the modal background, allowing you to embed it into a specific element of your website, such as your privacy notice. Use the [klaro_embedded] shortcode to display it.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label for="template_config_noAutoLoad">No Auto Load:</label></th>
+                        <td>
+                            <input type="checkbox" name="template_config[noAutoLoad]" id="template_config_noAutoLoad"
+                                <?php checked(isset($current_config['noAutoLoad']) ? $current_config['noAutoLoad'] : false); ?>>
+                            <p class="description">If enabled, Klaro will not automatically load itself when the page is being loaded. You'll need to manually trigger it.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label for="template_config_autoFocus">Auto Focus:</label></th>
+                        <td>
+                            <input type="checkbox" name="template_config[autoFocus]" id="template_config_autoFocus"
+                                <?php checked(isset($current_config['autoFocus']) ? $current_config['autoFocus'] : false); ?>>
+                            <p class="description">Automatically focus the consent modal when it appears.</p>
                         </td>
                     </tr>
                     <tr>
@@ -882,6 +921,22 @@ function klaro_geo_templates_page() {
                             <p class="description">Number of days after which the cookie expires.</p>
                         </td>
                     </tr>
+                    <tr>
+                        <th><label for="template_config_cookieDomain">Cookie Domain:</label></th>
+                        <td>
+                            <input type="text" name="template_config[cookieDomain]" id="template_config_cookieDomain" class="regular-text"
+                                value="<?php echo esc_attr(isset($current_config['cookieDomain']) ? $current_config['cookieDomain'] : ''); ?>">
+                            <p class="description">Domain for the consent cookie (leave empty for current domain).</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label for="template_config_cookiePath">Cookie Path:</label></th>
+                        <td>
+                            <input type="text" name="template_config[cookiePath]" id="template_config_cookiePath" class="regular-text"
+                                value="<?php echo esc_attr(isset($current_config['cookiePath']) ? $current_config['cookiePath'] : '/'); ?>">
+                            <p class="description">Path for the consent cookie (default: '/').</p>
+                        </td>
+                    </tr>
                 </table>
 
                 <h3>Consent Modal Settings</h3>
@@ -916,6 +971,46 @@ function klaro_geo_templates_page() {
                             <input type="checkbox" name="template_config[hideLearnMore]" id="template_config_hideLearnMore"
                                 <?php checked(isset($current_config['hideLearnMore']) ? $current_config['hideLearnMore'] : false); ?>>
                             <p class="description">Hide the "Learn More" link.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label for="template_config_showNoticeTitle">Show Notice Title:</label></th>
+                        <td>
+                            <input type="checkbox" name="template_config[showNoticeTitle]" id="template_config_showNoticeTitle"
+                                <?php checked(isset($current_config['showNoticeTitle']) ? $current_config['showNoticeTitle'] : false); ?>>
+                            <p class="description">Show the title in the consent notice.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label for="template_config_showDescriptionEmptyStore">Show Description for Empty Store:</label></th>
+                        <td>
+                            <input type="checkbox" name="template_config[showDescriptionEmptyStore]" id="template_config_showDescriptionEmptyStore"
+                                <?php checked(isset($current_config['showDescriptionEmptyStore']) ? $current_config['showDescriptionEmptyStore'] : true); ?>>
+                            <p class="description">Show description text even when no services are defined.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label for="template_config_disablePoweredBy">Disable Powered By:</label></th>
+                        <td>
+                            <input type="checkbox" name="template_config[disablePoweredBy]" id="template_config_disablePoweredBy"
+                                <?php checked(isset($current_config['disablePoweredBy']) ? $current_config['disablePoweredBy'] : false); ?>>
+                            <p class="description">Hide the "Powered by Klaro" text.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label for="template_config_additionalClass">Additional CSS Class:</label></th>
+                        <td>
+                            <input type="text" name="template_config[additionalClass]" id="template_config_additionalClass" class="regular-text"
+                                value="<?php echo esc_attr(isset($current_config['additionalClass']) ? $current_config['additionalClass'] : ''); ?>">
+                            <p class="description">Additional CSS class to add to the consent modal.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label for="template_config_lang">Default Language:</label></th>
+                        <td>
+                            <input type="text" name="template_config[lang]" id="template_config_lang" class="regular-text"
+                                value="<?php echo esc_attr(isset($current_config['lang']) ? $current_config['lang'] : ''); ?>">
+                            <p class="description">Default language code (e.g., 'en', 'de'). Leave empty to auto-detect.</p>
                         </td>
                     </tr>
                 </table>
@@ -1202,22 +1297,14 @@ function klaro_geo_templates_page() {
 
 // Helper function to create default templates
 function klaro_geo_create_templates() {
-    $templates = get_option('klaro_geo_templates', array());
+    // Initialize the template settings class
+    $template_settings = new Klaro_Geo_Template_Settings();
 
-    // If no templates exist, create default ones
-    if (empty($templates)) {
-        $templates = klaro_geo_get_default_templates();
-        update_option('klaro_geo_templates', $templates);
-    }
+    // The constructor already initializes with default templates if empty
+    // Just make sure to save any changes
+    $template_settings->save();
 
-    // Ensure the default template exists
-    if (!isset($templates['default'])) {
-        $default_templates = klaro_geo_get_default_templates();
-        $templates['default'] = $default_templates['default'];
-        update_option('klaro_geo_templates', $templates);
-    }
-
-    return $templates;
+    return $template_settings->get();
 }
 
 /**
@@ -1249,8 +1336,11 @@ function klaro_geo_create_template() {
     $template_name = sanitize_text_field($_POST['template_name']);
     $inherit_from = sanitize_text_field($_POST['inherit_from']);
 
+    // Initialize the template settings class
+    $template_settings = new Klaro_Geo_Template_Settings();
+
     // Get existing templates
-    $templates = get_option('klaro_geo_templates', array());
+    $templates = $template_settings->get();
 
     // Check if template name already exists
     foreach ($templates as $template) {
@@ -1279,19 +1369,32 @@ function klaro_geo_create_template() {
         return;
     }
 
+    // Get the template to inherit from
+    $inherited_template = $template_settings->get_template($inherit_from);
+
+    if (!$inherited_template) {
+        wp_send_json_error(array(
+            'message' => 'Error retrieving template to copy from.'
+        ));
+        return;
+    }
+
     // Copy settings from inherited template
-    $inherited_config = $templates[$inherit_from]['config'];
-    $wordpress_settings = $templates[$inherit_from]['wordpress_settings'];
+    $inherited_config = $inherited_template['config'];
+    $wordpress_settings = isset($inherited_template['wordpress_settings']) ?
+                          $inherited_template['wordpress_settings'] :
+                          array('enable_consent_logging' => true);
 
     // Create new template
-    $templates[$template_key] = array(
+    $new_template = array(
         'name' => $template_name,
         'config' => $inherited_config,
         'wordpress_settings' => $wordpress_settings
     );
 
-    // Save updated templates
-    update_option('klaro_geo_templates', $templates);
+    // Save the new template
+    $template_settings->set_template($template_key, $new_template);
+    $template_settings->save();
 
     wp_send_json_success(array(
         'template_key' => $template_key,
@@ -1328,11 +1431,12 @@ function klaro_geo_save_translations_ajax() {
     // Get the template ID
     $template_id = sanitize_text_field($_POST['template_id']);
 
-    // Get existing templates
-    $templates = get_option('klaro_geo_templates', array());
+    // Initialize the template settings class
+    $template_settings = new Klaro_Geo_Template_Settings();
 
     // Check if the template exists
-    if (!isset($templates[$template_id])) {
+    $template = $template_settings->get_template($template_id);
+    if (!$template) {
         wp_send_json_error(array('message' => 'Template not found.'));
         return;
     }
@@ -1353,16 +1457,18 @@ function klaro_geo_save_translations_ajax() {
                 // Successfully parsed JSON
                 klaro_geo_debug_log('Translations JSON parsed successfully');
 
-                // Update the template config
-                if (!isset($templates[$template_id]['config'])) {
-                    $templates[$template_id]['config'] = array();
+                // Get the template config
+                $config = $template_settings->get_template_config($template_id);
+                if (!$config) {
+                    $config = array();
                 }
 
                 // Update the translations
-                $templates[$template_id]['config']['translations'] = $translations;
+                $config['translations'] = $translations;
 
-                // Save the updated templates
-                update_option('klaro_geo_templates', $templates);
+                // Save the updated template config
+                $template_settings->set_template_config($template_id, $config);
+                $template_settings->save();
 
                 // Return success response with the updated translations
                 wp_send_json_success(array(

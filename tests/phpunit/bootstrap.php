@@ -67,3 +67,10 @@ require $_tests_dir . '/includes/bootstrap.php';
 
 // Disable deprecation notices after WordPress is loaded
 add_filter('deprecated_function_trigger_error', '__return_false');
+
+// Define a debug log function if it doesn't exist
+if (!function_exists('klaro_geo_debug_log')) {
+    function klaro_geo_debug_log($message) {
+        // Do nothing in tests
+    }
+}

@@ -72,3 +72,11 @@ docker compose run --user www-data --entrypoint bash wordpress_test -c "
 "
 
 echo "PHP tests completed!"
+
+# Display the test logs
+if [ -f "$(dirname "$0")/docker/logs.sh" ]; then
+  echo "Displaying test logs..."
+  bash "$(dirname "$0")/docker/logs.sh" view
+else
+  echo "Test log viewer script not found"
+fi

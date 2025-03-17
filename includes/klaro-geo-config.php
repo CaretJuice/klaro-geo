@@ -85,6 +85,8 @@ function klaro_geo_generate_config_file() {
             if ($key === 'translations' || $key === 'translations_json') {
                 continue;
             }
+
+            // Copy the value directly
             $klaro_config[$key] = $value;
         }
 
@@ -111,10 +113,24 @@ function klaro_geo_generate_config_file() {
         klaro_geo_debug_log('Applied template settings - default: ' .
             (($klaro_config['default'] ?? false) ? 'true' : 'false') . ', required: ' .
             (($klaro_config['required'] ?? false) ? 'true' : 'false'));
+
+        // Log additional settings
+        klaro_geo_debug_log('Additional settings - noAutoLoad: ' .
+            (($klaro_config['noAutoLoad'] ?? false) ? 'true' : 'false') . ', embedded: ' .
+            (($klaro_config['embedded'] ?? false) ? 'true' : 'false') . ', autoFocus: ' .
+            (($klaro_config['autoFocus'] ?? false) ? 'true' : 'false') . ', showNoticeTitle: ' .
+            (($klaro_config['showNoticeTitle'] ?? false) ? 'true' : 'false'));
     } else {
         // Ensure default values are set if template config is missing
         $klaro_config['default'] = false;
         $klaro_config['required'] = false;
+        $klaro_config['noAutoLoad'] = false;
+        $klaro_config['embedded'] = false;
+        $klaro_config['showDescriptionEmptyStore'] = true;
+        $klaro_config['autoFocus'] = false;
+        $klaro_config['showNoticeTitle'] = false;
+        $klaro_config['disablePoweredBy'] = false;
+        $klaro_config['cookiePath'] = '/';
     }
     klaro_geo_debug_log('Template config applied: ' . print_r($klaro_config, true));
 
@@ -246,6 +262,55 @@ function klaro_geo_generate_config_file() {
         $klaro_config['services'][] = $service_config;
     }
             
+    // Transform styling settings from object to array format if needed
+    if (isset($klaro_config['styling']) && isset($klaro_config['styling']['theme'])) {
+        klaro_geo_debug_log('Found styling theme settings: ' . print_r($klaro_config['styling']['theme'], true));
+
+        if (is_array($klaro_config['styling']['theme'])) {
+            // Check if theme is in object format (with keys like 'color', 'position', 'width')
+            // We need to check if it's an associative array rather than a numeric array
+            $is_associative = false;
+            foreach (array_keys($klaro_config['styling']['theme']) as $key) {
+                if (is_string($key)) {
+                    $is_associative = true;
+                    break;
+                }
+            }
+
+            klaro_geo_debug_log('Styling theme is ' . ($is_associative ? 'an associative array (object format)' : 'a numeric array (already in correct format)'));
+
+            if ($is_associative) {
+
+            // Extract values from the object
+            $theme_values = array();
+
+            // Add color if it exists
+            if (isset($klaro_config['styling']['theme']['color'])) {
+                $theme_values[] = $klaro_config['styling']['theme']['color'];
+            }
+
+            // Add position if it exists
+            if (isset($klaro_config['styling']['theme']['position'])) {
+                $theme_values[] = $klaro_config['styling']['theme']['position'];
+            }
+
+            // Add width if it exists
+            if (isset($klaro_config['styling']['theme']['width'])) {
+                $theme_values[] = $klaro_config['styling']['theme']['width'];
+            }
+
+            // Replace the object with the array
+            $klaro_config['styling']['theme'] = $theme_values;
+
+            klaro_geo_debug_log('Transformed styling theme from object to array format: ' . print_r($theme_values, true));
+        }
+    }
+
+    // Log the final config for debugging
+    if (isset($klaro_config['styling'])) {
+        klaro_geo_debug_log('Final styling configuration: ' . print_r($klaro_config['styling'], true));
+    }
+
     // Generate the JavaScript content
     $klaro_config_content = "// Detected/Debug Country Code: " . esc_js($user_country) . "\n\n";
 
@@ -381,5 +446,5 @@ JS;
     }
     return $result;
 }
-
+}
 ?>

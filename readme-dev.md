@@ -1,6 +1,6 @@
 # Development Setup for Klaro Geo
 
-This document provides instructions for setting up a development environment for the Klaro Geo plugin. The project uses Docker for development, making it easy to get started without configuring a local WordPress installation.
+This document provides instructions for setting up a development environment and running tests for the Klaro Geo plugin. The project uses Docker for development, making it easy to get started without configuring a local WordPress installation.
 
 ## Prerequisites
 
@@ -75,9 +75,54 @@ No manual configuration is required - the scripts handle everything automaticall
 
 The test suite is comprehensive and includes both PHP and JavaScript tests.
 
-### PHP Tests
+### Quick Start for Running Tests
 
-#### Method 1: Using the run-tests.sh Script (Recommended)
+To make all scripts executable and run tests without password prompts:
+
+```bash
+# Make all scripts executable
+bash fix-permissions.sh
+
+# Run PHP tests (no password required)
+./run-php-tests.sh
+
+# Run JavaScript tests (no password required)
+./run-js-tests.sh
+
+# Run a specific JavaScript test (no password required)
+./run-js-tests.sh "test-name"
+```
+
+### Available Test Scripts
+
+#### No-Password Scripts (Recommended)
+
+These scripts bypass the Docker entrypoint script that requires a password:
+
+- `run-php-tests.sh` - Runs all PHP tests
+- `run-js-tests.sh` - Runs all JavaScript tests
+- `run-js-tests.sh "test-name"` - Runs a specific JavaScript test
+
+#### Direct Test Script (Most Reliable)
+
+If you're having issues with npm permissions, use the direct test script:
+
+- `run-js-tests-direct.sh` - Runs JavaScript tests in a fresh container without using the existing npm cache
+- `run-js-tests-direct.sh "test-name"` - Runs a specific JavaScript test in a fresh container
+
+#### Original Scripts (May Require Password)
+
+The original test scripts may prompt for a password:
+
+- `run-tests.sh` - Runs all PHP tests
+- `run-tests.sh js` - Runs all JavaScript tests
+- `run-tests.sh js "test-name"` - Runs a specific JavaScript test
+
+### Alternative Methods for Running Tests
+
+#### PHP Tests
+
+##### Method 1: Using the run-tests.sh Script
 
 ```bash
 # Make the script executable
@@ -90,7 +135,7 @@ chmod +x run-tests.sh
 ./run-tests.sh -v
 ```
 
-#### Method 2: From Your Host Machine
+##### Method 2: From Your Host Machine
 
 ```bash
 # Change to the docker directory
@@ -103,7 +148,7 @@ docker compose run wordpress_test bash -c "cd /var/www/html/wp-content/plugins/k
 docker compose run wordpress_test bash -c "cd /var/www/html/wp-content/plugins/klaro-geo && phpunit -c phpunit.xml tests/phpunit/klaroGeoRegionsTest.php"
 ```
 
-#### Method 3: Inside the Test Container
+##### Method 3: Inside the Test Container
 
 ```bash
 # Change to the docker directory
@@ -119,11 +164,11 @@ cd /var/www/html/wp-content/plugins/klaro-geo
 phpunit -c phpunit.xml
 ```
 
-### JavaScript Tests
+#### JavaScript Tests
 
 The JavaScript tests use Jest and are located in the `/tests/js/` directory.
 
-#### Method 1: Using the run-tests.sh Script (Recommended)
+##### Method 1: Using the run-tests.sh Script
 
 ```bash
 # Run all JavaScript tests
@@ -133,7 +178,7 @@ The JavaScript tests use Jest and are located in the `/tests/js/` directory.
 ./run-tests.sh js test-consent-receipts.js
 ```
 
-#### Method 2: Manually Using npm
+##### Method 2: Manually Using npm
 
 ```bash
 # Enter the container
@@ -152,6 +197,47 @@ npm test
 npm test -- --watch
 ```
 
+## Fixing Permissions
+
+If you encounter permission issues, use the fix-permissions.sh script:
+
+```bash
+bash fix-permissions.sh
+```
+
+This will make all scripts executable.
+
+## Fixing npm Permissions
+
+If you encounter npm-specific permission issues:
+
+```bash
+./docker/fix-npm-permissions.sh
+```
+
+Or run it with bash if it's not executable:
+
+```bash
+bash docker/fix-npm-permissions.sh
+```
+
+## Viewing Test Logs
+
+After running tests, you can view the logs with:
+
+```bash
+./docker/logs.sh view    # View logs only
+./docker/logs.sh copy    # Copy logs from container to host
+./docker/logs.sh both    # Copy and then view logs (default)
+```
+
+This will display:
+- WordPress debug logs
+- npm logs
+- Jest test output
+
+The logs are also saved to the `docker/logs` directory.
+
 ## Debugging
 
 ### Debug Logs
@@ -167,11 +253,14 @@ To enable detailed logging during development:
 
 2. View the logs:
    ```bash
-   # Copy logs from the container to your host
-   ./docker/copy-debug-log.sh
+   # Copy logs from the container to your host and view them
+   ./docker/logs.sh both
 
-   # View the logs
-   cat docker/logs/debug_test.log
+   # Or just copy the logs
+   ./docker/logs.sh copy
+
+   # Or just view the logs (if already copied)
+   ./docker/logs.sh view
    ```
 
 ### Mock Database
@@ -181,6 +270,61 @@ For testing without a real database:
 ```bash
 # Run tests with the mock database
 ./docker/run-mock-tests.sh
+```
+
+## Troubleshooting
+
+### Password Prompts
+
+If you see a password prompt when running tests, use the no-password scripts instead:
+
+```bash
+# Instead of: ./run-tests.sh js
+./run-js-tests.sh
+```
+
+### npm Permission Errors
+
+If you see errors like:
+
+```
+npm ERR! code EACCES
+npm ERR! syscall mkdir
+npm ERR! path /var/www/.npm
+```
+
+Try one of these solutions:
+
+1. Run the npm permissions fix script:
+   ```bash
+   bash docker/fix-npm-permissions.sh
+   ```
+
+2. Use the direct test script which avoids npm permission issues:
+   ```bash
+   bash run-js-tests-direct.sh
+   ```
+
+### No Test Output
+
+If tests run but you don't see any output, check the logs:
+
+```bash
+./docker/view-test-logs.sh
+```
+
+### Script Not Executable
+
+If you see "Permission denied" errors when running scripts:
+
+```bash
+bash fix-permissions.sh
+```
+
+Or run the script directly with bash:
+
+```bash
+bash run-js-tests.sh
 ```
 
 ## Building for Production

@@ -61,9 +61,9 @@ fi
 echo "JavaScript tests completed!"
 
 # Display the test logs
-if [ -f "$(dirname "$0")/docker/view-test-logs.sh" ]; then
+if [ -f "$(dirname "$0")/docker/logs.sh" ]; then
   echo "Displaying test logs..."
-  bash "$(dirname "$0")/docker/view-test-logs.sh"
+  bash "$(dirname "$0")/docker/logs.sh" view
 else
   echo "Test log viewer script not found"
 fi

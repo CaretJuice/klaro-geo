@@ -1,0 +1,65 @@
+/* Styles for embedded Klaro consent manager */
+
+.klaro-embedded {
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 20px;
+    margin: 20px 0;
+    background-color: #f9f9f9;
+    min-height: 300px;
+    position: relative;
+}
+
+.klaro-embedded .klaro-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    width: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    color: #666;
+    font-style: italic;
+}
+
+.klaro-embedded .klaro-error {
+    color: #721c24;
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    padding: 15px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+/* Make sure Klaro elements inside the container are properly styled */
+.klaro-embedded .klaro .cookie-modal,
+.klaro-embedded .klaro .cookie-notice {
+    position: relative;
+    top: auto;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    margin: 0;
+    transform: none;
+    width: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    height: auto;
+}
+
+/* Remove background overlay in embedded mode */
+.klaro-embedded .klaro .cookie-modal .cm-bg {
+    display: none;
+}
+
+/* Adjust spacing for embedded mode */
+.klaro-embedded .klaro .cookie-modal .cm-modal {
+    max-height: none;
+    height: auto;
+}
+
+/* Make sure content is visible */
+.klaro-embedded .klaro .cookie-modal .cm-modal .cm-body {
+    max-height: none;
+}
