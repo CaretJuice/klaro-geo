@@ -86,7 +86,7 @@ function klaro_geo_admin_scripts($hook) {
             true
         );
 
-        // Localize the services script
+        // Localize the services script with all the data needed
         wp_localize_script(
             'klaro-geo-service-translations-js',
             'klaroGeoServices',
@@ -95,9 +95,13 @@ function klaro_geo_admin_scripts($hook) {
                 'nonce' => wp_create_nonce('klaro_geo_nonce'),
                 'purposes' => $purposes,
                 'services' => $services ? $services : [],
-                'templates' => $templates
+                'templates' => $templates,
+                'version' => KLARO_GEO_VERSION
             )
         );
+
+        // Make sure we have a global ajaxurl variable for backward compatibility
+        wp_add_inline_script('klaro-geo-service-translations-js', 'var ajaxurl = "' . admin_url('admin-ajax.php') . '";', 'before');
 
         wp_enqueue_script('klaro-geo-service-translations-js');
         klaro_geo_debug_log('Service translations script loaded');

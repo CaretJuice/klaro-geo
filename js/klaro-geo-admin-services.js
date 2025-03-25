@@ -83,14 +83,14 @@ if (typeof module !== 'undefined' && module.exports) {
 // Only run jQuery code if we're in a browser environment, not during testing
 if (typeof jQuery !== 'undefined') {
     jQuery(document).ready(function($) {
-        // Ensure klaroGeo is available
-        if (typeof klaroGeo === 'undefined') {
-            console.error('klaroGeo not defined');
+        // Ensure klaroGeoServices is available
+        if (typeof klaroGeoServices === 'undefined') {
+            console.error('klaroGeoServices not defined');
             return;
         }
 
         // Debug log
-        console.log('klaroGeo loaded:', klaroGeo);
+        console.log('klaroGeoServices loaded:', klaroGeoServices);
 
     // Function to get language name from code
     function getLanguageName(langCode) {
@@ -190,9 +190,9 @@ if (typeof jQuery !== 'undefined') {
     function populatePurposes() {
         var container = $('#service_purposes_container');
         container.empty();
-        
-        if (klaroGeo.purposes && klaroGeo.purposes.length > 0) {
-            klaroGeo.purposes.forEach(function(purpose) {
+
+        if (klaroGeoServices.purposes && klaroGeoServices.purposes.length > 0) {
+            klaroGeoServices.purposes.forEach(function(purpose) {
                 var checkbox = $('<input type="checkbox" name="service_purposes[]" value="' + purpose + '">');
                 var label = $('<label></label>').append(checkbox).append(' ' + purpose);
                 container.append(label).append('<br>');
@@ -235,7 +235,7 @@ if (typeof jQuery !== 'undefined') {
     // Edit Service button click
     $(document).on('click', '.edit-service', function() {
         var index = $(this).data('index');
-        var service = klaroGeo.services[index];
+        var service = klaroGeoServices.services[index];
         
         $('#service_index').val(index);
         $('#service_name').val(service.name || '');
@@ -336,7 +336,7 @@ if (typeof jQuery !== 'undefined') {
             data: {
                 action: 'delete_klaro_service',
                 index: index,
-                _wpnonce: klaroGeo.nonce
+                _wpnonce: klaroGeoServices.nonce
             },
             success: function(response) {
                 if (response.success) {
@@ -509,9 +509,9 @@ if (typeof jQuery !== 'undefined') {
         
         // Update or add service
         if (index !== '') {
-            klaroGeo.services[index] = service;
+            klaroGeoServices.services[index] = service;
         } else {
-            klaroGeo.services.push(service);
+            klaroGeoServices.services.push(service);
         }
         
         // Save services
@@ -520,8 +520,8 @@ if (typeof jQuery !== 'undefined') {
             type: 'POST',
             data: {
                 action: 'save_klaro_services',
-                services: JSON.stringify(klaroGeo.services),
-                _wpnonce: klaroGeo.nonce
+                services: JSON.stringify(klaroGeoServices.services),
+                _wpnonce: klaroGeoServices.nonce
             },
             success: function(response) {
                 if (response.success) {

@@ -46,23 +46,26 @@ function klaro_geo_generate_config_file() {
     $location = klaro_geo_get_user_location();
     $user_country = $location['country'];
     $user_region = $location['region'];
+    $using_debug_geo = $location['is_admin_override'];
 
-    klaro_geo_debug_log('User location - Country: ' . $user_country . ', Region: ' . $user_region);
+    klaro_geo_debug_log('User location - Country: ' . $user_country . ', Region: ' . $user_region .
+                       ($using_debug_geo ? ' (admin override)' : ''));
 
-    // Get effective settings for the location
-    $effective_settings = klaro_geo_get_effective_settings($user_country . ($user_region ? '-' . $user_region : ''));
+    // Get effective settings for the location, passing the admin override flag
+    $effective_settings = klaro_geo_get_effective_settings(
+        $user_country . ($user_region ? '-' . $user_region : ''),
+        $using_debug_geo
+    );
 
     // Determine template source for dataLayer
     $template_source = 'fallback';
+
+    // Use the source from effective settings
     if (isset($effective_settings['source'])) {
         $template_source = $effective_settings['source'];
-    } elseif (!empty($user_country) && !empty($user_region)) {
-        $template_source = 'geo-match region';
-    } elseif (!empty($user_country)) {
-        $template_source = 'geo-match country';
     }
 
-    klaro_geo_debug_log('Template source: ' . $template_source);
+    klaro_geo_debug_log('Template source: ' . $template_source . ($using_debug_geo ? ' (admin debug override)' : ''));
 
     // Extract template from effective settings
     $template_to_use = $effective_settings['template'] ?? 'default';
@@ -136,6 +139,29 @@ function klaro_geo_generate_config_file() {
 
     // Build the services configuration
     $klaro_config['services'] = array();
+
+    // Get the purpose settings once
+    $analytics_purposes = get_option('klaro_geo_analytics_purposes', array('analytics'));
+    if (!is_array($analytics_purposes)) {
+        $analytics_purposes = json_decode($analytics_purposes, true);
+        if (!is_array($analytics_purposes)) {
+            $analytics_purposes = array('analytics');
+        }
+    }
+
+    $ad_purposes = get_option('klaro_geo_ad_purposes', array('advertising'));
+    if (!is_array($ad_purposes)) {
+        $ad_purposes = json_decode($ad_purposes, true);
+        if (!is_array($ad_purposes)) {
+            $ad_purposes = array('advertising');
+        }
+    }
+
+    // Track which services have which purposes
+    $has_analytics_services = false;
+    $has_ad_services = false;
+
+    // Process each service
     foreach ($services as $service) {
         klaro_geo_debug_log('Processing service: ' . print_r($service, true));
         $service_config = array(
@@ -191,9 +217,7 @@ function klaro_geo_generate_config_file() {
             (empty($service_config['onInit']) || empty($service_config['onAccept']) || empty($service_config['onDecline']))) {
 
             // Get default values from the function
-            $defaults = function_exists('get_klaro_default_values') ? get_klaro_default_values() : array(
-                'gtm_oninit' => 'window.dataLayer = window.dataLayer || []; window.gtag = function() { dataLayer.push(arguments); }; gtag(\'consent\', \'default\', {\'ad_storage\': \'denied\', \'analytics_storage\': \'denied\', \'ad_user_data\': \'denied\', \'ad_personalization\': \'denied\'}); gtag(\'set\', \'ads_data_redaction\', true);',
-                'gtm_onaccept' => 'if (opts.consents.analytics || opts.consents.advertising) { for(let k of Object.keys(opts.consents)){ if (opts.consents[k]){ let eventName = \'klaro-\'+k+\'-accepted\'; dataLayer.push({\'event\': eventName}); } } }'            );
+            $defaults = get_klaro_default_values();
 
             klaro_geo_debug_log('Processing GTM settings with default values');
 
@@ -205,63 +229,149 @@ function klaro_geo_generate_config_file() {
             if (empty($service_config['onAccept'])) {
                 $service_config['onAccept'] = $defaults['gtm_onaccept'];
             }
+
+            if (empty($service_config['onDecline'])) {
+                $service_config['onDecline'] = $defaults['gtm_ondecline'];
+            }
         }
 
-        // For services without explicit callbacks, generate them based on purposes
-        if (empty($service_config['onAccept']) || empty($service_config['onDecline'])) {
-            // Add consent updates based on purposes
-            $analytics_purposes = get_option('klaro_geo_analytics_purposes', array('analytics'));
-            if (!is_array($analytics_purposes)) {
-                $analytics_purposes = json_decode($analytics_purposes, true);
-                if (!is_array($analytics_purposes)) {
-                    $analytics_purposes = array('analytics');
-                }
-            }
+        // Check if this service has analytics or advertising purposes
+        $purposes = isset($service['purposes']) ? $service['purposes'] :
+                   (isset($service['service_purposes']) ? $service['service_purposes'] : []);
 
-            $ad_purposes = get_option('klaro_geo_ad_purposes', array('advertising'));
-            if (!is_array($ad_purposes)) {
-                $ad_purposes = json_decode($ad_purposes, true);
-                if (!is_array($ad_purposes)) {
-                    $ad_purposes = array('advertising');
-                }
-            }
+        // Ensure purposes is an array
+        if (!is_array($purposes)) {
+            $purposes = array($purposes);
+        }
 
-            $purposes = isset($service['purposes']) ? $service['purposes'] :
-                       (isset($service['service_purposes']) ? $service['service_purposes'] : []);
+        // Track if this service has analytics or advertising purposes
+        if (is_array($purposes) && is_array($analytics_purposes) && count(array_intersect($purposes, $analytics_purposes)) > 0) {
+            $has_analytics_services = true;
+        }
 
-            // Ensure purposes is an array
-            if (!is_array($purposes)) {
-                $purposes = array($purposes);
-            }
-
-            // Generate analytics consent updates
-            if (is_array($purposes) && is_array($analytics_purposes) && count(array_intersect($purposes, $analytics_purposes)) > 0) {
-                if (empty($service_config['onAccept'])) {
-                    $service_config['onAccept'] = "gtag('consent', 'update', {'analytics_storage': 'granted'});";
-                }
-
-                if (empty($service_config['onDecline'])) {
-                    $service_config['onDecline'] = "gtag('consent', 'update', {'analytics_storage': 'denied'});";
-                }
-            }
-
-            // Generate ad consent updates
-            if (is_array($purposes) && is_array($ad_purposes) && count(array_intersect($purposes, $ad_purposes)) > 0) {
-                if (empty($service_config['onAccept'])) {
-                    $service_config['onAccept'] = ($service_config['onAccept'] ?? '') .
-                        "gtag('consent', 'update', {'ad_storage': 'granted', 'ad_user_data': 'granted', 'ad_personalization': 'granted'});";
-                }
-
-                if (empty($service_config['onDecline'])) {
-                    $service_config['onDecline'] = ($service_config['onDecline'] ?? '') .
-                        "gtag('consent', 'update', {'ad_storage': 'denied', 'ad_user_data': 'denied', 'ad_personalization': 'denied'});";
-                }
-            }
+        if (is_array($purposes) && is_array($ad_purposes) && count(array_intersect($purposes, $ad_purposes)) > 0) {
+            $has_ad_services = true;
         }
 
         $klaro_config['services'][] = $service_config;
     }
-            
+
+    // Add global consent handlers for analytics and advertising
+    $global_consent_js = "";
+
+    // Add a global variable to store the current opts
+    $global_consent_js .= "\n// Global variable to store the current Klaro opts\n";
+    $global_consent_js .= "window.currentKlaroOpts = null;\n";
+
+    // Add global onAccept handler
+    $global_consent_js .= "\n// Global consent update handler\n";
+    $global_consent_js .= "document.addEventListener('klaro:consent-change', function(e) {\n";
+    $global_consent_js .= "    // Get consents and services from the event detail\n";
+    $global_consent_js .= "    var consents = e.detail.manager.consents || {};\n";
+    $global_consent_js .= "    var services = e.detail.manager.services || [];\n";
+    $global_consent_js .= "    var consentUpdates = {};\n";
+    $global_consent_js .= "    console.log('Klaro consent change event:', e.detail);\n";
+
+    // Create arrays of purposes for JS
+    $analytics_purposes_js = wp_json_encode($analytics_purposes);
+    $ad_purposes_js = wp_json_encode($ad_purposes);
+
+    // Add analytics consent handling
+    if ($has_analytics_services) {
+        $global_consent_js .= "\n    // Check for analytics consent\n";
+        $global_consent_js .= "    var analyticsPurposes = {$analytics_purposes_js};\n";
+        $global_consent_js .= "    var hasAnalyticsConsent = false;\n";
+
+        // First check direct purpose consent
+        $global_consent_js .= "    // Check direct purpose consent\n";
+        $global_consent_js .= "    analyticsPurposes.forEach(function(purpose) {\n";
+        $global_consent_js .= "        if (consents[purpose] === true) {\n";
+        $global_consent_js .= "            console.log('Analytics purpose granted directly:', purpose);\n";
+        $global_consent_js .= "            hasAnalyticsConsent = true;\n";
+        $global_consent_js .= "        }\n";
+        $global_consent_js .= "    });\n";
+
+        // Then check service-based consent
+        $global_consent_js .= "\n    // Check service-based consent\n";
+        $global_consent_js .= "    if (!hasAnalyticsConsent) {\n";
+        $global_consent_js .= "        services.forEach(function(service) {\n";
+        $global_consent_js .= "            if (consents[service.name] === true && service.purposes) {\n";
+        $global_consent_js .= "                // Check if this service has any analytics purposes\n";
+        $global_consent_js .= "                var servicePurposes = Array.isArray(service.purposes) ? service.purposes : [service.purposes];\n";
+        $global_consent_js .= "                var hasAnalyticsPurpose = servicePurposes.some(function(purpose) {\n";
+        $global_consent_js .= "                    return analyticsPurposes.indexOf(purpose) !== -1;\n";
+        $global_consent_js .= "                });\n";
+        $global_consent_js .= "                if (hasAnalyticsPurpose) {\n";
+        $global_consent_js .= "                    console.log('Analytics consent granted via service:', service.name);\n";
+        $global_consent_js .= "                    hasAnalyticsConsent = true;\n";
+        $global_consent_js .= "                }\n";
+        $global_consent_js .= "            }\n";
+        $global_consent_js .= "        });\n";
+        $global_consent_js .= "    }\n";
+
+        $global_consent_js .= "    consentUpdates['analytics_storage'] = hasAnalyticsConsent ? 'granted' : 'denied';\n";
+    }
+
+    // Add advertising consent handling
+    if ($has_ad_services) {
+        $global_consent_js .= "\n    // Check for advertising consent\n";
+        $global_consent_js .= "    var adPurposes = {$ad_purposes_js};\n";
+        $global_consent_js .= "    var hasAdConsent = false;\n";
+
+        // First check direct purpose consent
+        $global_consent_js .= "    // Check direct purpose consent\n";
+        $global_consent_js .= "    adPurposes.forEach(function(purpose) {\n";
+        $global_consent_js .= "        if (consents[purpose] === true) {\n";
+        $global_consent_js .= "            console.log('Ad purpose granted directly:', purpose);\n";
+        $global_consent_js .= "            hasAdConsent = true;\n";
+        $global_consent_js .= "        }\n";
+        $global_consent_js .= "    });\n";
+
+        // Then check service-based consent
+        $global_consent_js .= "\n    // Check service-based consent\n";
+        $global_consent_js .= "    if (!hasAdConsent) {\n";
+        $global_consent_js .= "        services.forEach(function(service) {\n";
+        $global_consent_js .= "            if (consents[service.name] === true && service.purposes) {\n";
+        $global_consent_js .= "                // Check if this service has any ad purposes\n";
+        $global_consent_js .= "                var servicePurposes = Array.isArray(service.purposes) ? service.purposes : [service.purposes];\n";
+        $global_consent_js .= "                var hasAdPurpose = servicePurposes.some(function(purpose) {\n";
+        $global_consent_js .= "                    return adPurposes.indexOf(purpose) !== -1;\n";
+        $global_consent_js .= "                });\n";
+        $global_consent_js .= "                if (hasAdPurpose) {\n";
+        $global_consent_js .= "                    console.log('Ad consent granted via service:', service.name);\n";
+        $global_consent_js .= "                    hasAdConsent = true;\n";
+        $global_consent_js .= "                }\n";
+        $global_consent_js .= "            }\n";
+        $global_consent_js .= "        });\n";
+        $global_consent_js .= "    }\n";
+
+        $global_consent_js .= "    consentUpdates['ad_storage'] = hasAdConsent ? 'granted' : 'denied';\n";
+        $global_consent_js .= "    consentUpdates['ad_user_data'] = hasAdConsent ? 'granted' : 'denied';\n";
+        $global_consent_js .= "    consentUpdates['ad_personalization'] = hasAdConsent ? 'granted' : 'denied';\n";
+    }
+
+    // Add the actual consent update call
+    $global_consent_js .= "\n    // Update consent state in Google Consent Mode\n";
+    $global_consent_js .= "    if (Object.keys(consentUpdates).length > 0) {\n";
+    $global_consent_js .= "        console.log('Updating Google consent mode with:', consentUpdates);\n";
+    $global_consent_js .= "        gtag('consent', 'update', consentUpdates);\n";
+    $global_consent_js .= "    }\n";
+
+    // Also push to dataLayer for GTM integration
+    $global_consent_js .= "\n    // Push consent data to dataLayer\n";
+    $global_consent_js .= "    var acceptedServices = [];\n";
+    $global_consent_js .= "    for (var serviceName in consents) {\n";
+    $global_consent_js .= "        if (consents[serviceName] === true) {\n";
+    $global_consent_js .= "            acceptedServices.push(serviceName);\n";
+    $global_consent_js .= "        }\n";
+    $global_consent_js .= "    }\n";
+    $global_consent_js .= "    window.dataLayer = window.dataLayer || [];\n";
+    $global_consent_js .= "    window.dataLayer.push({\n";
+    $global_consent_js .= "        'event': 'Klaro Consent',\n";
+    $global_consent_js .= "        'acceptedServices': acceptedServices\n";
+    $global_consent_js .= "    });\n";
+    $global_consent_js .= "});\n";
+
     // Transform styling settings from object to array format if needed
     if (isset($klaro_config['styling']) && isset($klaro_config['styling']['theme'])) {
         klaro_geo_debug_log('Found styling theme settings: ' . print_r($klaro_config['styling']['theme'], true));
@@ -320,13 +430,17 @@ function klaro_geo_generate_config_file() {
     // Add a clear separator comment to help with parsing
     $klaro_config_content .= "// ===== END OF KLARO CONFIG =====\n\n";
 
+    // Add the global consent handler
+    $klaro_config_content .= $global_consent_js . "\n";
+
     // Add dataLayer push for debugging
     $dataLayer_push = array(
-        'event' => 'klaro_geo_klaro_config_loaded',
+        'event' => 'Klaro Config Loaded',
         'klaro_geo_consent_template' => $template_to_use,
         'klaro_geo_template_source' => $template_source,
         'klaro_geo_detected_country' => !empty($user_country) ? $user_country : null,
-        'klaro_geo_detected_region' => !empty($user_region) ? $user_region : null
+        'klaro_geo_detected_region' => !empty($user_region) ? $user_region : null,
+        'klaro_geo_admin_override' => $using_debug_geo
     );
 
     $klaro_config_content .= "// Push debug information to dataLayer\n";
@@ -347,19 +461,10 @@ function klaro_geo_generate_config_file() {
 
     // Append additional JavaScript code
     $klaro_config_content .= <<<JS
-// Initialize gtag function
-function gtag(){dataLayer.push(arguments);}
-
-// Set default consent state
-gtag('consent', 'default', {
-    'ad_storage': 'denied',
-    'analytics_storage': 'denied',
-    'ad_user_data': 'denied',
-    'ad_personalization': 'denied'
-});
-
-// Enable data redaction by default
-gtag('set', 'ads_data_redaction', true);
+// Initialize gtag function if it doesn't exist
+if (typeof gtag !== 'function') {
+    function gtag(){dataLayer.push(arguments);}
+}
 
 // Function to handle consent updates
 function handleConsentUpdate(type, granted) {
@@ -387,46 +492,34 @@ JS;
 
         $default_consent = isset($template_config['config']['default']) && $template_config['config']['default'] ? 'true' : 'false';
         $required_consent = isset($template_config['config']['required']) && $template_config['config']['required'] ? 'true' : 'false';
+        $admin_override_value = $using_debug_geo ? 'true' : 'false';
 
         // Add variables for the consent receipts script
         $klaro_config_content .= <<<JS
 // Consent Receipt Configuration
-window.klaroConsentReceiptsEnabled = true;
-window.klaroConsentTemplateName = "{$template_to_use}";
-window.klaroConsentTemplateSource = "{$template_source}";
-window.klaroDetectedCountry = "{$user_country}";
-window.klaroDetectedRegion = "{$user_region}";
-window.klaroAjaxUrl = "{$admin_ajax_url}";
-window.klaroNonce = "{$consent_nonce}";
-
-// Template settings for consent receipt
-window.klaroTemplateSettings = {
-    consentModalTitle: "{$modal_title}",
-    consentModalDescription: "{$modal_description}",
-    acceptAllText: "{$accept_all_text}",
-    declineAllText: "{$decline_all_text}",
-    defaultConsent: {$default_consent},
-    requiredConsent: {$required_consent}
+window.klaroConsentData = {
+    consentReceiptsEnabled: true,
+    templateName: "{$template_to_use}",
+    templateSource: "{$template_source}",
+    detectedCountry: "{$user_country}",
+    detectedRegion: "{$user_region}",
+    adminOverride: {$admin_override_value},
+    ajaxUrl: "{$admin_ajax_url}",
+    nonce: "{$consent_nonce}",
+    enableConsentLogging: true,
+    templateSettings: {
+        consentModalTitle: "{$modal_title}",
+        consentModalDescription: "{$modal_description}",
+        acceptAllText: "{$accept_all_text}",
+        declineAllText: "{$decline_all_text}",
+        defaultConsent: {$default_consent},
+        requiredConsent: {$required_consent}
+    }
 };
 
-// Basic dataLayer push for consent changes
-document.addEventListener('klaro:consent-change', function(e) {
-    // Create a simple consent receipt for dataLayer
-    var consentReceipt = {
-        'event': 'klaro_geo_consent_receipt',
-        'klaro_geo_consent_timestamp': new Date().toISOString(),
-        'klaro_geo_consent_choices': {}
-    };
-
-    // Add each service consent choice to the receipt
-    for (var serviceName in e.detail.manager.consents) {
-        consentReceipt.klaro_geo_consent_choices[serviceName] = e.detail.manager.consents[serviceName];
-    }
-
-    // Push the consent receipt to the dataLayer
-    window.dataLayer = window.dataLayer || [];
-    window.dataLayer.push(consentReceipt);
-});
+// Note: We're not adding a klaro:consent-change event listener here
+// because it's already handled in klaro-geo-consent-receipts.js
+// This prevents duplicate event handling
 
 JS;
     }

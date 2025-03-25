@@ -25,9 +25,9 @@ function klaro_geo_country_settings_page_content() {
 
     // Get visible countries from user settings
     $visible_countries = get_option('klaro_geo_visible_countries', $default_visible_countries);
-    
+
     // Load country codes from CSV file
-    $csv_file = dirname(dirname(plugin_dir_path(__FILE__))) . '/countries.csv';    
+    $csv_file = dirname(dirname(plugin_dir_path(__FILE__))) . '/countries.csv';
     $countries = array();
     if (($handle = fopen($csv_file, "r")) !== FALSE) {
         while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
@@ -35,6 +35,18 @@ function klaro_geo_country_settings_page_content() {
         }
         fclose($handle);
     }
+
+    // Sort countries alphabetically by name
+    asort($countries);
+
+    // Sort visible countries alphabetically
+    $sorted_visible_countries = array();
+    foreach ($countries as $code => $name) {
+        if (in_array($code, $visible_countries)) {
+            $sorted_visible_countries[] = $code;
+        }
+    }
+    $visible_countries = $sorted_visible_countries;
     
     // Get templates
     $templates = get_option('klaro_geo_templates', array());
@@ -117,6 +129,15 @@ function klaro_geo_country_settings_page_content() {
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
+
+                                <?php
+                                // Add hidden fields for region settings
+                                if (isset($country_config['regions']) && is_array($country_config['regions'])) {
+                                    foreach ($country_config['regions'] as $region_code => $template) {
+                                        echo '<input type="hidden" name="klaro_geo_country_settings[' . esc_attr($code) . '][regions][' . esc_attr($region_code) . ']" value="' . esc_attr($template) . '">';
+                                    }
+                                }
+                                ?>
                             </td>
                             <td>
                                 <?php

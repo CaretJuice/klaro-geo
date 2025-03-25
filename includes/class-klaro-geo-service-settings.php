@@ -41,6 +41,12 @@ class Klaro_Geo_Service_Settings extends Klaro_Geo_Option {
      * @return array The default services
      */
     public function get_default_services() {
+        // Use the central function to get default services
+        if (function_exists('klaro_geo_get_default_services')) {
+            return klaro_geo_get_default_services();
+        }
+
+        // Fallback if the function doesn't exist yet (should never happen)
         $default_services = array(
             array(
                 'name' => 'google-tag-manager',
@@ -56,7 +62,7 @@ class Klaro_Geo_Service_Settings extends Klaro_Geo_Option {
                 )
             )
         );
-        
+
         return $default_services;
     }
 

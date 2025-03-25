@@ -1,6 +1,6 @@
 /**
  * Frontend functionality for Klaro Geo
- */
+ * disused???
 (function() {
     // Initialize Klaro when the DOM is ready
     document.addEventListener('DOMContentLoaded', function() {
@@ -35,3 +35,5 @@
         }
     });
 })();
+
+ */

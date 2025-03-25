@@ -96,9 +96,9 @@ class ConsentReceiptsIntegrationTest extends IgnoreDeprecatedTestCase {
         $config_content = file_get_contents($klaro_config_file);
 
         // Check if the consent receipt code is included
-        $this->assertStringContainsString('klaroConsentReceiptsEnabled = true', $config_content, 'Config should enable consent receipts');
+        $this->assertStringContainsString('consentReceiptsEnabled: true', $config_content, 'Config should enable consent receipts');
         $this->assertStringContainsString('klaro:consent-change', $config_content, 'Config should include event listener');
-        $this->assertStringContainsString('klaro_geo_consent_receipt', $config_content, 'Config should include dataLayer event name');
+        $this->assertStringContainsString('window.klaroConsentData', $config_content, 'Config should include klaroConsentData object');
     }
 
     /**
@@ -204,7 +204,7 @@ class ConsentReceiptsIntegrationTest extends IgnoreDeprecatedTestCase {
         $config_content = file_get_contents($klaro_config_file);
 
         // Check that consent receipt code is not included
-        $this->assertStringNotContainsString('klaroConsentReceiptsEnabled = true', $config_content, 'Config should not enable consent receipts');
+        $this->assertStringNotContainsString('consentReceiptsEnabled: true', $config_content, 'Config should not enable consent receipts');
 
         // Set up a test post
         $post_id = $this->factory->post->create();

@@ -1,0 +1,78 @@
+# Operating System Files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msm
+*.msp
+*.lnk
+
+# IDE and Editor Files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+*.komodoproject
+.komodotools/
+*.kate-swp
+.project
+.buildpath
+.settings/
+nbproject/
+
+# Node.js and npm
+node_modules/
+npm-debug.log
+yarn-error.log
+yarn-debug.log
+package-lock.json
+
+# Composer
+vendor/
+composer.lock
+
+# WordPress Plugin Specific
+klaro-config.js
+klaro-geo.zip
+
+# Build and Distribution Files
+dist/
+build/
+assets/dist/
+
+# Testing and Coverage
+coverage/
+.phpunit.result.cache
+
+# Temporary Files
+*.log
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Environment Files
+.env
+.env.*
+!.env.example
+
+# Debugging Files
+debug.log
+
+# Backup Files
+*.bak
+*.backup
+*.old
+*.orig
+*~
+
+# Miscellaneous
+*.zip
+*.tar.gz
+*.tar
+*.rar
+*.sql
+.htaccess

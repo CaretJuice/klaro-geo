@@ -255,43 +255,90 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
             klaro_geo_debug_log('Invalid submitted settings, must be an array');
             return $this;
         }
-        
+
         // Get the default template
         $default_template = isset($submitted_settings['default_template']) ? $submitted_settings['default_template'] : 'default';
-        
-        // Create a new settings array with only the default_template
+
+        // Get current settings to preserve region settings
+        $current_settings = $this->get();
+
+        // Log the submitted settings and current settings for debugging
+        klaro_geo_debug_log('Submitted settings: ' . print_r($submitted_settings, true));
+        klaro_geo_debug_log('Current settings before update: ' . print_r($current_settings, true));
+
+        // Create a new settings array with the default_template
         $new_settings = array(
             'default_template' => $default_template
         );
-        
+
         // Process each country in the submitted settings
         foreach ($submitted_settings as $code => $config) {
             // Skip the default_template key
             if ($code === 'default_template') {
                 continue;
             }
-            
+
             // Remove the _is_default flag if it exists
             if (isset($config['_is_default'])) {
                 unset($config['_is_default']);
             }
-            
+
+            // Check if regions are included in the submitted settings
+            if (isset($config['regions']) && is_array($config['regions'])) {
+                klaro_geo_debug_log('Found regions in submitted settings for country ' . $code . ': ' . print_r($config['regions'], true));
+
+                // Filter out empty regions
+                $config['regions'] = array_filter($config['regions'], function($value) {
+                    return !empty($value) && $value !== 'default' && $value !== 'inherit';
+                });
+
+                if (!empty($config['regions'])) {
+                    klaro_geo_debug_log('After filtering, regions for country ' . $code . ': ' . print_r($config['regions'], true));
+                } else {
+                    klaro_geo_debug_log('No valid regions found after filtering for country ' . $code);
+                    // Keep an empty regions array for consistency
+                    $config['regions'] = array();
+                }
+            }
+            // If no regions in submitted settings, preserve existing ones or create empty array
+            else if (isset($current_settings[$code]) && isset($current_settings[$code]['regions'])) {
+                $config['regions'] = $current_settings[$code]['regions'];
+                klaro_geo_debug_log('Preserving existing region settings for country ' . $code . ': ' . print_r($config['regions'], true));
+            } else {
+                // Ensure regions key exists
+                $config['regions'] = array();
+                klaro_geo_debug_log('No regions found for country ' . $code . ', creating empty array');
+            }
+
             // If the country uses the default template and has no regions (or empty regions array), skip it
-            if (isset($config['template']) && $config['template'] === $default_template && 
+            if (isset($config['template']) && $config['template'] === $default_template &&
                 (!isset($config['regions']) || empty($config['regions']))) {
                 klaro_geo_debug_log('Skipping country ' . $code . ' (uses default template with no region overrides)');
                 continue;
             }
-            
+
             // Add the country to the new settings
             $new_settings[$code] = $config;
         }
-        
+
+        // Check for countries with region settings that might not be in the submitted settings
+        foreach ($current_settings as $code => $config) {
+            if ($code === 'default_template') {
+                continue;
+            }
+
+            // If country is not in new settings but has region overrides, preserve it
+            if (!isset($new_settings[$code]) && isset($config['regions']) && !empty($config['regions'])) {
+                $new_settings[$code] = $config;
+                klaro_geo_debug_log('Preserving country ' . $code . ' with region overrides: ' . print_r($config['regions'], true));
+            }
+        }
+
         // Replace the old settings with the new ones
         $this->set($new_settings);
-        
+
         klaro_geo_debug_log('Updated country settings from form: ' . print_r($new_settings, true));
-        
+
         return $this;
     }
 
@@ -306,24 +353,31 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
             klaro_geo_debug_log('Invalid region settings, must be an array');
             return $this;
         }
-        
+
         klaro_geo_debug_log('Updating regions from AJAX: ' . print_r($settings, true));
-        
+
+        // Get current settings to ensure we don't lose any data
+        $current_settings = $this->get();
+        klaro_geo_debug_log('Current settings before updating regions: ' . print_r($current_settings, true));
+
         // Update region settings for each country
         foreach ($settings as $country => $country_data) {
             // Get existing country settings or create new ones
             $country_settings = $this->get_country($country);
-            
+
             if (!$country_settings) {
                 $country_settings = array(
                     'template' => $this->get_default_template()
                 );
             }
-            
+
             // Make sure we preserve the existing template setting
             if (!isset($country_settings['template'])) {
                 $country_settings['template'] = $this->get_default_template();
             }
+
+            // Log the country settings before updating
+            klaro_geo_debug_log('Country settings before updating regions for ' . $country . ': ' . print_r($country_settings, true));
             
             // Check if regions is defined in the incoming data
             if (isset($country_data['regions']) && is_array($country_data['regions'])) {
@@ -370,19 +424,29 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
                 }
             }
             
-            // If regions array is empty, remove it to save space
-            if (empty($country_settings['regions'])) {
-                unset($country_settings['regions']);
-                klaro_geo_debug_log("Removed empty regions array for country {$country}");
+            // Ensure regions key exists
+            if (!isset($country_settings['regions'])) {
+                $country_settings['regions'] = array();
+                klaro_geo_debug_log("Creating empty regions array for country {$country}");
+            } else if (empty($country_settings['regions'])) {
+                // We'll keep the empty regions array to ensure we don't lose region settings
+                klaro_geo_debug_log("Empty regions array for country {$country}, but keeping it for consistency");
             }
-            
+
             // Update the country settings
             $this->set_country($country, $country_settings);
+
+            // Log the country settings after updating
+            klaro_geo_debug_log('Country settings after updating regions for ' . $country . ': ' . print_r($country_settings, true));
         }
-        
-        // Optimize the settings
-        $this->optimize();
-        
+
+        // Get settings after updating all countries
+        $updated_settings = $this->get();
+        klaro_geo_debug_log('Settings after updating all regions: ' . print_r($updated_settings, true));
+
+        // Skip optimization to ensure we don't lose any region settings
+        // $this->optimize();
+
         return $this;
     }
 
@@ -396,28 +460,44 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
         $optimized = array(
             'default_template' => $default_template
         );
-        
+
+        // Debug log before optimization
+        klaro_geo_debug_log('Before optimization: ' . print_r($this->value, true));
+
         foreach ($this->value as $code => $config) {
             // Skip the default_template key
             if ($code === 'default_template') {
                 continue;
             }
-            
-            // If the country uses the default template and has no regions (or empty regions array), skip it
-            if (isset($config['template']) && $config['template'] === $default_template && 
-                (!isset($config['regions']) || empty($config['regions']))) {
+
+            // Ensure regions key exists
+            if (!isset($config['regions'])) {
+                $config['regions'] = array();
+            }
+
+            // Check for region settings
+            $has_regions = !empty($config['regions']);
+
+            // If the country uses the default template and has no regions, skip it
+            if (isset($config['template']) && $config['template'] === $default_template && !$has_regions) {
                 klaro_geo_debug_log('Optimizing: Removing country ' . $code . ' (uses default template with no region overrides)');
                 continue;
             }
-            
+
+            // Always preserve countries with region settings
+            if ($has_regions) {
+                klaro_geo_debug_log('Optimizing: Preserving country ' . $code . ' because it has region settings: ' . print_r($config['regions'], true));
+            }
+
             // Add the country to the optimized settings
             $optimized[$code] = $config;
         }
-        
+
+        // Debug log after optimization
+        klaro_geo_debug_log('After optimization: ' . print_r($optimized, true));
+
         $this->set($optimized);
-        
-        klaro_geo_debug_log('Optimized settings: ' . print_r($optimized, true));
-        
+
         return $this;
     }
 

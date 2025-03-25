@@ -331,10 +331,41 @@ jQuery(document).ready(function($) {
     $('.manage-regions').click(function() {
         var countryCode = $(this).data('country');
         var modal = $('#region-modal-' + countryCode);
-        modal.show();
 
-        // Load regions for this country
-        loadRegions(countryCode);
+        // Save the current form state before opening the modal
+        var formData = $('#klaro-country-settings-form').serialize();
+
+        // Save country settings via AJAX
+        $.ajax({
+            url: klaroGeoAdmin.ajaxurl,
+            type: 'POST',
+            data: {
+                action: 'save_klaro_country_settings',
+                settings: formData,
+                nonce: klaroGeoAdmin.nonce
+            },
+            success: function(response) {
+                if (response.success) {
+                    console.log('Country settings saved before opening region modal');
+
+                    // Now show the modal and load regions
+                    modal.show();
+                    loadRegions(countryCode);
+                } else {
+                    console.error('Failed to save country settings:', response);
+                    alert('Failed to save country settings before opening region modal. Please try again.');
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('AJAX error:', status, error);
+                console.error('Response text:', xhr.responseText);
+                alert('Error saving country settings: ' + status + ' - ' + error);
+
+                // Still show the modal and load regions even if saving failed
+                modal.show();
+                loadRegions(countryCode);
+            }
+        });
     });
 
     // Close region modal

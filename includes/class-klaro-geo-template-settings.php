@@ -51,86 +51,67 @@ class Klaro_Geo_Template_Settings extends Klaro_Geo_Option {
      * @return array The default templates
      */
     public function get_default_templates() {
-        $default_templates = array(
+        // Use the global function to get default templates
+        // This ensures we have a single source of truth for template definitions
+        if (function_exists('klaro_geo_get_default_templates')) {
+            $templates = klaro_geo_get_default_templates();
+
+            // Add descriptions if they don't exist (for backward compatibility)
+            foreach ($templates as $key => &$template) {
+                if (!isset($template['description'])) {
+                    switch ($key) {
+                        case 'default':
+                            $template['description'] = 'The default template used when no location-specific template is found';
+                            break;
+                        case 'strict':
+                            $template['description'] = 'Requires explicit consent for all services (opt-in)';
+                            break;
+                        case 'relaxed':
+                            $template['description'] = 'Assumes consent for all services (opt-out)';
+                            break;
+                        default:
+                            $template['description'] = 'Custom template';
+                    }
+                }
+            }
+
+            return $templates;
+        }
+
+        // Fallback to basic templates if the global function doesn't exist
+        // This should never happen in normal operation
+        klaro_geo_debug_log('WARNING: klaro_geo_get_default_templates function not found, using fallback templates');
+
+        return array(
             'default' => array(
                 'name' => 'Default Template',
                 'description' => 'The default template used when no location-specific template is found',
                 'config' => array(
+                    'version' => 1,
+                    'elementID' => 'klaro',
+                    'styling' => array(
+                        'theme' => array(
+                            'color' => 'light',
+                            'position' => 'top',
+                            'width' => 'wide'
+                        )
+                    ),
+                    'htmlTexts' => true,
+                    'embedded' => false,
+                    'groupByPurpose' => true,
+                    'storageMethod' => 'cookie',
+                    'cookieName' => 'klaro',
+                    'cookieExpiresAfterDays' => 365,
                     'default' => false,
                     'mustConsent' => false,
                     'acceptAll' => true,
                     'hideDeclineAll' => false,
                     'hideLearnMore' => false,
                     'noticeAsModal' => false,
-                    'additionalClass' => '',
-                    'disablePoweredBy' => false,
-                    'htmlTexts' => true,
-                    'embedded' => false,
-                    'groupByPurpose' => true,
-                    'cookieDomain' => '',
-                    'cookieExpiresAfterDays' => 365,
-                    'privacyPolicy' => array(
-                        'default' => '/privacy-policy/'
-                    ),
-                    'translations' => array(
-                        'zz' => array(
-                            'privacyPolicyUrl' => '/privacy-policy/',
-                            'consentModal' => array(
-                                'title' => 'Information that we collect',
-                                'description' => 'Here you can see and customize the information that we collect about you.'
-                            ),
-                            'consentNotice' => array(
-                                'title' => 'Cookie Notice',
-                                'changeDescription' => 'There were changes since your last visit, please update your consent.',
-                                'description' => 'We use cookies to personalize content and analyze traffic to our website. You can choose to accept or decline these cookies.',
-                                'learnMore' => 'Learn more'
-                            ),
-                            'ok' => 'Accept',
-                            'decline' => 'Decline',
-                            'acceptAll' => 'Accept all',
-                            'acceptSelected' => 'Accept selected',
-                            'close' => 'Close',
-                            'purposes' => array(
-                                'functional' => 'Functional',
-                                'analytics' => 'Analytics',
-                                'advertising' => 'Advertising',
-                                'personalization' => 'Personalization'
-                            ),
-                            'purposeItem' => array(
-                                'service' => 'service',
-                                'services' => 'services'
-                            )
-                        )
-                    )
-                )
-            ),
-            'strict' => array(
-                'name' => 'Strict Opt-In',
-                'description' => 'Requires explicit consent for all services (opt-in)',
-                'config' => array(
-                    'default' => false,
-                    'mustConsent' => true,
-                    'acceptAll' => true,
-                    'hideDeclineAll' => false,
-                    'hideLearnMore' => false,
-                    'noticeAsModal' => true
-                )
-            ),
-            'relaxed' => array(
-                'name' => 'Relaxed Opt-Out',
-                'description' => 'Assumes consent for all services (opt-out)',
-                'config' => array(
-                    'default' => true,
-                    'mustConsent' => false,
-                    'acceptAll' => true,
-                    'hideDeclineAll' => true,
-                    'hideLearnMore' => false,
-                    'noticeAsModal' => false
+                    'disablePoweredBy' => false
                 )
             )
         );
-        
-        return $default_templates;
     }
 
     /**

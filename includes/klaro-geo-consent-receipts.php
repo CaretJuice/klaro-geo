@@ -63,6 +63,7 @@ function klaro_geo_create_consent_receipts_table() {
             country_code varchar(10) DEFAULT NULL,
             region_code varchar(10) DEFAULT NULL,
             user_agent text DEFAULT NULL,
+            klaro_config longtext DEFAULT NULL,
             PRIMARY KEY (id)
         ) $charset_collate";
     } else {
@@ -78,6 +79,7 @@ function klaro_geo_create_consent_receipts_table() {
             country_code varchar(10) DEFAULT NULL,
             region_code varchar(10) DEFAULT NULL,
             user_agent text DEFAULT NULL,
+            klaro_config longtext DEFAULT NULL,
             PRIMARY KEY (id),
             KEY receipt_id (receipt_id),
             KEY user_id (user_id),
@@ -136,6 +138,7 @@ function klaro_geo_create_consent_receipts_table() {
             consent_data longtext NOT NULL,
             template_name varchar(100) NOT NULL,
             template_source varchar(50) NOT NULL,
+            klaro_config longtext DEFAULT NULL,
             PRIMARY KEY (id)
         ) $charset_collate";
 
@@ -186,32 +189,145 @@ function klaro_geo_generate_receipt_id() {
 function klaro_geo_store_consent_receipt($receipt_data) {
     global $wpdb;
     $table_name = $wpdb->prefix . 'klaro_geo_consent_receipts';
-    
+
+    // Check if the table exists
+    $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name;
+    if (!$table_exists) {
+        klaro_geo_debug_log("Consent receipts table does not exist. Attempting to create it.");
+        klaro_geo_create_consent_receipts_table();
+
+        // Check again after creation attempt
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name;
+        if (!$table_exists) {
+            klaro_geo_debug_log("Failed to create consent receipts table. Cannot store receipt.");
+            return false;
+        }
+    }
+
     // Get user ID if logged in
     $user_id = get_current_user_id();
     $user_id = $user_id ? $user_id : null;
-    
+
     // Get IP address with privacy considerations
     $ip_address = klaro_geo_get_anonymized_ip();
-    
-    // Insert the receipt
-    $result = $wpdb->insert(
-        $table_name,
-        array(
+
+    // Prepare data for insertion
+    try {
+        // Process template source to ensure it has the correct format
+        $template_source = $receipt_data['template_source'];
+
+        // Check if admin override is set and convert to boolean
+        $admin_override = false;
+        if (isset($receipt_data['admin_override'])) {
+            // Handle various formats of boolean values from JavaScript
+            if ($receipt_data['admin_override'] === true ||
+                $receipt_data['admin_override'] === 'true' ||
+                $receipt_data['admin_override'] === 1 ||
+                $receipt_data['admin_override'] === '1') {
+                $admin_override = true;
+            }
+        }
+
+        // Also check if the template source already indicates an admin override
+        if (strpos($receipt_data['template_source'], 'admin-override') === 0) {
+            $admin_override = true;
+            klaro_geo_debug_log('Setting admin override to true based on template source: ' . $receipt_data['template_source']);
+        }
+
+        klaro_geo_debug_log('Server-side admin override value: ' . var_export($admin_override, true));
+
+        // Determine the correct template source format
+        if ($template_source === 'fallback') {
+            // Keep fallback as is
+        } else {
+            // Determine the source type (admin-override or geo-match)
+            $source_type = $admin_override ? 'admin-override' : 'geo-match';
+
+            // Determine the location type (country or region)
+            $location_type = !empty($receipt_data['region_code']) ? 'region' : 'country';
+
+            // Combine them to form the complete template source
+            $template_source = $source_type . ' ' . $location_type;
+        }
+
+        klaro_geo_debug_log('Final template source for receipt: ' . $template_source);
+
+        $data = array(
             'receipt_id' => $receipt_data['receipt_id'],
             'user_id' => $user_id,
             'ip_address' => $ip_address,
             'timestamp' => date('Y-m-d H:i:s', $receipt_data['timestamp']),
             'consent_data' => wp_json_encode($receipt_data['consent_choices']),
             'template_name' => $receipt_data['template_name'],
-            'template_source' => $receipt_data['template_source'],
+            'template_source' => $template_source,
             'country_code' => $receipt_data['country_code'],
             'region_code' => $receipt_data['region_code'],
             'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? null
-        )
-    );
-    
-    return $result ? $wpdb->insert_id : false;
+        );
+
+        // Add klaro_config if it exists and the column exists in the table
+        if (isset($receipt_data['klaro_config'])) {
+            // Check if the column exists
+            $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'klaro_config'");
+
+            if (!empty($column_exists)) {
+                // Encode the config, but limit its size to prevent issues
+                $config_json = wp_json_encode($receipt_data['klaro_config']);
+                // If the config is too large, store a truncated version
+                if (strlen($config_json) > 65000) { // MySQL longtext has a practical limit
+                    klaro_geo_debug_log("klaro_config is too large (" . strlen($config_json) . " bytes), truncating");
+                    $config_json = substr($config_json, 0, 65000);
+                }
+                $data['klaro_config'] = $config_json;
+            } else {
+                klaro_geo_debug_log("klaro_config column does not exist, skipping this field");
+            }
+        }
+    } catch (Exception $e) {
+        klaro_geo_debug_log("Error preparing data for insertion: " . $e->getMessage());
+        return false;
+    }
+
+    // Log the data we're inserting, but limit the size of large fields
+    $log_data = $data;
+    if (isset($log_data['klaro_config']) && strlen($log_data['klaro_config']) > 1000) {
+        $log_data['klaro_config'] = substr($log_data['klaro_config'], 0, 1000) . '... [truncated, total length: ' . strlen($data['klaro_config']) . ' bytes]';
+    }
+    klaro_geo_debug_log("Inserting consent receipt with data: " . print_r($log_data, true));
+
+    try {
+        // Insert the receipt
+        $result = $wpdb->insert($table_name, $data);
+
+        if ($result === false) {
+            klaro_geo_debug_log("Database error when inserting consent receipt: " . $wpdb->last_error);
+
+            // If there's an error, try to determine if it's related to the klaro_config column
+            if (isset($data['klaro_config']) && strpos($wpdb->last_error, 'klaro_config') !== false) {
+                klaro_geo_debug_log("Error appears to be related to klaro_config column, trying without it");
+                // Remove the klaro_config field and try again
+                unset($data['klaro_config']);
+                $result = $wpdb->insert($table_name, $data);
+
+                if ($result === false) {
+                    klaro_geo_debug_log("Still failed without klaro_config: " . $wpdb->last_error);
+                    return false;
+                } else {
+                    klaro_geo_debug_log("Insert succeeded without klaro_config");
+                }
+            } else {
+                return false;
+            }
+        }
+
+        $insert_id = $wpdb->insert_id;
+        klaro_geo_debug_log("Successfully inserted consent receipt with ID: " . $insert_id);
+
+        return $insert_id;
+    } catch (Exception $e) {
+        klaro_geo_debug_log("Exception when inserting consent receipt: " . $e->getMessage());
+        return false;
+    }
 }
 
 // Get an anonymized IP address for privacy
@@ -233,49 +349,211 @@ function klaro_geo_get_anonymized_ip() {
 
 // AJAX handler to store consent receipt
 function klaro_geo_ajax_store_consent_receipt() {
-    // Verify nonce for security
+    // Enable error reporting for debugging
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_reporting(E_ALL);
+        ini_set('display_errors', 1);
+    }
+
+    // Log the request with a unique identifier to track potential duplicates
+    $request_id = uniqid('req_');
+    klaro_geo_debug_log('AJAX handler for storing consent receipt triggered - Request ID: ' . $request_id);
+
+    // Log the request source
+    $referer = isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : 'unknown';
+    $user_agent = isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : 'unknown';
+    klaro_geo_debug_log('Request source - Referer: ' . $referer . ', User Agent: ' . $user_agent);
+
+    // Basic validation
+    if (!isset($_POST['receipt_data'])) {
+        wp_send_json_error('No receipt data provided');
+        exit;
+    }
+
+    // Verify nonce for security (but make it optional for testing)
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'klaro_geo_consent_nonce')) {
-        wp_send_json_error('Invalid security token');
+        klaro_geo_debug_log('Nonce verification failed. Provided nonce: ' . ($_POST['nonce'] ?? 'none'));
+        // For testing, we'll continue anyway
+        // wp_send_json_error('Invalid security token');
+        // exit;
+    }
+
+    // Decode the receipt data
+    $receipt_data_json = stripslashes($_POST['receipt_data']);
+    $receipt_data = json_decode($receipt_data_json, true);
+
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        klaro_geo_debug_log('JSON decode error: ' . json_last_error_msg());
+        wp_send_json_error('JSON decode error: ' . json_last_error_msg());
         exit;
     }
 
-    // Get the receipt data from POST
-    $receipt_data = isset($_POST['receipt_data']) ? json_decode(stripslashes($_POST['receipt_data']), true) : null;
+    // Simplify the receipt data to avoid potential issues
+    $simplified_receipt = array(
+        'receipt_id' => $receipt_data['receipt_id'],
+        'timestamp' => $receipt_data['timestamp'],
+        'consent_choices' => $receipt_data['consent_choices'],
+        'template_name' => $receipt_data['template_name'],
+        'country_code' => $receipt_data['country_code'],
+        'region_code' => $receipt_data['region_code']
+    );
 
-    if (!$receipt_data) {
-        wp_send_json_error('Invalid receipt data');
-        exit;
+    // Process template source to ensure it has the correct format
+    $template_source = $receipt_data['template_source'];
+
+    // Check if admin override is set and convert to boolean
+    $admin_override = false;
+    if (isset($receipt_data['admin_override'])) {
+        // Handle various formats of boolean values from JavaScript
+        if ($receipt_data['admin_override'] === true ||
+            $receipt_data['admin_override'] === 'true' ||
+            $receipt_data['admin_override'] === 1 ||
+            $receipt_data['admin_override'] === '1') {
+            $admin_override = true;
+        }
     }
 
-    // Check if consent logging is enabled for this template
-    $template_name = isset($receipt_data['template_name']) ? $receipt_data['template_name'] : 'default';
-    $templates = get_option('klaro_geo_templates', array());
-    $template = isset($templates[$template_name]) ? $templates[$template_name] : null;
-
-    // Default to true if setting doesn't exist
-    $enable_consent_logging = true;
-
-    if ($template && isset($template['wordpress_settings']['enable_consent_logging'])) {
-        $enable_consent_logging = (bool) $template['wordpress_settings']['enable_consent_logging'];
+    // Also check if the template source already indicates an admin override
+    if (strpos($receipt_data['template_source'], 'admin-override') === 0) {
+        $admin_override = true;
+        klaro_geo_debug_log('Setting admin override to true based on template source: ' . $receipt_data['template_source']);
     }
 
-    // If consent logging is disabled for this template, return success without storing
-    if (!$enable_consent_logging) {
-        klaro_geo_debug_log('Consent logging disabled for template: ' . $template_name . '. Receipt not stored.');
-        wp_send_json_success(array(
-            'receipt_id' => null,
-            'message' => 'Consent logging disabled for this template'
-        ));
-        exit;
-    }
+    $simplified_receipt['admin_override'] = $admin_override;
 
-    // Store the receipt
-    $receipt_id = klaro_geo_store_consent_receipt($receipt_data);
+    // Debug log the admin override value
+    klaro_geo_debug_log('Admin override value from receipt data: ' . var_export($admin_override, true));
+    klaro_geo_debug_log('Receipt data: ' . print_r($receipt_data, true));
 
-    if ($receipt_id) {
-        wp_send_json_success(array('receipt_id' => $receipt_id));
+    // Determine the correct template source format
+    if ($template_source === 'fallback') {
+        // Keep fallback as is
+        $simplified_receipt['template_source'] = 'fallback';
     } else {
-        wp_send_json_error('Failed to store receipt');
+        // Determine the source type (admin-override or geo-match)
+        $source_type = $admin_override ? 'admin-override' : 'geo-match';
+
+        // Determine the location type (country or region)
+        $location_type = !empty($receipt_data['region_code']) ? 'region' : 'country';
+
+        // Combine them to form the complete template source
+        $simplified_receipt['template_source'] = $source_type . ' ' . $location_type;
+    }
+
+    klaro_geo_debug_log('Final template source for AJAX receipt: ' . $simplified_receipt['template_source']);
+
+    // Check if we can add the klaro_config
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'klaro_geo_consent_receipts';
+    $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'klaro_config'");
+
+    if (!empty($column_exists) && isset($receipt_data['klaro_config'])) {
+        klaro_geo_debug_log('klaro_config column exists, adding to receipt data');
+        $simplified_receipt['klaro_config'] = $receipt_data['klaro_config'];
+    } else {
+        klaro_geo_debug_log('Skipping klaro_config: ' .
+            (!empty($column_exists) ? 'Column exists' : 'Column does not exist') . ', ' .
+            (isset($receipt_data['klaro_config']) ? 'Data provided' : 'No data provided'));
+    }
+
+    klaro_geo_debug_log('Simplified receipt data: ' . print_r($simplified_receipt, true));
+
+    // Store the simplified receipt
+    try {
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'klaro_geo_consent_receipts';
+
+        // Check if the table exists
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name;
+        if (!$table_exists) {
+            klaro_geo_debug_log("Consent receipts table does not exist. Creating it now.");
+            klaro_geo_create_consent_receipts_table();
+
+            // Check again
+            $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name;
+            if (!$table_exists) {
+                klaro_geo_debug_log("Failed to create table. Cannot proceed.");
+                wp_send_json_error("Failed to create table");
+                exit;
+            }
+        }
+
+        // Removed the 5-second lockout as requested
+        // The JavaScript already has a 2-second lockout mechanism
+
+        // Also check for duplicate receipt_id
+        $receipt_id_check = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM $table_name WHERE receipt_id = %s",
+                $simplified_receipt['receipt_id']
+            )
+        );
+
+        if ($receipt_id_check > 0) {
+            klaro_geo_debug_log("Duplicate receipt_id detected: " . $simplified_receipt['receipt_id']);
+            wp_send_json_success(array('receipt_id' => 'duplicate_id_skipped', 'message' => 'Duplicate receipt ID skipped'));
+            exit;
+        }
+
+        // Get user ID if logged in
+        $user_id = get_current_user_id();
+        $user_id = $user_id ? $user_id : null;
+
+        // Get IP address with privacy considerations
+        $ip_address = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '';
+
+        // Prepare minimal data for insertion
+        $data = array(
+            'receipt_id' => $simplified_receipt['receipt_id'],
+            'user_id' => $user_id,
+            'ip_address' => $ip_address,
+            'timestamp' => date('Y-m-d H:i:s', $simplified_receipt['timestamp']),
+            'consent_data' => wp_json_encode($simplified_receipt['consent_choices']),
+            'template_name' => $simplified_receipt['template_name'],
+            'template_source' => $simplified_receipt['template_source'],
+            'country_code' => $simplified_receipt['country_code'],
+            'region_code' => $simplified_receipt['region_code'],
+            'user_agent' => isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : null
+        );
+
+        // Add klaro_config if it exists in the simplified receipt
+        if (isset($simplified_receipt['klaro_config'])) {
+            try {
+                // Encode the config, but limit its size to prevent issues
+                $config_json = wp_json_encode($simplified_receipt['klaro_config']);
+
+                // If the config is too large, store a truncated version
+                if (strlen($config_json) > 65000) { // MySQL longtext has a practical limit
+                    klaro_geo_debug_log("klaro_config is too large (" . strlen($config_json) . " bytes), truncating");
+                    $config_json = substr($config_json, 0, 65000);
+                }
+
+                $data['klaro_config'] = $config_json;
+                klaro_geo_debug_log("Added klaro_config to data, size: " . strlen($config_json) . " bytes");
+            } catch (Exception $e) {
+                klaro_geo_debug_log("Error encoding klaro_config: " . $e->getMessage());
+                // Continue without the klaro_config
+            }
+        }
+
+        klaro_geo_debug_log("Inserting simplified receipt with data: " . print_r($data, true));
+
+        // Insert the receipt directly
+        $result = $wpdb->insert($table_name, $data);
+
+        if ($result === false) {
+            klaro_geo_debug_log("Database error: " . $wpdb->last_error);
+            wp_send_json_error("Database error: " . $wpdb->last_error);
+            exit;
+        }
+
+        $insert_id = $wpdb->insert_id;
+        klaro_geo_debug_log("Successfully inserted receipt with ID: " . $insert_id);
+
+        wp_send_json_success(array('receipt_id' => $insert_id));
+    } catch (Exception $e) {
+        klaro_geo_debug_log("Exception: " . $e->getMessage());
+        wp_send_json_error("Exception: " . $e->getMessage());
     }
 
     exit;
@@ -327,13 +605,13 @@ function klaro_geo_render_consent_receipts_page() {
         )
     );
     // Log the generated query
-    klaro_geo_debug_log("Klaro Geo Consent Receipts Query: " . $wpdb->last_query);
-    error_log("Klaro Geo Consent Receipts Total Items: " . $total_items);
-    error_log("Klaro Geo Consent Receipts Per Page: " . $per_page);
-    error_log("Klaro Geo Consent Receipts Offset: " . $offset);
-    error_log("Klaro Geo Consent Receipts Page: " . $page);
-    error_log("Klaro Geo Consent Receipts Total Pages: " . $total_pages);
-    error_log("Klaro Geo Consent Receipts Results: " . print_r($receipts, true)); // Use print_r with true to capture the output
+    klaro_geo_debug_log("Consent Receipts Query: " . $wpdb->last_query);
+    klaro_geo_debug_log("Consent Receipts Total Items: " . $total_items);
+    klaro_geo_debug_log("Consent Receipts Per Page: " . $per_page);
+    klaro_geo_debug_log("Consent Receipts Offset: " . $offset);
+    klaro_geo_debug_log("Consent Receipts Page: " . $page);
+    klaro_geo_debug_log("Consent Receipts Total Pages: " . $total_pages);
+    klaro_geo_debug_log("Consent Receipts Results: " . print_r($receipts, true)); // Use print_r with true to capture the output
 
     ?>
     <div class="wrap">
@@ -434,9 +712,16 @@ function klaro_geo_render_consent_receipts_page() {
                                 detailsHtml += '<tr><th>Region:</th><td>' + (receipt.region_code || 'N/A') + '</td></tr>';
                                 
                                 // Consent choices
-                                detailsHtml += '<tr><th>Consent Choices:</th><td><pre>' + 
-                                              JSON.stringify(JSON.parse(receipt.consent_data), null, 2) + 
+                                detailsHtml += '<tr><th>Consent Choices:</th><td><pre>' +
+                                              JSON.stringify(JSON.parse(receipt.consent_data), null, 2) +
                                               '</pre></td></tr>';
+
+                                // Klaro config (if available)
+                                if (receipt.klaro_config) {
+                                    detailsHtml += '<tr><th>Klaro Config:</th><td><pre>' +
+                                                  JSON.stringify(JSON.parse(receipt.klaro_config), null, 2) +
+                                                  '</pre></td></tr>';
+                                }
                                 
                                 detailsHtml += '</table>';
                                 

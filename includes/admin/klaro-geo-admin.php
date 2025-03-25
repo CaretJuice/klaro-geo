@@ -15,22 +15,90 @@ function get_klaro_default_values() {
     if ($defaults === null) {
         $defaults = array(
             'gtm_oninit' => <<<JS
-            window.dataLayer = window.dataLayer || [];
-            window.gtag = function() { dataLayer.push(arguments); };
-            gtag('consent', 'default', {'ad_storage': 'denied', 'analytics_storage': 'denied', 'ad_user_data': 'denied', 'ad_personalization': 'denied'});
-            gtag('set', 'ads_data_redaction', true);
-            JS,
+// Store the current opts for use by other scripts
+window.currentKlaroOpts = opts;
+
+// Initialize dataLayer and gtag
+window.dataLayer = window.dataLayer || [];
+window.gtag = function() { dataLayer.push(arguments); };
+
+// Set default consent state
+gtag('consent', 'default',{ 
+    'ad_storage': 'denied',
+    'analytics_storage': 'denied',
+    'ad_user_data': 'denied',
+    'ad_personalization': 'denied' 
+});
+gtag('set', 'ads_data_redaction', true);
+
+
+// Push a combined event with all accepted services
+const acceptedServices = [];
+for (let k of Object.keys(opts?.consents || {})) {
+    if (opts?.consents?.[k]) {
+        acceptedServices.push(k);
+    }
+}
+dataLayer.push({
+    'event': 'Klaro Consent',
+    'acceptedServices': acceptedServices
+});
+JS,
 
             'gtm_onaccept' => <<<JS
-            if (opts.consents.analytics || opts.consents.advertising) {
-                for(let k of Object.keys(opts.consents)){
-                    if (opts.consents[k]){
-                        let eventName = 'klaro-'+k+'-accepted';
-                        dataLayer.push({'event': eventName});
-                    }
-                }
-            }
-            JS
+// Store the current opts for use by other scripts
+window.currentKlaroOpts = opts;
+
+// Initialize dataLayer if it doesn't exist
+window.dataLayer = window.dataLayer || [];
+
+// Get all accepted services
+const acceptedServices = [];
+for (let k of Object.keys(opts?.consents || {})) {
+    if (opts?.consents?.[k]) {
+        acceptedServices.push(k);
+    }
+}
+
+// Push a combined event with all accepted services
+dataLayer.push({
+    'event': 'Klaro Consent',
+    'acceptedServices': acceptedServices
+});
+JS,
+
+            'gtm_ondecline' => <<<JS
+// Store the current opts for use by other scripts
+window.currentKlaroOpts = opts;
+
+// Initialize dataLayer if it doesn't exist
+window.dataLayer = window.dataLayer || [];
+
+// Set up consent updates for Google Consent Mode
+const consentUpdates = {
+    'ad_storage': 'denied',
+    'analytics_storage': 'denied',
+    'ad_user_data': 'denied',
+    'ad_personalization': 'denied'
+};
+
+// Get any remaining accepted services from opts.consents
+const acceptedServices = [];
+for (let k of Object.keys(opts?.consents || {})) {
+    if (opts?.consents?.[k]) {
+        acceptedServices.push(k);
+    }
+}
+
+// Push to dataLayer
+dataLayer.push({
+    'event': 'Klaro Consent',
+    'acceptedServices': acceptedServices
+});
+
+// Update Google Consent Mode
+gtag('consent', 'update', consentUpdates);
+JS
         );
     }
 
@@ -83,25 +151,18 @@ add_action('admin_menu', 'klaro_geo_admin_menu');
 
 // Activation function
 function klaro_geo_activate() {
-    global $default_services;
     $defaults = get_klaro_default_values();
 
     // Clean up the default values
     $defaults['gtm_oninit'] = preg_replace('/\R+/', ' ', $defaults['gtm_oninit']);
     $defaults['gtm_onaccept'] = preg_replace('/\R+/', ' ', $defaults['gtm_onaccept']);
+    $defaults['gtm_ondecline'] = preg_replace('/\R+/', ' ', $defaults['gtm_ondecline']);
 
-    // Set up the default services with GTM callbacks
-    $default_services = [
-        [
-            "name" => "google-tag-manager",
-            "required" => false,
-            "purposes" => ["analytics", "advertising"],
-            "default" => false,
-            "cookies" => [],
-            "onInit" => $defaults['gtm_oninit'],
-            "onAccept" => $defaults['gtm_onaccept']
-        ]
-    ];
+    // Set up the default services
+    $default_services = klaro_geo_get_default_services();
+
+    // Ge te default services available globally
+    $GLOBALS['default_services'] = $default_services;
 
     // Check if services already exist
     $existing_services = get_option('klaro_geo_services', '');
@@ -145,21 +206,28 @@ function klaro_geo_deactivate() {
     if (get_option('klaro_geo_cleanup_on_deactivate')) {
         // Template settings
         delete_option('klaro_geo_templates');
-        
+
         // Country and region settings
         delete_option('klaro_geo_country_settings');
-        
+
         // Service and purpose settings
         delete_option('klaro_geo_services');
         delete_option('klaro_geo_analytics_purposes');
         delete_option('klaro_geo_ad_purposes');
         delete_option('klaro_geo_purposes');
-        
+
+        // GTM settings
+        delete_option('klaro_geo_gtm_id');
+        delete_option('klaro_geo_gtm_oninit');
+        delete_option('klaro_geo_gtm_onaccept');
+        delete_option('klaro_geo_gtm_ondecline');
+
         // Other settings
         delete_option('klaro_geo_js_version');
         delete_option('klaro_geo_js_variant');
         delete_option('klaro_geo_fallback_behavior');
         delete_option('klaro_geo_debug_countries');
+        delete_option('klaro_geo_debug_geo');
         delete_option('klaro_geo_enable_consent_receipts');
         delete_option('klaro_geo_cleanup_on_deactivate');
 
@@ -167,7 +235,9 @@ function klaro_geo_deactivate() {
         delete_option('klaro_geo_enable_floating_button');
         delete_option('klaro_geo_button_text');
         delete_option('klaro_geo_button_theme');
-        delete_option('klaro_geo_gtm_id');
+        delete_option('klaro_geo_floating_button_text');
+        delete_option('klaro_geo_floating_button_theme');
+        delete_option('klaro_geo_floating_button_position');
     }
 }
 
@@ -178,6 +248,34 @@ function klaro_geo_get_default_geo_settings() {
         'countries' => array()
     );
 }
+/*
+ * Get default services for Klaro Geo
+ *
+ * @param array $defaults Optional. Default values for callbacks.
+ * @return array The default services
+ */
+function klaro_geo_get_default_services($defaults = null) {
+    // If defaults not provided, get them
+    if ($defaults === null) {
+        $defaults = get_klaro_default_values();
+    }
+
+    // Define the default services
+    return [
+        [
+            "name" => "google-tag-manager",
+            "title" => "Google Tag Manager",
+            "required" => false,
+            "purposes" => ["analytics", "advertising"],
+            "default" => false,
+            "cookies" => [],
+            "onInit" => $defaults['gtm_oninit'],
+            "onAccept" => $defaults['gtm_onaccept'],
+            "onDecline" => $defaults['gtm_ondecline']
+        ]
+    ];
+}
+
 
 // Function to get config based on user location
 function klaro_geo_get_config() {

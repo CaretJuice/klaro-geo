@@ -17,18 +17,7 @@ if (!defined('KLARO_GEO_PATH')) {
 if (!defined('KLARO_GEO_URL')) {
     define('KLARO_GEO_URL', plugin_dir_url(__FILE__));
 }
-// Define default services globally
-if (!isset($GLOBALS['default_services'])) {
-    $GLOBALS['default_services'] = [
-        [
-            "name" => "google-tag-manager",
-            "required" => false,
-            "purposes" => ["analytics", "advertising"],
-            "default" => false,
-            "cookies" => []
-        ]
-    ];
-}
+// Default services are defined in includes/admin/klaro-geo-admin.php
 
 // Debug logging function
 function klaro_geo_debug_log($message) {
@@ -54,18 +43,15 @@ function klaro_geo_debug_log($message) {
     }
 }
 
+// Always include the admin file with default values
+require_once plugin_dir_path(__FILE__) . 'includes/admin/klaro-geo-admin.php';
+
 if (is_admin() || (defined('WP_TESTS_DOMAIN') && WP_TESTS_DOMAIN)) {
     require_once plugin_dir_path(__FILE__) . 'includes/admin/klaro-geo-admin-countries.php';
     require_once plugin_dir_path(__FILE__) . 'includes/admin/klaro-geo-admin-services.php';
     require_once plugin_dir_path(__FILE__) . 'includes/admin/klaro-geo-admin-settings.php';
     require_once plugin_dir_path(__FILE__) . 'includes/admin/klaro-geo-admin-templates.php';
     require_once plugin_dir_path(__FILE__) . 'includes/admin/klaro-geo-admin-scripts.php';
-    require_once plugin_dir_path(__FILE__) . 'includes/admin/klaro-geo-admin.php';
-
-    // Include tests in admin only
-    if (isset($_GET['klaro_geo_run_tests']) || isset($_GET['page']) && $_GET['page'] === 'klaro-geo-tests') {
-        require_once plugin_dir_path(__FILE__) . 'includes/klaro-tests.php';
-    }
 }
 // Include base classes
 require_once plugin_dir_path(__FILE__) . 'includes/class-klaro-geo-option.php';
@@ -79,6 +65,8 @@ require_once plugin_dir_path(__FILE__) . 'includes/klaro-geo-geoip.php';
 require_once plugin_dir_path(__FILE__) . 'includes/klaro-geo-settings.php';
 require_once plugin_dir_path(__FILE__) . 'includes/klaro-geo-consent-receipts.php';
 require_once plugin_dir_path(__FILE__) . 'includes/klaro-geo-consent-button.php';
+
+// The consent receipts table check is now handled in includes/klaro-geo-consent-receipts.php
 
 /**
  * Enqueue all frontend scripts and styles for Klaro Geo
@@ -166,7 +154,7 @@ function klaro_geo_enqueue_scripts() {
     wp_enqueue_script(
         'klaro-geo-admin-bar-js',
         plugins_url('js/klaro-geo-admin-bar.js', __FILE__),
-        array('jquery', 'klaro-js'), // Explicit dependency on klaro-js
+        array('jquery', 'klaro-js'), 
         '1.0',
         true
     );
@@ -175,7 +163,7 @@ function klaro_geo_enqueue_scripts() {
         wp_enqueue_script(
             'klaro-consent-receipts-js',
             plugins_url('js/klaro-geo-consent-receipts.js', __FILE__),
-            array('klaro-js'), // Explicit dependency on klar'jquery', 'klaro-js'), // Ensure klaro-js is loaded first
+            array('klaro-js'), 
             KLARO_GEO_VERSION,
             true
         );
@@ -184,19 +172,21 @@ function klaro_geo_enqueue_scripts() {
         $location = klaro_geo_get_user_location();
         $user_country = $location['country'];
         $user_region = $location['region'];
+        $using_debug_geo = $location['is_admin_override'];
 
-        // Get template information
-        $effective_settings = klaro_geo_get_effective_settings($user_country . ($user_region ? '-' . $user_region : ''));
+        // Get template information, passing the admin override flag
+        $effective_settings = klaro_geo_get_effective_settings(
+            $user_country . ($user_region ? '-' . $user_region : ''),
+            $using_debug_geo
+        );
         $template_to_use = $effective_settings['template'] ?? 'default';
 
         // Determine template source
         $template_source = 'fallback';
+
+        // Use the source from effective settings
         if (isset($effective_settings['source'])) {
             $template_source = $effective_settings['source'];
-        } elseif (!empty($user_country) && !empty($user_region)) {
-            $template_source = 'geo-match region';
-        } elseif (!empty($user_country)) {
-            $template_source = 'geo-match country';
         }
 
         // Get template settings
@@ -209,6 +199,9 @@ function klaro_geo_enqueue_scripts() {
             $enable_consent_logging = (bool) $template_config['wordpress_settings']['enable_consent_logging'];
         }
 
+        // Debug log the admin override value
+        klaro_geo_debug_log('Admin override value being passed to JavaScript: ' . var_export($using_debug_geo, true));
+
         // Add variables for the consent receipts script
         wp_localize_script('klaro-consent-receipts-js', 'klaroConsentData', array(
             'ajaxUrl' => admin_url('admin-ajax.php'),
@@ -219,6 +212,7 @@ function klaro_geo_enqueue_scripts() {
             'templateSource' => $template_source,
             'detectedCountry' => $user_country,
             'detectedRegion' => $user_region,
+            'adminOverride' => $using_debug_geo ? true : false, // Ensure it's a proper boolean
             'templateSettings' => $template_config
         ));
     }
@@ -494,57 +488,68 @@ function klaro_geo_validate_services() {
     global $default_services;
     static $is_validating = false;
 
-    // Always get the latest default values to ensure proper syntax
-    $defaults = function_exists('get_klaro_default_values') ? get_klaro_default_values() : array(
-        'gtm_oninit' => 'window.dataLayer = window.dataLayer || []; window.gtag = function() { dataLayer.push(arguments); }; gtag(\'consent\', \'default\', {\'ad_storage\': \'denied\', \'analytics_storage\': \'denied\', \'ad_user_data\': \'denied\', \'ad_personalization\': \'denied\'}); gtag(\'set\', \'ads_data_redaction\', true);',
-        'gtm_onaccept' => 'if (opts.consents.analytics || opts.consents.advertising) { for(let k of Object.keys(opts.consents)){ if (opts.consents[k]){ let eventName = \'klaro-\'+k+\'-accepted\'; dataLayer.push({\'event\': eventName}); } } }'
-    );
+    // Get the default services from the central function
+    $default_services = klaro_geo_get_default_services();
 
-    $default_services = [
-        [
-            "name" => "google-tag-manager",
-            "required" => false,
-            "purposes" => ["analytics", "advertising"],
-            "default" => false,
-            "cookies" => [],
-            "onInit" => $defaults['gtm_oninit'],
-            "onAccept" => $defaults['gtm_onaccept']
-        ]
-    ];
+    $services_option = get_option('klaro_geo_services');
 
-    $services_json = get_option('klaro_geo_services');
-    
     // Handle empty services
-    if (empty($services_json)) {
+    if (empty($services_option)) {
         if ($is_validating) {
-                klaro_geo_debug_log('Preventing recursive validation');
-                return $default_services;
-            }
+            klaro_geo_debug_log('Preventing recursive validation');
+            return $default_services;
+        }
         $is_validating = true;
         klaro_geo_debug_log('Services empty, setting defaults');
         $encoded_services = wp_json_encode($default_services, JSON_PRETTY_PRINT);
         update_option('klaro_geo_services', $encoded_services);
         return $default_services;
     }
-    
-    // Handle JSON decoding
-    $services = json_decode($services_json, true);
-    $json_error = json_last_error();
-    
-    if ($json_error !== JSON_ERROR_NONE) {
-        if ($is_validating) {
-            klaro_geo_debug_log('Preventing recursive validation');
+
+    // Check if services_option is already an array
+    if (is_array($services_option)) {
+        klaro_geo_debug_log('Services already in array format, no decoding needed');
+        $services = $services_option;
+    } else {
+        // Handle JSON decoding for string format
+        klaro_geo_debug_log('Services in JSON format, decoding');
+        $services = json_decode($services_option, true);
+        $json_error = json_last_error();
+
+        if ($json_error !== JSON_ERROR_NONE) {
+            if ($is_validating) {
+                klaro_geo_debug_log('Preventing recursive validation');
+                return $default_services;
+            }
+            klaro_geo_debug_log('Invalid JSON in services, using defaults. Error: ' . json_last_error_msg());
+            $encoded_services = wp_json_encode($default_services, JSON_PRETTY_PRINT);
+            update_option('klaro_geo_services', $encoded_services);
             return $default_services;
         }
-        if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
-            klaro_geo_debug_log('Invalid JSON in services, using defaults. Error: ' . json_last_error_msg());
+    }
+
+    // Validate that services is an array with expected structure
+    if (!is_array($services) || empty($services) || !isset($services[0]['name'])) {
+        if ($is_validating) {
+            klaro_geo_debug_log('Preventing recursive validation during structure check');
+            return $default_services;
         }
+        klaro_geo_debug_log('Services has invalid structure, using defaults');
         $encoded_services = wp_json_encode($default_services, JSON_PRETTY_PRINT);
         update_option('klaro_geo_services', $encoded_services);
         return $default_services;
     }
+
     $is_validating = false;
-    // Return decoded services
+
+    // Ensure services are stored as JSON string for consistency
+    if (is_array($services_option)) {
+        klaro_geo_debug_log('Converting services from array to JSON string for storage consistency');
+        $encoded_services = wp_json_encode($services, JSON_PRETTY_PRINT);
+        update_option('klaro_geo_services', $encoded_services);
+    }
+
+    // Return services array
     return $services;
 }
 
@@ -556,7 +561,8 @@ add_action('init', 'klaro_geo_validate_services');
 function klaro_geo_get_user_location() {
     $location = array(
         'country' => '',
-        'region' => ''
+        'region' => '',
+        'is_admin_override' => false
     );
 
     // Check if we're in debug mode via query var or GET parameter
@@ -573,6 +579,9 @@ function klaro_geo_get_user_location() {
     // If we have a debug geo value, use it
     if (!empty($debug_geo)) {
         klaro_geo_debug_log('Using debug geo location: ' . $debug_geo);
+
+        // Mark this as an admin override
+        $location['is_admin_override'] = true;
 
         // Check if it's a country-region format (e.g., US-CA)
         if (strpos($debug_geo, '-') !== false) {
@@ -603,11 +612,19 @@ function klaro_geo_get_user_location() {
     return $location;
 }
 
-// Helper function to get default templates
+/**
+ * Get default templates for Klaro Geo
+ *
+ * This is the single source of truth for template definitions.
+ * All other parts of the plugin should use this function to get default templates.
+ *
+ * @return array The default templates
+ */
 function klaro_geo_get_default_templates() {
     return array(
         'default' => array(
             'name' => 'Default Template',
+            'description' => 'The default template used when no location-specific template is found',
             'config' => array(
                 'version' => 1,
                 'elementID' => 'klaro',
@@ -631,15 +648,17 @@ function klaro_geo_get_default_templates() {
                 'hideDeclineAll' => false,
                 'hideLearnMore' => false,
                 'noticeAsModal' => false,
+                'additionalClass' => '',
+                'disablePoweredBy' => false,
                 'translations' => array(
                     'zz' => array(
-                        'privacyPolicyUrl' => '/privacy',
+                        'privacyPolicyUrl' => '/privacy-policy/',
                         'consentModal' => array(
                             'title' => 'Privacy Settings',
                             'description' => 'Here you can assess and customize the services that we\'d like to use on this website. You\'re in charge! Enable or disable services as you see fit.'
                         ),
                         'consentNotice' => array(
-                            'title' => 'Cookie Consent',
+                            'title' => 'Cookie Notice',
                             'description' => 'Hi! Could we please enable some additional services for {purposes}? You can always change or withdraw your consent later.',
                             'changeDescription' => 'There were changes since your last visit, please renew your consent.',
                             'learnMore' => 'Let me choose'
@@ -667,6 +686,10 @@ function klaro_geo_get_default_templates() {
                                 'title' => 'Advertising',
                                 'description' => 'These services process personal information to show you personalized or interest-based advertisements.'
                             )
+                        ),
+                        'purposeItem' => array(
+                            'service' => 'service',
+                            'services' => 'services'
                         )
                     )
                 )
@@ -677,6 +700,7 @@ function klaro_geo_get_default_templates() {
         ),
         'strict' => array(
             'name' => 'Strict Opt-In',
+            'description' => 'Requires explicit consent for all services (opt-in)',
             'config' => array(
                 'version' => 1,
                 'elementID' => 'klaro',
@@ -699,10 +723,12 @@ function klaro_geo_get_default_templates() {
                 'acceptAll' => true,
                 'hideDeclineAll' => false,
                 'hideLearnMore' => false,
-                'noticeAsModal' => false,
+                'noticeAsModal' => true,
+                'additionalClass' => '',
+                'disablePoweredBy' => false,
                 'translations' => array(
                     'zz' => array(
-                        'privacyPolicyUrl' => '/privacy',
+                        'privacyPolicyUrl' => '/privacy-policy/',
                         'consentModal' => array(
                             'title' => 'Privacy Settings',
                             'description' => 'Here you can assess and customize the services that we\'d like to use on this website. You\'re in charge! Enable or disable services as you see fit.'
@@ -718,25 +744,7 @@ function klaro_geo_get_default_templates() {
                         'decline' => 'I decline',
                         'ok' => 'That\'s ok',
                         'close' => 'Close',
-                        'save' => 'Save',
-                        'privacyPolicy' => array(
-                            'name' => 'privacy policy',
-                            'text' => 'To learn more, please read our {privacyPolicy}.'
-                        ),
-                        'purposes' => array(
-                            'functional' => array(
-                                'title' => 'Functional',
-                                'description' => 'These services are essential for the correct functioning of this website. You cannot disable them here as the service would not work correctly otherwise.'
-                            ),
-                            'analytics' => array(
-                                'title' => 'Analytics',
-                                'description' => 'These services process personal information to help us understand how visitors interact with the website.'
-                            ),
-                            'advertising' => array(
-                                'title' => 'Advertising',
-                                'description' => 'These services process personal information to show you personalized or interest-based advertisements.'
-                            )
-                        )
+                        'save' => 'Save'
                     )
                 )
             ),
@@ -746,6 +754,7 @@ function klaro_geo_get_default_templates() {
         ),
         'relaxed' => array(
             'name' => 'Relaxed Opt-Out',
+            'description' => 'Assumes consent for all services (opt-out)',
             'config' => array(
                 'version' => 1,
                 'elementID' => 'klaro',
@@ -764,14 +773,16 @@ function klaro_geo_get_default_templates() {
                 'cookieExpiresAfterDays' => 365,
                 'default' => true,
                 'required' => false,
-                'mustConsent' => true,
+                'mustConsent' => false,
                 'acceptAll' => true,
-                'hideDeclineAll' => false,
+                'hideDeclineAll' => true,
                 'hideLearnMore' => false,
                 'noticeAsModal' => false,
+                'additionalClass' => '',
+                'disablePoweredBy' => false,
                 'translations' => array(
                     'zz' => array(
-                        'privacyPolicyUrl' => '/privacy',
+                        'privacyPolicyUrl' => '/privacy-policy/',
                         'consentModal' => array(
                             'title' => 'Privacy Settings',
                             'description' => 'Here you can assess and customize the services that we\'d like to use on this website. You\'re in charge! Enable or disable services as you see fit.'
@@ -787,25 +798,7 @@ function klaro_geo_get_default_templates() {
                         'decline' => 'I decline',
                         'ok' => 'That\'s ok',
                         'close' => 'Close',
-                        'save' => 'Save',
-                        'privacyPolicy' => array(
-                            'name' => 'privacy policy',
-                            'text' => 'To learn more, please read our {privacyPolicy}.'
-                        ),
-                        'purposes' => array(
-                            'functional' => array(
-                                'title' => 'Functional',
-                                'description' => 'These services are essential for the correct functioning of this website. You cannot disable them here as the service would not work correctly otherwise.'
-                            ),
-                            'analytics' => array(
-                                'title' => 'Analytics',
-                                'description' => 'These services process personal information to help us understand how visitors interact with the website.'
-                            ),
-                            'advertising' => array(
-                                'title' => 'Advertising',
-                                'description' => 'These services process personal information to show you personalized or interest-based advertisements.'
-                            )
-                        )
+                        'save' => 'Save'
                     )
                 )
             ),

@@ -13,18 +13,8 @@ function klaro_geo_settings_page_content() {
     // Get existing services or initialize with defaults
     $services_json = get_option('klaro_geo_services', '');
     if (empty($services_json)) {
-        // Set up the default services with GTM callbacks
-        $default_services = [
-            [
-                "name" => "google-tag-manager",
-                "required" => false,
-                "purposes" => ["analytics", "advertising"],
-                "default" => false,
-                "cookies" => [],
-                "onInit" => $defaults['gtm_oninit'],
-                "onAccept" => $defaults['gtm_onaccept']
-            ]
-        ];
+        // Get default services from the central function
+        $default_services = klaro_geo_get_default_services($defaults);
     } else {
         $default_services = json_decode($services_json, true);
         if (!is_array($default_services)) {

@@ -242,9 +242,13 @@ function klaro_geo_get_country_regions($country_code) {
 
 /**
  * Get the effective settings for a location, considering inheritance
+ *
+ * @param string $location_code The location code (e.g., 'US' or 'US-CA')
+ * @param bool $is_admin_override Optional. Whether this location is from an admin override. Default false.
+ * @return array The effective settings for the location
  */
-function klaro_geo_get_effective_settings($location_code) {
-    klaro_geo_debug_log('Getting effective settings for location: ' . $location_code);
+function klaro_geo_get_effective_settings($location_code, $is_admin_override = false) {
+    klaro_geo_debug_log('Getting effective settings for location: ' . $location_code . ($is_admin_override ? ' (admin override)' : ''));
 
     // Split location code to check if it's a region request
     $parts = explode('-', $location_code);
@@ -290,18 +294,21 @@ function klaro_geo_get_effective_settings($location_code) {
             klaro_geo_debug_log('Country ' . $country_code . ' not found in settings, using default template');
             $effective_settings['template'] = $geo_settings['default_template'] ?? 'default';
             $effective_settings['source'] = 'default';
+            $effective_settings['admin_override'] = $is_admin_override;
         } else {
             // Country has specific settings
             klaro_geo_debug_log('Country ' . $country_code . ' found in settings');
             $effective_settings['template'] = $geo_settings[$country_code]['template'] ?? $effective_settings['template'];
-            $effective_settings['source'] = 'country';
+            $effective_settings['source'] = $is_admin_override ? 'admin-override country' : 'geo-match country';
+            $effective_settings['admin_override'] = $is_admin_override;
 
             // Check for region override
             if ($region_code && isset($geo_settings[$country_code]['regions']) &&
                 isset($geo_settings[$country_code]['regions'][$region_code])) {
                 klaro_geo_debug_log('Region ' . $region_code . ' found in settings');
                 $effective_settings['template'] = $geo_settings[$country_code]['regions'][$region_code];
-                $effective_settings['source'] = 'region';
+                $effective_settings['source'] = $is_admin_override ? 'admin-override region' : 'geo-match region';
+                $effective_settings['admin_override'] = $is_admin_override;
             }
         }
     }
@@ -316,12 +323,14 @@ function klaro_geo_get_effective_settings($location_code) {
             // This is a region, use its template
             klaro_geo_debug_log('Using region template from location settings');
             $effective_settings['template'] = $location_settings['template'];
-            $effective_settings['source'] = 'region';
+            $effective_settings['source'] = $is_admin_override ? 'admin-override region' : 'geo-match region';
+            $effective_settings['admin_override'] = $is_admin_override;
         } else {
             // This is a country, use its template
             klaro_geo_debug_log('Using country template from location settings');
             $effective_settings['template'] = $location_settings['template'];
-            $effective_settings['source'] = 'country';
+            $effective_settings['source'] = $is_admin_override ? 'admin-override country' : 'geo-match country';
+            $effective_settings['admin_override'] = $is_admin_override;
         }
     }
 
@@ -348,6 +357,7 @@ function klaro_geo_get_effective_settings($location_code) {
         // Fall back to default template if the selected one doesn't exist
         $effective_settings['template'] = 'default';
         $effective_settings['source'] = 'fallback';
+        $effective_settings['admin_override'] = $is_admin_override;
         klaro_geo_debug_log('Falling back to default template');
     }
 

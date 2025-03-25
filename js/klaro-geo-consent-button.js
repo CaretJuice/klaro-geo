@@ -17,11 +17,32 @@
         debug: false
     };
 
+    // Helper function to merge objects (replacement for jQuery's $.extend if not available)
+    function mergeObjects(target) {
+        if (target === undefined || target === null) {
+            target = {};
+        }
+
+        for (var i = 1; i < arguments.length; i++) {
+            var source = arguments[i];
+            if (source === undefined || source === null) {
+                continue;
+            }
+
+            for (var key in source) {
+                if (source.hasOwnProperty(key)) {
+                    target[key] = source[key];
+                }
+            }
+        }
+
+        return target;
+    }
+
     // Get settings from global object or use defaults
     function getSettings() {
         // Try to get settings from different possible locations
-        var settings = typeof window.klaroGeo !== 'undefined' ? window.klaroGeo :
-                      (typeof klaroGeo !== 'undefined' ? klaroGeo : null);
+        var settings = typeof window.klaroGeo !== 'undefined' ? window.klaroGeo : null;
 
         // Debug: log what we found
         if (settings && settings.debug) {
@@ -30,7 +51,10 @@
 
         // If settings are found, merge with defaults
         if (settings) {
-            var mergedSettings = $.extend({}, defaultSettings, settings);
+            // Use $.extend if available, otherwise use our own mergeObjects function
+            var mergedSettings = (typeof $.extend === 'function')
+                ? $.extend({}, defaultSettings, settings)
+                : mergeObjects({}, defaultSettings, settings);
 
             // Debug: log merged settings
             if (mergedSettings.debug) {
@@ -52,9 +76,6 @@
         if (settings.debug) {
             console.log('Initializing Klaro Geo Consent Button, version:', settings.version);
         }
-
-        // We already added the click handler in the document.ready function
-        // So we don't need to add it again here
 
         // Create and append floating button if enabled in settings
         if (settings.enableFloatingButton === true) {
@@ -101,19 +122,22 @@
         }
     }
 
+    // Function to handle clicks on open-klaro-modal elements
+    function handleKlaroModalClick(e) {
+        e.preventDefault();
+
+        // Show Klaro modal if available
+        if (isKlaroLoaded()) {
+            window.klaro.show();
+        } else {
+            console.error('Klaro is not initialized or show() function is missing.');
+        }
+    }
+
     // Start the initialization process
     $(document).ready(function() {
-        // First register the click handler immediately
-        $(document).on('click', '.open-klaro-modal', function(e) {
-            e.preventDefault();
-
-            // Show Klaro modal if available
-            if (isKlaroLoaded()) {
-                window.klaro.show();
-            } else {
-                console.error('Klaro is not initialized or show() function is missing.');
-            }
-        });
+        // Register click handler for .open-klaro-modal elements
+        $(document).on('click', '.open-klaro-modal', handleKlaroModalClick);
 
         // Then start checking for Klaro
         initWithKlaroCheck();
@@ -128,84 +152,193 @@
         var buttonTheme = settings.floatingButtonTheme;
         var buttonPosition = settings.floatingButtonPosition;
 
-        // Create button element
-        var $button = $('<button>', {
-            'class': 'klaro-floating-button open-klaro-modal klaro-theme-' + buttonTheme + ' klaro-position-' + buttonPosition,
-            'text': buttonText,
-            'aria-label': buttonText
-        });
+        try {
+            // Create button with jQuery
+            var $button = $('<button>', {
+                'class': 'klaro-floating-button open-klaro-modal klaro-theme-' + buttonTheme + ' klaro-position-' + buttonPosition,
+                'text': buttonText,
+                'aria-label': buttonText
+            });
 
-        // Append button to body
-        $('body').append($button);
+            // Append to body
+            $('body').append($button);
 
-        // Add button styles if not already added
-        if ($('#klaro-floating-button-styles').length === 0) {
-            var css = `
-                .klaro-floating-button {
-                    position: fixed;
-                    z-index: 1000;
-                    padding: 10px 15px;
-                    border-radius: 4px;
-                    cursor: pointer;
-                    font-size: 14px;
-                    border: none;
-                    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
-                    transition: all 0.2s ease;
+            // Add button styles if not already added
+            var hasStyles = false;
+            try {
+                hasStyles = $('#klaro-floating-button-styles').length > 0;
+            } catch (e) {
+                // If jQuery selector fails, check with native JS
+                hasStyles = document.getElementById('klaro-floating-button-styles') !== null;
+            }
+
+            if (!hasStyles) {
+                var css = `
+                    .klaro-floating-button {
+                        position: fixed;
+                        z-index: 1000;
+                        padding: 10px 15px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-size: 14px;
+                        border: none;
+                        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+                        transition: all 0.2s ease;
+                    }
+
+                    .klaro-floating-button:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+                    }
+
+                    /* Button positions */
+                    .klaro-position-bottom-right {
+                        bottom: 20px;
+                        right: 20px;
+                    }
+
+                    .klaro-position-bottom-left {
+                        bottom: 20px;
+                        left: 20px;
+                    }
+
+                    .klaro-position-top-right {
+                        top: 20px;
+                        right: 20px;
+                    }
+
+                    .klaro-position-top-left {
+                        top: 20px;
+                        left: 20px;
+                    }
+
+                    /* Button themes */
+                    .klaro-theme-light {
+                        background-color: #f1f1f1;
+                        color: #333;
+                    }
+
+                    .klaro-theme-dark {
+                        background-color: #333;
+                        color: #fff;
+                    }
+
+                    .klaro-theme-blue {
+                        background-color: #1a73e8;
+                        color: #fff;
+                    }
+
+                    .klaro-theme-green {
+                        background-color: #0f9d58;
+                        color: #fff;
+                    }
+                `;
+
+                try {
+                    $('<style>', {
+                        id: 'klaro-floating-button-styles',
+                        type: 'text/css',
+                        html: css
+                    }).appendTo('head');
+                } catch (e) {
+                    // Fallback to native JS if jQuery fails
+                    var style = document.createElement('style');
+                    style.id = 'klaro-floating-button-styles';
+                    style.type = 'text/css';
+                    style.appendChild(document.createTextNode(css));
+                    document.head.appendChild(style);
+                }
+            }
+        } catch (e) {
+            // If jQuery methods fail, fall back to native JS
+            console.warn('jQuery methods failed, falling back to native JS:', e);
+
+            // Create button with native JS
+            var button = document.createElement('button');
+            button.className = 'klaro-floating-button open-klaro-modal klaro-theme-' + buttonTheme + ' klaro-position-' + buttonPosition;
+            button.textContent = buttonText;
+            button.setAttribute('aria-label', buttonText);
+
+            // Append to body
+            document.body.appendChild(button);
+
+            // Add button styles if not already added
+            if (!document.getElementById('klaro-floating-button-styles')) {
+                var css = `
+                    .klaro-floating-button {
+                        position: fixed;
+                        z-index: 1000;
+                        padding: 10px 15px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-size: 14px;
+                        border: none;
+                        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+                        transition: all 0.2s ease;
+                    }
+
+                    .klaro-floating-button:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+                    }
+
+                    /* Button positions */
+                    .klaro-position-bottom-right {
+                        bottom: 20px;
+                        right: 20px;
+                    }
+
+                    .klaro-position-bottom-left {
+                        bottom: 20px;
+                        left: 20px;
+                    }
+
+                    .klaro-position-top-right {
+                        top: 20px;
+                        right: 20px;
+                    }
+
+                    .klaro-position-top-left {
+                        top: 20px;
+                        left: 20px;
+                    }
+
+                    /* Button themes */
+                    .klaro-theme-light {
+                        background-color: #f1f1f1;
+                        color: #333;
+                    }
+
+                    .klaro-theme-dark {
+                        background-color: #333;
+                        color: #fff;
+                    }
+
+                    .klaro-theme-blue {
+                        background-color: #1a73e8;
+                        color: #fff;
+                    }
+
+                    .klaro-theme-green {
+                        background-color: #0f9d58;
+                        color: #fff;
+                    }
+                `;
+
+                var style = document.createElement('style');
+                style.id = 'klaro-floating-button-styles';
+                style.type = 'text/css';
+
+                if (style.styleSheet) {
+                    // For IE
+                    style.styleSheet.cssText = css;
+                } else {
+                    // For modern browsers
+                    style.appendChild(document.createTextNode(css));
                 }
 
-                .klaro-floating-button:hover {
-                    transform: translateY(-2px);
-                    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-                }
-
-                /* Button positions */
-                .klaro-position-bottom-right {
-                    bottom: 20px;
-                    right: 20px;
-                }
-
-                .klaro-position-bottom-left {
-                    bottom: 20px;
-                    left: 20px;
-                }
-
-                .klaro-position-top-right {
-                    top: 20px;
-                    right: 20px;
-                }
-
-                .klaro-position-top-left {
-                    top: 20px;
-                    left: 20px;
-                }
-
-                /* Button themes */
-                .klaro-theme-light {
-                    background-color: #f1f1f1;
-                    color: #333;
-                }
-
-                .klaro-theme-dark {
-                    background-color: #333;
-                    color: #fff;
-                }
-
-                .klaro-theme-blue {
-                    background-color: #1a73e8;
-                    color: #fff;
-                }
-
-                .klaro-theme-green {
-                    background-color: #0f9d58;
-                    color: #fff;
-                }
-            `;
-
-            $('<style>', {
-                'id': 'klaro-floating-button-styles',
-                'type': 'text/css',
-                'html': css
-            }).appendTo('head');
+                document.head.appendChild(style);
+            }
         }
     }
 

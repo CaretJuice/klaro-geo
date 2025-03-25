@@ -36,7 +36,7 @@ describe('Klaro Config', function() {
 
         // Mock the initial dataLayer push that happens in klaro-config.js
         window.dataLayer.push({
-            "event": "klaro_geo_klaro_config_loaded",
+            "event": "Klaro Config Loaded",
             "klaro_geo_consent_template": "default",
             "klaro_geo_template_source": "fallback",
             "klaro_geo_detected_country": null,
@@ -72,7 +72,7 @@ describe('Klaro Config', function() {
     test('should initialize dataLayer with correct debug information', function() {
         // Check if dataLayer was initialized with the correct debug information
         expect(window.dataLayer.length).toBe(1);
-        expect(window.dataLayer[0].event).toBe('klaro_geo_klaro_config_loaded');
+        expect(window.dataLayer[0].event).toBe('Klaro Config Loaded');
         expect(window.dataLayer[0].klaro_geo_consent_template).toBe('default');
         expect(window.dataLayer[0].klaro_geo_template_source).toBe('fallback');
         expect(window.dataLayer[0].klaro_geo_detected_country).toBeNull();
