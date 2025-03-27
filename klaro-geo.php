@@ -189,30 +189,49 @@ function klaro_geo_enqueue_scripts() {
             $template_source = $effective_settings['source'];
         }
 
-        // Get template settings
-        $templates = klaro_geo_get_default_templates();
-        $template_config = $templates[$template_to_use] ?? $templates['default'];
+        // Get template settings from the database
+        $template_settings = new Klaro_Geo_Template_Settings();
+        $templates = $template_settings->get();
+        $template_config = $templates[$template_to_use] ?? $templates['default'] ?? klaro_geo_get_default_templates()['default'];
 
         // Check if consent logging is enabled for this template
         $enable_consent_logging = true; // Default to true
-        if (isset($template_config['wordpress_settings']['enable_consent_logging'])) {
-            $enable_consent_logging = (bool) $template_config['wordpress_settings']['enable_consent_logging'];
+        if (isset($template_config['plugin_settings']['enable_consent_logging'])) {
+            $enable_consent_logging = (bool) $template_config['plugin_settings']['enable_consent_logging'];
         }
 
         // Debug log the admin override value
         klaro_geo_debug_log('Admin override value being passed to JavaScript: ' . var_export($using_debug_geo, true));
 
+        // Get plugin settings from the template
+        $plugin_settings = isset($templates[$template_to_use]['plugin_settings']) ?
+            $templates[$template_to_use]['plugin_settings'] :
+            array('enable_consent_logging' => true, 'consent_mode' => 'basic');
+
+        // Get enableConsentLogging setting
+        $enable_consent_logging = isset($plugin_settings['enable_consent_logging']) ?
+            $plugin_settings['enable_consent_logging'] : true;
+
+        // Get consent_mode setting
+        $consent_mode = isset($plugin_settings['consent_mode']) ?
+            $plugin_settings['consent_mode'] : 'basic';
+
+        // Debug log the settings
+        klaro_geo_debug_log('Plugin settings for template ' . $template_to_use . ': ' . print_r($plugin_settings, true));
+        klaro_geo_debug_log('enableConsentLogging: ' . ($enable_consent_logging ? 'true' : 'false'));
+        klaro_geo_debug_log('consentMode: ' . $consent_mode);
+
         // Add variables for the consent receipts script
         wp_localize_script('klaro-consent-receipts-js', 'klaroConsentData', array(
             'ajaxUrl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('klaro_geo_consent_nonce'),
-            'consentReceiptsEnabled' => true,
             'enableConsentLogging' => $enable_consent_logging,
+            'consentMode' => $consent_mode,
             'templateName' => $template_to_use,
             'templateSource' => $template_source,
             'detectedCountry' => $user_country,
             'detectedRegion' => $user_region,
-            'adminOverride' => $using_debug_geo ? true : false, // Ensure it's a proper boolean
+            'adminOverride' => $using_debug_geo ? true : false,
             'templateSettings' => $template_config
         ));
     }
@@ -488,66 +507,40 @@ function klaro_geo_validate_services() {
     global $default_services;
     static $is_validating = false;
 
-    // Get the default services from the central function
-    $default_services = klaro_geo_get_default_services();
-
-    $services_option = get_option('klaro_geo_services');
-
-    // Handle empty services
-    if (empty($services_option)) {
-        if ($is_validating) {
-            klaro_geo_debug_log('Preventing recursive validation');
-            return $default_services;
-        }
-        $is_validating = true;
-        klaro_geo_debug_log('Services empty, setting defaults');
-        $encoded_services = wp_json_encode($default_services, JSON_PRETTY_PRINT);
-        update_option('klaro_geo_services', $encoded_services);
-        return $default_services;
+    // Prevent recursive validation
+    if ($is_validating) {
+        klaro_geo_debug_log('Preventing recursive validation');
+        return klaro_geo_get_default_services();
     }
 
-    // Check if services_option is already an array
-    if (is_array($services_option)) {
-        klaro_geo_debug_log('Services already in array format, no decoding needed');
-        $services = $services_option;
-    } else {
-        // Handle JSON decoding for string format
-        klaro_geo_debug_log('Services in JSON format, decoding');
-        $services = json_decode($services_option, true);
-        $json_error = json_last_error();
+    $is_validating = true;
 
-        if ($json_error !== JSON_ERROR_NONE) {
-            if ($is_validating) {
-                klaro_geo_debug_log('Preventing recursive validation');
-                return $default_services;
-            }
-            klaro_geo_debug_log('Invalid JSON in services, using defaults. Error: ' . json_last_error_msg());
-            $encoded_services = wp_json_encode($default_services, JSON_PRETTY_PRINT);
-            update_option('klaro_geo_services', $encoded_services);
-            return $default_services;
-        }
-    }
+    // Use the service settings class to get and validate services
+    $service_settings = new Klaro_Geo_Service_Settings();
+    $services = $service_settings->get();
+
+    // Make sure we have the default services available globally
+    $default_services = $service_settings->get_default_services();
 
     // Validate that services is an array with expected structure
-    if (!is_array($services) || empty($services) || !isset($services[0]['name'])) {
-        if ($is_validating) {
-            klaro_geo_debug_log('Preventing recursive validation during structure check');
-            return $default_services;
-        }
+    if (empty($services) || !is_array($services) || !isset($services[0]['name'])) {
         klaro_geo_debug_log('Services has invalid structure, using defaults');
-        $encoded_services = wp_json_encode($default_services, JSON_PRETTY_PRINT);
-        update_option('klaro_geo_services', $encoded_services);
-        return $default_services;
+        $services = $default_services;
+
+        // Update the services using the service settings class
+        $service_settings->set($services);
+        $service_settings->save();
+    } else {
+        // Validate each service using the class's validate_services method
+        $services = $service_settings->validate_services();
+
+        // If validation changed anything, save the changes
+        if ($service_settings->is_modified()) {
+            $service_settings->save();
+        }
     }
 
     $is_validating = false;
-
-    // Ensure services are stored as JSON string for consistency
-    if (is_array($services_option)) {
-        klaro_geo_debug_log('Converting services from array to JSON string for storage consistency');
-        $encoded_services = wp_json_encode($services, JSON_PRETTY_PRINT);
-        update_option('klaro_geo_services', $encoded_services);
-    }
 
     // Return services array
     return $services;
@@ -694,8 +687,9 @@ function klaro_geo_get_default_templates() {
                     )
                 )
             ),
-            'wordpress_settings' => array(
-                'enable_consent_logging' => true
+            'plugin_settings' => array(
+                'enable_consent_logging' => true,
+                'consent_mode' => 'basic'
             )
         ),
         'strict' => array(
@@ -748,8 +742,9 @@ function klaro_geo_get_default_templates() {
                     )
                 )
             ),
-            'wordpress_settings' => array(
-                'enable_consent_logging' => true
+            'plugin_settings' => array(
+                'enable_consent_logging' => true,
+                'consent_mode' => 'basic'
             )
         ),
         'relaxed' => array(
@@ -802,8 +797,9 @@ function klaro_geo_get_default_templates() {
                     )
                 )
             ),
-            'wordpress_settings' => array(
-                'enable_consent_logging' => true
+            'plugin_settings' => array(
+                'enable_consent_logging' => true,
+                'consent_mode' => 'basic'
             )
         )
     );

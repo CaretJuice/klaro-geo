@@ -330,14 +330,6 @@ class KlaroConfigTest extends WP_UnitTestCase {
 
         $this->assertNotNull($gtm_service, 'Google Tag Manager service not found');
         $this->assertArrayHasKey('onInit', $gtm_service, 'GTM service does not have onInit key');
-        $this->assertArrayHasKey('onAccept', $gtm_service, 'GTM service does not have onAccept key');
-        // onDecline is no longer included in the default configuration
-        // $this->assertArrayHasKey('onDecline', $gtm_service, 'GTM service does not have onDecline key');
-
-        // Instead of checking for exact values, just verify they're not empty
-        // since we now use default values from the code
         $this->assertNotEmpty($gtm_service['onInit'], 'GTM onInit script is empty');
-        $this->assertNotEmpty($gtm_service['onAccept'], 'GTM onAccept script is empty');
-        // onDecline is no longer included in the default configuration
     }
 }

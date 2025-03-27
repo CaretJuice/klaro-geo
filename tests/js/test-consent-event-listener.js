@@ -7,7 +7,7 @@ describe('Klaro Consent Event Listener', function() {
     // Helper function to simulate the event listener behavior
     function simulateConsentChange(manager) {
         // Generate a unique receipt number if logging is enabled
-        var receiptNumber = window.klaroConsentReceiptsEnabled && window.klaro_geo_logging_enabled ?
+        var receiptNumber = window.klaroConsentData.enableConsentLogging && window.klaro_geo_logging_enabled ?
             'receipt_' + new Date().getTime() + '_' + Math.random().toString(36).substr(2, 9) :
             null;
 
@@ -36,25 +36,28 @@ describe('Klaro Consent Event Listener', function() {
         // Mock dataLayer
         window.dataLayer = [];
 
+        // Initialize Klaro consent data object
+        window.klaroConsentData = {};
+
         // Set up Klaro consent variables
-        window.klaroConsentReceiptsEnabled = true;
+        window.klaroConsentData.enableConsentLogging = true; // Boolean true
         window.klaro_geo_logging_enabled = false;
-        window.klaroConsentTemplateName = 'default';
-        window.klaroConsentTemplateSource = 'fallback';
-        window.klaroDetectedCountry = 'US';
-        window.klaroDetectedRegion = 'CA';
+        window.klaroConsentData.templateName = 'default';
+        window.klaroConsentData.templateSource = 'fallback';
+        window.klaroConsentData.detectedCountry = 'US';
+        window.klaroConsentData.detectedRegion = 'CA';
     });
 
     afterEach(function() {
         // Clean up
         window.dataLayer = [];
         jest.clearAllMocks();
-        delete window.klaroConsentReceiptsEnabled;
+
+        // Reset klaroConsentData
+        window.klaroConsentData = {};
+
+        // Reset other variables
         delete window.klaro_geo_logging_enabled;
-        delete window.klaroConsentTemplateName;
-        delete window.klaroConsentTemplateSource;
-        delete window.klaroDetectedCountry;
-        delete window.klaroDetectedRegion;
     });
 
     test('should push to dataLayer when consent changes', function() {
@@ -121,7 +124,7 @@ describe('Klaro Consent Event Listener', function() {
     test('should not include receipt number when consent receipts are disabled', function() {
         // Enable logging but disable consent receipts
         window.klaro_geo_logging_enabled = true;
-        window.klaroConsentReceiptsEnabled = false;
+        window.klaroConsentData.enableConsentLogging = false;
 
         // Create a mock Klaro manager
         const manager = {

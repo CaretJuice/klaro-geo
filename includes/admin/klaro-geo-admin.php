@@ -12,16 +12,10 @@ require_once plugin_dir_path(__FILE__) . 'klaro-geo-admin-services.php';
 function get_klaro_default_values() {
     static $defaults = null;
 
+
     if ($defaults === null) {
         $defaults = array(
             'gtm_oninit' => <<<JS
-// Store the current opts for use by other scripts
-window.currentKlaroOpts = opts;
-
-// Initialize dataLayer and gtag
-window.dataLayer = window.dataLayer || [];
-window.gtag = function() { dataLayer.push(arguments); };
-
 // Set default consent state
 gtag('consent', 'default',{ 
     'ad_storage': 'denied',
@@ -30,74 +24,12 @@ gtag('consent', 'default',{
     'ad_personalization': 'denied' 
 });
 gtag('set', 'ads_data_redaction', true);
-
-
-// Push a combined event with all accepted services
-const acceptedServices = [];
-for (let k of Object.keys(opts?.consents || {})) {
-    if (opts?.consents?.[k]) {
-        acceptedServices.push(k);
-    }
-}
-dataLayer.push({
-    'event': 'Klaro Consent',
-    'acceptedServices': acceptedServices
-});
 JS,
 
             'gtm_onaccept' => <<<JS
-// Store the current opts for use by other scripts
-window.currentKlaroOpts = opts;
-
-// Initialize dataLayer if it doesn't exist
-window.dataLayer = window.dataLayer || [];
-
-// Get all accepted services
-const acceptedServices = [];
-for (let k of Object.keys(opts?.consents || {})) {
-    if (opts?.consents?.[k]) {
-        acceptedServices.push(k);
-    }
-}
-
-// Push a combined event with all accepted services
-dataLayer.push({
-    'event': 'Klaro Consent',
-    'acceptedServices': acceptedServices
-});
 JS,
 
             'gtm_ondecline' => <<<JS
-// Store the current opts for use by other scripts
-window.currentKlaroOpts = opts;
-
-// Initialize dataLayer if it doesn't exist
-window.dataLayer = window.dataLayer || [];
-
-// Set up consent updates for Google Consent Mode
-const consentUpdates = {
-    'ad_storage': 'denied',
-    'analytics_storage': 'denied',
-    'ad_user_data': 'denied',
-    'ad_personalization': 'denied'
-};
-
-// Get any remaining accepted services from opts.consents
-const acceptedServices = [];
-for (let k of Object.keys(opts?.consents || {})) {
-    if (opts?.consents?.[k]) {
-        acceptedServices.push(k);
-    }
-}
-
-// Push to dataLayer
-dataLayer.push({
-    'event': 'Klaro Consent',
-    'acceptedServices': acceptedServices
-});
-
-// Update Google Consent Mode
-gtag('consent', 'update', consentUpdates);
 JS
         );
     }
@@ -158,20 +90,21 @@ function klaro_geo_activate() {
     $defaults['gtm_onaccept'] = preg_replace('/\R+/', ' ', $defaults['gtm_onaccept']);
     $defaults['gtm_ondecline'] = preg_replace('/\R+/', ' ', $defaults['gtm_ondecline']);
 
-    // Set up the default services
-    $default_services = klaro_geo_get_default_services();
+    // Set up the default services using the service settings class
+    $service_settings = new Klaro_Geo_Service_Settings();
+    $default_services = $service_settings->get_default_services();
 
-    // Ge te default services available globally
+    // Make default services available globally
     $GLOBALS['default_services'] = $default_services;
 
     // Check if services already exist
-    $existing_services = get_option('klaro_geo_services', '');
+    $existing_services = $service_settings->get();
 
     // Only set default services if they don't already exist
     if (empty($existing_services)) {
         // Set default services only on first activation
-        $encoded_services = wp_json_encode($default_services, JSON_PRETTY_PRINT);
-        add_option('klaro_geo_services', $encoded_services);
+        $service_settings->set($default_services);
+        $service_settings->save();
     }
 
     // Set default GTM settings (only if they don't exist)
@@ -185,9 +118,15 @@ function klaro_geo_activate() {
     // Set default geo settings
     add_option('klaro_geo_country_settings', wp_json_encode(klaro_geo_get_default_geo_settings()));
 
-    // Set up the default templates
-    $default_templates = klaro_geo_get_default_templates();
-    add_option('klaro_geo_templates', $default_templates);
+    // Set up the default templates using the template settings class
+    $template_settings = new Klaro_Geo_Template_Settings();
+    $default_templates = $template_settings->get_default_templates();
+
+    // Only set default templates if they don't already exist
+    if (empty($template_settings->get())) {
+        $template_settings->set($default_templates);
+        $template_settings->save();
+    }
 
     // Floating button settings
     add_option('klaro_geo_enable_floating_button', false);
@@ -349,8 +288,9 @@ function klaro_geo_get_config() {
     // Build final configuration
     $config = $template_config['config'];
 
-    // Add services configuration
-    $services = json_decode(get_option('klaro_geo_services'), true);
+    // Add services configuration using the service settings class
+    $service_settings = new Klaro_Geo_Service_Settings();
+    $services = $service_settings->get();
     if (!empty($services)) {
         $config['services'] = $services;
     }
@@ -370,15 +310,18 @@ function klaro_geo_get_config() {
 
 // Function to get template configuration
 function klaro_geo_get_template_config($template_key) {
-    $templates = get_option('klaro_geo_templates', array());
+    // Initialize the template settings class
+    $template_settings = new Klaro_Geo_Template_Settings();
 
-    if ($template_key === 'default' || !isset($templates[$template_key])) {
-        // Get default templates
-        $default_templates = klaro_geo_get_default_templates();
-        return $default_templates['default'];
+    // Get the template using the class method
+    $template = $template_settings->get_template($template_key);
+
+    if (!$template) {
+        // If template not found, return the default template
+        return $template_settings->get_template('default');
     }
 
-    return $templates[$template_key];
+    return $template;
 }
 
 // Function to output the configuration

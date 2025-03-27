@@ -108,7 +108,8 @@ class Klaro_Geo_Template_Settings extends Klaro_Geo_Option {
                     'hideDeclineAll' => false,
                     'hideLearnMore' => false,
                     'noticeAsModal' => false,
-                    'disablePoweredBy' => false
+                    'disablePoweredBy' => false,
+                    'consent_mode' => 'none'
                 )
             )
         );

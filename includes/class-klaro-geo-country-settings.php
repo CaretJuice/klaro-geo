@@ -343,6 +343,7 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
     }
 
     /**
+     * Possibly delete this
      * Update region settings from AJAX data
      *
      * @param array $settings The region settings
@@ -502,28 +503,34 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
     }
 
     /**
-     * Get the effective settings for a location
+     * Get the effective settings for a location, considering inheritance
      *
-     * @param string $location_code The location code (country or country-region)
-     * @return array The effective settings
+     * @param string $location_code The location code (e.g., 'US' or 'US-CA')
+     * @param bool $is_admin_override Optional. Whether this location is from an admin override. Default false.
+     * @return array The effective settings for the location
      */
-    public function get_effective_settings($location_code) {
-        klaro_geo_debug_log('Getting effective settings for location: ' . $location_code);
-        
+    public function get_effective_settings($location_code, $is_admin_override = false) {
+        klaro_geo_debug_log('Getting effective settings for location: ' . $location_code . ($is_admin_override ? ' (admin override)' : ''));
+
         // Split location code to check if it's a region request
         $parts = explode('-', $location_code);
         $country_code = $parts[0];
         $region_code = isset($parts[1]) ? $parts[1] : null;
-        
+
         klaro_geo_debug_log('Parsed location - Country: ' . $country_code . ', Region: ' . ($region_code ?? 'none'));
-        
+
+        // Load country settings (using class methods)
+        $geo_settings = $this->get();
+
+        klaro_geo_debug_log('Global settings: ' . print_r($geo_settings, true));
+
         // Default settings
         $effective_settings = array(
-            'template' => $this->get_default_template(),
-            'fallback_behavior' => 'default',
+            'template' => $this->get_default_template(), // Assuming this method exists in the class
+            'fallback_behavior' => $geo_settings['fallback_behavior'] ?? 'default',
             'source' => 'default' // Track where the template came from
         );
-        
+
         // Check if the country is in the visible countries list
         if (in_array($country_code, $this->visible_countries)) {
             // If the country is not in the settings, it means it's using the default template
@@ -538,12 +545,17 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
                 klaro_geo_debug_log('Country ' . $country_code . ' found in settings');
                 $effective_settings['template'] = $country_settings['template'] ?? $effective_settings['template'];
                 $effective_settings['source'] = 'country';
-                
+
                 // Check for region override
-                if ($region_code && isset($country_settings['regions']) && 
+                if ($region_code && isset($country_settings['regions']) &&
                     isset($country_settings['regions'][$region_code])) {
                     klaro_geo_debug_log('Region ' . $region_code . ' found in settings');
-                    $effective_settings['template'] = $country_settings['regions'][$region_code];
+                    // Handle both formats: array with 'template' key or direct string value
+                    if (is_array($country_settings['regions'][$region_code]) && isset($country_settings['regions'][$region_code]['template'])) {
+                        $effective_settings['template'] = $country_settings['regions'][$region_code]['template'];
+                    } else {
+                        $effective_settings['template'] = $country_settings['regions'][$region_code];
+                    }
                     $effective_settings['source'] = 'region';
                 }
             }
@@ -551,6 +563,14 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
         
         // Allow filtering of effective settings
         $effective_settings = apply_filters('klaro_geo_effective_settings', $effective_settings);
+
+        // Get the template configuration to verify it exists (using class methods)
+        $template_settings = new Klaro_Geo_Template_Settings();
+        $templates = $template_settings->get();
+
+        // Allow filtering of templates
+        $templates = apply_filters('klaro_geo_default_templates', $templates);
+
         
         // In tests, we need to use mock templates
         if (defined('WP_TESTS_DOMAIN') && WP_TESTS_DOMAIN) {
@@ -597,5 +617,161 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
         
         klaro_geo_debug_log('Final effective settings: ' . print_r($effective_settings, true));
         return $effective_settings;
+    }
+
+    /**
+     * Get settings for a specific location (country or region)
+     *
+     * @param string $location_code Country code or region code (e.g., 'US' or 'US-CA')
+     * @return array|null Settings for the location or null if not found
+     */
+    public function get_location_settings($location_code) {
+        klaro_geo_debug_log('Getting location settings for: ' . $location_code);
+
+        // Split the location code to check if it's a region
+        $parts = explode('-', $location_code);
+        $country_code = $parts[0];
+        $region_code = isset($parts[1]) ? $parts[1] : null;
+
+        // Get country settings
+        $country_settings = $this->get_country($country_code);
+
+        // If no country settings found, return null
+        if (!$country_settings) {
+            return null;
+        }
+
+        // If this is a region request
+        if ($region_code) {
+            // Check if region exists
+            if (!isset($country_settings['regions']) || !isset($country_settings['regions'][$region_code])) {
+                return null;
+            }
+
+            // Get region template and other settings
+            $region_data = $country_settings['regions'][$region_code];
+
+            // Create region settings by inheriting from country
+            $region_settings = $country_settings;
+
+            // Handle both formats: array with 'template' key or direct string value
+            if (is_array($region_data)) {
+                // If region_data is an array, copy all its properties to region_settings
+                foreach ($region_data as $key => $value) {
+                    $region_settings[$key] = $value;
+                }
+                // Ensure template is set
+                if (isset($region_data['template'])) {
+                    $region_settings['template'] = $region_data['template'];
+                }
+            } else {
+                // If region_data is a string, it's just the template
+                $region_settings['template'] = $region_data;
+            }
+
+            $region_settings['is_region'] = true;
+            $region_settings['country_code'] = $country_code;
+            $region_settings['region_code'] = $region_code;
+
+            return $region_settings;
+        }
+
+        // For country request, just return the country settings
+        return $country_settings;
+    }
+
+    /**
+     * Alias for get_location_settings for backward compatibility
+     *
+     * @param string $location_code Country code or region code (e.g., 'US' or 'US-CA')
+     * @return array|null Settings for the location or null if not found
+     */
+    public function get_country_or_region_settings($location_code) {
+        return $this->get_location_settings($location_code);
+    }
+
+    /**
+     * Update settings for a specific location
+     *
+     * @param string $location_code Country code or region code
+     * @param array $new_settings New settings to apply
+     * @return bool Success status
+     */
+    public function update_location_settings($location_code, $new_settings) {
+        // Split the location code to check if it's a region
+        $parts = explode('-', $location_code);
+        $country_code = $parts[0];
+        $region_code = isset($parts[1]) ? $parts[1] : null;
+
+        if ($region_code) {
+            // Get current country settings or create new ones
+            $country_settings = $this->get_country($country_code);
+            if (!$country_settings) {
+                $country_settings = array(
+                    'template' => $this->get_default_template(),
+                    'regions' => array()
+                );
+            }
+
+            // Ensure regions array exists
+            if (!isset($country_settings['regions'])) {
+                $country_settings['regions'] = array();
+            }
+
+            // Update region template
+            if (isset($new_settings['template'])) {
+                $country_settings['regions'][$region_code] = $new_settings['template'];
+            }
+
+            // Save country settings
+            $this->set_country($country_code, $country_settings);
+            return true;
+        } else {
+            // For country request, update country settings
+            $country_settings = $this->get_country($country_code);
+            if (!$country_settings) {
+                $country_settings = array();
+            }
+
+            // Update country template
+            if (isset($new_settings['template'])) {
+                $country_settings['template'] = $new_settings['template'];
+            }
+
+            // Save country settings
+            $this->set_country($country_code, $country_settings);
+            return true;
+        }
+    }
+
+    /**
+     * Get all regions for a country
+     *
+     * @param string $country_code Country code
+     * @return array Array of region settings
+     */
+    public function get_country_regions($country_code) {
+        // Get country settings
+        $country_settings = $this->get_country($country_code);
+
+        // If no country settings or no regions, return empty array
+        if (!$country_settings || !isset($country_settings['regions'])) {
+            return array();
+        }
+
+        $regions = array();
+
+        // Process each region
+        foreach ($country_settings['regions'] as $region_code => $region_data) {
+            if (is_array($region_data)) {
+                $regions[$region_code] = $region_data;
+            } else {
+                $regions[$region_code] = array(
+                    'template' => $region_data
+                );
+            }
+        }
+
+        return $regions;
     }
 }

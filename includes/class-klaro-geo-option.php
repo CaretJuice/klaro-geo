@@ -379,7 +379,16 @@ class Klaro_Geo_Option {
     public function reset() {
         $this->value = $this->default_value;
         $this->is_modified = true;
-        
+
         return $this;
+    }
+
+    /**
+     * Check if the option has been modified
+     *
+     * @return bool Whether the option has been modified
+     */
+    public function is_modified() {
+        return $this->is_modified;
     }
 }

@@ -76,12 +76,23 @@ class ConsentReceiptsIntegrationTest extends IgnoreDeprecatedTestCase {
 
         // Check if the klaroConsentData object is added
         $this->assertStringContainsString('klaroConsentData', $head_output . $footer_output, 'klaroConsentData object should be added');
+
+        // Generate the config file to check its content
+        klaro_geo_generate_config_file();
+        $plugin_dir = plugin_dir_path(dirname(dirname(__FILE__)));
+        $klaro_config_file = $plugin_dir . 'klaro-config.js';
+        $config_content = file_get_contents($klaro_config_file);
+
+        // Check for integration between the watcher and consent receipts
+        $this->assertStringContainsString('handleConsentChange(syntheticEvent)', $config_content, 'Config should call handleConsentChange from the watcher');
+        $this->assertStringContainsString('window.currentKlaroOpts = { consents: consents }', $config_content, 'Config should store consents for receipt handling');
     }
 
     /**
      * Test that the klaro-config.js file contains the necessary consent receipt code.
      */
     public function test_config_file_contains_receipt_code() {
+        update_option('klaro_geo_enable_consent_receipts', true);
         // Generate the config file
         klaro_geo_generate_config_file();
 
@@ -95,10 +106,13 @@ class ConsentReceiptsIntegrationTest extends IgnoreDeprecatedTestCase {
         // Get the file contents
         $config_content = file_get_contents($klaro_config_file);
 
-        // Check if the consent receipt code is included
-        $this->assertStringContainsString('consentReceiptsEnabled: true', $config_content, 'Config should enable consent receipts');
-        $this->assertStringContainsString('klaro:consent-change', $config_content, 'Config should include event listener');
         $this->assertStringContainsString('window.klaroConsentData', $config_content, 'Config should include klaroConsentData object');
+
+        $watchMethodFound = strpos($config_content, 'manager.watch') !== false ||
+                           strpos($config_content, 'manager.watch(') !== false;
+        $this->assertTrue($watchMethodFound, 'Config should include manager.watch method');
+
+        $this->assertStringContainsString('handleConsentUpdate', $config_content, 'Config should include handleConsentUpdate function');
     }
 
     /**
@@ -185,6 +199,31 @@ class ConsentReceiptsIntegrationTest extends IgnoreDeprecatedTestCase {
     }
 
     /**
+     * Test that the Klaro manager watcher is properly implemented.
+     */
+    public function test_klaro_manager_watcher() {
+        // Generate the config file
+        klaro_geo_generate_config_file();
+
+        // Get the file path
+        $plugin_dir = plugin_dir_path(dirname(dirname(__FILE__)));
+        $klaro_config_file = $plugin_dir . 'klaro-config.js';
+
+        // Get the file contents
+        $config_content = file_get_contents($klaro_config_file);
+
+        // Check for the manager watcher implementation
+        $this->assertStringContainsString('manager.watch({', $config_content, 'Config should include manager.watch setup');
+        $this->assertStringContainsString('update: handleConsentUpdate', $config_content, 'Config should connect handleConsentUpdate to the watcher');
+        $this->assertStringContainsString('if (eventType === \'saveConsents\')', $config_content, 'Config should check for saveConsents event');
+        $this->assertStringContainsString('window.lastWatcherConsentTimestamp = Date.now()', $config_content, 'Config should set timestamp to prevent duplicate processing');
+
+        // Check for dataLayer integration
+        $this->assertStringContainsString('\'event\': \'Klaro Consent\'', $config_content, 'Config should push to dataLayer');
+        $this->assertStringContainsString('\'consentType\': data.type', $config_content, 'Config should include consent type in dataLayer push');
+    }
+
+    /**
      * Test that consent receipts are not processed when the feature is disabled.
      *
      * @expectedDeprecated the_block_template_skip_link
@@ -204,7 +243,9 @@ class ConsentReceiptsIntegrationTest extends IgnoreDeprecatedTestCase {
         $config_content = file_get_contents($klaro_config_file);
 
         // Check that consent receipt code is not included
-        $this->assertStringNotContainsString('consentReceiptsEnabled: true', $config_content, 'Config should not enable consent receipts');
+        // When consent receipts are disabled, the klaroConsentData object should not be present
+        $this->assertStringNotContainsString('window.klaroConsentData = {', $config_content, 'Config should not include klaroConsentData object when disabled');
+        $this->assertStringNotContainsString('enableConsentLogging:', $config_content, 'Config should not include enableConsentLogging setting when disabled');
 
         // Set up a test post
         $post_id = $this->factory->post->create();

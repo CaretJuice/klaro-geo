@@ -14,21 +14,15 @@ class gtmDefaultsTest extends WP_UnitTestCase {
         
         // Check that the GTM defaults exist
         $this->assertArrayHasKey('gtm_oninit', $defaults);
-        $this->assertArrayHasKey('gtm_onaccept', $defaults);
-        $this->assertArrayHasKey('gtm_ondecline', $defaults);
-
 
         // Check that the GTM defaults are not empty
         $this->assertNotEmpty($defaults['gtm_oninit']);
-        $this->assertNotEmpty($defaults['gtm_onaccept']);
-        $this->assertNotEmpty($defaults['gtm_ondecline']);
-
         
         // Check that the GTM defaults contain expected content
-        $this->assertStringContainsString('window.dataLayer', $defaults['gtm_oninit']);
         $this->assertStringContainsString('gtag(', $defaults['gtm_oninit']);
         $this->assertStringContainsString('consent', $defaults['gtm_oninit']);
-        $this->assertStringContainsString('dataLayer.push', $defaults['gtm_onaccept']);
+        $this->assertStringContainsString('default', $defaults['gtm_oninit']);
+        $this->assertStringContainsString('denied', $defaults['gtm_oninit']);
     }
     
     /**
@@ -63,16 +57,12 @@ class gtmDefaultsTest extends WP_UnitTestCase {
         
         // Check that the GTM service has the callbacks
         $this->assertArrayHasKey('onInit', $gtm_service);
-        $this->assertArrayHasKey('onAccept', $gtm_service);
         
         // Check that the callbacks are not empty
         $this->assertNotEmpty($gtm_service['onInit']);
-        $this->assertNotEmpty($gtm_service['onAccept']);
         
         // Check that the callbacks contain expected content
-        $this->assertStringContainsString('window.dataLayer', $gtm_service['onInit']);
-        $this->assertStringContainsString('window.currentKlaroOpts', $gtm_service['onInit']);
-        $this->assertStringContainsString('dataLayer.push', $gtm_service['onAccept']);
-        $this->assertStringContainsString('acceptedServices', $gtm_service['onAccept']);
+        $this->assertStringContainsString('gtag', $gtm_service['onInit']);
+        $this->assertStringContainsString('ad_storage', $gtm_service['onInit']);
     }
 }

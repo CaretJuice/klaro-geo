@@ -85,12 +85,10 @@ class KlaroGeoRegionsTest extends WP_UnitTestCase {
         $settings = array(
             'default_template' => 'default',
             'fallback_behavior' => 'default',
-            'countries' => array(
-                'US' => array(
-                    'template' => 'relaxed',
-                    'regions' => array(
-                        'CA' => array('template' => 'strict')
-                    )
+            'US' => array(
+                'template' => 'relaxed',
+                'regions' => array(
+                    'CA' => array('template' => 'strict')
                 )
             )
         );

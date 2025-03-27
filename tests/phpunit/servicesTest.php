@@ -35,20 +35,22 @@ class ServicesTest extends WP_UnitTestCase {
      */
     public function test_save_service() {
         $new_service = array(
-            'service_name' => 'test-service',
-            'service_required' => false,
-            'service_default' => false,
-            'service_purposes' => array('analytics'),
-            'service_cookies' => array('test_cookie')
+            'name' => 'test-service',
+            'required' => false,
+            'default' => false,
+            'purposes' => array('analytics'),
+            'cookies' => array('test_cookie')
         );
-        
-        $services = array($new_service);
-        update_option('klaro_geo_services', json_encode($services));
-        
-        $saved_services = json_decode(get_option('klaro_geo_services'), true);
-        $this->assertIsArray($saved_services);
-        $this->assertCount(1, $saved_services);
-        $this->assertEquals($new_service['service_name'], $saved_services[0]['service_name']);
+
+        // Use the service settings class
+        $service_settings = new Klaro_Geo_Service_Settings();
+        $service_settings->set_service($new_service['name'], $new_service);
+        $service_settings->save();
+
+        // Get the service back using the class
+        $saved_service = $service_settings->get_service($new_service['name']);
+        $this->assertIsArray($saved_service);
+        $this->assertEquals($new_service['name'], $saved_service['name']);
     }
 
     /**
@@ -56,25 +58,41 @@ class ServicesTest extends WP_UnitTestCase {
      */
     public function test_delete_service() {
         // First add a service
-        $initial_services = array(
-            array(
-                'service_name' => 'test-service',
-                'service_required' => false,
-                'service_default' => false,
-                'service_purposes' => array('analytics'),
-                'service_cookies' => array('test_cookie')
-            )
+        $service = array(
+            'name' => 'test-service',
+            'required' => false,
+            'default' => false,
+            'purposes' => array('analytics'),
+            'cookies' => array('test_cookie')
         );
-        
-        update_option('klaro_geo_services', json_encode($initial_services));
-        
+
+        // Use the service settings class
+        $service_settings = new Klaro_Geo_Service_Settings();
+        $service_settings->set_service($service['name'], $service);
+        $service_settings->save();
+
+        // Verify the service was added
+        $this->assertNotNull($service_settings->get_service($service['name']));
+
         // Delete the service
-        $services = json_decode(get_option('klaro_geo_services'), true);
-        array_splice($services, 0, 1);
-        update_option('klaro_geo_services', json_encode($services));
-        
-        $saved_services = json_decode(get_option('klaro_geo_services'), true);
-        $this->assertIsArray($saved_services);
-        $this->assertCount(0, $saved_services);
+        $service_settings->remove_service($service['name']);
+        $service_settings->save();
+
+        // Verify the service was deleted
+        $this->assertNull($service_settings->get_service($service['name']));
+
+        // Get all services and verify count
+        $all_services = $service_settings->get();
+        $this->assertIsArray($all_services);
+
+        // Check if the service we added was removed
+        $found = false;
+        foreach ($all_services as $s) {
+            if (isset($s['name']) && $s['name'] === $service['name']) {
+                $found = true;
+                break;
+            }
+        }
+        $this->assertFalse($found, 'Service should have been removed');
     }
 }

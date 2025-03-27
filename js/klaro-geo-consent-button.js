@@ -39,39 +39,56 @@
         return target;
     }
 
+    var isInitialized = false;
+    var settings;
     // Get settings from global object or use defaults
     function getSettings() {
+        if (settings) { // Check if settings are already cached
+            if (settings.debug) {
+                console.log('Returning cached klaroGeo settings:', settings);
+            }
+            return settings;
+        }
+
         // Try to get settings from different possible locations
-        var settings = typeof window.klaroGeo !== 'undefined' ? window.klaroGeo : null;
+        var rawSettings = typeof window.klaroGeo !== 'undefined' ? window.klaroGeo : null;
 
         // Debug: log what we found
-        if (settings && settings.debug) {
-            console.log('klaroGeo settings found:', settings);
+        if (rawSettings && rawSettings.debug) {
+            console.log('klaroGeo settings found:', rawSettings);
         }
 
         // If settings are found, merge with defaults
-        if (settings) {
-            // Use $.extend if available, otherwise use our own mergeObjects function
+        if (rawSettings) {
             var mergedSettings = (typeof $.extend === 'function')
-                ? $.extend({}, defaultSettings, settings)
-                : mergeObjects({}, defaultSettings, settings);
+                ? $.extend({}, defaultSettings, rawSettings)
+                : mergeObjects({}, defaultSettings, rawSettings);
 
             // Debug: log merged settings
             if (mergedSettings.debug) {
                 console.log('klaroGeo merged settings:', mergedSettings);
             }
-
-            return mergedSettings;
+            settings = mergedSettings; // Cache the settings
+            return settings;
         }
 
         // Log warning and return defaults
         console.warn('klaroGeo settings not found, using defaults');
+        settings = defaultSettings; // Cache defaults as well
         return defaultSettings;
     }
 
     // Initialize the consent button functionality
     function init() {
-        var settings = getSettings();
+        if (isInitialized) {
+            if (settings && settings.debug) { // Use the cached settings
+                console.log('init() already run, exiting.');
+            }
+            return;
+        }
+
+        settings = getSettings(); // Get settings only when init runs
+        if (!settings) return; // Prevent further execution if settings are not available
 
         if (settings.debug) {
             console.log('Initializing Klaro Geo Consent Button, version:', settings.version);
@@ -95,6 +112,7 @@
         } else if (settings.debug) {
             console.log('Floating button is disabled in settings');
         }
+        isInitialized = true;
     }
 
     // Function to check if Klaro is loaded
@@ -104,18 +122,17 @@
 
     // Initialize with Klaro check
     function initWithKlaroCheck() {
-        var settings = getSettings();
+        console.log('initWithKlaroCheck() called');
+        var settingsForCheck = typeof window.klaroGeo !== 'undefined' ? window.klaroGeo : null; // Only get raw settings for the debug log here
 
-        if (settings.debug) {
+        if (settingsForCheck && settingsForCheck.debug) {
             console.log('Checking if Klaro is loaded:', isKlaroLoaded());
         }
 
-        // If Klaro is loaded, initialize
         if (isKlaroLoaded()) {
             init();
         } else {
-            // If not, wait and try again
-            if (settings.debug) {
+            if (settingsForCheck && settingsForCheck.debug) {
                 console.log('Klaro not loaded yet, waiting...');
             }
             setTimeout(initWithKlaroCheck, 500);

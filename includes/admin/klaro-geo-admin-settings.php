@@ -10,16 +10,13 @@ function klaro_geo_settings_page_content() {
 
     add_filter('pre_update_option_klaro_geo_debug_countries', 'klaro_geo_process_debug_countries', 10, 2);
 
-    // Get existing services or initialize with defaults
-    $services_json = get_option('klaro_geo_services', '');
-    if (empty($services_json)) {
-        // Get default services from the central function
-        $default_services = klaro_geo_get_default_services($defaults);
-    } else {
-        $default_services = json_decode($services_json, true);
-        if (!is_array($default_services)) {
-            $default_services = [];
-        }
+    // Get existing services or initialize with defaults using the service settings class
+    $service_settings = new Klaro_Geo_Service_Settings();
+    $default_services = $service_settings->get();
+
+    if (empty($default_services)) {
+        // Get default services from the service settings class
+        $default_services = $service_settings->get_default_services();
     }
     ?>
     <div class="wrap">
@@ -140,66 +137,6 @@ function klaro_geo_settings_page_content() {
                             <li><strong>class</strong> - (Optional) Additional CSS classes to add to the button.</li>
                             <li><strong>style</strong> - (Optional) Set to "link" for a text link instead of a button.</li>
                         </ul>
-                    </td>
-                </tr>
-            </table>
-
-
-            <h2>Advanced Consent Mode</h2>
-            <table class="form-table">
-                <tr valign="top">
-                    <th scope="row"><label for="klaro_geo_analytics_purposes">Analytics Storage Purposes:</label></th>
-                    <td>
-                        <select name="klaro_geo_analytics_purposes[]" id="klaro_geo_analytics_purposes" multiple>  // Multi-select
-                            <?php
-                            $purposes = explode(',', get_option('klaro_geo_purposes', 'functional,analytics,advertising'));
-                            $selected_analytics_purposes = get_option('klaro_geo_analytics_purposes', json_encode(['analytics'])); // Default to 'analytics'
-
-                            // Ensure we have a valid array
-                            if (is_array($selected_analytics_purposes)) {
-                                // Already an array, use as is
-                            } elseif (is_string($selected_analytics_purposes)) {
-                                // Try to decode JSON string
-                                $decoded = json_decode($selected_analytics_purposes, true);
-                                $selected_analytics_purposes = (is_array($decoded)) ? $decoded : ['analytics'];
-                            } else {
-                                // Fallback to default
-                                $selected_analytics_purposes = ['analytics'];
-                            }
-
-                            foreach ($purposes as $purpose) {
-                                echo '<option value="' . esc_attr($purpose) . '" ' . (in_array($purpose, $selected_analytics_purposes) ? 'selected' : '') . '>' . esc_html($purpose) . '</option>';
-                            }
-                            ?>
-                        </select>
-                        <p class="description">Select the purposes that will trigger analytics_storage consent updates.</p>
-                    </td>
-                </tr>
-                <tr valign="top">
-                    <th scope="row"><label for="klaro_geo_ad_purposes">Ad Storage, Personalization, and User Data Purposes:</label></th>
-                    <td>
-                        <select name="klaro_geo_ad_purposes[]" id="klaro_geo_ad_purposes" multiple>  // Multi-select
-                            <?php
-                            $selected_ad_purposes = get_option('klaro_geo_ad_purposes', json_encode(['advertising'])); // Default to 'advertising'
-
-                            // Ensure we have a valid array
-                            if (is_array($selected_ad_purposes)) {
-                                // Already an array, use as is
-                            } elseif (is_string($selected_ad_purposes)) {
-                                // Try to decode JSON string
-                                $decoded = json_decode($selected_ad_purposes, true);
-                                $selected_ad_purposes = (is_array($decoded)) ? $decoded : ['advertising'];
-                            } else {
-                                // Fallback to default
-                                $selected_ad_purposes = ['advertising'];
-                            }
-
-                            foreach ($purposes as $purpose) {
-                                echo '<option value="' . esc_attr($purpose) . '" ' . (in_array($purpose, $selected_ad_purposes) ? 'selected' : '') . '>' . esc_html($purpose) . '</option>';
-                            }
-                            ?>
-                        </select>
-                        <p class="description">Select the purposes that will trigger ad_storage, ad_user_data, and ad_personalization consent updates.</p>
                     </td>
                 </tr>
             </table>

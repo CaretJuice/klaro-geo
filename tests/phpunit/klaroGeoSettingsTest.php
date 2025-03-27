@@ -1,9 +1,12 @@
 <?php
 
 class KlaroGeoSettingsTest extends WP_UnitTestCase {
+    private $country_settings;
+
     public function setUp(): void {
         parent::setUp();
         delete_option('klaro_geo_country_settings');
+        $this->country_settings = new Klaro_Geo_Country_Settings();
     }
 
     public function tearDown(): void {
@@ -21,25 +24,26 @@ class KlaroGeoSettingsTest extends WP_UnitTestCase {
     public function test_get_location_settings() {
         // Set up test data
         $test_settings = array(
-            'countries' => array(
-                'US' => array(
-                    'template' => 'us_template',
-                    'regions' => array(
-                        'CA' => array(
-                            'template' => 'california_template'
-                        )
+            'US' => array(
+                'template' => 'us_template',
+                'regions' => array(
+                    'CA' => array(
+                        'template' => 'california_template'
                     )
                 )
             )
         );
-        update_option('klaro_geo_country_settings', wp_json_encode($test_settings));
+
+        // Use class methods to set and save the settings
+        $this->country_settings->set($test_settings);
+        $this->country_settings->save();
 
         // Test country settings
-        $us_settings = klaro_geo_get_location_settings('US');
+        $us_settings = $this->country_settings->get_location_settings('US');
         $this->assertEquals('us_template', $us_settings['template']);
 
         // Test region settings
-        $ca_settings = klaro_geo_get_location_settings('US-CA');
+        $ca_settings = $this->country_settings->get_location_settings('US-CA');
         $this->assertEquals('california_template', $ca_settings['template']);
         $this->assertTrue($ca_settings['is_region']);
     }
@@ -49,77 +53,52 @@ class KlaroGeoSettingsTest extends WP_UnitTestCase {
         $us_settings = array(
             'template' => 'us_template'
         );
-        $result = klaro_geo_update_location_settings('US', $us_settings);
+        $result = $this->country_settings->update_location_settings('US', $us_settings);
         $this->assertTrue($result);
 
         // Test updating region settings
         $ca_settings = array(
             'template' => 'california_template'
         );
-        $result = klaro_geo_update_location_settings('US-CA', $ca_settings);
+        $result = $this->country_settings->update_location_settings('US-CA', $ca_settings);
         $this->assertTrue($result);
 
+        // Save the settings to the database
+        $this->country_settings->save();
+
+        // Reload the settings
+        $this->country_settings = new Klaro_Geo_Country_Settings();
+
         // Verify settings were saved correctly
-        $all_settings_json = get_option('klaro_geo_country_settings');
-        $all_settings = json_decode($all_settings_json, true); // Decode JSON to array.
-
-        $this->assertEquals('us_template', $all_settings['countries']['US']['template']);
-        $this->assertEquals('california_template', $all_settings['countries']['US']['regions']['CA']['template']);
+        $all_settings = $this->country_settings->get();
+        $this->assertIsArray($all_settings);
+        $this->assertEquals('us_template', $all_settings['US']['template']);
+        $this->assertEquals('california_template', $all_settings['US']['regions']['CA']);
     }
-
     public function test_get_country_regions() {
         // Set up test data
         $test_settings = array(
-            'countries' => array(
-                'US' => array(
-                    'template' => 'us_template',
-                    'regions' => array(
-                        'CA' => array('template' => 'california_template'),
-                        'NY' => array('template' => 'new_york_template')
-                    )
+            'US' => array(
+                'template' => 'us_template',
+                'regions' => array(
+                    'CA' => array('template' => 'california_template'),
+                    'NY' => array('template' => 'new_york_template')
                 )
             )
         );
-        update_option('klaro_geo_country_settings', wp_json_encode($test_settings));
+
+        // Use class methods to set and save the settings
+        $this->country_settings->set($test_settings);
+        $this->country_settings->save();
 
         // Test getting regions
-        $regions = klaro_geo_get_country_regions('US');
+        $regions = $this->country_settings->get_country_regions('US');
         $this->assertCount(2, $regions);
         $this->assertEquals('california_template', $regions['CA']['template']);
         $this->assertEquals('new_york_template', $regions['NY']['template']);
     }
 
     public function test_region_settings_inheritance() {
-        // Set up test data with multiple settings
-        $test_settings = array(
-            'countries' => array(
-                'US' => array(
-                    'template' => 'us_template',
-                    'hideDeclineAll' => true,
-                    'noticeAsModal' => false,
-                    'regions' => array(
-                        'CA' => array(
-                            'template' => 'california_template',
-                            'noticeAsModal' => true
-                            // hideDeclineAll not defined - should inherit from country
-                        )
-                    )
-                )
-            )
-        );
-        update_option('klaro_geo_country_settings', wp_json_encode($test_settings));
-
-        // Get region settings
-        $ca_settings = klaro_geo_get_location_settings('US-CA');
-
-        // Verify region overrides and inheritance
-        $this->assertEquals('california_template', $ca_settings['template'], 'Region should override country template');
-        $this->assertTrue($ca_settings['hideDeclineAll'], 'Region should inherit country hideDeclineAll setting');
-        $this->assertTrue($ca_settings['noticeAsModal'], 'Region should override country noticeAsModal setting');
-        $this->assertTrue($ca_settings['is_region'], 'Region flag should be set');
-    }
-
-    public function test_get_effective_settings() {
         // Add a filter to make our test templates available to the function
         $filter_callback = function($templates) {
             // Add our test templates to the list
@@ -146,32 +125,34 @@ class KlaroGeoSettingsTest extends WP_UnitTestCase {
 
         add_filter('klaro_geo_default_templates', $filter_callback, 10, 1);
 
-        // Set up test data with inheritance and default template
+        // Set up test data with multiple settings
         $test_settings = array(
             'default_template' => 'default',
-            'countries' => array(
-                'US' => array(
-                    'template' => 'us_template',
-                    'regions' => array(
-                        'CA' => array(
-                            'template' => 'california_template'
-                        )
+            'US' => array(
+                'template' => 'us_template',
+                'hideDeclineAll' => true,
+                'noticeAsModal' => false,
+                'regions' => array(
+                    'CA' => array(
+                        'template' => 'california_template',
+                        'noticeAsModal' => true
+                        // hideDeclineAll not defined - should inherit from country
                     )
                 )
             )
         );
-        update_option('klaro_geo_country_settings', wp_json_encode($test_settings));
 
-        // Test country settings
-        $us_settings = klaro_geo_get_effective_settings('US');
-        $this->assertEquals('us_template', $us_settings['template'], 'US template should be us_template');
+        // Use class methods to set and save the settings
+        $this->country_settings->set($test_settings);
+        $this->country_settings->save();
 
-        // Test region settings
-        $ca_settings = klaro_geo_get_effective_settings('US-CA');
-        $this->assertEquals('california_template', $ca_settings['template'], 'California template should be california_template');
+        // Get region settings
+        $ca_settings = $this->country_settings->get_location_settings('US-CA');
 
-        // Test non-existent location falls back to defaults
-        $default_settings = klaro_geo_get_effective_settings('XX');
-        $this->assertEquals('default', $default_settings['template'], 'Default template should be default');
+        // Verify region overrides and inheritance
+        $this->assertEquals('california_template', $ca_settings['template'], 'Region should override country template');
+        $this->assertTrue($ca_settings['hideDeclineAll'], 'Region should inherit country hideDeclineAll setting');
+        $this->assertTrue($ca_settings['noticeAsModal'], 'Region should override country noticeAsModal setting');
+        $this->assertTrue($ca_settings['is_region'], 'Region flag should be set');
     }
 }

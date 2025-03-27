@@ -16,13 +16,16 @@ describe('Klaro Config', function() {
         // Mock gtag function
         window.gtag = jest.fn();
 
+        // Initialize Klaro consent data object
+        window.klaroConsentData = {};
+
         // Set up Klaro consent variables
-        window.klaroConsentReceiptsEnabled = true;
+        window.klaroConsentData.enableConsentLogging = true; // Boolean true
         window.klaro_geo_logging_enabled = false;
-        window.klaroConsentTemplateName = 'default';
-        window.klaroConsentTemplateSource = 'fallback';
-        window.klaroDetectedCountry = 'US';
-        window.klaroDetectedRegion = 'CA';
+        window.klaroConsentData.templateName = 'default';
+        window.klaroConsentData.templateSource = 'fallback';
+        window.klaroConsentData.detectedCountry = 'US';
+        window.klaroConsentData.detectedRegion = 'CA';
 
         // Create a mock handleConsentUpdate function
         mockHandleConsentUpdate = jest.fn((type, granted) => {
@@ -60,12 +63,12 @@ describe('Klaro Config', function() {
         // Clean up
         window.dataLayer = [];
         jest.clearAllMocks();
-        delete window.klaroConsentReceiptsEnabled;
+
+        // Reset klaroConsentData
+        window.klaroConsentData = {};
+
+        // Reset other variables
         delete window.klaro_geo_logging_enabled;
-        delete window.klaroConsentTemplateName;
-        delete window.klaroConsentTemplateSource;
-        delete window.klaroDetectedCountry;
-        delete window.klaroDetectedRegion;
         delete window.handleConsentUpdate;
     });
 

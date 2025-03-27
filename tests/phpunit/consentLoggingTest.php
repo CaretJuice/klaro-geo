@@ -37,7 +37,7 @@ class ConsentLoggingTest extends WP_UnitTestCase {
                     'version' => 1,
                     'elementID' => 'klaro',
                 ),
-                'wordpress_settings' => array(
+                'plugin_settings' => array(
                     'enable_consent_logging' => true
                 )
             ),
@@ -48,7 +48,7 @@ class ConsentLoggingTest extends WP_UnitTestCase {
                     'version' => 1,
                     'elementID' => 'klaro',
                 ),
-                'wordpress_settings' => array(
+                'plugin_settings' => array(
                     'enable_consent_logging' => false
                 )
             )
@@ -222,7 +222,7 @@ class ConsentLoggingTest extends WP_UnitTestCase {
     public function test_js_variable_setting() {
         // Mock the template config
         $template_config = [
-            'wordpress_settings' => [
+            'plugin_settings' => [
                 'enable_consent_logging' => false
             ]
         ];
@@ -235,7 +235,7 @@ class ConsentLoggingTest extends WP_UnitTestCase {
             'ajaxUrl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('klaro_geo_consent_nonce'),
             'consentReceiptsEnabled' => true,
-            'enableConsentLogging' => $template_config['wordpress_settings']['enable_consent_logging'],
+            'enableConsentLogging' => $template_config['plugin_settings']['enable_consent_logging'],
             'templateName' => 'test_template',
             'templateSource' => 'test',
             'detectedCountry' => 'FI',

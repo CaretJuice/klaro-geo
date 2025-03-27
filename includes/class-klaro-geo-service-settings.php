@@ -56,7 +56,7 @@ class Klaro_Geo_Service_Settings extends Klaro_Geo_Option {
                 'default' => false,
                 'cookies' => array(),
                 'callback' => array(
-                    'onInit' => "window.dataLayer = window.dataLayer || []; window.gtag = function(){dataLayer.push(arguments)} gtag('consent', 'default', {'ad_storage': 'denied', 'analytics_storage': 'denied', 'ad_user_data': 'denied', 'ad_personalization': 'denied'}) gtag('set', 'ads_data_redaction', true)",
+                    'onInit' => "",
                     'onAccept' => "if (opts.consents.analytics || opts.consents.advertising) { for(let k of Object.keys(opts.consents)){ if (opts.consents[k]){ let eventName = 'klaro-'+k+'-accepted' dataLayer.push({'event': eventName}) } } }",
                     'onDecline' => ""
                 )
@@ -319,7 +319,16 @@ class Klaro_Geo_Service_Settings extends Klaro_Geo_Option {
         // Validate services before saving
         $this->value = $this->validate_services();
         $this->is_modified = true;
-        
+
         return parent::save();
+    }
+
+    /**
+     * Check if the option has been modified
+     *
+     * @return bool Whether the option has been modified
+     */
+    public function is_modified() {
+        return $this->is_modified;
     }
 }

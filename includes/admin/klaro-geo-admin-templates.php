@@ -288,29 +288,41 @@ function klaro_geo_templates_page() {
             $template_settings->set_template_config($current_template, $template_config);
         }
 
-        // Get WordPress settings
-        if (isset($_POST['wordpress_settings']) && is_array($_POST['wordpress_settings'])) {
-            $wordpress_settings = array();
+        // Get Plugin settings
+        if (isset($_POST['plugin_settings']) && is_array($_POST['plugin_settings'])) {
+            $plugin_settings = array();
 
             // Process enable_consent_logging setting
-            $wordpress_settings['enable_consent_logging'] = isset($_POST['wordpress_settings']['enable_consent_logging']);
+            $plugin_settings['enable_consent_logging'] = isset($_POST['plugin_settings']['enable_consent_logging']);
+
+            // Process consent_mode setting
+            if (isset($_POST['plugin_settings']['consent_mode'])) {
+                $plugin_settings['consent_mode'] = sanitize_text_field($_POST['plugin_settings']['consent_mode']);
+                klaro_geo_debug_log('Saving consent_mode: ' . $plugin_settings['consent_mode']);
+            } else {
+                $plugin_settings['consent_mode'] = 'basic';
+                klaro_geo_debug_log('No consent_mode provided, defaulting to "basic"');
+            }
 
             // Get the existing template
             $template = $template_settings->get_template($current_template);
 
-            // Update the WordPress settings
+            // Update the plugin settings
             if ($template) {
-                $template['wordpress_settings'] = $wordpress_settings;
+                $template['plugin_settings'] = $plugin_settings;
                 $template_settings->set_template($current_template, $template);
+                klaro_geo_debug_log('Updated plugin_settings: ' . print_r($plugin_settings, true));
             }
         } else {
-            // Set default WordPress settings if not provided
+            // Set default plugin settings if not provided
             $template = $template_settings->get_template($current_template);
             if ($template) {
-                $template['wordpress_settings'] = array(
-                    'enable_consent_logging' => true
+                $template['plugin_settings'] = array(
+                    'enable_consent_logging' => true,
+                    'consent_mode' => 'basic'
                 );
                 $template_settings->set_template($current_template, $template);
+                klaro_geo_debug_log('Set default plugin_settings');
             }
         }
 
@@ -881,18 +893,6 @@ function klaro_geo_templates_page() {
                     </tr>
                 </table>
 
-                <h3>WordPress Settings</h3>
-                <table class="form-table">
-                    <tr>
-                        <th><label for="enable_consent_logging">Enable Consent Logging:</label></th>
-                        <td>
-                            <input type="checkbox" name="wordpress_settings[enable_consent_logging]" id="enable_consent_logging"
-                                <?php checked(isset($templates[$current_template]['wordpress_settings']['enable_consent_logging']) ? $templates[$current_template]['wordpress_settings']['enable_consent_logging'] : true); ?>>
-                            <p class="description">Log consent choices for this template in the WordPress database.</p>
-                        </td>
-                    </tr>
-                </table>
-
                 <h3>Cookie Settings</h3>
                 <table class="form-table">
                     <tr>
@@ -1011,6 +1011,29 @@ function klaro_geo_templates_page() {
                             <input type="text" name="template_config[lang]" id="template_config_lang" class="regular-text"
                                 value="<?php echo esc_attr(isset($current_config['lang']) ? $current_config['lang'] : ''); ?>">
                             <p class="description">Default language code (e.g., 'en', 'de'). Leave empty to auto-detect.</p>
+                        </td>
+                    </tr>
+                </table>
+
+                <h3>Plugin Settings</h3>
+                <p>Template-level settings not related to Klaro-specific functionality.</p>
+                <table class="form-table">
+                    <tr>
+                        <th><label for="enable_consent_logging">Enable Consent Logging:</label></th>
+                        <td>
+                            <input type="checkbox" name="plugin_settings[enable_consent_logging]" id="enable_consent_logging"
+                                <?php checked(isset($templates[$current_template]['plugin_settings']['enable_consent_logging']) ? $templates[$current_template]['plugin_settings']['enable_consent_logging'] : true); ?>>
+                            <p class="description">Log consent choices for this template in the WordPress database.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label for="plugin_settings_consent_mode">Consent Mode:</label></th>
+                        <td>
+                            <select name="plugin_settings[consent_mode]" id="plugin_settings_consent_mode">
+                                <option value="basic" <?php selected(isset($templates[$current_template]['plugin_settings']['consent_mode']) ? $templates[$current_template]['plugin_settings']['consent_mode'] : 'basic', 'basic'); ?>>Basic</option>
+                                <option value="advanced" <?php selected(isset($templates[$current_template]['plugin_settings']['consent_mode']) ? $templates[$current_template]['plugin_settings']['consent_mode'] : 'basic', 'advanced'); ?>>Advanced</option>
+                            </select>
+                            <p class="description">Google Tag Manager consent mode setting. This value will be pushed to the dataLayer for use in GTM templates.</p>
                         </td>
                     </tr>
                 </table>
@@ -1381,15 +1404,15 @@ function klaro_geo_create_template() {
 
     // Copy settings from inherited template
     $inherited_config = $inherited_template['config'];
-    $wordpress_settings = isset($inherited_template['wordpress_settings']) ?
-                          $inherited_template['wordpress_settings'] :
+    $plugin_settings = isset($inherited_template['plugin_settings']) ?
+                          $inherited_template['plugin_settings'] :
                           array('enable_consent_logging' => true);
 
     // Create new template
     $new_template = array(
         'name' => $template_name,
         'config' => $inherited_config,
-        'wordpress_settings' => $wordpress_settings
+        'plugin_settings' => $plugin_settings
     );
 
     // Save the new template

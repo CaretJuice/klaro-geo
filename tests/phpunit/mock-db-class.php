@@ -179,8 +179,8 @@ class KlaroGeoMockDB {
         // Default to true if setting doesn't exist
         $enable_consent_logging = true;
 
-        if ($template && isset($template['wordpress_settings']['enable_consent_logging'])) {
-            $enable_consent_logging = (bool) $template['wordpress_settings']['enable_consent_logging'];
+        if ($template && isset($template['plugin_settings']['enable_consent_logging'])) {
+            $enable_consent_logging = (bool) $template['plugin_settings']['enable_consent_logging'];
         }
 
         // If consent logging is disabled for this template, return success without storing
