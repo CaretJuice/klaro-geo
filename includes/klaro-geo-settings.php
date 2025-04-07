@@ -54,3 +54,91 @@ function klaro_geo_get_effective_settings($location_code, $is_admin_override = f
     $country_settings_class = new Klaro_Geo_Country_Settings();
     return $country_settings_class->get_effective_settings($location_code, $is_admin_override);
 }
+
+/**
+ * Get template data for a specific template
+ *
+ * @param string $template_key The template key
+ * @return array The template data
+ */
+function klaro_geo_get_template_data($template_key) {
+    // Initialize the template settings class
+    $template_settings = new Klaro_Geo_Template_Settings();
+
+    // Get the template
+    $template = $template_settings->get_template($template_key);
+
+    // If template not found, return the fallback template
+    if (!$template) {
+        // Get the fallback template key from country settings
+        $country_settings = new Klaro_Geo_Country_Settings();
+        $fallback_template_key = $country_settings->get_default_template();
+
+        // Get the fallback template
+        $template = $template_settings->get_template($fallback_template_key);
+
+        // If still no template found, try to get the first available template
+        if (!$template) {
+            $templates = $template_settings->get();
+            if (!empty($templates)) {
+                $template_keys = array_keys($templates);
+                $first_template_key = reset($template_keys);
+                $template = $template_settings->get_template($first_template_key);
+            }
+        }
+    }
+
+    // Ensure consent_mode_settings exists with default values
+    if (!isset($template['consent_mode_settings'])) {
+        $template['consent_mode_settings'] = array(
+            'initialize_consent_mode' => false,
+            'ad_storage_service' => 'no_service',
+            'ad_user_data' => false,
+            'ad_personalization' => false,
+        );
+    } else {
+        // Ensure all required fields exist
+        if (!isset($template['consent_mode_settings']['initialize_consent_mode'])) {
+            $template['consent_mode_settings']['initialize_consent_mode'] = false;
+        }
+
+        // Ensure ad_storage_service is set
+        if (!isset($template['consent_mode_settings']['ad_storage_service'])) {
+            $template['consent_mode_settings']['ad_storage_service'] = 'no_service';
+        }
+
+        if (!isset($template['consent_mode_settings']['ad_user_data'])) {
+            $template['consent_mode_settings']['ad_user_data'] = false;
+        }
+        if (!isset($template['consent_mode_settings']['ad_personalization'])) {
+            $template['consent_mode_settings']['ad_personalization'] = false;
+        }
+    }
+
+    return $template;
+}
+
+/**
+ * Localize scripts with template data
+ *
+ * This function is used to pass template data to JavaScript
+ */
+function klaro_geo_localize_scripts() {
+    // Get current template data from filter
+    $template_data = apply_filters('klaro_geo_current_template_data', array());
+
+    // Create data array for JavaScript
+    $data = array(
+        'templateSettings' => array(
+            'config' => $template_data
+        )
+    );
+
+    // Allow other plugins to modify the data
+    $data = apply_filters('klaro_geo_localize_script_data', $data);
+
+    // Localize the script with the data
+    wp_localize_script('klaro-geo-consent-mode-js', 'klaroConsentData', $data);
+
+    return $data;
+}

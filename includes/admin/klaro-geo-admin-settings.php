@@ -4,9 +4,7 @@ if (!defined('ABSPATH')) exit;
 
 // Main settings page content
 function klaro_geo_settings_page_content() {
-    global $defaults;
     global $default_services;
-    $defaults = get_klaro_default_values();
 
     add_filter('pre_update_option_klaro_geo_debug_countries', 'klaro_geo_process_debug_countries', 10, 2);
 

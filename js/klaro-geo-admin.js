@@ -173,7 +173,7 @@ jQuery(document).ready(function($) {
                             html += '<td class="region-code">' + fullCode + '</td>';
                             html += '<td>' + name + '</td>';
                             html += '<td><select name="klaro_geo_region_settings[' + countryCode + '][' + code + '][template]" data-country="' + countryCode + '" data-region="' + code + '">';
-                            html += '<option value="inherit">Use Country Default</option>';
+                            html += '<option value="inherit">Use country template</option>';
                             // Use klaroGeoAdmin.templates if available, otherwise try window.klaroTemplates
                             var templates = klaroGeoAdmin.templates || window.klaroTemplates || {};
                             console.log('Available templates:', templates);
@@ -246,14 +246,14 @@ jQuery(document).ready(function($) {
             console.log('Processing select - country:', country, 'region:', region, 'value:', value);
 
             if (country && region) {
-                // Only add if not using the default template
-                if (value !== 'inherit' && value !== 'default') {
-                    // Initialize regions object if it doesn't exist
-                    if (!regionSettings[country].regions) {
-                        regionSettings[country].regions = {};
-                    }
-                    regionSettings[country].regions[region] = value;
+                // Initialize regions object if it doesn't exist
+                if (!regionSettings[country].regions) {
+                    regionSettings[country].regions = {};
                 }
+
+                // If using the country template (inherit), we'll still send it
+                // The server will handle removing it from the database
+                regionSettings[country].regions[region] = value;
             }
         });
 

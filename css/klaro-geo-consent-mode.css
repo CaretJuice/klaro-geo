@@ -1,0 +1,88 @@
+/**
+ * Klaro Geo Consent Mode Extension CSS
+ */
+
+/* Styling for the separate controls list item */
+.klaro-geo-consent-mode-controls {
+    background-color: #f9f9f9;
+    border-left: 3px solid #ddd;
+    margin-left: 15px !important;
+    margin-top: -5px !important;
+    margin-bottom: 10px !important;
+    padding-top: 5px !important;
+    padding-bottom: 5px !important;
+}
+
+.klaro-geo-consent-mode-controls .cm-list-title {
+    font-size: 0.9em;
+    font-weight: bold;
+    color: #555;
+    margin-bottom: 8px;
+    display: block;
+}
+
+/* Container for the additional controls */
+.klaro-geo-ad-controls {
+    margin-top: 5px;
+    padding-left: 10px;
+    font-size: 0.9em;
+}
+
+/* Sub-control styling */
+.klaro-geo-sub-control {
+    margin-bottom: 10px;
+}
+
+.klaro-geo-sub-control .cm-list-title {
+    font-size: 0.9em;
+    font-weight: normal;
+}
+
+.klaro-geo-sub-control .purposes {
+    font-size: 0.85em;
+    color: #666;
+    margin-top: 2px;
+    margin-bottom: 2px;
+}
+
+/* Smaller switch for sub-controls */
+.klaro-geo-sub-control .cm-switch {
+    transform: scale(0.85);
+}
+
+/* Disabled state for controls when parent service is disabled */
+.klaro-geo-controls-disabled {
+    opacity: 0.6;
+    pointer-events: none !important;
+}
+
+.klaro-geo-controls-disabled .klaro-geo-sub-control {
+    cursor: not-allowed !important;
+}
+
+.klaro-geo-controls-disabled .cm-list-input {
+    cursor: not-allowed !important;
+}
+
+/* Ensure enabled controls are interactive */
+.klaro-geo-ad-controls:not(.klaro-geo-controls-disabled) {
+    pointer-events: auto !important;
+}
+
+.klaro-geo-ad-controls:not(.klaro-geo-controls-disabled) .klaro-geo-sub-control {
+    cursor: pointer !important;
+}
+
+.klaro-geo-ad-controls:not(.klaro-geo-controls-disabled) .cm-list-input {
+    cursor: pointer !important;
+}
+
+/* Add a note about disabled state */
+.klaro-geo-controls-disabled::before {
+    content: "These options require the main service to be enabled";
+    display: block;
+    font-style: italic;
+    font-size: 0.85em;
+    color: #666;
+    margin-bottom: 8px;
+}

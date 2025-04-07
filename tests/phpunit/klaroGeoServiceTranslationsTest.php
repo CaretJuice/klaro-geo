@@ -11,7 +11,7 @@ defined('ABSPATH') or die('No script kiddies please!');
 /**
  * Test Service Translations
  */
-class serviceTranslationsTest {
+class Klaro_Geo_Service_Translations_Test {
     /**
      * Run all tests
      */
@@ -41,7 +41,10 @@ class serviceTranslationsTest {
                     'translations' => array(
                         'zz' => array(
                             'title' => 'Test Service ZZ',
-                            'description' => 'Test Service Description ZZ'
+                            'description' => 'Test Service Description ZZ',
+                            'purpose' => 'Service Purpose ZZ',
+                            'purposes' => 'Service Purposes ZZ',
+                            'cookies' => 'Service Cookies ZZ'
                         )
                     )
                 )
@@ -56,15 +59,21 @@ class serviceTranslationsTest {
             );
         }
         
-        // Add test translations for English and French
+        // Add comprehensive test translations for English and French
         $services[0]['translations']['en'] = array(
             'title' => 'Test Service EN',
-            'description' => 'Test Service Description EN'
+            'description' => 'Test Service Description EN',
+            'purpose' => 'Service Purpose EN',
+            'purposes' => 'Service Purposes EN',
+            'cookies' => 'Service Cookies EN'
         );
-        
+
         $services[0]['translations']['fr'] = array(
             'title' => 'Test Service FR',
-            'description' => 'Test Service Description FR'
+            'description' => 'Test Service Description FR',
+            'purpose' => 'Service Purpose FR',
+            'purposes' => 'Service Purposes FR',
+            'cookies' => 'Service Cookies FR'
         );
         
         // Save services
@@ -133,10 +142,25 @@ class serviceTranslationsTest {
             }
         }
         
-        // Check specific values
-        if ($translations['fr']['title'] !== 'Test Service FR') {
-            self::log_error('French service title not loaded correctly');
-            return;
+        // Check specific values for each language and key
+        $test_keys = array(
+            'title' => 'Test Service FR',
+            'description' => 'Test Service Description FR',
+            'purpose' => 'Service Purpose FR',
+            'purposes' => 'Service Purposes FR',
+            'cookies' => 'Service Cookies FR'
+        );
+
+        foreach ($test_keys as $key => $expected_value) {
+            if (!isset($translations['fr'][$key])) {
+                self::log_error("French service translation key '$key' not found");
+                return;
+            }
+
+            if ($translations['fr'][$key] !== $expected_value) {
+                self::log_error("French service translation key '$key' has incorrect value. Expected: '$expected_value', Got: '{$translations['fr'][$key]}'");
+                return;
+            }
         }
         
         self::log_success('Service translations loaded successfully');
@@ -188,10 +212,13 @@ class serviceTranslationsTest {
             return;
         }
         
-        // Add Spanish translation to the service
+        // Add comprehensive Spanish translation to the service
         $services[0]['translations']['es'] = array(
             'title' => 'Test Service ES',
-            'description' => 'Test Service Description ES'
+            'description' => 'Test Service Description ES',
+            'purpose' => 'Service Purpose ES',
+            'purposes' => 'Service Purposes ES',
+            'cookies' => 'Service Cookies ES'
         );
         
         // Save services
@@ -206,10 +233,25 @@ class serviceTranslationsTest {
             return;
         }
         
-        // Check specific values
-        if ($services[0]['translations']['es']['title'] !== 'Test Service ES') {
-            self::log_error('Spanish service title not loaded correctly');
-            return;
+        // Check specific values for each key
+        $test_keys = array(
+            'title' => 'Test Service ES',
+            'description' => 'Test Service Description ES',
+            'purpose' => 'Service Purpose ES',
+            'purposes' => 'Service Purposes ES',
+            'cookies' => 'Service Cookies ES'
+        );
+
+        foreach ($test_keys as $key => $expected_value) {
+            if (!isset($services[0]['translations']['es'][$key])) {
+                self::log_error("Spanish service translation key '$key' not found");
+                return;
+            }
+
+            if ($services[0]['translations']['es'][$key] !== $expected_value) {
+                self::log_error("Spanish service translation key '$key' has incorrect value. Expected: '$expected_value', Got: '{$services[0]['translations']['es'][$key]}'");
+                return;
+            }
         }
         
         self::log_success('Service translations from templates loaded successfully');

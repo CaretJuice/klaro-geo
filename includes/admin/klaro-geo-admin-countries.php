@@ -51,6 +51,9 @@ function klaro_geo_country_settings_page_content() {
     // Get templates
     $templates = get_option('klaro_geo_templates', array());
 
+    // Check if 'default' template exists
+    $has_default_template = isset($templates['default']);
+
     // Add data to JavaScript - use the consolidated script
     wp_localize_script('klaro-geo-admin-js', 'klaroGeoAdmin', array(
         'ajaxurl' => admin_url('admin-ajax.php'),
@@ -77,10 +80,9 @@ function klaro_geo_country_settings_page_content() {
                 <tbody>
                 <!-- Default settings for other countries -->
                 <tr class="default-settings">
-                    <td><strong>Country Default/Fallback Template</strong></td>
+                    <td><strong>Fallback Template</strong></td>
                     <td>
                         <select name="klaro_geo_country_settings[default_template]">
-                            <option value="default">Default Template</option>
                             <?php foreach ($templates as $key => $template) : ?>
                                 <option value="<?php echo esc_attr($key); ?>"
                                     <?php selected(isset($geo_settings['default_template']) ? $geo_settings['default_template'] : 'default', $key); ?>>
@@ -110,7 +112,7 @@ function klaro_geo_country_settings_page_content() {
                     // Default settings if nothing is found
                     else {
                         $country_config = array(
-                            'template' => 'default',
+                            'template' => 'inherit',
                             'regions' => array()
                         );
                         // Flag this as a default config so we don't save it unnecessarily
@@ -121,7 +123,7 @@ function klaro_geo_country_settings_page_content() {
                             <td><?php echo esc_html($code); ?> (<?php echo esc_html($name); ?>)</td>
                             <td>
                                 <select name="klaro_geo_country_settings[<?php echo esc_attr($code); ?>][template]">
-                                    <option value="default">Default Template</option>
+                                    <option value="inherit">Use fallback template</option>
                                     <?php foreach ($templates as $key => $template) : ?>
                                         <option value="<?php echo esc_attr($key); ?>"
                                             <?php selected($country_config['template'], $key); ?>>

@@ -41,29 +41,23 @@ class Klaro_Geo_Service_Settings extends Klaro_Geo_Option {
      * @return array The default services
      */
     public function get_default_services() {
-        // Use the central function to get default services
-        if (function_exists('klaro_geo_get_default_services')) {
-            return klaro_geo_get_default_services();
+        // Always use the global function to get default services
+        // This ensures we have a single source of truth for service definitions
+        if (!function_exists('klaro_geo_get_default_services')) {
+            // If the function doesn't exist, include the defaults file that defines it
+            require_once dirname(__FILE__) . '/klaro-geo-defaults.php';
+
+            // Log a warning that we had to include the file
+            klaro_geo_debug_log('WARNING: Had to include klaro-geo-defaults.php to get default services');
         }
 
-        // Fallback if the function doesn't exist yet (should never happen)
-        $default_services = array(
-            array(
-                'name' => 'google-tag-manager',
-                'title' => 'Google Tag Manager',
-                'purposes' => array('analytics', 'advertising'),
-                'required' => false,
-                'default' => false,
-                'cookies' => array(),
-                'callback' => array(
-                    'onInit' => "",
-                    'onAccept' => "if (opts.consents.analytics || opts.consents.advertising) { for(let k of Object.keys(opts.consents)){ if (opts.consents[k]){ let eventName = 'klaro-'+k+'-accepted' dataLayer.push({'event': eventName}) } } }",
-                    'onDecline' => ""
-                )
-            )
-        );
+        // Now get the services from the global function
+        $services = klaro_geo_get_default_services();
 
-        return $default_services;
+        // Log the services we got
+        klaro_geo_debug_log('Got ' . count($services) . ' default services from global function');
+
+        return $services;
     }
 
     /**
@@ -212,8 +206,14 @@ class Klaro_Geo_Service_Settings extends Klaro_Geo_Option {
                     $value = array_map('trim', $value);
                 }
             } elseif ($key === 'required' || $key === 'default') {
-                // Convert to boolean
-                $value = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+                // Handle 'global' value for template inheritance
+                if ($value === 'global') {
+                    // Use null to indicate that this setting should inherit from template
+                    $value = null;
+                } else {
+                    // Convert to boolean for explicit settings
+                    $value = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+                }
             } elseif ($key === 'cookies') {
                 // Convert cookies to array if it's a string
                 if (is_string($value)) {
@@ -225,11 +225,69 @@ class Klaro_Geo_Service_Settings extends Klaro_Geo_Option {
                 if (!isset($service['callback'])) {
                     $service['callback'] = array();
                 }
-                
+
                 $service['callback'] = array_merge($service['callback'], $value);
                 continue; // Skip setting this key directly
+            } elseif ($key === 'translations' && is_array($value)) {
+                // Handle translations
+                if (!isset($service['translations'])) {
+                    $service['translations'] = array();
+                }
+
+                // Process each language
+                foreach ($value as $lang => $translations) {
+                    if (!isset($service['translations'][$lang])) {
+                        $service['translations'][$lang] = array();
+                    }
+
+                    // Process each translation key
+                    foreach ($translations as $trans_key => $trans_value) {
+                        // Handle nested structures like optOut and required
+                        if (is_array($trans_value) && in_array($trans_key, array('optOut', 'required'))) {
+                            if (!isset($service['translations'][$lang][$trans_key])) {
+                                $service['translations'][$lang][$trans_key] = array();
+                            }
+
+                            // Set title and description
+                            if (isset($trans_value['title'])) {
+                                $service['translations'][$lang][$trans_key]['title'] = $trans_value['title'];
+                            }
+
+                            if (isset($trans_value['description'])) {
+                                $service['translations'][$lang][$trans_key]['description'] = $trans_value['description'];
+                            }
+                        } else {
+                            // Set the translation directly
+                            $service['translations'][$lang][$trans_key] = $trans_value;
+                        }
+                    }
+
+                    // Remove any service-specific translations that should be in the template
+                    if ($lang === 'zz') {
+                        // Remove optOut translations if they exist
+                        if (isset($service['translations'][$lang]['optOut'])) {
+                            unset($service['translations'][$lang]['optOut']);
+                        }
+
+                        // Remove required translations if they exist
+                        if (isset($service['translations'][$lang]['required'])) {
+                            unset($service['translations'][$lang]['required']);
+                        }
+
+                        // Remove purpose/purposes translations if they exist
+                        if (isset($service['translations'][$lang]['purpose'])) {
+                            unset($service['translations'][$lang]['purpose']);
+                        }
+
+                        if (isset($service['translations'][$lang]['purposes'])) {
+                            unset($service['translations'][$lang]['purposes']);
+                        }
+                    }
+                }
+
+                continue; // Skip setting this key directly
             }
-            
+
             $service[$key] = $value;
         }
         
@@ -278,35 +336,78 @@ class Klaro_Geo_Service_Settings extends Klaro_Geo_Option {
      */
     public function validate_services() {
         $validated = array();
-        
+
         foreach ($this->value as $service) {
             // Ensure required fields exist
             if (!isset($service['name']) || empty($service['name'])) {
                 continue;
             }
-            
+
             // Ensure purposes is an array
             if (!isset($service['purposes']) || !is_array($service['purposes'])) {
                 $service['purposes'] = array();
             }
-            
+
             // Ensure cookies is an array
             if (!isset($service['cookies']) || !is_array($service['cookies'])) {
                 $service['cookies'] = array();
             }
-            
+
             // Ensure callback is an array
             if (!isset($service['callback']) || !is_array($service['callback'])) {
                 $service['callback'] = array();
             }
-            
-            // Ensure required and default are booleans
-            $service['required'] = isset($service['required']) ? filter_var($service['required'], FILTER_VALIDATE_BOOLEAN) : false;
-            $service['default'] = isset($service['default']) ? filter_var($service['default'], FILTER_VALIDATE_BOOLEAN) : false;
-            
+
+            // Handle required and default settings
+            // If value is null, it means "inherit from template"
+            // If value is set, ensure it's a boolean
+            if (isset($service['required']) && $service['required'] !== null) {
+                $service['required'] = filter_var($service['required'], FILTER_VALIDATE_BOOLEAN);
+            }
+
+            if (isset($service['default']) && $service['default'] !== null) {
+                $service['default'] = filter_var($service['default'], FILTER_VALIDATE_BOOLEAN);
+            }
+
+            // Ensure translations structure is correct
+            if (!isset($service['translations']) || !is_array($service['translations'])) {
+                $service['translations'] = array();
+            }
+
+            // Ensure zz fallback translations exist
+            if (!isset($service['translations']['zz']) || !is_array($service['translations']['zz'])) {
+                $service['translations']['zz'] = array();
+            }
+
+            // Set default title and description if not set
+            if (!isset($service['translations']['zz']['title']) || empty($service['translations']['zz']['title'])) {
+                $service['translations']['zz']['title'] = isset($service['title']) ? $service['title'] : $service['name'];
+            }
+
+            if (!isset($service['translations']['zz']['description']) || empty($service['translations']['zz']['description'])) {
+                $service['translations']['zz']['description'] = 'This service is used for ' . implode(', ', $service['purposes']) . '.';
+            }
+
+            // Remove any service-specific translations that should be in the template
+            if (isset($service['translations']['zz']['optOut'])) {
+                unset($service['translations']['zz']['optOut']);
+            }
+
+            if (isset($service['translations']['zz']['required'])) {
+                unset($service['translations']['zz']['required']);
+            }
+
+            if (isset($service['translations']['zz']['purpose'])) {
+                unset($service['translations']['zz']['purpose']);
+            }
+
+            if (isset($service['translations']['zz']['purposes'])) {
+                unset($service['translations']['zz']['purposes']);
+            }
+
             $validated[] = $service;
         }
-        
+
         return $validated;
     }
 

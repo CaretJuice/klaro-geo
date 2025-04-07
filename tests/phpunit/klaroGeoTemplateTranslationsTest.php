@@ -11,7 +11,7 @@ defined('ABSPATH') or die('No script kiddies please!');
 /**
  * Test Template Translations
  */
-class templateTranslationsTest {
+class Klaro_Geo_Template_Translations_Test {
     /**
      * Run all tests
      */
@@ -36,31 +36,184 @@ class templateTranslationsTest {
             return;
         }
         
-        // Create test translations
+        // Create comprehensive test translations with all default keys
         $test_translations = array(
             'zz' => array(
+                'privacyPolicyUrl' => '/privacy-policy-zz/',
                 'consentModal' => array(
                     'title' => 'Test Title ZZ',
                     'description' => 'Test Description ZZ'
                 ),
+                'consentNotice' => array(
+                    'title' => 'Notice Title ZZ',
+                    'changeDescription' => 'Change Description ZZ',
+                    'description' => 'Notice Description ZZ',
+                    'learnMore' => 'Learn More ZZ'
+                ),
                 'acceptAll' => 'Accept All ZZ',
-                'declineAll' => 'Decline All ZZ'
+                'acceptSelected' => 'Accept Selected ZZ',
+                'decline' => 'Decline ZZ',
+                'close' => 'Close ZZ',
+                'purposes' => array(
+                    'functional' => array(
+                        'title' => 'Functional ZZ',
+                        'description' => 'Functional Description ZZ'
+                    ),
+                    'analytics' => array(
+                        'title' => 'Analytics ZZ',
+                        'description' => 'Analytics Description ZZ'
+                    ),
+                    'advertising' => array(
+                        'title' => 'Advertising ZZ',
+                        'description' => 'Advertising Description ZZ'
+                    )
+                ),
+                'purposeItem' => array(
+                    'service' => 'service ZZ',
+                    'services' => 'services ZZ'
+                ),
+                'service' => array(
+                    'disableAll' => array(
+                        'title' => 'Disable All Title ZZ',
+                        'description' => 'Disable All Description ZZ'
+                    ),
+                    'optOut' => array(
+                        'title' => 'Opt Out Title ZZ',
+                        'description' => 'Opt Out Description ZZ'
+                    ),
+                    'required' => array(
+                        'title' => 'Required Title ZZ',
+                        'description' => 'Required Description ZZ'
+                    ),
+                    'purpose' => 'purpose ZZ',
+                    'purposes' => 'purposes ZZ',
+                    'contextualConsent' => array(
+                        'description' => 'Contextual Consent Description ZZ',
+                        'acceptOnce' => 'Accept Once ZZ',
+                        'acceptAlways' => 'Accept Always ZZ'
+                    )
+                ),
+                'ok' => 'OK ZZ',
+                'save' => 'Save ZZ',
+                'poweredBy' => 'Powered By ZZ'
             ),
             'en' => array(
+                'privacyPolicyUrl' => '/privacy-policy-en/',
                 'consentModal' => array(
                     'title' => 'Test Title EN',
                     'description' => 'Test Description EN'
                 ),
+                'consentNotice' => array(
+                    'title' => 'Notice Title EN',
+                    'changeDescription' => 'Change Description EN',
+                    'description' => 'Notice Description EN',
+                    'learnMore' => 'Learn More EN'
+                ),
                 'acceptAll' => 'Accept All EN',
-                'declineAll' => 'Decline All EN'
+                'acceptSelected' => 'Accept Selected EN',
+                'decline' => 'Decline EN',
+                'close' => 'Close EN',
+                'purposes' => array(
+                    'functional' => array(
+                        'title' => 'Functional EN',
+                        'description' => 'Functional Description EN'
+                    ),
+                    'analytics' => array(
+                        'title' => 'Analytics EN',
+                        'description' => 'Analytics Description EN'
+                    ),
+                    'advertising' => array(
+                        'title' => 'Advertising EN',
+                        'description' => 'Advertising Description EN'
+                    )
+                ),
+                'purposeItem' => array(
+                    'service' => 'service EN',
+                    'services' => 'services EN'
+                ),
+                'service' => array(
+                    'disableAll' => array(
+                        'title' => 'Disable All Title EN',
+                        'description' => 'Disable All Description EN'
+                    ),
+                    'optOut' => array(
+                        'title' => 'Opt Out Title EN',
+                        'description' => 'Opt Out Description EN'
+                    ),
+                    'required' => array(
+                        'title' => 'Required Title EN',
+                        'description' => 'Required Description EN'
+                    ),
+                    'purpose' => 'purpose EN',
+                    'purposes' => 'purposes EN',
+                    'contextualConsent' => array(
+                        'description' => 'Contextual Consent Description EN',
+                        'acceptOnce' => 'Accept Once EN',
+                        'acceptAlways' => 'Accept Always EN'
+                    )
+                ),
+                'ok' => 'OK EN',
+                'save' => 'Save EN',
+                'poweredBy' => 'Powered By EN'
             ),
             'fr' => array(
+                'privacyPolicyUrl' => '/privacy-policy-fr/',
                 'consentModal' => array(
                     'title' => 'Test Title FR',
                     'description' => 'Test Description FR'
                 ),
+                'consentNotice' => array(
+                    'title' => 'Notice Title FR',
+                    'changeDescription' => 'Change Description FR',
+                    'description' => 'Notice Description FR',
+                    'learnMore' => 'Learn More FR'
+                ),
                 'acceptAll' => 'Accept All FR',
-                'declineAll' => 'Decline All FR'
+                'acceptSelected' => 'Accept Selected FR',
+                'decline' => 'Decline FR',
+                'close' => 'Close FR',
+                'purposes' => array(
+                    'functional' => array(
+                        'title' => 'Functional FR',
+                        'description' => 'Functional Description FR'
+                    ),
+                    'analytics' => array(
+                        'title' => 'Analytics FR',
+                        'description' => 'Analytics Description FR'
+                    ),
+                    'advertising' => array(
+                        'title' => 'Advertising FR',
+                        'description' => 'Advertising Description FR'
+                    )
+                ),
+                'purposeItem' => array(
+                    'service' => 'service FR',
+                    'services' => 'services FR'
+                ),
+                'service' => array(
+                    'disableAll' => array(
+                        'title' => 'Disable All Title FR',
+                        'description' => 'Disable All Description FR'
+                    ),
+                    'optOut' => array(
+                        'title' => 'Opt Out Title FR',
+                        'description' => 'Opt Out Description FR'
+                    ),
+                    'required' => array(
+                        'title' => 'Required Title FR',
+                        'description' => 'Required Description FR'
+                    ),
+                    'purpose' => 'purpose FR',
+                    'purposes' => 'purposes FR',
+                    'contextualConsent' => array(
+                        'description' => 'Contextual Consent Description FR',
+                        'acceptOnce' => 'Accept Once FR',
+                        'acceptAlways' => 'Accept Always FR'
+                    )
+                ),
+                'ok' => 'OK FR',
+                'save' => 'Save FR',
+                'poweredBy' => 'Powered By FR'
             )
         );
         
@@ -123,10 +276,58 @@ class templateTranslationsTest {
             }
         }
         
-        // Check specific values
-        if ($translations['fr']['consentModal']['title'] !== 'Test Title FR') {
-            self::log_error('French translation title not loaded correctly');
-            return;
+        // Check specific values for each language and key
+        $test_keys = array(
+            'consentModal.title' => 'Test Title FR',
+            'consentModal.description' => 'Test Description FR',
+            'consentNotice.title' => 'Notice Title FR',
+            'consentNotice.description' => 'Notice Description FR',
+            'consentNotice.changeDescription' => 'Change Description FR',
+            'consentNotice.learnMore' => 'Learn More FR',
+            'acceptAll' => 'Accept All FR',
+            'acceptSelected' => 'Accept Selected FR',
+            'decline' => 'Decline FR',
+            'close' => 'Close FR',
+            'purposes.functional.title' => 'Functional FR',
+            'purposes.functional.description' => 'Functional Description FR',
+            'purposes.analytics.title' => 'Analytics FR',
+            'purposes.analytics.description' => 'Analytics Description FR',
+            'purposes.advertising.title' => 'Advertising FR',
+            'purposes.advertising.description' => 'Advertising Description FR',
+            'purposeItem.service' => 'service FR',
+            'purposeItem.services' => 'services FR',
+            'service.disableAll.title' => 'Disable All Title FR',
+            'service.disableAll.description' => 'Disable All Description FR',
+            'service.optOut.title' => 'Opt Out Title FR',
+            'service.optOut.description' => 'Opt Out Description FR',
+            'service.required.title' => 'Required Title FR',
+            'service.required.description' => 'Required Description FR',
+            'service.purpose' => 'purpose FR',
+            'service.purposes' => 'purposes FR',
+            'service.contextualConsent.description' => 'Contextual Consent Description FR',
+            'service.contextualConsent.acceptOnce' => 'Accept Once FR',
+            'service.contextualConsent.acceptAlways' => 'Accept Always FR',
+            'ok' => 'OK FR',
+            'save' => 'Save FR',
+            'poweredBy' => 'Powered By FR'
+        );
+
+        foreach ($test_keys as $key_path => $expected_value) {
+            $parts = explode('.', $key_path);
+            $actual_value = $translations['fr'];
+
+            foreach ($parts as $part) {
+                if (!isset($actual_value[$part])) {
+                    self::log_error("French translation key '$key_path' not found");
+                    return;
+                }
+                $actual_value = $actual_value[$part];
+            }
+
+            if ($actual_value !== $expected_value) {
+                self::log_error("French translation key '$key_path' has incorrect value. Expected: '$expected_value', Got: '$actual_value'");
+                return;
+            }
         }
         
         self::log_success('Template translations loaded successfully');

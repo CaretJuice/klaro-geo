@@ -43,7 +43,10 @@ function klaro_geo_debug_log($message) {
     }
 }
 
-// Always include the admin file with default values
+// Include defaults file first
+require_once plugin_dir_path(__FILE__) . 'includes/klaro-geo-defaults.php';
+
+// Include admin file
 require_once plugin_dir_path(__FILE__) . 'includes/admin/klaro-geo-admin.php';
 
 if (is_admin() || (defined('WP_TESTS_DOMAIN') && WP_TESTS_DOMAIN)) {
@@ -80,6 +83,7 @@ function klaro_geo_enqueue_scripts() {
     wp_enqueue_style('klaro-css', plugins_url('klaro.css', __FILE__), array(), KLARO_GEO_VERSION);
     wp_enqueue_style('klaro-consent-button-css', plugins_url('css/klaro-consent-button.css', __FILE__), array(), KLARO_GEO_VERSION);
     wp_enqueue_style('klaro-embedded-css', plugins_url('css/klaro-embedded.css', __FILE__), array(), KLARO_GEO_VERSION);
+    wp_enqueue_style('klaro-geo-consent-mode-css', plugins_url('css/klaro-geo-consent-mode.css', __FILE__), array('klaro-css'), KLARO_GEO_VERSION);
 
     klaro_geo_generate_config_file();
     $klaro_version = get_option('klaro_geo_js_version', '0.7');
@@ -102,6 +106,164 @@ function klaro_geo_enqueue_scripts() {
         $klaro_version,
         array('strategy' => 'defer', 'in_footer' => true)
     );
+
+    // Add a script to create a centralized Klaro manager handler
+    wp_add_inline_script('klaro-js', "
+        // Create a global Klaro Geo namespace
+        window.klaroGeo = window.klaroGeo || {};
+        
+        // Store callbacks that want to be notified when the Klaro manager is ready
+        window.klaroGeo.managerCallbacks = [];
+        
+        // Flag to track if the manager is ready
+        window.klaroGeo.managerReady = false;
+        
+        // Store the manager instance once it's ready
+        window.klaroGeo.manager = null;
+        
+        // Function to register a callback for when the manager is ready
+        window.klaroGeo.onManagerReady = function(callback) {
+            if (window.klaroGeo.managerReady && window.klaroGeo.manager) {
+                // If the manager is already ready, call the callback immediately
+                console.log('Klaro manager already ready, calling callback immediately');
+                callback(window.klaroGeo.manager);
+            } else {
+                // Otherwise, store the callback for later
+                console.log('Klaro manager not ready yet, storing callback');
+                window.klaroGeo.managerCallbacks.push(callback);
+            }
+        };
+        
+        // Function to notify all callbacks that the manager is ready
+        window.klaroGeo.notifyManagerReady = function(manager) {
+            console.log('Notifying ' + window.klaroGeo.managerCallbacks.length + ' callbacks that Klaro manager is ready');
+            window.klaroGeo.managerReady = true;
+            window.klaroGeo.manager = manager;
+            
+            // Call all registered callbacks
+            window.klaroGeo.managerCallbacks.forEach(function(callback) {
+                try {
+                    callback(manager);
+                } catch (e) {
+                    console.error('Error in Klaro manager callback:', e);
+                }
+            });
+            
+            // Clear the callbacks array
+            window.klaroGeo.managerCallbacks = [];
+        };
+        
+        // Log the current state of gtag
+        console.log('Setting up Klaro manager handler');
+        console.log('Current gtag state:', typeof window.gtag !== 'undefined' ? 'defined' : 'undefined');
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Setting up Klaro manager polling');
+            
+            // Counter for retry attempts
+            var retryAttempts = 0;
+            var MAX_RETRY_ATTEMPTS = 10;
+            
+            // Wait for Klaro to be initialized
+            var checkKlaro = setInterval(function() {
+                // Increment retry counter
+                retryAttempts++;
+                
+                console.log('Checking if Klaro is loaded... (attempt ' + retryAttempts + ' of ' + MAX_RETRY_ATTEMPTS + ')');
+                
+                // Check if we've exceeded the maximum number of retry attempts
+                if (retryAttempts > MAX_RETRY_ATTEMPTS) {
+                    console.log('Maximum retry attempts exceeded. Proceeding with initialization anyway.');
+                    clearInterval(checkKlaro);
+                    
+                    // Try to initialize with whatever we have
+                    try {
+                        if (window.klaro && typeof window.klaro.getManager === 'function') {
+                            var manager = window.klaro.getManager();
+                            if (manager) {
+                                // Notify callbacks with whatever manager we have
+                                window.klaroGeo.notifyManagerReady(manager);
+                            } else {
+                                console.log('Proceeding without Klaro manager');
+                                window.klaroGeo.notifyManagerReady(null);
+                            }
+                        } else {
+                            console.log('Proceeding without Klaro manager');
+                            window.klaroGeo.notifyManagerReady(null);
+                        }
+                    } catch (e) {
+                        console.error('Error during fallback initialization:', e);
+                        // Notify callbacks with null manager as a last resort
+                        window.klaroGeo.notifyManagerReady(null);
+                    }
+                    return;
+                }
+                
+                if (window.klaro) {
+                    console.log('Klaro object found, checking for manager');
+                    
+                    if (typeof window.klaro.getManager === 'function') {
+                        try {
+                            // Log the current state of gtag before getting the manager
+                            console.log('Before getManager - gtag defined:', typeof window.gtag !== 'undefined');
+                            if (typeof window.gtag !== 'undefined') {
+                                console.log('gtag is a function:', typeof window.gtag === 'function');
+                            }
+                            
+                            // Get the manager without using gtag
+                            var manager = null;
+                            try {
+                                // Use a safer approach to get the manager
+                                var getManagerFn = window.klaro.getManager;
+                                manager = getManagerFn.call(window.klaro);
+                                console.log('Got manager using safer approach');
+                            } catch (e) {
+                                console.error('Error getting manager with safer approach:', e);
+                                // Fall back to direct call
+                                try {
+                                    manager = window.klaro.getManager();
+                                    console.log('Got manager using direct call');
+                                } catch (e2) {
+                                    console.error('Error getting manager with direct call:', e2);
+                                }
+                            }
+                            
+                            // Log the state of gtag after getting the manager
+                            console.log('After getManager - gtag defined:', typeof window.gtag !== 'undefined');
+                            if (typeof window.gtag !== 'undefined') {
+                                console.log('gtag is a function:', typeof window.gtag === 'function');
+                            }
+                            
+                            if (manager && manager.consents) {
+                                // We have a valid manager with consents
+                                clearInterval(checkKlaro);
+                                console.log('Klaro manager found with consents');
+                                
+                                // Notify all callbacks
+                                window.klaroGeo.notifyManagerReady(manager);
+                            } else {
+                                console.log('Klaro manager not fully initialized yet');
+                                
+                                // Log manager details for debugging
+                                if (manager) {
+                                    console.log('Manager properties:', Object.keys(manager));
+                                } else {
+                                    console.log('Manager is null or undefined');
+                                }
+                            }
+                        } catch (e) {
+                            console.error('Detailed error getting Klaro manager:', e);
+                            console.log('Error stack:', e.stack);
+                        }
+                    } else {
+                        console.log('Klaro getManager function not available yet');
+                    }
+                } else {
+                    console.log('Waiting for Klaro to initialize...');
+                }
+            }, 100);
+        });
+    ");
 
     if ($klaro_variant === 'klaro-no-css.js') {
         wp_enqueue_style(
@@ -159,11 +321,101 @@ function klaro_geo_enqueue_scripts() {
         true
     );
 
+    // Enqueue the consent mode extension script if needed
+    $template_settings = new Klaro_Geo_Template_Settings();
+    $templates = $template_settings->get();
+
+    // Get user location
+    $location = klaro_geo_get_user_location();
+    $user_country = $location['country'];
+    $user_region = $location['region'];
+    $using_debug_geo = $location['is_admin_override'];
+
+    // Get effective settings for the location, passing the admin override flag
+    $effective_settings = klaro_geo_get_effective_settings(
+        $user_country . ($user_region ? '-' . $user_region : ''),
+        $using_debug_geo
+    );
+
+    // Get template to use
+    $template_to_use = $effective_settings['template'] ?? 'default';
+
+    // Get the template config
+    $template_config = $templates[$template_to_use] ?? $templates['default'] ?? klaro_geo_get_default_templates()['default'];
+
+    // Check if consent mode is enabled in the template
+    // First check if consent_mode_settings is directly in the template
+    if (isset($template_config['consent_mode_settings'])) {
+        $consent_mode_settings = $template_config['consent_mode_settings'];
+    } 
+    // Then check if it's in the config array (as set by the admin form)
+    else if (isset($template_config['config']) && isset($template_config['config']['consent_mode_settings'])) {
+        $consent_mode_settings = $template_config['config']['consent_mode_settings'];
+    } else {
+        $consent_mode_settings = [];
+    }
+
+    $initialize_consent_mode = isset($consent_mode_settings['initialize_consent_mode']) ?
+        filter_var($consent_mode_settings['initialize_consent_mode'], FILTER_VALIDATE_BOOLEAN) : false;
+
+    // Debug log the consent mode settings
+    klaro_geo_debug_log('Consent mode enabled check in wp_enqueue_scripts: ' . ($initialize_consent_mode ? 'true' : 'false'));
+    klaro_geo_debug_log('Template config consent_mode_settings: ' . print_r($consent_mode_settings, true));
+
+    if ($initialize_consent_mode) {
+        klaro_geo_debug_log('Enqueuing klaro-geo-consent-mode.js script');
+        wp_enqueue_script(
+            'klaro-geo-consent-mode-js',
+            plugins_url('js/klaro-geo-consent-mode.js', __FILE__),
+            array('klaro-js'),
+            KLARO_GEO_VERSION,
+            array('strategy' => 'defer', 'in_footer' => true)
+        );
+
+        // Prepare consent mode settings for JavaScript
+        $js_consent_mode_settings = array(
+            'initialize_consent_mode' => $initialize_consent_mode
+        );
+        
+        // Set analytics_storage_service
+        if (isset($consent_mode_settings['analytics_storage_service'])) {
+            $js_consent_mode_settings['analytics_storage_service'] = $consent_mode_settings['analytics_storage_service'];
+        }
+        
+        // Set ad_storage_service
+        if (isset($consent_mode_settings['ad_storage_service'])) {
+            $js_consent_mode_settings['ad_storage_service'] = $consent_mode_settings['ad_storage_service'];
+        }
+        
+        // Set initialization_code
+        if (isset($consent_mode_settings['initialization_code'])) {
+            $js_consent_mode_settings['initialization_code'] = $consent_mode_settings['initialization_code'];
+        }
+        
+        // Create the consent mode settings array
+        $consent_mode_data = array(
+            'templateSettings' => array(
+                'config' => array(
+                    'consent_mode_settings' => $js_consent_mode_settings
+                )
+            ),
+            'detectedCountry' => $user_country,
+            'detectedRegion' => $user_region,
+            'adminOverride' => $using_debug_geo ? true : false
+        );
+
+        // Debug log the consent mode data
+        klaro_geo_debug_log('Consent mode data for JavaScript: ' . print_r($consent_mode_data, true));
+
+        // Localize the script with the consent mode settings
+        wp_localize_script('klaro-geo-consent-mode-js', 'klaroConsentData', $consent_mode_data);
+    }
+
     if (get_option('klaro_geo_enable_consent_receipts', false)) {
         wp_enqueue_script(
             'klaro-consent-receipts-js',
             plugins_url('js/klaro-geo-consent-receipts.js', __FILE__),
-            array('klaro-js'), 
+            array('klaro-js'),
             KLARO_GEO_VERSION,
             true
         );
@@ -206,27 +458,21 @@ function klaro_geo_enqueue_scripts() {
         // Get plugin settings from the template
         $plugin_settings = isset($templates[$template_to_use]['plugin_settings']) ?
             $templates[$template_to_use]['plugin_settings'] :
-            array('enable_consent_logging' => true, 'consent_mode' => 'basic');
+            array('enable_consent_logging' => true);
 
         // Get enableConsentLogging setting
         $enable_consent_logging = isset($plugin_settings['enable_consent_logging']) ?
             $plugin_settings['enable_consent_logging'] : true;
 
-        // Get consent_mode setting
-        $consent_mode = isset($plugin_settings['consent_mode']) ?
-            $plugin_settings['consent_mode'] : 'basic';
-
         // Debug log the settings
         klaro_geo_debug_log('Plugin settings for template ' . $template_to_use . ': ' . print_r($plugin_settings, true));
         klaro_geo_debug_log('enableConsentLogging: ' . ($enable_consent_logging ? 'true' : 'false'));
-        klaro_geo_debug_log('consentMode: ' . $consent_mode);
 
         // Add variables for the consent receipts script
         wp_localize_script('klaro-consent-receipts-js', 'klaroConsentData', array(
             'ajaxUrl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('klaro_geo_consent_nonce'),
             'enableConsentLogging' => $enable_consent_logging,
-            'consentMode' => $consent_mode,
             'templateName' => $template_to_use,
             'templateSource' => $template_source,
             'detectedCountry' => $user_country,
@@ -603,205 +849,5 @@ function klaro_geo_get_user_location() {
     }
 
     return $location;
-}
-
-/**
- * Get default templates for Klaro Geo
- *
- * This is the single source of truth for template definitions.
- * All other parts of the plugin should use this function to get default templates.
- *
- * @return array The default templates
- */
-function klaro_geo_get_default_templates() {
-    return array(
-        'default' => array(
-            'name' => 'Default Template',
-            'description' => 'The default template used when no location-specific template is found',
-            'config' => array(
-                'version' => 1,
-                'elementID' => 'klaro',
-                'styling' => array(
-                    'theme' => array(
-                        'color' => 'light',
-                        'position' => 'top',
-                        'width' => 'wide'
-                    )
-                ),
-                'htmlTexts' => true,
-                'embedded' => false,
-                'groupByPurpose' => true,
-                'storageMethod' => 'cookie',
-                'cookieName' => 'klaro',
-                'cookieExpiresAfterDays' => 365,
-                'default' => false,
-                'required' => false,
-                'mustConsent' => false,
-                'acceptAll' => true,
-                'hideDeclineAll' => false,
-                'hideLearnMore' => false,
-                'noticeAsModal' => false,
-                'additionalClass' => '',
-                'disablePoweredBy' => false,
-                'translations' => array(
-                    'zz' => array(
-                        'privacyPolicyUrl' => '/privacy-policy/',
-                        'consentModal' => array(
-                            'title' => 'Privacy Settings',
-                            'description' => 'Here you can assess and customize the services that we\'d like to use on this website. You\'re in charge! Enable or disable services as you see fit.'
-                        ),
-                        'consentNotice' => array(
-                            'title' => 'Cookie Notice',
-                            'description' => 'Hi! Could we please enable some additional services for {purposes}? You can always change or withdraw your consent later.',
-                            'changeDescription' => 'There were changes since your last visit, please renew your consent.',
-                            'learnMore' => 'Let me choose'
-                        ),
-                        'acceptAll' => 'Accept all',
-                        'acceptSelected' => 'Accept selected',
-                        'decline' => 'I decline',
-                        'ok' => 'That\'s ok',
-                        'close' => 'Close',
-                        'save' => 'Save',
-                        'privacyPolicy' => array(
-                            'name' => 'privacy policy',
-                            'text' => 'To learn more, please read our {privacyPolicy}.'
-                        ),
-                        'purposes' => array(
-                            'functional' => array(
-                                'title' => 'Functional',
-                                'description' => 'These services are essential for the correct functioning of this website. You cannot disable them here as the service would not work correctly otherwise.'
-                            ),
-                            'analytics' => array(
-                                'title' => 'Analytics',
-                                'description' => 'These services process personal information to help us understand how visitors interact with the website.'
-                            ),
-                            'advertising' => array(
-                                'title' => 'Advertising',
-                                'description' => 'These services process personal information to show you personalized or interest-based advertisements.'
-                            )
-                        ),
-                        'purposeItem' => array(
-                            'service' => 'service',
-                            'services' => 'services'
-                        )
-                    )
-                )
-            ),
-            'plugin_settings' => array(
-                'enable_consent_logging' => true,
-                'consent_mode' => 'basic'
-            )
-        ),
-        'strict' => array(
-            'name' => 'Strict Opt-In',
-            'description' => 'Requires explicit consent for all services (opt-in)',
-            'config' => array(
-                'version' => 1,
-                'elementID' => 'klaro',
-                'styling' => array(
-                    'theme' => array(
-                        'color' => 'light',
-                        'position' => 'top',
-                        'width' => 'wide'
-                    )
-                ),
-                'htmlTexts' => true,
-                'embedded' => false,
-                'groupByPurpose' => true,
-                'storageMethod' => 'cookie',
-                'cookieName' => 'klaro',
-                'cookieExpiresAfterDays' => 365,
-                'default' => false,
-                'required' => false,
-                'mustConsent' => true,
-                'acceptAll' => true,
-                'hideDeclineAll' => false,
-                'hideLearnMore' => false,
-                'noticeAsModal' => true,
-                'additionalClass' => '',
-                'disablePoweredBy' => false,
-                'translations' => array(
-                    'zz' => array(
-                        'privacyPolicyUrl' => '/privacy-policy/',
-                        'consentModal' => array(
-                            'title' => 'Privacy Settings',
-                            'description' => 'Here you can assess and customize the services that we\'d like to use on this website. You\'re in charge! Enable or disable services as you see fit.'
-                        ),
-                        'consentNotice' => array(
-                            'title' => 'Cookie Consent',
-                            'description' => 'Hi! Could we please enable some additional services for {purposes}? You can always change or withdraw your consent later.',
-                            'changeDescription' => 'There were changes since your last visit, please renew your consent.',
-                            'learnMore' => 'Let me choose'
-                        ),
-                        'acceptAll' => 'Accept all',
-                        'acceptSelected' => 'Accept selected',
-                        'decline' => 'I decline',
-                        'ok' => 'That\'s ok',
-                        'close' => 'Close',
-                        'save' => 'Save'
-                    )
-                )
-            ),
-            'plugin_settings' => array(
-                'enable_consent_logging' => true,
-                'consent_mode' => 'basic'
-            )
-        ),
-        'relaxed' => array(
-            'name' => 'Relaxed Opt-Out',
-            'description' => 'Assumes consent for all services (opt-out)',
-            'config' => array(
-                'version' => 1,
-                'elementID' => 'klaro',
-                'styling' => array(
-                    'theme' => array(
-                        'color' => 'light',
-                        'position' => 'top',
-                        'width' => 'wide'
-                    )
-                ),
-                'htmlTexts' => true,
-                'embedded' => false,
-                'groupByPurpose' => true,
-                'storageMethod' => 'cookie',
-                'cookieName' => 'klaro',
-                'cookieExpiresAfterDays' => 365,
-                'default' => true,
-                'required' => false,
-                'mustConsent' => false,
-                'acceptAll' => true,
-                'hideDeclineAll' => true,
-                'hideLearnMore' => false,
-                'noticeAsModal' => false,
-                'additionalClass' => '',
-                'disablePoweredBy' => false,
-                'translations' => array(
-                    'zz' => array(
-                        'privacyPolicyUrl' => '/privacy-policy/',
-                        'consentModal' => array(
-                            'title' => 'Privacy Settings',
-                            'description' => 'Here you can assess and customize the services that we\'d like to use on this website. You\'re in charge! Enable or disable services as you see fit.'
-                        ),
-                        'consentNotice' => array(
-                            'title' => 'Cookie Consent',
-                            'description' => 'Hi! Could we please enable some additional services for {purposes}? You can always change or withdraw your consent later.',
-                            'changeDescription' => 'There were changes since your last visit, please renew your consent.',
-                            'learnMore' => 'Let me choose'
-                        ),
-                        'acceptAll' => 'Accept all',
-                        'acceptSelected' => 'Accept selected',
-                        'decline' => 'I decline',
-                        'ok' => 'That\'s ok',
-                        'close' => 'Close',
-                        'save' => 'Save'
-                    )
-                )
-            ),
-            'plugin_settings' => array(
-                'enable_consent_logging' => true,
-                'consent_mode' => 'basic'
-            )
-        )
-    );
 }
 ?>

@@ -296,7 +296,7 @@ class KlaroGeoCountrySettingsClassTest extends WP_UnitTestCase {
                 'regions' => array(
                     'CA' => 'strict',
                     'NY' => 'relaxed',
-                    'TX' => 'default' // Should be removed (default)
+                    'TX' => 'inherit' // Should be removed (inherit)
                 )
             ),
             'CA' => array(
@@ -314,7 +314,7 @@ class KlaroGeoCountrySettingsClassTest extends WP_UnitTestCase {
         $us = $settings->get_country('US');
         $this->assertEquals('strict', $us['regions']['CA']);
         $this->assertEquals('relaxed', $us['regions']['NY']);
-        $this->assertFalse(isset($us['regions']['TX'])); // Default should be removed
+        $this->assertFalse(isset($us['regions']['TX'])); // Inherit should be removed
 
         // Check that CA regions were set correctly
         $ca = $settings->get_country('CA');
@@ -421,5 +421,81 @@ class KlaroGeoCountrySettingsClassTest extends WP_UnitTestCase {
         $tx_settings = $settings->get_effective_settings('US-TX');
         $this->assertEquals('strict', $tx_settings['template']); // Should use country template
         $this->assertEquals('country', $tx_settings['source']);
+    }
+
+    /**
+     * Test fallback template inheritance
+     */
+    public function test_fallback_template_inheritance() {
+        // Create settings with our test option name
+        $settings = new Klaro_Geo_Country_Settings($this->option_name);
+
+        // Set fallback template
+        $settings->set_default_template('strict');
+
+        // Set up test countries with different inheritance patterns
+        $settings->set_country('US', array(
+            'template' => 'relaxed', // Specific template
+            'regions' => array(
+                'CA' => 'strict',    // Specific template
+                'NY' => 'inherit'    // Inherit from country (relaxed)
+            )
+        ));
+
+        $settings->set_country('CA', array(
+            'template' => 'inherit', // Inherit from fallback (strict)
+            'regions' => array(
+                'ON' => 'relaxed',   // Specific template
+                'QC' => 'inherit'    // Inherit from country (which inherits from fallback)
+            )
+        ));
+
+        // Set visible countries
+        $settings->set_visible_countries(array('US', 'CA', 'UK'));
+
+        // We need to manually set the visible_countries_option property
+        // since we're using a custom option name for testing
+        $reflection = new ReflectionClass($settings);
+        $property = $reflection->getProperty('visible_countries_option');
+        $property->setAccessible(true);
+        $property->setValue($settings, $this->visible_countries_option);
+
+        // Save visible countries to our test option
+        $settings->save_visible_countries();
+
+        // Test US (specific template)
+        $us_settings = $settings->get_effective_settings('US');
+        $this->assertEquals('relaxed', $us_settings['template']);
+        $this->assertEquals('country', $us_settings['source']);
+
+        // Test US-CA (specific region template)
+        $ca_settings = $settings->get_effective_settings('US-CA');
+        $this->assertEquals('strict', $ca_settings['template']);
+        $this->assertEquals('region', $ca_settings['source']);
+
+        // Test US-NY (inherits from country)
+        $ny_settings = $settings->get_effective_settings('US-NY');
+        $this->assertEquals('relaxed', $ny_settings['template']);
+        $this->assertEquals('country', $ny_settings['source']);
+
+        // Test CA (inherits from fallback)
+        $ca_country_settings = $settings->get_effective_settings('CA');
+        $this->assertEquals('strict', $ca_country_settings['template']);
+        $this->assertEquals('fallback', $ca_country_settings['source']);
+
+        // Test CA-ON (specific region template)
+        $on_settings = $settings->get_effective_settings('CA-ON');
+        $this->assertEquals('relaxed', $on_settings['template']);
+        $this->assertEquals('region', $on_settings['source']);
+
+        // Test CA-QC (inherits from country, which inherits from fallback)
+        $qc_settings = $settings->get_effective_settings('CA-QC');
+        $this->assertEquals('strict', $qc_settings['template']);
+        $this->assertEquals('fallback', $qc_settings['source']);
+
+        // Test UK (not in settings, uses fallback)
+        $uk_settings = $settings->get_effective_settings('UK');
+        $this->assertEquals('strict', $uk_settings['template']);
+        $this->assertEquals('default', $uk_settings['source']);
     }
 }

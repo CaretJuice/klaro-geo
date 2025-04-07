@@ -28,6 +28,24 @@ describe('Klaro Template Translations', function() {
                                 <input type="text" name="template_config[translations][zz][declineAll]" value="Decline All" class="regular-text">
                             </td>
                         </tr>
+                        <tr>
+                            <th scope="row">Accept Selected</th>
+                            <td>
+                                <input type="text" name="template_config[translations][zz][acceptSelected]" value="Accept Selected" class="regular-text">
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row">Close</th>
+                            <td>
+                                <input type="text" name="template_config[translations][zz][close]" value="Close" class="regular-text">
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row">Powered By</th>
+                            <td>
+                                <input type="text" name="template_config[translations][zz][poweredBy]" value="Realized with Klaro!" class="regular-text">
+                            </td>
+                        </tr>
                     </table>
                 </div>
 
@@ -44,7 +62,10 @@ describe('Klaro Template Translations', function() {
             <textarea id="translations_json_editor" name="template_config[translations_json]" rows="15" cols="80" class="large-text code">{
                 "zz": {
                     "acceptAll": "Accept All",
-                    "declineAll": "Decline All"
+                    "declineAll": "Decline All",
+                    "acceptSelected": "Accept Selected",
+                    "close": "Close",
+                    "poweredBy": "Realized with Klaro!"
                 }
             }</textarea>
 
@@ -74,11 +95,17 @@ describe('Klaro Template Translations', function() {
                             return JSON.stringify({
                                 zz: {
                                     acceptAll: "Accept All",
-                                    declineAll: "Decline All"
+                                    declineAll: "Decline All",
+                                    acceptSelected: "Accept Selected",
+                                    close: "Close",
+                                    poweredBy: "Realized with Klaro!"
                                 },
                                 fr: {
                                     acceptAll: "Accepter Tout",
-                                    declineAll: "Tout Décliner"
+                                    declineAll: "Tout Décliner",
+                                    acceptSelected: "Accepter Sélectionné",
+                                    close: "Fermer",
+                                    poweredBy: "Réalisé avec Klaro!"
                                 }
                             });
                         } else {
@@ -107,6 +134,27 @@ describe('Klaro Template Translations', function() {
                                     return '';
                                 },
                                 val: function() { return 'Decline All'; }
+                            },
+                            {
+                                attr: function(name) {
+                                    if (name === 'name') return 'template_config[translations][zz][acceptSelected]';
+                                    return '';
+                                },
+                                val: function() { return 'Accept Selected'; }
+                            },
+                            {
+                                attr: function(name) {
+                                    if (name === 'name') return 'template_config[translations][zz][close]';
+                                    return '';
+                                },
+                                val: function() { return 'Close'; }
+                            },
+                            {
+                                attr: function(name) {
+                                    if (name === 'name') return 'template_config[translations][zz][poweredBy]';
+                                    return '';
+                                },
+                                val: function() { return 'Realized with Klaro!'; }
                             }
                         ];
 
@@ -166,7 +214,34 @@ describe('Klaro Template Translations', function() {
                         translations: {
                             zz: {
                                 acceptAll: "Accept All",
-                                declineAll: "Decline All"
+                                declineAll: "Decline All",
+                                acceptSelected: "Accept Selected",
+                                close: "Close",
+                                poweredBy: "Realized with Klaro!",
+                                consentModal: {
+                                    title: "Privacy Settings",
+                                    description: "Here you can assess and customize the services that we'd like to use on this website."
+                                },
+                                consentNotice: {
+                                    title: "Privacy Settings",
+                                    changeDescription: "There were changes since your last visit, please update your consent.",
+                                    description: "We use cookies and similar technologies to provide certain features.",
+                                    learnMore: "Learn more"
+                                },
+                                purposes: {
+                                    functional: {
+                                        title: "Functional",
+                                        description: "These services are essential for the correct functioning of this website."
+                                    },
+                                    analytics: {
+                                        title: "Analytics",
+                                        description: "These services allow us to analyze website usage to evaluate and improve its performance."
+                                    }
+                                },
+                                service: {
+                                    purpose: "purpose",
+                                    purposes: "purposes"
+                                }
                             }
                         }
                     }
@@ -219,7 +294,10 @@ describe('Klaro Template Translations', function() {
             const translations = {
                 zz: {
                     acceptAll: "Accept All",
-                    declineAll: "Decline All"
+                    declineAll: "Decline All",
+                    acceptSelected: "Accept Selected",
+                    close: "Close",
+                    poweredBy: "Realized with Klaro!"
                 }
             };
 

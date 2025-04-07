@@ -52,8 +52,20 @@ window.klaroGeo = {
     {
       name: 'analytics',
       translations: {
-        zz: { title: 'Analytics', description: 'Analytics service' },
-        en: { title: 'Analytics', description: 'Analytics service' }
+        zz: {
+          title: 'Analytics',
+          description: 'Analytics service',
+          purpose: 'Analytics Purpose',
+          purposes: 'Analytics Purposes',
+          cookies: 'Analytics Cookies'
+        },
+        en: {
+          title: 'Analytics',
+          description: 'Analytics service',
+          purpose: 'Analytics Purpose',
+          purposes: 'Analytics Purposes',
+          cookies: 'Analytics Cookies'
+        }
       }
     }
   ]
@@ -113,5 +125,19 @@ describe('Service Translations', () => {
     const service = window.klaroGeo.services[0];
     expect(service.translations.zz).toBeDefined();
     expect(service.translations.en).toBeDefined();
+
+    // Check if all required fields are present
+    expect(service.translations.zz.title).toBeDefined();
+    expect(service.translations.zz.description).toBeDefined();
+    expect(service.translations.zz.purpose).toBeDefined();
+    expect(service.translations.zz.purposes).toBeDefined();
+    expect(service.translations.zz.cookies).toBeDefined();
+
+    // Check values
+    expect(service.translations.zz.title).toBe('Analytics');
+    expect(service.translations.zz.description).toBe('Analytics service');
+    expect(service.translations.zz.purpose).toBe('Analytics Purpose');
+    expect(service.translations.zz.purposes).toBe('Analytics Purposes');
+    expect(service.translations.zz.cookies).toBe('Analytics Cookies');
   });
 });

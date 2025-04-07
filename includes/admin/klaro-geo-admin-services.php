@@ -113,19 +113,19 @@ function klaro_geo_services_page_content() {
                 <input type="text" id="service_name" name="service_name" required><br>
                 <label for="service_required">Required:</label><br>
                 <select id="service_required" name="service_required">
-                    <option value="global">Use Global Setting</option>
+                    <option value="global" selected>Use Global Setting</option>
                     <option value="true">Yes</option>
                     <option value="false">No</option>
                 </select>
-                <p class="description">When set to "Yes", users cannot decline this service. Only use for essential services that are required for your website to function.</p><br>
+                <p class="description">When set to "Use Global Setting", this service will inherit the required setting from the template. When set to "Yes", users cannot decline this service. Only use for essential services that are required for your website to function.</p><br>
 
                 <label for="service_default">Default:</label><br>
                 <select id="service_default" name="service_default">
-                    <option value="global">Use Global Setting</option>
+                    <option value="global" selected>Use Global Setting</option>
                     <option value="true">Yes</option>
                     <option value="false">No</option>
                 </select>
-                <p class="description">When set to "Yes", this service will be activated by default (opt-out). Use with caution as this may not be compliant with privacy regulations in some regions.</p><br>
+                <p class="description">When set to "Use Global Setting", this service will inherit the default setting from the template. When set to "Yes", this service will be activated by default (opt-out). Use with caution as this may not be compliant with privacy regulations in some regions.</p><br>
                 <label for="service_purposes">Purposes:</label><br>
                 <div id="service_purposes_container"></div>
                 <label for="service_cookies">Cookies:</label><br>
@@ -200,57 +200,12 @@ function klaro_geo_services_page_content() {
                                 </tr>
 
                                 <tr>
-                                    <th scope="row" colspan="2"><h4>Opt-Out Message</h4></th>
-                                </tr>
-
-                                <tr>
-                                    <th scope="row">Title</th>
-                                    <td>
-                                        <input type="text" id="service_translations_zz_optOut_title" name="service_translations[zz][optOut][title]" value="(opt-out)" class="regular-text">
-                                    </td>
-                                </tr>
-
-                                <tr>
-                                    <th scope="row">Description</th>
-                                    <td>
-                                        <input type="text" id="service_translations_zz_optOut_description" name="service_translations[zz][optOut][description]" value="This services is loaded by default (but you can opt out)" class="regular-text">
-                                    </td>
-                                </tr>
-
-                                <tr>
-                                    <th scope="row" colspan="2"><h4>Required Message</h4></th>
-                                </tr>
-
-                                <tr>
-                                    <th scope="row">Title</th>
-                                    <td>
-                                        <input type="text" id="service_translations_zz_required_title" name="service_translations[zz][required][title]" value="(always required)" class="regular-text">
-                                    </td>
-                                </tr>
-
-                                <tr>
-                                    <th scope="row">Description</th>
-                                    <td>
-                                        <input type="text" id="service_translations_zz_required_description" name="service_translations[zz][required][description]" value="This services is always required" class="regular-text">
-                                    </td>
-                                </tr>
-
-                                <tr>
-                                    <th scope="row" colspan="2"><h4>Purposes</h4></th>
-                                </tr>
-
-                                <tr>
-                                    <th scope="row">Purpose (singular)</th>
-                                    <td>
-                                        <input type="text" id="service_translations_zz_purpose" name="service_translations[zz][purpose]" value="purpose" class="regular-text">
-                                    </td>
-                                </tr>
-
-                                <tr>
-                                    <th scope="row">Purposes (plural)</th>
-                                    <td>
-                                        <input type="text" id="service_translations_zz_purposes" name="service_translations[zz][purposes]" value="purposes" class="regular-text">
-                                    </td>
+                                    <th scope="row" colspan="2">
+                                        <p class="description">
+                                            <strong>Note:</strong> The translations for "Opt-Out Message", "Required Message", and "Purposes" are now configured globally in the Templates section.
+                                            This ensures consistent messaging across all services.
+                                        </p>
+                                    </th>
                                 </tr>
                             </table>
                         </div>

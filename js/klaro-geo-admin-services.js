@@ -92,6 +92,10 @@ if (typeof jQuery !== 'undefined') {
         // Debug log
         console.log('klaroGeoServices loaded:', klaroGeoServices);
 
+        // Ensure default values for required and default settings are set to 'global'
+        $('#service_required').val('global');
+        $('#service_default').val('global');
+
     // Function to get language name from code
     function getLanguageName(langCode) {
         var langName;
@@ -202,19 +206,58 @@ if (typeof jQuery !== 'undefined') {
         }
     }
 
+    // Function to convert service name to title case
+    function toTitleCase(str) {
+        // Replace hyphens and underscores with spaces
+        str = str.replace(/[-_]/g, ' ');
+        // Convert to title case (capitalize first letter of each word)
+        return str.replace(/\w\S*/g, function(txt) {
+            return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+        });
+    }
+
+    // Function to update translation title based on service name
+    function updateTranslationTitle() {
+        var serviceName = $('#service_name').val();
+        if (serviceName) {
+            // Convert service name to title case for the translation title
+            var titleCaseName = toTitleCase(serviceName);
+            $('#service_translations_zz_title').val(titleCaseName);
+        }
+    }
+
+    // Function to update translation description based on selected purposes
+    function updateTranslationDescription() {
+        var purposes = [];
+        $('#service_purposes_container input:checked').each(function() {
+            purposes.push($(this).val());
+        });
+
+        if (purposes.length > 0) {
+            var description = 'This service is used for ' + purposes.join(', ') + '.';
+            $('#service_translations_zz_description').val(description);
+        }
+    }
+
+    // Add event listener for service name field
+    $('#service_name').on('blur', updateTranslationTitle);
+
+    // Add event listener for purpose checkboxes
+    $(document).on('change', '#service_purposes_container input[type="checkbox"]', updateTranslationDescription);
+
     // Add New Service button click
     $('#add-new-service').click(function() {
         $('#service_index').val('');
         $('#service_name').val('');
-        $('#service_required').val('false');
-        $('#service_default').val('false');
-        
+        $('#service_required').val('global');
+        $('#service_default').val('global');
+
         // Clear purposes
         $('#service_purposes_container input[type="checkbox"]').prop('checked', false);
-        
+
         // Clear cookies
         $('.cookie-group').remove();
-        
+
         // Clear advanced settings
         $('#service_optout').prop('checked', false);
         $('#service_onlyonce').prop('checked', false);
@@ -224,10 +267,13 @@ if (typeof jQuery !== 'undefined') {
         $('#service_oninit').val('');
         $('#service_onaccept').val('');
         $('#service_ondecline').val('');
-        
+
+        // Clear translation fields
+        $('input[name^="service_translations"], textarea[name^="service_translations"]').val('');
+
         // Show the form
         $('#service-form-container').show();
-        
+
         // Populate purposes
         populatePurposes();
     });
@@ -320,6 +366,14 @@ if (typeof jQuery !== 'undefined') {
 
         // Show the form
         $('#service-form-container').show();
+
+        // If no translations exist, generate default ones based on service name and purposes
+        if (!service.translations || !service.translations.zz || !service.translations.zz.title) {
+            updateTranslationTitle();
+        }
+        if (!service.translations || !service.translations.zz || !service.translations.zz.description) {
+            updateTranslationDescription();
+        }
     });
 
     // Delete Service button click
@@ -377,11 +431,21 @@ if (typeof jQuery !== 'undefined') {
     // Form submission
     $('#service-form').submit(function(e) {
         e.preventDefault();
-        
+
         var index = $('#service_index').val();
         var name = $('#service_name').val();
         var required = $('#service_required').val();
         var defaultValue = $('#service_default').val();
+
+        // Ensure translation title is set based on service name if empty
+        if (!$('#service_translations_zz_title').val()) {
+            updateTranslationTitle();
+        }
+
+        // Ensure translation description is set based on purposes if empty
+        if (!$('#service_translations_zz_description').val()) {
+            updateTranslationDescription();
+        }
         
         // Get selected purposes
         var purposes = [];

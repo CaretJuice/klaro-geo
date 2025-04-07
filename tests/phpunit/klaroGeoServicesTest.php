@@ -25,9 +25,18 @@ class ServicesTest extends WP_UnitTestCase {
         // Verify the default services are defined in GLOBALS
         $this->assertArrayHasKey('default_services', $GLOBALS);
         $this->assertIsArray($GLOBALS['default_services']);
-        $this->assertCount(1, $GLOBALS['default_services']); // Default Google Tag Manager service
-        $this->assertEquals('google-tag-manager', $GLOBALS['default_services'][0]['name']);
-        $this->assertEquals(['analytics', 'advertising'], $GLOBALS['default_services'][0]['purposes']);
+        $this->assertCount(3, $GLOBALS['default_services']); // Default services: Google Tag Manager, Google Analytics, Google Ads
+
+        // Check for Google Tag Manager
+        $gtm_found = false;
+        foreach ($GLOBALS['default_services'] as $service) {
+            if ($service['name'] === 'google-tag-manager') {
+                $gtm_found = true;
+                $this->assertEquals(['analytics', 'advertising'], $service['purposes']);
+                break;
+            }
+        }
+        $this->assertTrue($gtm_found, 'Google Tag Manager service not found');
     }
 
     /**

@@ -8,35 +8,6 @@ require_once plugin_dir_path(__FILE__) . 'klaro-geo-admin-templates.php';
 require_once plugin_dir_path(__FILE__) . 'klaro-geo-admin-countries.php';
 require_once plugin_dir_path(__FILE__) . 'klaro-geo-admin-services.php';
 
-// Define default values as a function to ensure they're always available
-function get_klaro_default_values() {
-    static $defaults = null;
-
-
-    if ($defaults === null) {
-        $defaults = array(
-            'gtm_oninit' => <<<JS
-// Set default consent state
-gtag('consent', 'default',{ 
-    'ad_storage': 'denied',
-    'analytics_storage': 'denied',
-    'ad_user_data': 'denied',
-    'ad_personalization': 'denied' 
-});
-gtag('set', 'ads_data_redaction', true);
-JS,
-
-            'gtm_onaccept' => <<<JS
-JS,
-
-            'gtm_ondecline' => <<<JS
-JS
-        );
-    }
-
-    return $defaults;
-}
-
 // Register admin menu
 function klaro_geo_admin_menu() {
     add_menu_page(
@@ -83,13 +54,6 @@ add_action('admin_menu', 'klaro_geo_admin_menu');
 
 // Activation function
 function klaro_geo_activate() {
-    $defaults = get_klaro_default_values();
-
-    // Clean up the default values
-    $defaults['gtm_oninit'] = preg_replace('/\R+/', ' ', $defaults['gtm_oninit']);
-    $defaults['gtm_onaccept'] = preg_replace('/\R+/', ' ', $defaults['gtm_onaccept']);
-    $defaults['gtm_ondecline'] = preg_replace('/\R+/', ' ', $defaults['gtm_ondecline']);
-
     // Set up the default services using the service settings class
     $service_settings = new Klaro_Geo_Service_Settings();
     $default_services = $service_settings->get_default_services();
@@ -106,14 +70,6 @@ function klaro_geo_activate() {
         $service_settings->set($default_services);
         $service_settings->save();
     }
-
-    // Set default GTM settings (only if they don't exist)
-    add_option('klaro_geo_gtm_oninit', $defaults['gtm_oninit'], '', 'no');
-    add_option('klaro_geo_gtm_onaccept', $defaults['gtm_onaccept']);
-
-    // Set default purposes (only if they don't exist)
-    add_option('klaro_geo_ad_purposes', json_encode(['advertising']));
-    add_option('klaro_geo_analytics_purposes', json_encode(['analytics']));
 
     // Set default geo settings
     add_option('klaro_geo_country_settings', wp_json_encode(klaro_geo_get_default_geo_settings()));
@@ -161,6 +117,12 @@ function klaro_geo_deactivate() {
         delete_option('klaro_geo_gtm_onaccept');
         delete_option('klaro_geo_gtm_ondecline');
 
+        // Consent Mode settings
+        delete_option('klaro_geo_consent_mode_settings');
+        delete_option('klaro_geo_analytics_storage_service');
+        // Legacy option removed
+        delete_option('klaro_geo_initialization_code');
+
         // Other settings
         delete_option('klaro_geo_js_version');
         delete_option('klaro_geo_js_variant');
@@ -182,39 +144,26 @@ function klaro_geo_deactivate() {
 
 // Helper function to get default geo settings
 function klaro_geo_get_default_geo_settings() {
+    // Get templates
+    $templates = get_option('klaro_geo_templates', array());
+
+    // If there are templates, use the first one as the default
+    if (!empty($templates)) {
+        $template_keys = array_keys($templates);
+        $default_template = reset($template_keys);
+    } else {
+        // If no templates are available, use an empty string
+        // The get_default_template method will handle this case
+        $default_template = '';
+    }
+
     return array(
-        'default_template' => 'default',
+        'default_template' => $default_template,
         'countries' => array()
     );
 }
-/*
- * Get default services for Klaro Geo
- *
- * @param array $defaults Optional. Default values for callbacks.
- * @return array The default services
- */
-function klaro_geo_get_default_services($defaults = null) {
-    // If defaults not provided, get them
-    if ($defaults === null) {
-        $defaults = get_klaro_default_values();
-    }
 
-    // Define the default services
-    return [
-        [
-            "name" => "google-tag-manager",
-            "title" => "Google Tag Manager",
-            "required" => false,
-            "purposes" => ["analytics", "advertising"],
-            "default" => false,
-            "cookies" => [],
-            "onInit" => $defaults['gtm_oninit'],
-            "onAccept" => $defaults['gtm_onaccept'],
-            "onDecline" => $defaults['gtm_ondecline']
-        ]
-    ];
-}
-
+// Default services are now defined in includes/klaro-geo-defaults.php
 
 // Function to get config based on user location
 function klaro_geo_get_config() {
@@ -243,9 +192,22 @@ function klaro_geo_get_config() {
     else if (isset($legacy_settings['default_template'])) {
         $template_to_use = $legacy_settings['default_template'];
     }
-    // Default to 'default' if nothing is found
+    // Use the first available template if nothing is found
     else {
-        $template_to_use = 'default';
+        // Get templates
+        $templates = get_option('klaro_geo_templates', array());
+
+        // If there are templates, use the first one
+        if (!empty($templates)) {
+            $template_keys = array_keys($templates);
+            $template_to_use = reset($template_keys);
+            klaro_geo_debug_log('No template specified, using first available template: ' . $template_to_use);
+        } else {
+            // If no templates are available, use an empty string
+            // This will be handled by the template loading code
+            $template_to_use = '';
+            klaro_geo_debug_log('No templates available, using empty template');
+        }
     }
 
     // Check for country-specific settings in new format
@@ -254,12 +216,24 @@ function klaro_geo_get_config() {
 
         // Check for template setting
         if (isset($country_config['template'])) {
-            $template_to_use = $country_config['template'];
+            // If template is set to 'inherit', use the fallback template
+            if ($country_config['template'] === 'inherit') {
+                // template_to_use is already set to the fallback template
+                klaro_geo_debug_log('Country ' . $user_country . ' is set to inherit from fallback template');
+            } else {
+                $template_to_use = $country_config['template'];
+            }
         }
 
         // Check for region-specific settings
         if ($user_region && isset($country_config['regions']) && isset($country_config['regions'][$user_region])) {
-            $template_to_use = $country_config['regions'][$user_region];
+            // If region template is set to 'inherit', use the fallback template
+            if ($country_config['regions'][$user_region] === 'inherit') {
+                // template_to_use is already set to the fallback template
+                klaro_geo_debug_log('Region ' . $user_region . ' is set to inherit from fallback template');
+            } else {
+                $template_to_use = $country_config['regions'][$user_region];
+            }
         }
     }
     // Check for country-specific settings in legacy format
@@ -269,12 +243,24 @@ function klaro_geo_get_config() {
         if ($user_region && isset($country_config['regions'][$user_region])) {
             // Use region-specific template if set
             if (!empty($country_config['regions'][$user_region]['template'])) {
-                $template_to_use = $country_config['regions'][$user_region]['template'];
+                // If template is set to 'inherit', use the fallback template
+                if ($country_config['regions'][$user_region]['template'] === 'inherit') {
+                    // template_to_use is already set to the fallback template
+                    klaro_geo_debug_log('Region ' . $user_region . ' is set to inherit from fallback template (legacy format)');
+                } else {
+                    $template_to_use = $country_config['regions'][$user_region]['template'];
+                }
             }
         } else {
             // Use country-level template if set
             if (!empty($country_config['template'])) {
-                $template_to_use = $country_config['template'];
+                // If template is set to 'inherit', use the fallback template
+                if ($country_config['template'] === 'inherit') {
+                    // template_to_use is already set to the fallback template
+                    klaro_geo_debug_log('Country ' . $user_country . ' is set to inherit from fallback template (legacy format)');
+                } else {
+                    $template_to_use = $country_config['template'];
+                }
             }
         }
     }
@@ -317,8 +303,24 @@ function klaro_geo_get_template_config($template_key) {
     $template = $template_settings->get_template($template_key);
 
     if (!$template) {
-        // If template not found, return the default template
-        return $template_settings->get_template('default');
+        // Get the fallback template key from country settings
+        $country_settings = new Klaro_Geo_Country_Settings();
+        $fallback_template_key = $country_settings->get_default_template();
+
+        // Get the fallback template
+        $fallback_template = $template_settings->get_template($fallback_template_key);
+
+        // If fallback template not found, try to get the first available template
+        if (!$fallback_template) {
+            $templates = $template_settings->get();
+            if (!empty($templates)) {
+                $template_keys = array_keys($templates);
+                $first_template_key = reset($template_keys);
+                return $template_settings->get_template($first_template_key);
+            }
+        }
+
+        return $fallback_template;
     }
 
     return $template;

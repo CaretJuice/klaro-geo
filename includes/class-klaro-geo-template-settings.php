@@ -51,68 +51,23 @@ class Klaro_Geo_Template_Settings extends Klaro_Geo_Option {
      * @return array The default templates
      */
     public function get_default_templates() {
-        // Use the global function to get default templates
+        // Always use the global function to get default templates
         // This ensures we have a single source of truth for template definitions
-        if (function_exists('klaro_geo_get_default_templates')) {
-            $templates = klaro_geo_get_default_templates();
+        if (!function_exists('klaro_geo_get_default_templates')) {
+            // If the function doesn't exist, include the defaults file that defines it
+            require_once dirname(__FILE__) . '/klaro-geo-defaults.php';
 
-            // Add descriptions if they don't exist (for backward compatibility)
-            foreach ($templates as $key => &$template) {
-                if (!isset($template['description'])) {
-                    switch ($key) {
-                        case 'default':
-                            $template['description'] = 'The default template used when no location-specific template is found';
-                            break;
-                        case 'strict':
-                            $template['description'] = 'Requires explicit consent for all services (opt-in)';
-                            break;
-                        case 'relaxed':
-                            $template['description'] = 'Assumes consent for all services (opt-out)';
-                            break;
-                        default:
-                            $template['description'] = 'Custom template';
-                    }
-                }
-            }
-
-            return $templates;
+            // Log a warning that we had to include the file
+            klaro_geo_debug_log('WARNING: Had to include klaro-geo-defaults.php to get default templates');
         }
 
-        // Fallback to basic templates if the global function doesn't exist
-        // This should never happen in normal operation
-        klaro_geo_debug_log('WARNING: klaro_geo_get_default_templates function not found, using fallback templates');
+        // Now get the templates from the global function
+        $templates = klaro_geo_get_default_templates();
 
-        return array(
-            'default' => array(
-                'name' => 'Default Template',
-                'description' => 'The default template used when no location-specific template is found',
-                'config' => array(
-                    'version' => 1,
-                    'elementID' => 'klaro',
-                    'styling' => array(
-                        'theme' => array(
-                            'color' => 'light',
-                            'position' => 'top',
-                            'width' => 'wide'
-                        )
-                    ),
-                    'htmlTexts' => true,
-                    'embedded' => false,
-                    'groupByPurpose' => true,
-                    'storageMethod' => 'cookie',
-                    'cookieName' => 'klaro',
-                    'cookieExpiresAfterDays' => 365,
-                    'default' => false,
-                    'mustConsent' => false,
-                    'acceptAll' => true,
-                    'hideDeclineAll' => false,
-                    'hideLearnMore' => false,
-                    'noticeAsModal' => false,
-                    'disablePoweredBy' => false,
-                    'consent_mode' => 'none'
-                )
-            )
-        );
+        // Log the templates we got
+        klaro_geo_debug_log('Got ' . count($templates) . ' default templates from global function');
+
+        return $templates;
     }
 
     /**
@@ -188,6 +143,29 @@ class Klaro_Geo_Template_Settings extends Klaro_Geo_Option {
                 $config['translations'] = $template['config']['translations'];
                 klaro_geo_debug_log('Preserved existing translations for template ' . $template_key);
             }
+
+            // Process consent mode settings to prevent over-escaping
+            if (isset($config['consent_mode_settings'])) {
+                // Fix initialize_consent_mode checkbox value
+                if (isset($config['consent_mode_settings']['initialize_consent_mode'])) {
+                    $config['consent_mode_settings']['initialize_consent_mode'] =
+                        filter_var($config['consent_mode_settings']['initialize_consent_mode'], FILTER_VALIDATE_BOOLEAN);
+                }
+
+                // Fix initialization code escaping
+                if (isset($config['consent_mode_settings']['initialization_code'])) {
+                    // First, strip all slashes to get to the raw code
+                    $raw_code = stripslashes($config['consent_mode_settings']['initialization_code']);
+
+                    // Store the raw code back
+                    $config['consent_mode_settings']['initialization_code'] = $raw_code;
+
+                    klaro_geo_debug_log('Processed initialization code to prevent over-escaping');
+                }
+            }
+
+            // Process boolean values in the config
+            $this->process_boolean_values($config);
 
             $template['config'] = $config;
         }
@@ -271,6 +249,55 @@ class Klaro_Geo_Template_Settings extends Klaro_Geo_Option {
         unset($config['translations'][$language]);
         
         return $this->set_template_config($template_key, $config);
+    }
+
+    /**
+     * Process boolean values in the config array
+     *
+     * @param array &$config The config array to process
+     */
+    private function process_boolean_values(&$config) {
+        // List of keys that should be boolean
+        $boolean_keys = array(
+            'default', 'required', 'htmlTexts', 'embedded', 'noAutoLoad',
+            'autoFocus', 'groupByPurpose', 'mustConsent', 'acceptAll',
+            'hideDeclineAll', 'hideLearnMore', 'noticeAsModal', 'disablePoweredBy'
+        );
+
+        foreach ($boolean_keys as $key) {
+            if (isset($config[$key])) {
+                // Convert string values to boolean
+                if ($config[$key] === 'true' || $config[$key] === 'on') {
+                    $config[$key] = true;
+                } else if ($config[$key] === 'false') {
+                    $config[$key] = false;
+                }
+
+                // Ensure the value is actually boolean
+                $config[$key] = (bool) $config[$key];
+            }
+        }
+
+        // Process nested boolean values
+        if (isset($config['styling']) && is_array($config['styling'])) {
+            // Add any nested boolean values here if needed
+        }
+
+        // Process consent mode settings
+        if (isset($config['consent_mode_settings']) && is_array($config['consent_mode_settings'])) {
+            if (isset($config['consent_mode_settings']['initialize_consent_mode'])) {
+                if ($config['consent_mode_settings']['initialize_consent_mode'] === 'true' ||
+                    $config['consent_mode_settings']['initialize_consent_mode'] === 'on') {
+                    $config['consent_mode_settings']['initialize_consent_mode'] = true;
+                } else if ($config['consent_mode_settings']['initialize_consent_mode'] === 'false') {
+                    $config['consent_mode_settings']['initialize_consent_mode'] = false;
+                }
+
+                // Ensure the value is actually boolean
+                $config['consent_mode_settings']['initialize_consent_mode'] =
+                    (bool) $config['consent_mode_settings']['initialize_consent_mode'];
+            }
+        }
     }
 
     /**

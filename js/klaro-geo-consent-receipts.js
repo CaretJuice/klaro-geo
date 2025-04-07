@@ -83,7 +83,6 @@ function handleConsentChange(e) {
         country_code: window.klaroConsentData.detectedCountry || null,
         region_code: window.klaroConsentData.detectedRegion || null,
         admin_override: window.klaroConsentData.adminOverride === true,
-        consent_mode: window.klaroConsentData.consentMode || 'basic',
         template_settings: window.klaroConsentData.templateSettings || {},
         klaro_config: window.klaroConfig || null
     };
@@ -148,8 +147,7 @@ function handleConsentChange(e) {
         'event': 'klaro_geo_consent_receipt',
         'klaro_geo_consent_receipt': consentReceipt,
         'klaro_geo_template_source': consentReceipt.template_source,
-        'klaro_geo_admin_override': consentReceipt.admin_override,
-        'consentMode': window.klaroConsentData.consentMode || 'basic'
+        'klaro_geo_admin_override': consentReceipt.admin_override
     });
 }
 
@@ -265,7 +263,6 @@ function sendReceiptToServer(receipt) {
             window.klaroConsentData.enableConsentLogging = window.klaroConsentData.enableConsentLogging || false;
         }
 
-        window.klaroConsentData.consentMode = window.klaroConsentData.consentMode || 'basic';
         window.klaroConsentData.templateName = window.klaroConsentData.templateName || 'default';
         window.klaroConsentData.templateSource = window.klaroConsentData.templateSource || 'fallback';
         window.klaroConsentData.detectedCountry = window.klaroConsentData.detectedCountry || null;

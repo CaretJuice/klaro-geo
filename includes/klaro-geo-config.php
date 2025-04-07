@@ -75,6 +75,10 @@ function klaro_geo_generate_config_file() {
     klaro_geo_debug_log('Available templates from database: ' . print_r($templates, true));
 
     // Get the template config from the database, or fall back to default if not found
+    if (!function_exists('klaro_geo_get_default_templates')) {
+        // If the function doesn't exist, include the defaults file that defines it
+        require_once dirname(__FILE__) . '/klaro-geo-defaults.php';
+    }
     $template_config = $templates[$template_to_use] ?? $templates['default'] ?? klaro_geo_get_default_templates()['default'];
     klaro_geo_debug_log('Template config: ' . print_r($template_config, true));
 
@@ -84,18 +88,11 @@ function klaro_geo_generate_config_file() {
 
     // Initialize custom template settings that are not part of klaroConfig
     $custom_template_settings = array(
-        'consentMode' => 'basic',
         'enableConsentLogging' => $enable_consent_receipts // Use the global setting by default
     );
 
     // Get plugin settings from the template
     if (isset($template_config['plugin_settings'])) {
-        // Get consent_mode setting
-        if (isset($template_config['plugin_settings']['consent_mode'])) {
-            $custom_template_settings['consentMode'] = $template_config['plugin_settings']['consent_mode'];
-            klaro_geo_debug_log('Using consentMode from plugin_settings: ' . $custom_template_settings['consentMode']);
-        }
-
         // Get enableConsentLogging setting
         if (isset($template_config['plugin_settings']['enable_consent_logging'])) {
             $custom_template_settings['enableConsentLogging'] = $template_config['plugin_settings']['enable_consent_logging'];
@@ -114,9 +111,25 @@ function klaro_geo_generate_config_file() {
             if ($key === 'translations' || $key === 'translations_json') {
                 continue;
             }
-
-            // Copy the value directly to klaroConfig
-            $klaro_config[$key] = $value;
+            
+            // Special handling for consent_mode_settings to prevent gtag calls during initialization
+            if ($key === 'consent_mode_settings' && is_array($value)) {
+                // Create a copy of the value
+                $consent_mode_settings = $value;
+                
+                // Remove the initialization_code from the config
+                // We'll handle it separately in the JavaScript
+                if (isset($consent_mode_settings['initialization_code'])) {
+                    $consent_mode_settings['initialization_code_original'] = $consent_mode_settings['initialization_code'];
+                    $consent_mode_settings['initialization_code'] = '// Initialization code moved to JavaScript';
+                }
+                
+                // Copy the modified value
+                $klaro_config[$key] = $consent_mode_settings;
+            } else {
+                // Copy the value directly to klaroConfig
+                $klaro_config[$key] = $value;
+            }
         }
 
         // Log the klaro_config after applying template settings
@@ -170,19 +183,63 @@ function klaro_geo_generate_config_file() {
     // Build the services configuration
     $klaro_config['services'] = array();
 
+    // Check if consent mode is enabled in the template
+    // First check if consent_mode_settings is directly in the template
+    if (isset($template_config['consent_mode_settings'])) {
+        $consent_mode_settings = $template_config['consent_mode_settings'];
+    } 
+    // Then check if it's in the config array (as set by the admin form)
+    else if (isset($template_config['config']) && isset($template_config['config']['consent_mode_settings'])) {
+        $consent_mode_settings = $template_config['config']['consent_mode_settings'];
+    } else {
+        $consent_mode_settings = [];
+    }
+
+    $initialize_consent_mode = isset($consent_mode_settings['initialize_consent_mode']) ?
+        filter_var($consent_mode_settings['initialize_consent_mode'], FILTER_VALIDATE_BOOLEAN) : false;
+
+    $analytics_storage_service = isset($consent_mode_settings['analytics_storage_service']) ?
+        $consent_mode_settings['analytics_storage_service'] : 'no_service';
+
+    $ad_storage_service = isset($consent_mode_settings['ad_storage_service']) ?
+        $consent_mode_settings['ad_storage_service'] : 'no_service';
+
+    $initialization_code = isset($consent_mode_settings['initialization_code']) ?
+        $consent_mode_settings['initialization_code'] : '';
+
+    klaro_geo_debug_log('Consent mode settings from template - initialize_consent_mode: ' . ($initialize_consent_mode ? 'true' : 'false'));
+    klaro_geo_debug_log('Consent mode settings from template - analytics_storage_service: ' . $analytics_storage_service);
+    klaro_geo_debug_log('Consent mode settings from template - ad_storage_service: ' . $ad_storage_service);
+
     // Process each service
     foreach ($services as $service) {
         klaro_geo_debug_log('Processing service: ' . print_r($service, true));
         $service_config = array(
             'name' => $service['name'] ?? 'undefined',
-            'required' => isset($service['required']) ? filter_var($service['required'], FILTER_VALIDATE_BOOLEAN) : false,
-            'default' => isset($service['default']) ? filter_var($service['default'], FILTER_VALIDATE_BOOLEAN) : false,
             'purposes' => $service['purposes'] ?? $service['service_purposes'] ?? array('analytics'),
             'cookies' => isset($service['cookies']) ? $service['cookies'] : array(),
-            'onInit' => $service['onInit'] ?? '',
-            'onAccept' => $service['onAccept'] ?? '',
-            'onDecline' => $service['onDecline'] ?? ''
+            'onInit' => isset($service['callback']['onInit']) ? $service['callback']['onInit'] : ($service['onInit'] ?? ''),
+            'onAccept' => isset($service['callback']['onAccept']) ? $service['callback']['onAccept'] : ($service['onAccept'] ?? ''),
+            'onDecline' => isset($service['callback']['onDecline']) ? $service['callback']['onDecline'] : ($service['onDecline'] ?? '')
         );
+
+        // Only add required and default if they're explicitly set (not null)
+        // This allows inheriting these values from the template
+        if (isset($service['required']) && $service['required'] !== null) {
+            $service_config['required'] = filter_var($service['required'], FILTER_VALIDATE_BOOLEAN);
+            klaro_geo_debug_log('Service ' . $service['name'] . ' has explicit required setting: ' .
+                ($service_config['required'] ? 'true' : 'false'));
+        } else {
+            klaro_geo_debug_log('Service ' . $service['name'] . ' inherits required setting from template');
+        }
+
+        if (isset($service['default']) && $service['default'] !== null) {
+            $service_config['default'] = filter_var($service['default'], FILTER_VALIDATE_BOOLEAN);
+            klaro_geo_debug_log('Service ' . $service['name'] . ' has explicit default setting: ' .
+                ($service_config['default'] ? 'true' : 'false'));
+        } else {
+            klaro_geo_debug_log('Service ' . $service['name'] . ' inherits default setting from template');
+        }
 
         // Add optional fields if they exist
         if (isset($service['optOut'])) {
@@ -202,17 +259,97 @@ function klaro_geo_generate_config_file() {
             $service_config['translations'] = $service['translations'];
         }
 
-        // Use service-specific callbacks if they exist
-        if (isset($service['onInit'])) {
-            $service_config['onInit'] = $service['onInit'];
-        }
+        // Log the callback values for debugging
+        klaro_geo_debug_log('Service ' . $service['name'] . ' callbacks:');
+        klaro_geo_debug_log('  onInit: ' . (isset($service['callback']['onInit']) ? 'From callback array' : 'From direct property'));
+        klaro_geo_debug_log('  onAccept: ' . (isset($service['callback']['onAccept']) ? 'From callback array' : 'From direct property'));
+        klaro_geo_debug_log('  onDecline: ' . (isset($service['callback']['onDecline']) ? 'From callback array' : 'From direct property'));
 
-        if (isset($service['onAccept'])) {
-            $service_config['onAccept'] = $service['onAccept'];
-        }
+        // Apply Google Consent Mode modifications if enabled
+        if ($initialize_consent_mode) {
+            // Check if this is the Google Tag Manager service and if initialize_consent_mode is true
+            if ($service['name'] === 'google-tag-manager' && $initialize_consent_mode && !empty($initialization_code)) {
+                // Store the initialization code but don't append it directly
+                // We'll handle it in JavaScript to prevent gtag errors
+                $service_config['initialization_code_original'] = $initialization_code;
+                $service_config['onInit'] = $service_config['onInit'] . "\n" . '// Initialization code moved to JavaScript';
+                klaro_geo_debug_log('Stored initialization code for GTM to be handled in JavaScript');
+            }
 
-        if (isset($service['onDecline'])) {
-            $service_config['onDecline'] = $service['onDecline'];
+            // Check if this service matches the analytics storage event
+            $is_analytics_service = $analytics_storage_service !== 'no_service' && $service['name'] === $analytics_storage_service;
+
+            // Check if this service matches the ad storage event
+            $is_ad_service = $ad_storage_service !== 'no_service' && $service['name'] === $ad_storage_service;
+
+            // Modify onAccept callback for analytics storage
+            if ($is_analytics_service) {
+                // Store the original code but use a safer version that checks for gtag
+                $analytics_accept_code = "\nif (typeof window.gtag === 'function') {\n  window.gtag('consent', 'update', {\n    analytics_storage: 'granted',\n  });\n}\n";
+                $service_config['onAccept'] = $service_config['onAccept'] . $analytics_accept_code;
+                klaro_geo_debug_log('Added analytics_storage accept code to ' . $service['name']);
+                klaro_geo_debug_log('Updated onAccept callback: ' . $service_config['onAccept']);
+
+                // Add onDecline callback for analytics storage if not already present
+                $analytics_decline_code = "\nif (typeof window.gtag === 'function') {\n  window.gtag('consent', 'update', {\n    analytics_storage: 'denied',\n  });\n}\n";
+                $service_config['onDecline'] = $service_config['onDecline'] . $analytics_decline_code;
+                klaro_geo_debug_log('Added analytics_storage decline code to ' . $service['name']);
+                klaro_geo_debug_log('Updated onDecline callback: ' . $service_config['onDecline']);
+            }
+
+            // Modify onAccept callback for ad storage
+            if ($is_ad_service) {
+                $ad_accept_code = "\nif (typeof window.gtag === 'function') {\n  window.gtag('consent', 'update', {\n    ad_storage: 'granted',\n    ad_user_data: 'granted',\n    ad_personalization: 'granted'\n  });\n}\n";
+                $service_config['onAccept'] = $service_config['onAccept'] . $ad_accept_code;
+                klaro_geo_debug_log('Added ad_storage accept code to ' . $service['name']);
+                klaro_geo_debug_log('Updated onAccept callback: ' . $service_config['onAccept']);
+
+                // Add onDecline callback for ad storage if not already present
+                $ad_decline_code = "\nif (typeof window.gtag === 'function') {\n  window.gtag('consent', 'update', {\n    ad_storage: 'denied',\n    ad_user_data: 'denied',\n    ad_personalization: 'denied'\n  });\n}\n";
+                $service_config['onDecline'] = $service_config['onDecline'] . $ad_decline_code;
+                klaro_geo_debug_log('Added ad_storage decline code to ' . $service['name']);
+                klaro_geo_debug_log('Updated onDecline callback: ' . $service_config['onDecline']);
+            }
+
+            // Our custom code to control the 'checked' attribute
+            // This code should be executed *after* the consent mode updates
+            if ($is_ad_service || $is_analytics_service) {
+                $checkbox_accept_code = "\n" .
+                "const adPersonalizationCheckbox = document.querySelector('#klaro-geo-ad-personalization');\n" .
+                "const adUserDataCheckbox = document.querySelector('#klaro-geo-ad-user-data');\n" .
+                "if (adPersonalizationCheckbox) {\n" .
+                "    adPersonalizationCheckbox.checked = true;\n" .
+                "}\n" .
+                "if (adUserDataCheckbox) {\n" .
+                "    adUserDataCheckbox.checked = true;\n" .
+                "}\n" .
+                "// Remove disabled class from controls container\n" .
+                "const controlsContainer = document.querySelector('.klaro-geo-ad-controls');\n" .
+                "if (controlsContainer) {\n" .
+                "    controlsContainer.classList.remove('klaro-geo-controls-disabled');\n" .
+                "}\n";
+
+                $service_config['onAccept'] = $service_config['onAccept'] . $checkbox_accept_code;
+                klaro_geo_debug_log('Added checkbox control code to onAccept for ' . $service['name']);
+
+                $checkbox_decline_code = "\n" .
+                "const adPersonalizationCheckbox = document.querySelector('#klaro-geo-ad-personalization');\n" .
+                "const adUserDataCheckbox = document.querySelector('#klaro-geo-ad-user-data');\n" .
+                "if (adPersonalizationCheckbox) {\n" .
+                "    adPersonalizationCheckbox.checked = false;\n" .
+                "}\n" .
+                "if (adUserDataCheckbox) {\n" .
+                "    adUserDataCheckbox.checked = false;\n" .
+                "}\n" .
+                "// Add disabled class to controls container\n" .
+                "const controlsContainer = document.querySelector('.klaro-geo-ad-controls');\n" .
+                "if (controlsContainer) {\n" .
+                "    controlsContainer.classList.add('klaro-geo-controls-disabled');\n" .
+                "}\n";
+
+                $service_config['onDecline'] = $service_config['onDecline'] . $checkbox_decline_code;
+                klaro_geo_debug_log('Added checkbox control code to onDecline for ' . $service['name']);
+            }
         }
 
         $klaro_config['services'][] = $service_config;
@@ -245,17 +382,12 @@ function klaro_geo_generate_config_file() {
 
             // Get custom template settings
             var customTemplateSettings = window.klaroConsentData || {};
-            // Handle the consentMode which might be stored with quotes
-            var consentMode = customTemplateSettings.consentMode || 'basic';
-            // Remove quotes if they exist
-            consentMode = consentMode.replace(/^['"]|['"]$/g, '');
 
             // Push to dataLayer
             window.dataLayer = window.dataLayer || [];
             window.dataLayer.push({
                 'event': 'Klaro Consent',
                 'acceptedServices': acceptedServices,
-                'consentMode': consentMode,
                 'consentType': data.type // 'save', 'accept', or 'decline'
             });
 
@@ -358,10 +490,7 @@ function klaro_geo_generate_config_file() {
     // Add a clear separator comment to help with parsing
     $klaro_config_content .= "// ===== END OF KLARO CONFIG =====\n\n";
 
-    // Add gtag default consent call before dataLayer push
-    $klaro_config_content .= "// Initialize consent defaults (if needed)\n";
-
-    // Add the global consent handler
+    // Add the global consent handler (always included for compatibility)
     $klaro_config_content .= $global_consent_js . "\n";
 
 
@@ -372,11 +501,9 @@ function klaro_geo_generate_config_file() {
         'klaro_geo_template_source' => $template_source,
         'klaro_geo_detected_country' => !empty($user_country) ? $user_country : null,
         'klaro_geo_detected_region' => !empty($user_region) ? $user_region : null,
-        'klaro_geo_admin_override' => $using_debug_geo,
-        'consentMode' => $custom_template_settings['consentMode']
+        'klaro_geo_admin_override' => $using_debug_geo
     );
 
-    klaro_geo_debug_log('Adding consentMode to dataLayer push: ' . $custom_template_settings['consentMode']);
     klaro_geo_debug_log('enableConsentLogging setting: ' . ($custom_template_settings['enableConsentLogging'] ? 'true' : 'false'));
 
     $klaro_config_content .= "// Push debug information to dataLayer\n";
@@ -393,18 +520,13 @@ function klaro_geo_generate_config_file() {
     $consent_nonce = wp_create_nonce('klaro_geo_consent_nonce');
 
     // Get the consent_mode value for JavaScript
-    $consent_mode = isset($klaro_config['consent_mode']) ? $klaro_config['consent_mode'] : 'none';
+    $consent_mode = $initialize_consent_mode ? 'v2' : 'none';
     $consent_mode_js = wp_json_encode($consent_mode);
 
     klaro_geo_debug_log('Using consent_mode: ' . $consent_mode);
+    klaro_geo_debug_log('Template config consent_mode_settings: ' . print_r($consent_mode_settings, true));
 
-    // Append additional JavaScript code
-    $klaro_config_content .= <<<JS
-// Initialize gtag function if it doesn't exist
-if (typeof gtag !== 'function') {
-    function gtag(){dataLayer.push(arguments);}
-}
-JS;
+    // No need to append gtag initialization code here as it's added to the Google Tag Manager service
 
     // Add consent receipt functionality if enabled
     if ($enable_consent_receipts) {
@@ -427,7 +549,9 @@ JS;
 
         // Prepare custom template settings for JavaScript
         $enable_consent_logging_value = $custom_template_settings['enableConsentLogging'] ? 'true' : 'false';
-        $consent_mode_value = !empty($custom_template_settings['consentMode']) ? "'" . $custom_template_settings['consentMode'] . "'" : "'basic'";
+
+        // Pre-calculate values for heredoc
+        $initialize_consent_mode_js = $initialize_consent_mode ? 'true' : 'false';
 
         // Add variables for the consent receipts script
         $klaro_config_content .= <<<JS
@@ -441,14 +565,22 @@ window.klaroConsentData = {
     ajaxUrl: "{$admin_ajax_url}",
     nonce: "{$consent_nonce}",
     enableConsentLogging: {$enable_consent_logging_value},
-    consentMode: {$consent_mode_value},
+    consentMode: {$consent_mode_js},
     templateSettings: {
         consentModalTitle: "{$modal_title}",
         consentModalDescription: "{$modal_description}",
         acceptAllText: "{$accept_all_text}",
         declineAllText: "{$decline_all_text}",
         defaultConsent: {$default_consent},
-        requiredConsent: {$required_consent}
+        requiredConsent: {$required_consent},
+        config: {
+            consent_mode_settings: {
+                initialize_consent_mode: {$initialize_consent_mode_js},
+                analytics_storage_service: "{$analytics_storage_service}",
+                ad_storage_service: "{$ad_storage_service}",
+                initialization_code: `{$initialization_code}`
+            }
+        }
     }
 };
 JS;

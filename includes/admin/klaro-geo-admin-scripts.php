@@ -113,7 +113,7 @@ function klaro_geo_admin_scripts($hook) {
         wp_register_script(
             'klaro-geo-templates-js',
             KLARO_GEO_URL . 'js/klaro-geo-admin-templates.js',
-            array('jquery', 'jquery-ui-tabs', 'klaro-geo-admin-js'),
+            array('jquery', 'jquery-ui-tabs', 'jquery-ui-dialog', 'klaro-geo-admin-js'),
             KLARO_GEO_VERSION,
             true
         );

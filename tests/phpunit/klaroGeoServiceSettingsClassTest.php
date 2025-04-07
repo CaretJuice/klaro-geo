@@ -219,8 +219,8 @@ class KlaroGeoServiceSettingsClassTest extends WP_UnitTestCase {
         $form_data = array(
             'title' => 'Updated Service',
             'purposes' => 'functional,analytics',
-            'required' => '1',
-            'default' => '0',
+            'required' => 'global', // Use global setting (inherit from template)
+            'default' => 'global', // Use global setting (inherit from template)
             'cookies' => 'cookie1,cookie2',
             'callback' => array(
                 'onInit' => 'console.log("init")',
@@ -237,8 +237,8 @@ class KlaroGeoServiceSettingsClassTest extends WP_UnitTestCase {
         $this->assertEquals('Updated Service', $updated_service['title']);
         $this->assertContains('functional', $updated_service['purposes']);
         $this->assertContains('analytics', $updated_service['purposes']);
-        $this->assertTrue($updated_service['required']);
-        $this->assertFalse($updated_service['default']);
+        $this->assertNull($updated_service['required'], 'Required should be null when set to "global"');
+        $this->assertNull($updated_service['default'], 'Default should be null when set to "global"');
         $this->assertContains('cookie1', $updated_service['cookies']);
         $this->assertContains('cookie2', $updated_service['cookies']);
         $this->assertEquals('console.log("init")', $updated_service['callback']['onInit']);
@@ -308,10 +308,10 @@ class KlaroGeoServiceSettingsClassTest extends WP_UnitTestCase {
         $this->assertCount(2, $functional_services);
         
         $analytics_services = $settings->get_services_by_purpose('analytics');
-        $this->assertCount(3, $analytics_services); // 2 test services + Google Tag Manager
+        $this->assertCount(4, $analytics_services); // 2 test services + Google Tag Manager + Google Analytics
         
         $advertising_services = $settings->get_services_by_purpose('advertising');
-        $this->assertCount(2, $advertising_services); // 1 test service + Google Tag Manager
+        $this->assertCount(3, $advertising_services); // 1 test service + Google Tag Manager + Google Ads
         
         $non_existent_services = $settings->get_services_by_purpose('non_existent');
         $this->assertEmpty($non_existent_services);
@@ -392,6 +392,12 @@ class KlaroGeoServiceSettingsClassTest extends WP_UnitTestCase {
                 'default' => 'not-a-boolean', // Invalid default (should be converted to boolean)
             ),
             array(
+                'name' => 'test-service-5b',
+                'purposes' => array('functional'),
+                'required' => null, // Null required (should be kept as null for template inheritance)
+                'default' => null, // Null default (should be kept as null for template inheritance)
+            ),
+            array(
                 'name' => 'test-service-6',
                 'purposes' => array('functional'),
                 'required' => true,
@@ -407,7 +413,7 @@ class KlaroGeoServiceSettingsClassTest extends WP_UnitTestCase {
         $validated = $settings->validate_services();
 
         // Check that invalid service was removed
-        $this->assertCount(6, $validated);
+        $this->assertCount(7, $validated);
 
         // Check that missing purposes were added
         $this->assertArrayHasKey('purposes', $validated[0]);
@@ -415,6 +421,10 @@ class KlaroGeoServiceSettingsClassTest extends WP_UnitTestCase {
 
         // Check that invalid purposes were converted to array
         $this->assertIsArray($validated[1]['purposes']);
+
+        // Check that null values for required and default are preserved
+        $this->assertNull($validated[5]['required'], 'Required should remain null for template inheritance');
+        $this->assertNull($validated[5]['default'], 'Default should remain null for template inheritance');
 
         // The behavior seems to be different in the actual implementation
         // Instead of keeping 'not-an-array' as an array element, it might be creating an empty array
@@ -435,8 +445,10 @@ class KlaroGeoServiceSettingsClassTest extends WP_UnitTestCase {
         $this->assertIsBool($validated[4]['default']);
 
         // Check that valid service was kept as is
-        $this->assertTrue($validated[5]['required']);
-        $this->assertFalse($validated[5]['default']);
+        // With our changes, the 5th service is now the one with null values for required and default
+        // The 6th service is the one with explicit boolean values
+        $this->assertTrue($validated[6]['required']);
+        $this->assertFalse($validated[6]['default']);
     }
 
     /**
@@ -449,11 +461,13 @@ class KlaroGeoServiceSettingsClassTest extends WP_UnitTestCase {
         // Initialize with an empty array
         $settings->set(array());
 
-        // Add a test service
+        // Add a test service with null for required and default (inherit from template)
         $settings->set_service('test-service', array(
             'name' => 'test-service',
             'title' => 'Test Service',
-            'purposes' => array('functional')
+            'purposes' => array('functional'),
+            'required' => null,
+            'default' => null
         ));
 
         // Save services
@@ -475,8 +489,9 @@ class KlaroGeoServiceSettingsClassTest extends WP_UnitTestCase {
                 $this->assertArrayHasKey('purposes', $service);
                 $this->assertArrayHasKey('cookies', $service);
                 $this->assertArrayHasKey('callback', $service);
-                $this->assertArrayHasKey('required', $service);
-                $this->assertArrayHasKey('default', $service);
+
+                // Note: 'required' and 'default' keys might not be present when they're set to inherit from the template
+                // We don't assert their existence anymore
 
                 break;
             }

@@ -7,6 +7,36 @@ if (!class_exists('Klaro_Geo_Template_Settings')) {
     require_once dirname(dirname(__FILE__)) . '/class-klaro-geo-template-settings.php';
 }
 
+/**
+ * Sanitize an array recursively, properly handling boolean values
+ *
+ * @param array $array The array to sanitize
+ * @return array The sanitized array
+ */
+function klaro_geo_sanitize_array($array) {
+    $sanitized = array();
+
+    foreach ($array as $key => $value) {
+        if (is_array($value)) {
+            $sanitized[$key] = klaro_geo_sanitize_array($value);
+        } else {
+            // Convert boolean values properly
+            if ($value === 'true') {
+                $sanitized[$key] = true;
+            } else if ($value === 'false') {
+                $sanitized[$key] = false;
+            } else if ($value === 'on') {
+                // Checkbox values come as 'on' when checked
+                $sanitized[$key] = true;
+            } else {
+                $sanitized[$key] = sanitize_text_field($value);
+            }
+        }
+    }
+
+    return $sanitized;
+}
+
 // Templates page content
 function klaro_geo_templates_page() {
     if (!current_user_can('manage_options')) {
@@ -276,11 +306,40 @@ function klaro_geo_templates_page() {
                 if ($key === 'translations') continue;
 
                 if (is_array($value)) {
-                    // Handle nested arrays (like styling) with recursive sanitization
-                    $template_config[$key] = klaro_geo_sanitize_array($value);
+                    // Special handling for consent mode settings
+                    if ($key === 'consent_mode_settings') {
+                        $template_config[$key] = array();
+
+                        // Process each consent mode setting
+                        foreach ($value as $setting_key => $setting_value) {
+                            if ($setting_key === 'initialize_consent_mode') {
+                                // Handle checkbox value
+                                $template_config[$key][$setting_key] = isset($value['initialize_consent_mode']);
+                            } else if ($setting_key === 'initialization_code') {
+                                // Handle JavaScript code - don't sanitize too aggressively
+                                $template_config[$key][$setting_key] = stripslashes($setting_value);
+                            } else {
+                                // Handle other settings normally
+                                $template_config[$key][$setting_key] = sanitize_text_field($setting_value);
+                            }
+                        }
+                    } else {
+                        // Handle other nested arrays with recursive sanitization
+                        $template_config[$key] = klaro_geo_sanitize_array($value);
+                    }
                 } else {
                     // Handle simple values
-                    $template_config[$key] = sanitize_text_field($value);
+                    // Convert boolean values properly
+                    if ($value === 'true') {
+                        $template_config[$key] = true;
+                    } else if ($value === 'false') {
+                        $template_config[$key] = false;
+                    } else if ($value === 'on') {
+                        // Checkbox values come as 'on' when checked
+                        $template_config[$key] = true;
+                    } else {
+                        $template_config[$key] = sanitize_text_field($value);
+                    }
                 }
             }
 
@@ -294,15 +353,6 @@ function klaro_geo_templates_page() {
 
             // Process enable_consent_logging setting
             $plugin_settings['enable_consent_logging'] = isset($_POST['plugin_settings']['enable_consent_logging']);
-
-            // Process consent_mode setting
-            if (isset($_POST['plugin_settings']['consent_mode'])) {
-                $plugin_settings['consent_mode'] = sanitize_text_field($_POST['plugin_settings']['consent_mode']);
-                klaro_geo_debug_log('Saving consent_mode: ' . $plugin_settings['consent_mode']);
-            } else {
-                $plugin_settings['consent_mode'] = 'basic';
-                klaro_geo_debug_log('No consent_mode provided, defaulting to "basic"');
-            }
 
             // Get the existing template
             $template = $template_settings->get_template($current_template);
@@ -318,8 +368,7 @@ function klaro_geo_templates_page() {
             $template = $template_settings->get_template($current_template);
             if ($template) {
                 $template['plugin_settings'] = array(
-                    'enable_consent_logging' => true,
-                    'consent_mode' => 'basic'
+                    'enable_consent_logging' => true
                 );
                 $template_settings->set_template($current_template, $template);
                 klaro_geo_debug_log('Set default plugin_settings');
@@ -406,8 +455,9 @@ function klaro_geo_templates_page() {
                     </option>
                 <?php endforeach; ?>
             </select>
-            
+
             <button type="button" id="add_template" class="button">Add New Template</button>
+            <button type="button" id="delete_template" class="button button-secondary" style="margin-left: 10px;">Delete Template</button>
 
             <script type="text/javascript">
             jQuery(document).ready(function($) {
@@ -421,6 +471,68 @@ function klaro_geo_templates_page() {
 
                     // Redirect to the selected template
                     window.location.href = '<?php echo admin_url('admin.php?page=klaro-geo-templates'); ?>&template=' + selectedTemplate;
+                });
+
+                // Handle delete template button
+                $('#delete_template').on('click', function() {
+                    var selectedTemplate = $('#template_selector').val();
+
+                    // Don't allow deleting the default template
+                    if (selectedTemplate === 'default') {
+                        alert('The default template cannot be deleted.');
+                        return;
+                    }
+
+                    if (confirm('Are you sure you want to delete the template "' + selectedTemplate + '"? This action cannot be undone.')) {
+                        // Send AJAX request to delete the template
+                        $.ajax({
+                            url: ajaxurl,
+                            type: 'POST',
+                            data: {
+                                action: 'klaro_geo_delete_template',
+                                template_id: selectedTemplate,
+                                nonce: $('#klaro_geo_nonce').val()
+                            },
+                            success: function(response) {
+                                if (response.success) {
+                                    alert('Template deleted successfully.');
+                                    // Redirect to the templates page with the default template selected
+                                    window.location.href = '<?php echo admin_url('admin.php?page=klaro-geo-templates'); ?>';
+                                } else {
+                                    // Create a more user-friendly error message
+                                    var errorMessage = 'Error deleting template: ' + response.data.message;
+
+                                    // Show the error in a dialog for better readability
+                                    var $dialog = $('<div></div>')
+                                        .html(errorMessage)
+                                        .dialog({
+                                            title: 'Template Deletion Error',
+                                            modal: true,
+                                            width: 500,
+                                            buttons: {
+                                                Ok: function() {
+                                                    $(this).dialog('close');
+                                                }
+                                            }
+                                        });
+                                }
+                            },
+                            error: function(xhr, status, error) {
+                                var $dialog = $('<div></div>')
+                                    .html('An error occurred while deleting the template: ' + error)
+                                    .dialog({
+                                        title: 'Template Deletion Error',
+                                        modal: true,
+                                        width: 400,
+                                        buttons: {
+                                            Ok: function() {
+                                                $(this).dialog('close');
+                                            }
+                                        }
+                                    });
+                            }
+                        });
+                    }
                 });
 
                 // Initialize tabs when the page loads
@@ -836,8 +948,8 @@ function klaro_geo_templates_page() {
                         <th><label for="template_config_default">Default State:</label></th>
                         <td>
                             <select name="template_config[default]" id="template_config_default">
-                                <option value="true" <?php selected(isset($current_config['default']) && $current_config['default'] === true, true); ?>>Accepted (Opt-Out)</option>
-                                <option value="false" <?php selected(isset($current_config['default']) && $current_config['default'] === false, true); ?>>Declined (Opt-In)</option>
+                                <option value="true" <?php selected(isset($current_config['default']) && ($current_config['default'] === true || $current_config['default'] === 'true'), true); ?>>Accepted (Opt-Out)</option>
+                                <option value="false" <?php selected(isset($current_config['default']) && ($current_config['default'] === false || $current_config['default'] === 'false'), true); ?>>Declined (Opt-In)</option>
                             </select>
                             <p class="description">Default state for services if the user doesn't make a choice.</p>
                         </td>
@@ -845,7 +957,9 @@ function klaro_geo_templates_page() {
                     <tr>
                         <th><label for="template_config_required">Required:</label></th>
                         <td>
-                            <input type="checkbox" name="template_config[required]" id="template_config_required"
+                            <!-- Hidden field to ensure the value is sent even when unchecked -->
+                            <input type="hidden" name="template_config[required]" value="false">
+                            <input type="checkbox" name="template_config[required]" id="template_config_required" value="true"
                                 <?php checked(isset($current_config['required']) ? $current_config['required'] : true); ?>>
                             <p class="description">	
                             When enabled, users cannot decline services. Only use for essential services that are required for your website to function. This setting can also be overridden per-service.</p>
@@ -854,7 +968,9 @@ function klaro_geo_templates_page() {
                     <tr>
                         <th><label for="template_config_htmlTexts">HTML Texts:</label></th>
                         <td>
-                            <input type="checkbox" name="template_config[htmlTexts]" id="template_config_htmlTexts"
+                            <!-- Hidden field to ensure the value is sent even when unchecked -->
+                            <input type="hidden" name="template_config[htmlTexts]" value="false">
+                            <input type="checkbox" name="template_config[htmlTexts]" id="template_config_htmlTexts" value="true"
                                 <?php checked(isset($current_config['htmlTexts']) ? $current_config['htmlTexts'] : true); ?>>
                             <p class="description">Allow HTML in text fields.</p>
                         </td>
@@ -862,15 +978,19 @@ function klaro_geo_templates_page() {
                     <tr>
                         <th><label for="template_config_embedded">Embedded Mode:</label></th>
                         <td>
-                            <input type="checkbox" name="template_config[embedded]" id="template_config_embedded"
+                            <!-- Hidden field to ensure the value is sent even when unchecked -->
+                            <input type="hidden" name="template_config[embedded]" value="false">
+                            <input type="checkbox" name="template_config[embedded]" id="template_config_embedded" value="true"
                                 <?php checked(isset($current_config['embedded']) ? $current_config['embedded'] : false); ?>>
-                            <p class="description">If enabled, Klaro will render without the modal background, allowing you to embed it into a specific element of your website, such as your privacy notice. Use the [klaro_embedded] shortcode to display it.</p>
+                            <p class="description">If enabled, Klaro will render without the modal background, allowing you to embed it into a specific element of your website, such as your privacy notice.</p>
                         </td>
                     </tr>
                     <tr>
                         <th><label for="template_config_noAutoLoad">No Auto Load:</label></th>
                         <td>
-                            <input type="checkbox" name="template_config[noAutoLoad]" id="template_config_noAutoLoad"
+                            <!-- Hidden field to ensure the value is sent even when unchecked -->
+                            <input type="hidden" name="template_config[noAutoLoad]" value="false">
+                            <input type="checkbox" name="template_config[noAutoLoad]" id="template_config_noAutoLoad" value="true"
                                 <?php checked(isset($current_config['noAutoLoad']) ? $current_config['noAutoLoad'] : false); ?>>
                             <p class="description">If enabled, Klaro will not automatically load itself when the page is being loaded. You'll need to manually trigger it.</p>
                         </td>
@@ -878,7 +998,9 @@ function klaro_geo_templates_page() {
                     <tr>
                         <th><label for="template_config_autoFocus">Auto Focus:</label></th>
                         <td>
-                            <input type="checkbox" name="template_config[autoFocus]" id="template_config_autoFocus"
+                            <!-- Hidden field to ensure the value is sent even when unchecked -->
+                            <input type="hidden" name="template_config[autoFocus]" value="false">
+                            <input type="checkbox" name="template_config[autoFocus]" id="template_config_autoFocus" value="true"
                                 <?php checked(isset($current_config['autoFocus']) ? $current_config['autoFocus'] : false); ?>>
                             <p class="description">Automatically focus the consent modal when it appears.</p>
                         </td>
@@ -886,7 +1008,9 @@ function klaro_geo_templates_page() {
                     <tr>
                         <th><label for="template_config_groupByPurpose">Group by Purpose:</label></th>
                         <td>
-                            <input type="checkbox" name="template_config[groupByPurpose]" id="template_config_groupByPurpose"
+                            <!-- Hidden field to ensure the value is sent even when unchecked -->
+                            <input type="hidden" name="template_config[groupByPurpose]" value="false">
+                            <input type="checkbox" name="template_config[groupByPurpose]" id="template_config_groupByPurpose" value="true"
                                 <?php checked(isset($current_config['groupByPurpose']) ? $current_config['groupByPurpose'] : true); ?>>
                             <p class="description">Group services by their purpose in the consent modal.</p>
                         </td>
@@ -944,7 +1068,9 @@ function klaro_geo_templates_page() {
                     <tr>
                         <th><label for="template_config_mustConsent">Must Consent:</label></th>
                         <td>
-                            <input type="checkbox" name="template_config[mustConsent]" id="template_config_mustConsent"
+                            <!-- Hidden field to ensure the value is sent even when unchecked -->
+                            <input type="hidden" name="template_config[mustConsent]" value="false">
+                            <input type="checkbox" name="template_config[mustConsent]" id="template_config_mustConsent" value="true"
                                 <?php checked(isset($current_config['mustConsent']) ? $current_config['mustConsent'] : false); ?>>
                             <p class="description">If enabled, users must make a choice before using the site.</p>
                         </td>
@@ -952,7 +1078,9 @@ function klaro_geo_templates_page() {
                     <tr>
                         <th><label for="template_config_acceptAll">Accept All:</label></th>
                         <td>
-                            <input type="checkbox" name="template_config[acceptAll]" id="template_config_acceptAll"
+                            <!-- Hidden field to ensure the value is sent even when unchecked -->
+                            <input type="hidden" name="template_config[acceptAll]" value="false">
+                            <input type="checkbox" name="template_config[acceptAll]" id="template_config_acceptAll" value="true"
                                 <?php checked(isset($current_config['acceptAll']) ? $current_config['acceptAll'] : true); ?>>
                             <p class="description">Show an "Accept All" button.</p>
                         </td>
@@ -960,7 +1088,9 @@ function klaro_geo_templates_page() {
                     <tr>
                         <th><label for="template_config_hideDeclineAll">Hide Decline All:</label></th>
                         <td>
-                            <input type="checkbox" name="template_config[hideDeclineAll]" id="template_config_hideDeclineAll"
+                            <!-- Hidden field to ensure the value is sent even when unchecked -->
+                            <input type="hidden" name="template_config[hideDeclineAll]" value="false">
+                            <input type="checkbox" name="template_config[hideDeclineAll]" id="template_config_hideDeclineAll" value="true"
                                 <?php checked(isset($current_config['hideDeclineAll']) ? $current_config['hideDeclineAll'] : false); ?>>
                             <p class="description">Hide the "Decline All" button.</p>
                         </td>
@@ -968,7 +1098,9 @@ function klaro_geo_templates_page() {
                     <tr>
                         <th><label for="template_config_hideLearnMore">Hide Learn More:</label></th>
                         <td>
-                            <input type="checkbox" name="template_config[hideLearnMore]" id="template_config_hideLearnMore"
+                            <!-- Hidden field to ensure the value is sent even when unchecked -->
+                            <input type="hidden" name="template_config[hideLearnMore]" value="false">
+                            <input type="checkbox" name="template_config[hideLearnMore]" id="template_config_hideLearnMore" value="true"
                                 <?php checked(isset($current_config['hideLearnMore']) ? $current_config['hideLearnMore'] : false); ?>>
                             <p class="description">Hide the "Learn More" link.</p>
                         </td>
@@ -976,7 +1108,9 @@ function klaro_geo_templates_page() {
                     <tr>
                         <th><label for="template_config_showNoticeTitle">Show Notice Title:</label></th>
                         <td>
-                            <input type="checkbox" name="template_config[showNoticeTitle]" id="template_config_showNoticeTitle"
+                            <!-- Hidden field to ensure the value is sent even when unchecked -->
+                            <input type="hidden" name="template_config[showNoticeTitle]" value="false">
+                            <input type="checkbox" name="template_config[showNoticeTitle]" id="template_config_showNoticeTitle" value="true"
                                 <?php checked(isset($current_config['showNoticeTitle']) ? $current_config['showNoticeTitle'] : false); ?>>
                             <p class="description">Show the title in the consent notice.</p>
                         </td>
@@ -984,7 +1118,9 @@ function klaro_geo_templates_page() {
                     <tr>
                         <th><label for="template_config_showDescriptionEmptyStore">Show Description for Empty Store:</label></th>
                         <td>
-                            <input type="checkbox" name="template_config[showDescriptionEmptyStore]" id="template_config_showDescriptionEmptyStore"
+                            <!-- Hidden field to ensure the value is sent even when unchecked -->
+                            <input type="hidden" name="template_config[showDescriptionEmptyStore]" value="false">
+                            <input type="checkbox" name="template_config[showDescriptionEmptyStore]" id="template_config_showDescriptionEmptyStore" value="true"
                                 <?php checked(isset($current_config['showDescriptionEmptyStore']) ? $current_config['showDescriptionEmptyStore'] : true); ?>>
                             <p class="description">Show description text even when no services are defined.</p>
                         </td>
@@ -992,7 +1128,9 @@ function klaro_geo_templates_page() {
                     <tr>
                         <th><label for="template_config_disablePoweredBy">Disable Powered By:</label></th>
                         <td>
-                            <input type="checkbox" name="template_config[disablePoweredBy]" id="template_config_disablePoweredBy"
+                            <!-- Hidden field to ensure the value is sent even when unchecked -->
+                            <input type="hidden" name="template_config[disablePoweredBy]" value="false">
+                            <input type="checkbox" name="template_config[disablePoweredBy]" id="template_config_disablePoweredBy" value="true"
                                 <?php checked(isset($current_config['disablePoweredBy']) ? $current_config['disablePoweredBy'] : false); ?>>
                             <p class="description">Hide the "Powered by Klaro" text.</p>
                         </td>
@@ -1010,11 +1148,81 @@ function klaro_geo_templates_page() {
                         <td>
                             <input type="text" name="template_config[lang]" id="template_config_lang" class="regular-text"
                                 value="<?php echo esc_attr(isset($current_config['lang']) ? $current_config['lang'] : ''); ?>">
-                            <p class="description">Default language code (e.g., 'en', 'de'). Leave empty to auto-detect.</p>
+                            <p class="description">Default language code (e.g., 'en', 'de'). Leave empty to use the fallback language and translation settings ('zz').</p>
                         </td>
                     </tr>
                 </table>
+                <h3>Consent Mode Settings</h3>
+                <table class="form-table">
+                    <tr>
+                        <th><label for="consent_mode_settings_initialize_consent_mode">Initialize Consent Mode:</label></th>
+                        <td>
+                            <!-- Hidden field to ensure the value is sent even when unchecked -->
+                            <input type="hidden" name="template_config[consent_mode_settings][initialize_consent_mode]" value="false">
+                            <input type="checkbox" name="template_config[consent_mode_settings][initialize_consent_mode]" id="consent_mode_settings_initialize_consent_mode" value="true"
+                                <?php checked(isset($current_config['consent_mode_settings']['initialize_consent_mode']) ? filter_var($current_config['consent_mode_settings']['initialize_consent_mode'], FILTER_VALIDATE_BOOLEAN) : false); ?>>
+                            <p class="description">Initialize all consent signals (denied) when Google Tag Manager loads and enable other consent mode operations.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label for="consent_mode_settings_analytics_storage_service">Map analytics_storage to service:</label></th>
+                        <td>
+                            <select name="template_config[consent_mode_settings][analytics_storage_service]" id="consent_mode_settings_analytics_storage_service">
+                                <option value="no_service" <?php selected(isset($current_config['consent_mode_settings']['analytics_storage_service']) ? $current_config['consent_mode_settings']['analytics_storage_service'] : 'no_service', 'no_service'); ?>>No service</option>
+                                <?php
+                                // Get services for dropdown
+                                $service_settings = new Klaro_Geo_Service_Settings();
+                                $services = $service_settings->get();
+                                foreach ($services as $service) {
+                                    if (isset($service['name'])) {
+                                        echo '<option value="' . esc_attr($service['name']) . '" ' .
+                                            selected(isset($current_config['consent_mode_settings']['analytics_storage_service']) ? $current_config['consent_mode_settings']['analytics_storage_service'] : 'no_service', $service['name'], false) . '>' .
+                                            esc_html($service['name']) . '</option>';
+                                    }
+                                }
+                                ?>
+                            </select>
+                            <p class="description">Select the service that enables or disables analytics_storage.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label for="ad_storage_service">Map ad signals to service:</label></th>
+                        <td>
+                            <select name="template_config[consent_mode_settings][ad_storage_service]" id="ad_storage_service">
+                                <option value="no_service" <?php selected(isset($current_config['consent_mode_settings']['ad_storage_service']) ? $current_config['consent_mode_settings']['ad_storage_service'] : 'no_service', 'no_service'); ?>>No service</option>
+                                <?php
+                                // Reuse services from above
+                                foreach ($services as $service) {
+                                    if (isset($service['name'])) {
+                                        echo '<option value="' . esc_attr($service['name']) . '" ' .
+                                            selected(isset($current_config['consent_mode_settings']['ad_storage_service']) ? $current_config['consent_mode_settings']['ad_storage_service'] : 'no_service', $service['name'], false) . '>' .
+                                            esc_html($service['name']) . '</option>';
+                                    }
+                                }
+                                ?>
+                            </select>
+                            <p class="description">Select the service that enables or disables `ads_storage` and under which `ad_personalization` and `ad_user_data` controls get injected.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label for="consent_mode_settings_initialization_code">Consent Mode Initialization Code:</label></th>
+                        <td>
+                            <textarea name="template_config[consent_mode_settings][initialization_code]" id="consent_mode_settings_initialization_code" rows="8" cols="50" class="large-text code"><?php
+                                $default_code = "// Set default consent state\ngtag('consent', 'default',{ \n    'ad_storage': 'denied',\n    'analytics_storage': 'denied',\n    'ad_user_data': 'denied',\n    'ad_personalization': 'denied' \n});\ngtag('set', 'ads_data_redaction', true);";
 
+                                if (isset($current_config['consent_mode_settings']['initialization_code'])) {
+                                    // Make sure to strip any slashes that might have been added
+                                    $code = stripslashes($current_config['consent_mode_settings']['initialization_code']);
+                                } else {
+                                    $code = $default_code;
+                                }
+
+                                echo esc_textarea($code);
+                            ?></textarea>
+                            <p class="description">JavaScript code to initialize Google Consent Mode v2. This code will run when Google Tag Manager loads.</p>
+                        </td>
+                    </tr>
+                </table>
                 <h3>Plugin Settings</h3>
                 <p>Template-level settings not related to Klaro-specific functionality.</p>
                 <table class="form-table">
@@ -1024,16 +1232,6 @@ function klaro_geo_templates_page() {
                             <input type="checkbox" name="plugin_settings[enable_consent_logging]" id="enable_consent_logging"
                                 <?php checked(isset($templates[$current_template]['plugin_settings']['enable_consent_logging']) ? $templates[$current_template]['plugin_settings']['enable_consent_logging'] : true); ?>>
                             <p class="description">Log consent choices for this template in the WordPress database.</p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th><label for="plugin_settings_consent_mode">Consent Mode:</label></th>
-                        <td>
-                            <select name="plugin_settings[consent_mode]" id="plugin_settings_consent_mode">
-                                <option value="basic" <?php selected(isset($templates[$current_template]['plugin_settings']['consent_mode']) ? $templates[$current_template]['plugin_settings']['consent_mode'] : 'basic', 'basic'); ?>>Basic</option>
-                                <option value="advanced" <?php selected(isset($templates[$current_template]['plugin_settings']['consent_mode']) ? $templates[$current_template]['plugin_settings']['consent_mode'] : 'basic', 'advanced'); ?>>Advanced</option>
-                            </select>
-                            <p class="description">Google Tag Manager consent mode setting. This value will be pushed to the dataLayer for use in GTM templates.</p>
                         </td>
                     </tr>
                 </table>
@@ -1169,6 +1367,13 @@ function klaro_geo_templates_page() {
                                             value="<?php echo esc_attr(isset($current_config['translations']['zz']['close']) ? $current_config['translations']['zz']['close'] : 'Close'); ?>">
                                     </td>
                                 </tr>
+                                <tr>
+                                    <th><label for="template_config_translations_zz_poweredBy">Powered By:</label></th>
+                                    <td>
+                                        <input type="text" name="template_config[translations][zz][poweredBy]" id="template_config_translations_zz_poweredBy" class="regular-text"
+                                            value="<?php echo esc_attr(isset($current_config['translations']['zz']['poweredBy']) ? $current_config['translations']['zz']['poweredBy'] : 'Realized with Klaro!'); ?>">
+                                    </td>
+                                </tr>
                             </table>
 
                             <h4>Purposes</h4>
@@ -1228,6 +1433,164 @@ function klaro_geo_templates_page() {
                                     </tr>
                                 </table>
                             <?php } ?>
+
+                            <h4>Service Translations</h4>
+                            <p class="description">Configure the global service-related translations that apply to all services.</p>
+
+                            <h5>Service Controls</h5>
+                            <table class="form-table">
+                                <tr>
+                                    <th><label for="template_config_translations_zz_service_disableAll_title">Disable All Title:</label></th>
+                                    <td>
+                                        <input type="text"
+                                            name="template_config[translations][zz][service][disableAll][title]"
+                                            id="template_config_translations_zz_service_disableAll_title"
+                                            class="regular-text"
+                                            value="<?php echo esc_attr(isset($current_config['translations']['zz']['service']['disableAll']['title']) ? $current_config['translations']['zz']['service']['disableAll']['title'] : 'Enable or disable all services'); ?>">
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th><label for="template_config_translations_zz_service_disableAll_description">Disable All Description:</label></th>
+                                    <td>
+                                        <input type="text"
+                                            name="template_config[translations][zz][service][disableAll][description]"
+                                            id="template_config_translations_zz_service_disableAll_description"
+                                            class="regular-text"
+                                            value="<?php echo esc_attr(isset($current_config['translations']['zz']['service']['disableAll']['description']) ? $current_config['translations']['zz']['service']['disableAll']['description'] : 'Use this switch to enable or disable all services.'); ?>">
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <h5>Opt-Out Services</h5>
+                            <table class="form-table">
+                                <tr>
+                                    <th><label for="template_config_translations_zz_service_optOut_title">Opt-Out Title:</label></th>
+                                    <td>
+                                        <input type="text"
+                                            name="template_config[translations][zz][service][optOut][title]"
+                                            id="template_config_translations_zz_service_optOut_title"
+                                            class="regular-text"
+                                            value="<?php echo esc_attr(isset($current_config['translations']['zz']['service']['optOut']['title']) ? $current_config['translations']['zz']['service']['optOut']['title'] : '(opt-out)'); ?>">
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th><label for="template_config_translations_zz_service_optOut_description">Opt-Out Description:</label></th>
+                                    <td>
+                                        <input type="text"
+                                            name="template_config[translations][zz][service][optOut][description]"
+                                            id="template_config_translations_zz_service_optOut_description"
+                                            class="regular-text"
+                                            value="<?php echo esc_attr(isset($current_config['translations']['zz']['service']['optOut']['description']) ? $current_config['translations']['zz']['service']['optOut']['description'] : 'This service is loaded by default (but you can opt out)'); ?>">
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <h5>Required Services</h5>
+                            <table class="form-table">
+                                <tr>
+                                    <th><label for="template_config_translations_zz_service_required_title">Required Title:</label></th>
+                                    <td>
+                                        <input type="text"
+                                            name="template_config[translations][zz][service][required][title]"
+                                            id="template_config_translations_zz_service_required_title"
+                                            class="regular-text"
+                                            value="<?php echo esc_attr(isset($current_config['translations']['zz']['service']['required']['title']) ? $current_config['translations']['zz']['service']['required']['title'] : '(always required)'); ?>">
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th><label for="template_config_translations_zz_service_required_description">Required Description:</label></th>
+                                    <td>
+                                        <input type="text"
+                                            name="template_config[translations][zz][service][required][description]"
+                                            id="template_config_translations_zz_service_required_description"
+                                            class="regular-text"
+                                            value="<?php echo esc_attr(isset($current_config['translations']['zz']['service']['required']['description']) ? $current_config['translations']['zz']['service']['required']['description'] : 'This service is always required'); ?>">
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <h5>Purpose Labels</h5>
+                            <table class="form-table">
+                                <tr>
+                                    <th><label for="template_config_translations_zz_service_purpose">Purpose (Singular):</label></th>
+                                    <td>
+                                        <input type="text"
+                                            name="template_config[translations][zz][service][purpose]"
+                                            id="template_config_translations_zz_service_purpose"
+                                            class="regular-text"
+                                            value="<?php echo esc_attr(isset($current_config['translations']['zz']['service']['purpose']) ? $current_config['translations']['zz']['service']['purpose'] : 'purpose'); ?>">
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th><label for="template_config_translations_zz_service_purposes">Purposes (Plural):</label></th>
+                                    <td>
+                                        <input type="text"
+                                            name="template_config[translations][zz][service][purposes]"
+                                            id="template_config_translations_zz_service_purposes"
+                                            class="regular-text"
+                                            value="<?php echo esc_attr(isset($current_config['translations']['zz']['service']['purposes']) ? $current_config['translations']['zz']['service']['purposes'] : 'purposes'); ?>">
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <h5>Purpose Item Labels</h5>
+                            <table class="form-table">
+                                <tr>
+                                    <th><label for="template_config_translations_zz_purposeItem_service">Service (Singular):</label></th>
+                                    <td>
+                                        <input type="text"
+                                            name="template_config[translations][zz][purposeItem][service]"
+                                            id="template_config_translations_zz_purposeItem_service"
+                                            class="regular-text"
+                                            value="<?php echo esc_attr(isset($current_config['translations']['zz']['purposeItem']['service']) ? $current_config['translations']['zz']['purposeItem']['service'] : 'service'); ?>">
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th><label for="template_config_translations_zz_purposeItem_services">Services (Plural):</label></th>
+                                    <td>
+                                        <input type="text"
+                                            name="template_config[translations][zz][purposeItem][services]"
+                                            id="template_config_translations_zz_purposeItem_services"
+                                            class="regular-text"
+                                            value="<?php echo esc_attr(isset($current_config['translations']['zz']['purposeItem']['services']) ? $current_config['translations']['zz']['purposeItem']['services'] : 'services'); ?>">
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <h5>Contextual Consent</h5>
+                            <table class="form-table">
+                                <tr>
+                                    <th><label for="template_config_translations_zz_service_contextualConsent_description">Description:</label></th>
+                                    <td>
+                                        <input type="text"
+                                            name="template_config[translations][zz][service][contextualConsent][description]"
+                                            id="template_config_translations_zz_service_contextualConsent_description"
+                                            class="regular-text"
+                                            value="<?php echo esc_attr(isset($current_config['translations']['zz']['service']['contextualConsent']['description']) ? $current_config['translations']['zz']['service']['contextualConsent']['description'] : 'Would you like to consent to {title}?'); ?>">
+                                        <p class="description">Use {title} as a placeholder for the service title.</p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th><label for="template_config_translations_zz_service_contextualConsent_acceptOnce">Accept Once:</label></th>
+                                    <td>
+                                        <input type="text"
+                                            name="template_config[translations][zz][service][contextualConsent][acceptOnce]"
+                                            id="template_config_translations_zz_service_contextualConsent_acceptOnce"
+                                            class="regular-text"
+                                            value="<?php echo esc_attr(isset($current_config['translations']['zz']['service']['contextualConsent']['acceptOnce']) ? $current_config['translations']['zz']['service']['contextualConsent']['acceptOnce'] : 'Yes'); ?>">
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th><label for="template_config_translations_zz_service_contextualConsent_acceptAlways">Accept Always:</label></th>
+                                    <td>
+                                        <input type="text"
+                                            name="template_config[translations][zz][service][contextualConsent][acceptAlways]"
+                                            id="template_config_translations_zz_service_contextualConsent_acceptAlways"
+                                            class="regular-text"
+                                            value="<?php echo esc_attr(isset($current_config['translations']['zz']['service']['contextualConsent']['acceptAlways']) ? $current_config['translations']['zz']['service']['contextualConsent']['acceptAlways'] : 'Always'); ?>">
+                                    </td>
+                                </tr>
+                            </table>
                         </div>
 
                         <div id="tab-add" class="translation-tab">
@@ -1328,28 +1691,6 @@ function klaro_geo_create_templates() {
     $template_settings->save();
 
     return $template_settings->get();
-}
-
-/**
- * Recursively sanitize an array
- *
- * @param array $array The array to sanitize
- * @return array The sanitized array
- */
-function klaro_geo_sanitize_array($array) {
-    if (!is_array($array)) {
-        return sanitize_text_field($array);
-    }
-
-    foreach ($array as $key => $value) {
-        if (is_array($value)) {
-            $array[$key] = klaro_geo_sanitize_array($value);
-        } else {
-            $array[$key] = sanitize_text_field($value);
-        }
-    }
-
-    return $array;
 }
 
 // AJAX handler for template creation
@@ -1513,3 +1854,84 @@ function klaro_geo_save_translations_ajax() {
     }
 }
 add_action('wp_ajax_klaro_geo_save_translations', 'klaro_geo_save_translations_ajax');
+
+/**
+ * AJAX handler for deleting a template
+ */
+function klaro_geo_delete_template_ajax() {
+    // Check nonce for security
+    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'klaro_geo_template_nonce')) {
+        wp_send_json_error(array('message' => 'Security check failed.'));
+        return;
+    }
+
+    // Check if user has permission
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(array('message' => 'You do not have permission to delete templates.'));
+        return;
+    }
+
+    // Get the template ID
+    if (!isset($_POST['template_id']) || empty($_POST['template_id'])) {
+        wp_send_json_error(array('message' => 'No template ID provided.'));
+        return;
+    }
+
+    $template_id = sanitize_text_field($_POST['template_id']);
+
+    // Don't allow deleting the default template
+    if ($template_id === 'default') {
+        wp_send_json_error(array('message' => 'The default template cannot be deleted.'));
+        return;
+    }
+
+    // Initialize the template settings class
+    $template_settings = new Klaro_Geo_Template_Settings();
+
+    // Check if the template exists
+    $template = $template_settings->get_template($template_id);
+    if (!$template) {
+        wp_send_json_error(array('message' => 'Template not found.'));
+        return;
+    }
+
+    // Check if the template is in use by any countries
+    $country_settings = get_option('klaro_geo_country_settings', array());
+    $template_in_use = false;
+    $countries_using_template = array();
+
+    if (is_array($country_settings)) {
+        foreach ($country_settings as $country_code => $country_data) {
+            if (isset($country_data['template']) && $country_data['template'] === $template_id) {
+                $template_in_use = true;
+                $countries_using_template[] = $country_code;
+            }
+        }
+    }
+
+    // If the template is in use, return an error
+    if ($template_in_use) {
+        $country_list = implode(', ', $countries_using_template);
+        $error_message = 'This template cannot be deleted because it is currently in use by the following countries: ' . $country_list . '. ';
+        $error_message .= 'Please assign a different template to these countries in Country Settings before deleting this template.';
+
+        wp_send_json_error(array('message' => $error_message));
+        return;
+    }
+
+    // Log the deletion
+    klaro_geo_debug_log('Deleting template: ' . $template_id);
+
+    // Remove the template
+    $template_settings->remove_template($template_id);
+
+    // Save the changes
+    $result = $template_settings->save();
+
+    if ($result) {
+        wp_send_json_success(array('message' => 'Template deleted successfully.'));
+    } else {
+        wp_send_json_error(array('message' => 'Failed to delete template.'));
+    }
+}
+add_action('wp_ajax_klaro_geo_delete_template', 'klaro_geo_delete_template_ajax');
