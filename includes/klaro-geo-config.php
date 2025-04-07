@@ -112,24 +112,8 @@ function klaro_geo_generate_config_file() {
                 continue;
             }
             
-            // Special handling for consent_mode_settings to prevent gtag calls during initialization
-            if ($key === 'consent_mode_settings' && is_array($value)) {
-                // Create a copy of the value
-                $consent_mode_settings = $value;
-                
-                // Remove the initialization_code from the config
-                // We'll handle it separately in the JavaScript
-                if (isset($consent_mode_settings['initialization_code'])) {
-                    $consent_mode_settings['initialization_code_original'] = $consent_mode_settings['initialization_code'];
-                    $consent_mode_settings['initialization_code'] = '// Initialization code moved to JavaScript';
-                }
-                
-                // Copy the modified value
-                $klaro_config[$key] = $consent_mode_settings;
-            } else {
-                // Copy the value directly to klaroConfig
-                $klaro_config[$key] = $value;
-            }
+            // Copy the value directly to klaroConfig
+            $klaro_config[$key] = $value;
         }
 
         // Log the klaro_config after applying template settings
@@ -210,6 +194,7 @@ function klaro_geo_generate_config_file() {
     klaro_geo_debug_log('Consent mode settings from template - initialize_consent_mode: ' . ($initialize_consent_mode ? 'true' : 'false'));
     klaro_geo_debug_log('Consent mode settings from template - analytics_storage_service: ' . $analytics_storage_service);
     klaro_geo_debug_log('Consent mode settings from template - ad_storage_service: ' . $ad_storage_service);
+    klaro_geo_debug_log('Consent mode settings from template - initialization_code: ' . $initialization_code);
 
     // Process each service
     foreach ($services as $service) {
@@ -268,12 +253,10 @@ function klaro_geo_generate_config_file() {
         // Apply Google Consent Mode modifications if enabled
         if ($initialize_consent_mode) {
             // Check if this is the Google Tag Manager service and if initialize_consent_mode is true
-            if ($service['name'] === 'google-tag-manager' && $initialize_consent_mode && !empty($initialization_code)) {
-                // Store the initialization code but don't append it directly
-                // We'll handle it in JavaScript to prevent gtag errors
-                $service_config['initialization_code_original'] = $initialization_code;
-                $service_config['onInit'] = $service_config['onInit'] . "\n" . '// Initialization code moved to JavaScript';
-                klaro_geo_debug_log('Stored initialization code for GTM to be handled in JavaScript');
+            if ($service['name'] === 'google-tag-manager' && $initialize_consent_mode && !empty($initialization_code)) {                
+                // Add the initialization code directly to the onInit callback
+                $service_config['onInit'] = $service_config['onInit'] . "\n" . $initialization_code;
+                klaro_geo_debug_log('Added initialization code to GTM onInit callback with safety check');
             }
 
             // Check if this service matches the analytics storage event

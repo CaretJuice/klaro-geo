@@ -107,58 +107,20 @@ function klaro_geo_enqueue_scripts() {
         array('strategy' => 'defer', 'in_footer' => true)
     );
 
-    // Add a script to create a centralized Klaro manager handler
+    // Add a simple script to create the Klaro Geo namespace
     wp_add_inline_script('klaro-js', "
         // Create a global Klaro Geo namespace
         window.klaroGeo = window.klaroGeo || {};
         
-        // Store callbacks that want to be notified when the Klaro manager is ready
-        window.klaroGeo.managerCallbacks = [];
-        
-        // Flag to track if the manager is ready
-        window.klaroGeo.managerReady = false;
-        
-        // Store the manager instance once it's ready
-        window.klaroGeo.manager = null;
-        
-        // Function to register a callback for when the manager is ready
-        window.klaroGeo.onManagerReady = function(callback) {
-            if (window.klaroGeo.managerReady && window.klaroGeo.manager) {
-                // If the manager is already ready, call the callback immediately
-                console.log('Klaro manager already ready, calling callback immediately');
-                callback(window.klaroGeo.manager);
-            } else {
-                // Otherwise, store the callback for later
-                console.log('Klaro manager not ready yet, storing callback');
-                window.klaroGeo.managerCallbacks.push(callback);
-            }
-        };
-        
-        // Function to notify all callbacks that the manager is ready
-        window.klaroGeo.notifyManagerReady = function(manager) {
-            console.log('Notifying ' + window.klaroGeo.managerCallbacks.length + ' callbacks that Klaro manager is ready');
-            window.klaroGeo.managerReady = true;
-            window.klaroGeo.manager = manager;
-            
-            // Call all registered callbacks
-            window.klaroGeo.managerCallbacks.forEach(function(callback) {
-                try {
-                    callback(manager);
-                } catch (e) {
-                    console.error('Error in Klaro manager callback:', e);
-                }
-            });
-            
-            // Clear the callbacks array
-            window.klaroGeo.managerCallbacks = [];
-        };
-        
         // Log the current state of gtag
-        console.log('Setting up Klaro manager handler');
+        console.log('Setting up Klaro Geo namespace');
         console.log('Current gtag state:', typeof window.gtag !== 'undefined' ? 'defined' : 'undefined');
-        
+    ");
+    
+    // Add a script to check if Klaro is loaded
+    wp_add_inline_script('klaro-js', "
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('Setting up Klaro manager polling');
+            console.log('Setting up Klaro initialization check');
             
             // Counter for retry attempts
             var retryAttempts = 0;
@@ -173,29 +135,8 @@ function klaro_geo_enqueue_scripts() {
                 
                 // Check if we've exceeded the maximum number of retry attempts
                 if (retryAttempts > MAX_RETRY_ATTEMPTS) {
-                    console.log('Maximum retry attempts exceeded. Proceeding with initialization anyway.');
+                    console.log('Maximum retry attempts exceeded. Stopping checks.');
                     clearInterval(checkKlaro);
-                    
-                    // Try to initialize with whatever we have
-                    try {
-                        if (window.klaro && typeof window.klaro.getManager === 'function') {
-                            var manager = window.klaro.getManager();
-                            if (manager) {
-                                // Notify callbacks with whatever manager we have
-                                window.klaroGeo.notifyManagerReady(manager);
-                            } else {
-                                console.log('Proceeding without Klaro manager');
-                                window.klaroGeo.notifyManagerReady(null);
-                            }
-                        } else {
-                            console.log('Proceeding without Klaro manager');
-                            window.klaroGeo.notifyManagerReady(null);
-                        }
-                    } catch (e) {
-                        console.error('Error during fallback initialization:', e);
-                        // Notify callbacks with null manager as a last resort
-                        window.klaroGeo.notifyManagerReady(null);
-                    }
                     return;
                 }
                 
@@ -239,8 +180,11 @@ function klaro_geo_enqueue_scripts() {
                                 clearInterval(checkKlaro);
                                 console.log('Klaro manager found with consents');
                                 
-                                // Notify all callbacks
-                                window.klaroGeo.notifyManagerReady(manager);
+                                // Store the manager in the klaroGeo namespace for potential future use
+                                window.klaroGeo.manager = manager;
+                                
+                                // Dispatch a custom event to notify that Klaro manager is ready
+                                document.dispatchEvent(new CustomEvent('klaro-manager-ready', { detail: { manager: manager } }));
                             } else {
                                 console.log('Klaro manager not fully initialized yet');
                                 
@@ -263,7 +207,7 @@ function klaro_geo_enqueue_scripts() {
                 }
             }, 100);
         });
-    ");
+    ", 'after');
 
     if ($klaro_variant === 'klaro-no-css.js') {
         wp_enqueue_style(
@@ -371,32 +315,12 @@ function klaro_geo_enqueue_scripts() {
             KLARO_GEO_VERSION,
             array('strategy' => 'defer', 'in_footer' => true)
         );
-
-        // Prepare consent mode settings for JavaScript
-        $js_consent_mode_settings = array(
-            'initialize_consent_mode' => $initialize_consent_mode
-        );
-        
-        // Set analytics_storage_service
-        if (isset($consent_mode_settings['analytics_storage_service'])) {
-            $js_consent_mode_settings['analytics_storage_service'] = $consent_mode_settings['analytics_storage_service'];
-        }
-        
-        // Set ad_storage_service
-        if (isset($consent_mode_settings['ad_storage_service'])) {
-            $js_consent_mode_settings['ad_storage_service'] = $consent_mode_settings['ad_storage_service'];
-        }
-        
-        // Set initialization_code
-        if (isset($consent_mode_settings['initialization_code'])) {
-            $js_consent_mode_settings['initialization_code'] = $consent_mode_settings['initialization_code'];
-        }
         
         // Create the consent mode settings array
         $consent_mode_data = array(
             'templateSettings' => array(
                 'config' => array(
-                    'consent_mode_settings' => $js_consent_mode_settings
+                    'consent_mode_settings' => $consent_mode_settings
                 )
             ),
             'detectedCountry' => $user_country,

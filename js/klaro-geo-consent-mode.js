@@ -42,9 +42,9 @@
         // Log current status
         logGtagStatus();
         
-        // Check if window.dataLayer exists, which indicates GTM is loaded
+        // Check if window.dataLayer exists
         if (window.dataLayer && Array.isArray(window.dataLayer)) {
-            console.log('DEBUG: dataLayer exists, GTM should be loaded');
+            console.log('DEBUG: dataLayer exists');
             
             // Check if gtag is a function
             if (typeof window.gtag === 'function') {
@@ -61,25 +61,7 @@
             console.log('DEBUG: dataLayer does not exist or is not an array');
         }
         
-        console.log('DEBUG: gtag is not available yet');
-        
-        // Set up a retry mechanism if not already set up
-        if (!window.gtagCheckInterval) {
-            console.log('DEBUG: Setting up gtag check interval');
-            window.gtagCheckInterval = setInterval(function() {
-                console.log('DEBUG: Checking for gtag availability...');
-                
-                // Check if gtag is now available
-                if (typeof window.gtag === 'function') {
-                    console.log('DEBUG: gtag is now available');
-                    gtagAvailable = true;
-                    clearInterval(window.gtagCheckInterval);
-                } else {
-                    console.log('DEBUG: gtag is still not available');
-                }
-            }, 1000);
-        }
-        
+        console.log('DEBUG: gtag is not available');
         return false;
     }
     
@@ -113,63 +95,12 @@
 
     // Function to safely apply initialization code
     function safelyApplyInitializationCode() {
-        console.log('DEBUG: Safely applying initialization code');
+        console.log('DEBUG: Safely applying initialization code function is now deprecated');
+        console.log('DEBUG: Initialization code is now directly included in the onInit callback of the Google Tag Manager service');
         
-        // Check if we have the consent mode configuration
-        if (
-            typeof window.klaroConsentData === 'undefined' ||
-            !window.klaroConsentData.templateSettings ||
-            !window.klaroConsentData.templateSettings.config ||
-            !window.klaroConsentData.templateSettings.config.consent_mode_settings
-        ) {
-            console.log('DEBUG: No consent mode settings found for initialization');
-            return;
-        }
-        
-        // Get the consent mode settings
-        const consentModeSettings = window.klaroConsentData.templateSettings.config.consent_mode_settings;
-        
-        // Check if initialization code is available
-        if (!consentModeSettings.initialization_code) {
-            console.log('DEBUG: No initialization code found');
-            return;
-        }
-        
-        // Log gtag status
-        logGtagStatus();
-        
-        // Check if gtag is available
-        if (typeof window.gtag !== 'function') {
-            console.log('DEBUG: gtag not available for initialization code, will try again later');
-            
-            // Schedule another attempt
-            setTimeout(function() {
-                console.log('DEBUG: Retrying initialization code application');
-                safelyApplyInitializationCode();
-            }, 1000);
-            
-            return;
-        }
-        
-        // Apply the initialization code
-        try {
-            console.log('DEBUG: Applying initialization code');
-            
-            // Set default consent state
-            window.gtag('consent', 'default', {
-                'ad_storage': 'denied',
-                'analytics_storage': 'denied',
-                'ad_user_data': 'denied',
-                'ad_personalization': 'denied'
-            });
-            
-            // Set ads data redaction
-            window.gtag('set', 'ads_data_redaction', true);
-            
-            console.log('DEBUG: Initialization code applied successfully');
-        } catch (e) {
-            console.error('DEBUG: Error applying initialization code:', e);
-        }
+        // This function is now deprecated as the initialization code is directly included in the onInit callback
+        // We're keeping it for backward compatibility, but it doesn't do anything anymore
+        return;
     }
     
     // Function to log gtag availability
@@ -202,15 +133,21 @@
         // Try to safely apply initialization code
         safelyApplyInitializationCode();
         
-        // Register with the global Klaro manager handler if it exists
-        if (window.klaroGeo && typeof window.klaroGeo.onManagerReady === 'function') {
-            console.log('DEBUG: Using global Klaro manager handler');
-            window.klaroGeo.onManagerReady(function(manager) {
-                console.log('DEBUG: Received manager from global handler');
-                initializeExtension(manager);
-            });
+        // Check if the manager is already available in the klaroGeo namespace
+        if (window.klaroGeo && window.klaroGeo.manager) {
+            console.log('DEBUG: Klaro manager already available in klaroGeo namespace');
+            initializeExtension(window.klaroGeo.manager);
             return;
         }
+        
+        // Listen for the klaro-manager-ready event
+        document.addEventListener('klaro-manager-ready', function(event) {
+            console.log('DEBUG: Received klaro-manager-ready event');
+            if (event.detail && event.detail.manager) {
+                console.log('DEBUG: Got manager from event');
+                initializeExtension(event.detail.manager);
+            }
+        });
         
         // Fall back to our own polling mechanism if the global handler isn't available
         console.log('DEBUG: Global Klaro manager handler not available, using polling');
@@ -411,6 +348,12 @@
         console.log('DEBUG: Initializing for service ' + adStorageService);
 
         // Try to inject immediately in case the modal is already open
+        if (!controlsInjected) {
+            console.log('DEBUG: Attempting immediate initial injection');
+            injectAdControls(adStorageService);
+        }
+        
+        // Also try after a delay in case the DOM wasn't ready
         setTimeout(function() {
             // Check again if controls are already injected
             if (controlsInjected) {
@@ -420,6 +363,14 @@
 
             console.log('DEBUG: Attempting initial injection after delay');
             injectAdControls(adStorageService);
+            
+            // Try one more time with a longer delay as a fallback
+            setTimeout(function() {
+                if (!controlsInjected) {
+                    console.log('DEBUG: Final attempt at initial injection after longer delay');
+                    injectAdControls(adStorageService);
+                }
+            }, 1000);
         }, 500);
     }
     
@@ -618,6 +569,14 @@
 
         // Try to inject the controls
         console.log('DEBUG: Scheduling injection after modal open');
+        
+        // First attempt immediately
+        if (!controlsInjected) {
+            console.log('DEBUG: Attempting immediate injection after modal open');
+            injectAdControls(adStorageService);
+        }
+        
+        // Then try again after a delay in case the DOM wasn't ready
         setTimeout(function() {
             // Check again if controls are already injected
             if (controlsInjected) {
@@ -627,6 +586,14 @@
 
             console.log('DEBUG: Attempting injection after modal open delay');
             injectAdControls(adStorageService);
+            
+            // Try one more time with a longer delay as a fallback
+            setTimeout(function() {
+                if (!controlsInjected) {
+                    console.log('DEBUG: Final attempt at injection after longer delay');
+                    injectAdControls(adStorageService);
+                }
+            }, 1000);
         }, 500);
     }
 
@@ -1163,6 +1130,14 @@
         titleDiv.textContent = 'Consent Mode Settings';
         newListItemDiv.appendChild(titleDiv);
 
+        // Add a description paragraph
+        const descriptionDiv = document.createElement('div');
+        const descriptionPara = document.createElement('p');
+        descriptionPara.className = 'cm-service-description';
+        descriptionPara.textContent = 'Additional controls for Google Consent Mode v2';
+        descriptionDiv.appendChild(descriptionPara);
+        newListItemDiv.appendChild(descriptionDiv);
+
         // Add the controls container to the new list item
         newListItemDiv.appendChild(controlsContainer);
 
@@ -1193,7 +1168,7 @@
 
         // Create the control HTML
         container.innerHTML = `
-            <div>
+            <div class="cm-service-header">
                 <input id="klaro-geo-${id}" type="checkbox" class="cm-list-input" ${
                     initialState ? 'checked' : ''
                 }>
@@ -1201,7 +1176,7 @@
                     <span class="cm-list-title">${title}</span>
                     <span class="cm-switch"><div class="slider round"></div></span>
                 </label>
-                <div>
+                <div class="cm-service-description">
                     <p class="purposes">${description}</p>
                 </div>
             </div>
@@ -1451,11 +1426,7 @@
         
         // Check if gtag is available
         if (typeof window.gtag !== 'function') {
-            console.log('DEBUG: gtag not available, will try again later');
-            // Schedule another attempt in case gtag loads later
-            setTimeout(function() {
-                updateConsentState();
-            }, 1000);
+            console.log('DEBUG: gtag not available, skipping consent update');
             return;
         }
 
