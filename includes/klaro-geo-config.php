@@ -188,8 +188,8 @@ function klaro_geo_generate_config_file() {
     $ad_storage_service = isset($consent_mode_settings['ad_storage_service']) ?
         $consent_mode_settings['ad_storage_service'] : 'no_service';
 
-    $initialization_code = isset($consent_mode_settings['initialization_code']) ?
-        $consent_mode_settings['initialization_code'] : '';
+        $initialization_code = isset($consent_mode_settings['initialization_code']) ?
+            $consent_mode_settings['initialization_code'] : '';
 
     klaro_geo_debug_log('Consent mode settings from template - initialize_consent_mode: ' . ($initialize_consent_mode ? 'true' : 'false'));
     klaro_geo_debug_log('Consent mode settings from template - analytics_storage_service: ' . $analytics_storage_service);
@@ -253,10 +253,10 @@ function klaro_geo_generate_config_file() {
         // Apply Google Consent Mode modifications if enabled
         if ($initialize_consent_mode) {
             // Check if this is the Google Tag Manager service and if initialize_consent_mode is true
-            if ($service['name'] === 'google-tag-manager' && $initialize_consent_mode && !empty($initialization_code)) {                
-                // Add the initialization code directly to the onInit callback
+            if ($service['name'] === 'google-tag-manager' && $initialize_consent_mode && !empty($initialization_code)) {
+                // Add the initialization code directly to the onInit callback without safety checks
                 $service_config['onInit'] = $service_config['onInit'] . "\n" . $initialization_code;
-                klaro_geo_debug_log('Added initialization code to GTM onInit callback with safety check');
+                klaro_geo_debug_log('Added initialization code to GTM onInit callback');
             }
 
             // Check if this service matches the analytics storage event
@@ -267,14 +267,14 @@ function klaro_geo_generate_config_file() {
 
             // Modify onAccept callback for analytics storage
             if ($is_analytics_service) {
-                // Store the original code but use a safer version that checks for gtag
-                $analytics_accept_code = "\nif (typeof window.gtag === 'function') {\n  window.gtag('consent', 'update', {\n    analytics_storage: 'granted',\n  });\n}\n";
+                // Add analytics storage consent update without safety checks
+                $analytics_accept_code = "\nwindow.gtag('consent', 'update', {\n  analytics_storage: 'granted',\n});\n";
                 $service_config['onAccept'] = $service_config['onAccept'] . $analytics_accept_code;
                 klaro_geo_debug_log('Added analytics_storage accept code to ' . $service['name']);
                 klaro_geo_debug_log('Updated onAccept callback: ' . $service_config['onAccept']);
 
                 // Add onDecline callback for analytics storage if not already present
-                $analytics_decline_code = "\nif (typeof window.gtag === 'function') {\n  window.gtag('consent', 'update', {\n    analytics_storage: 'denied',\n  });\n}\n";
+                $analytics_decline_code = "\nwindow.gtag('consent', 'update', {\n  analytics_storage: 'denied',\n});\n";
                 $service_config['onDecline'] = $service_config['onDecline'] . $analytics_decline_code;
                 klaro_geo_debug_log('Added analytics_storage decline code to ' . $service['name']);
                 klaro_geo_debug_log('Updated onDecline callback: ' . $service_config['onDecline']);
@@ -282,13 +282,13 @@ function klaro_geo_generate_config_file() {
 
             // Modify onAccept callback for ad storage
             if ($is_ad_service) {
-                $ad_accept_code = "\nif (typeof window.gtag === 'function') {\n  window.gtag('consent', 'update', {\n    ad_storage: 'granted',\n    ad_user_data: 'granted',\n    ad_personalization: 'granted'\n  });\n}\n";
+                $ad_accept_code = "\nwindow.gtag('consent', 'update', {\n  ad_storage: 'granted',\n  ad_user_data: 'granted',\n  ad_personalization: 'granted'\n});\n";
                 $service_config['onAccept'] = $service_config['onAccept'] . $ad_accept_code;
                 klaro_geo_debug_log('Added ad_storage accept code to ' . $service['name']);
                 klaro_geo_debug_log('Updated onAccept callback: ' . $service_config['onAccept']);
 
                 // Add onDecline callback for ad storage if not already present
-                $ad_decline_code = "\nif (typeof window.gtag === 'function') {\n  window.gtag('consent', 'update', {\n    ad_storage: 'denied',\n    ad_user_data: 'denied',\n    ad_personalization: 'denied'\n  });\n}\n";
+                $ad_decline_code = "\nwindow.gtag('consent', 'update', {\n  ad_storage: 'denied',\n  ad_user_data: 'denied',\n  ad_personalization: 'denied'\n});\n";
                 $service_config['onDecline'] = $service_config['onDecline'] . $ad_decline_code;
                 klaro_geo_debug_log('Added ad_storage decline code to ' . $service['name']);
                 klaro_geo_debug_log('Updated onDecline callback: ' . $service_config['onDecline']);

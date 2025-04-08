@@ -111,103 +111,7 @@ function klaro_geo_enqueue_scripts() {
     wp_add_inline_script('klaro-js', "
         // Create a global Klaro Geo namespace
         window.klaroGeo = window.klaroGeo || {};
-        
-        // Log the current state of gtag
-        console.log('Setting up Klaro Geo namespace');
-        console.log('Current gtag state:', typeof window.gtag !== 'undefined' ? 'defined' : 'undefined');
     ");
-    
-    // Add a script to check if Klaro is loaded
-    wp_add_inline_script('klaro-js', "
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('Setting up Klaro initialization check');
-            
-            // Counter for retry attempts
-            var retryAttempts = 0;
-            var MAX_RETRY_ATTEMPTS = 10;
-            
-            // Wait for Klaro to be initialized
-            var checkKlaro = setInterval(function() {
-                // Increment retry counter
-                retryAttempts++;
-                
-                console.log('Checking if Klaro is loaded... (attempt ' + retryAttempts + ' of ' + MAX_RETRY_ATTEMPTS + ')');
-                
-                // Check if we've exceeded the maximum number of retry attempts
-                if (retryAttempts > MAX_RETRY_ATTEMPTS) {
-                    console.log('Maximum retry attempts exceeded. Stopping checks.');
-                    clearInterval(checkKlaro);
-                    return;
-                }
-                
-                if (window.klaro) {
-                    console.log('Klaro object found, checking for manager');
-                    
-                    if (typeof window.klaro.getManager === 'function') {
-                        try {
-                            // Log the current state of gtag before getting the manager
-                            console.log('Before getManager - gtag defined:', typeof window.gtag !== 'undefined');
-                            if (typeof window.gtag !== 'undefined') {
-                                console.log('gtag is a function:', typeof window.gtag === 'function');
-                            }
-                            
-                            // Get the manager without using gtag
-                            var manager = null;
-                            try {
-                                // Use a safer approach to get the manager
-                                var getManagerFn = window.klaro.getManager;
-                                manager = getManagerFn.call(window.klaro);
-                                console.log('Got manager using safer approach');
-                            } catch (e) {
-                                console.error('Error getting manager with safer approach:', e);
-                                // Fall back to direct call
-                                try {
-                                    manager = window.klaro.getManager();
-                                    console.log('Got manager using direct call');
-                                } catch (e2) {
-                                    console.error('Error getting manager with direct call:', e2);
-                                }
-                            }
-                            
-                            // Log the state of gtag after getting the manager
-                            console.log('After getManager - gtag defined:', typeof window.gtag !== 'undefined');
-                            if (typeof window.gtag !== 'undefined') {
-                                console.log('gtag is a function:', typeof window.gtag === 'function');
-                            }
-                            
-                            if (manager && manager.consents) {
-                                // We have a valid manager with consents
-                                clearInterval(checkKlaro);
-                                console.log('Klaro manager found with consents');
-                                
-                                // Store the manager in the klaroGeo namespace for potential future use
-                                window.klaroGeo.manager = manager;
-                                
-                                // Dispatch a custom event to notify that Klaro manager is ready
-                                document.dispatchEvent(new CustomEvent('klaro-manager-ready', { detail: { manager: manager } }));
-                            } else {
-                                console.log('Klaro manager not fully initialized yet');
-                                
-                                // Log manager details for debugging
-                                if (manager) {
-                                    console.log('Manager properties:', Object.keys(manager));
-                                } else {
-                                    console.log('Manager is null or undefined');
-                                }
-                            }
-                        } catch (e) {
-                            console.error('Detailed error getting Klaro manager:', e);
-                            console.log('Error stack:', e.stack);
-                        }
-                    } else {
-                        console.log('Klaro getManager function not available yet');
-                    }
-                } else {
-                    console.log('Waiting for Klaro to initialize...');
-                }
-            }, 100);
-        });
-    ", 'after');
 
     if ($klaro_variant === 'klaro-no-css.js') {
         wp_enqueue_style(
@@ -224,38 +128,6 @@ function klaro_geo_enqueue_scripts() {
         }
         return $tag;
     }, 10, 3);
-
-    wp_add_inline_script(
-        'klaro-js',
-        "document.addEventListener('DOMContentLoaded', function() {
-            if (typeof klaroConfig !== 'undefined') {
-                console.log('Klaro config loaded:', klaroConfig);
-                setTimeout(function() {
-                    if (typeof window.klaro === 'undefined') {
-                        console.error('Klaro not initialized. Attempting manual initialization...');
-                        if (typeof window.klaroConfig !== 'undefined') {
-                            window.klaro = window.klaro || {};
-                            window.klaro.show = function() {
-                                console.log('Manual Klaro show called');
-                                if (typeof window.klaroManager !== 'undefined') {
-                                    window.klaroManager.show();
-                                } else {
-                                    console.error('Klaro manager not available');
-                                }
-                            };
-                        }
-                    } else {
-                        console.log('Klaro initialized successfully');
-                        // Dispatch a custom event to notify that Klaro is ready
-                        document.dispatchEvent(new CustomEvent('klaro-ready'));
-                    }
-                }, 500);
-            } else {
-                console.error('Klaro config not loaded');
-            }
-        });",
-        'after'
-    );
 
     wp_enqueue_script(
         'klaro-geo-admin-bar-js',

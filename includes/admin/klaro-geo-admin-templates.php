@@ -1208,7 +1208,7 @@ function klaro_geo_templates_page() {
                         <th><label for="consent_mode_settings_initialization_code">Consent Mode Initialization Code:</label></th>
                         <td>
                             <textarea name="template_config[consent_mode_settings][initialization_code]" id="consent_mode_settings_initialization_code" rows="8" cols="50" class="large-text code"><?php
-                                $default_code = "// Set default consent state\ngtag('consent', 'default',{ \n    'ad_storage': 'denied',\n    'analytics_storage': 'denied',\n    'ad_user_data': 'denied',\n    'ad_personalization': 'denied' \n});\ngtag('set', 'ads_data_redaction', true);";
+                                $default_code = "window.dataLayer = window.dataLayer || [];\nwindow.gtag = function(){dataLayer.push(arguments)};\ngtag('consent', 'default', {\n'ad_storage': 'denied', \n'analytics_storage': 'denied', \n'ad_user_data': 'denied', \n'ad_personalization': 'denied'});\ngtag('set', 'ads_data_redaction', true);";
 
                                 if (isset($current_config['consent_mode_settings']['initialization_code'])) {
                                     // Make sure to strip any slashes that might have been added

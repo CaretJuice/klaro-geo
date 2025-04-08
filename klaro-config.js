@@ -1,7 +1,7 @@
-// Detected/Debug Country Code: UK
+// Detected/Debug Country Code: 
 
 var klaroConfig = {
-    "version": 1,
+    "version": "1",
     "elementID": "klaro",
     "styling": {
         "theme": [
@@ -10,37 +10,57 @@ var klaroConfig = {
             "wide"
         ]
     },
+    "default": false,
+    "required": true,
     "htmlTexts": true,
     "embedded": false,
+    "noAutoLoad": false,
+    "autoFocus": false,
     "groupByPurpose": true,
     "storageMethod": "cookie",
     "cookieName": "klaro",
-    "cookieExpiresAfterDays": 365,
-    "default": false,
+    "cookieExpiresAfterDays": "365",
+    "cookieDomain": "",
+    "cookiePath": "/",
     "mustConsent": false,
     "acceptAll": true,
     "hideDeclineAll": false,
     "hideLearnMore": false,
-    "noticeAsModal": false,
+    "showNoticeTitle": false,
+    "showDescriptionEmptyStore": true,
     "disablePoweredBy": false,
-    "consent_mode": "none",
+    "additionalClass": "",
+    "lang": "",
+    "consent_mode_settings": {
+        "initialize_consent_mode": true,
+        "analytics_storage_service": "google-analytics",
+        "ad_storage_service": "google-ads",
+        "initialization_code": "window.dataLayer = window.dataLayer || [];\r\nwindow.gtag = function(){dataLayer.push(arguments)}\r\ngtag('consent', 'default', {'ad_storage': 'denied', 'analytics_storage': 'denied', 'ad_user_data': 'denied', 'ad_personalization': 'denied'})\r\ngtag('set', 'ads_data_redaction', true)"
+    },
     "translations": {
         "zz": {
-            "privacyPolicyUrl": "/privacy-policy/",
             "consentModal": {
                 "title": "Privacy Settings",
                 "description": "Here you can assess and customize the services that we'd like to use on this website. You're in charge! Enable or disable services as you see fit."
             },
             "consentNotice": {
                 "title": "Privacy Settings",
-                "changeDescription": "There were changes since your last visit, please update your consent.",
                 "description": "We use cookies and similar technologies to provide certain features, enhance the user experience and deliver content that is relevant to your interests.",
+                "changeDescription": "There were changes since your last visit, please update your consent.",
                 "learnMore": "Learn more"
+            },
+            "privacyPolicyUrl": "/privacy-policy/",
+            "privacyPolicy": {
+                "name": "privacy policy",
+                "text": "To learn more, please read our {privacyPolicy}."
             },
             "acceptAll": "Accept all",
             "acceptSelected": "Accept selected",
             "decline": "Decline",
+            "ok": "OK",
+            "save": "Save",
             "close": "Close",
+            "poweredBy": "Realized with Klaro!",
             "purposes": {
                 "functional": {
                     "title": "Functional",
@@ -54,10 +74,6 @@ var klaroConfig = {
                     "title": "Advertising",
                     "description": "These services process personal information to show you personalized advertisements."
                 }
-            },
-            "purposeItem": {
-                "service": "service",
-                "services": "services"
             },
             "service": {
                 "disableAll": {
@@ -80,21 +96,66 @@ var klaroConfig = {
                     "acceptAlways": "Always"
                 }
             },
-            "ok": "OK",
-            "save": "Save",
-            "poweredBy": "Realized with Klaro!"
+            "purposeItem": {
+                "service": "service",
+                "services": "services"
+            }
         }
     },
     "services": [
         {
-            "name": "test-service",
+            "name": "google-tag-manager",
+            "purposes": [
+                "functinal"
+            ],
+            "cookies": [],
+            "onInit": "\nwindow.dataLayer = window.dataLayer || [];\r\nwindow.gtag = function(){dataLayer.push(arguments)}\r\ngtag('consent', 'default', {'ad_storage': 'denied', 'analytics_storage': 'denied', 'ad_user_data': 'denied', 'ad_personalization': 'denied'})\r\ngtag('set', 'ads_data_redaction', true)",
+            "onAccept": "",
+            "onDecline": "",
+            "required": true,
+            "default": true,
+            "translations": {
+                "zz": {
+                    "title": "Google Tag Manager",
+                    "description": "Google Tag Manager is a tag management system that allows you to quickly and easily update tracking codes and related code fragments collectively known as tags on your website or mobile app."
+                }
+            }
+        },
+        {
+            "name": "google-analytics",
             "purposes": [
                 "analytics"
             ],
             "cookies": [],
             "onInit": "",
-            "onAccept": "",
-            "onDecline": ""
+            "onAccept": "\nwindow.gtag('consent', 'update', {\n  analytics_storage: 'granted',\n});\n\nconst adPersonalizationCheckbox = document.querySelector('#klaro-geo-ad-personalization');\nconst adUserDataCheckbox = document.querySelector('#klaro-geo-ad-user-data');\nif (adPersonalizationCheckbox) {\n    adPersonalizationCheckbox.checked = true;\n}\nif (adUserDataCheckbox) {\n    adUserDataCheckbox.checked = true;\n}\n// Remove disabled class from controls container\nconst controlsContainer = document.querySelector('.klaro-geo-ad-controls');\nif (controlsContainer) {\n    controlsContainer.classList.remove('klaro-geo-controls-disabled');\n}\n",
+            "onDecline": "\nwindow.gtag('consent', 'update', {\n  analytics_storage: 'denied',\n});\n\nconst adPersonalizationCheckbox = document.querySelector('#klaro-geo-ad-personalization');\nconst adUserDataCheckbox = document.querySelector('#klaro-geo-ad-user-data');\nif (adPersonalizationCheckbox) {\n    adPersonalizationCheckbox.checked = false;\n}\nif (adUserDataCheckbox) {\n    adUserDataCheckbox.checked = false;\n}\n// Add disabled class to controls container\nconst controlsContainer = document.querySelector('.klaro-geo-ad-controls');\nif (controlsContainer) {\n    controlsContainer.classList.add('klaro-geo-controls-disabled');\n}\n",
+            "required": false,
+            "default": false,
+            "translations": {
+                "zz": {
+                    "title": "Google Analytics",
+                    "description": "Google Analytics is a web analytics service that tracks and reports website traffic to help you understand how visitors interact with your website."
+                }
+            }
+        },
+        {
+            "name": "google-ads",
+            "purposes": [
+                "advertising"
+            ],
+            "cookies": [],
+            "onInit": "",
+            "onAccept": "\nwindow.gtag('consent', 'update', {\n  ad_storage: 'granted',\n  ad_user_data: 'granted',\n  ad_personalization: 'granted'\n});\n\nconst adPersonalizationCheckbox = document.querySelector('#klaro-geo-ad-personalization');\nconst adUserDataCheckbox = document.querySelector('#klaro-geo-ad-user-data');\nif (adPersonalizationCheckbox) {\n    adPersonalizationCheckbox.checked = true;\n}\nif (adUserDataCheckbox) {\n    adUserDataCheckbox.checked = true;\n}\n// Remove disabled class from controls container\nconst controlsContainer = document.querySelector('.klaro-geo-ad-controls');\nif (controlsContainer) {\n    controlsContainer.classList.remove('klaro-geo-controls-disabled');\n}\n",
+            "onDecline": "\nwindow.gtag('consent', 'update', {\n  ad_storage: 'denied',\n  ad_user_data: 'denied',\n  ad_personalization: 'denied'\n});\n\nconst adPersonalizationCheckbox = document.querySelector('#klaro-geo-ad-personalization');\nconst adUserDataCheckbox = document.querySelector('#klaro-geo-ad-user-data');\nif (adPersonalizationCheckbox) {\n    adPersonalizationCheckbox.checked = false;\n}\nif (adUserDataCheckbox) {\n    adUserDataCheckbox.checked = false;\n}\n// Add disabled class to controls container\nconst controlsContainer = document.querySelector('.klaro-geo-ad-controls');\nif (controlsContainer) {\n    controlsContainer.classList.add('klaro-geo-controls-disabled');\n}\n",
+            "required": false,
+            "default": false,
+            "translations": {
+                "zz": {
+                    "title": "Google Ads",
+                    "description": "Google Ads is an online advertising platform developed by Google, where advertisers pay to display brief advertisements, service offerings, product listings, and video content to web users."
+                }
+            }
         }
     ]
 };
@@ -179,35 +240,38 @@ window.dataLayer.push({
     "event": "Klaro Config Loaded",
     "klaro_geo_consent_template": "default",
     "klaro_geo_template_source": "default",
-    "klaro_geo_detected_country": "UK",
+    "klaro_geo_detected_country": null,
     "klaro_geo_detected_region": null,
-    "klaro_geo_admin_override": true
+    "klaro_geo_admin_override": false
 });
 
 // Consent Receipt Configuration
 window.klaroConsentData = {
     templateName: "default",
     templateSource: "default",
-    detectedCountry: "UK",
+    detectedCountry: "",
     detectedRegion: "",
-    adminOverride: true,
-    ajaxUrl: "http://example.org/wp-admin/admin-ajax.php",
-    nonce: "a71cd632cd",
+    adminOverride: false,
+    ajaxUrl: "http://localhost:8000/wp-admin/admin-ajax.php",
+    nonce: "e26fc40534",
     enableConsentLogging: true,
-    consentMode: "none",
+    consentMode: "v2",
     templateSettings: {
         consentModalTitle: "Privacy Settings",
         consentModalDescription: "",
         acceptAllText: "Accept All",
         declineAllText: "Decline All",
         defaultConsent: false,
-        requiredConsent: false,
+        requiredConsent: true,
         config: {
             consent_mode_settings: {
-                initialize_consent_mode: false,
-                analytics_storage_service: "no_service",
-                ad_storage_service: "no_service",
-                initialization_code: ``
+                initialize_consent_mode: true,
+                analytics_storage_service: "google-analytics",
+                ad_storage_service: "google-ads",
+                initialization_code: `window.dataLayer = window.dataLayer || [];
+window.gtag = function(){dataLayer.push(arguments)}
+gtag('consent', 'default', {'ad_storage': 'denied', 'analytics_storage': 'denied', 'ad_user_data': 'denied', 'ad_personalization': 'denied'})
+gtag('set', 'ads_data_redaction', true)`
             }
         }
     }
