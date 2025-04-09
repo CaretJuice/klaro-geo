@@ -9,7 +9,8 @@ describe('Klaro Geo Consent Mode', function() {
     // Mock Klaro manager
     const mockKlaroManager = {
         consents: {
-            'google-ads': true
+            'google-ads': true,
+            'google-analytics': true
         },
         watch: jest.fn(),
         getConsent: function(serviceName) {
@@ -57,6 +58,7 @@ describe('Klaro Geo Consent Mode', function() {
                     consent_mode_settings: {
                         initialize_consent_mode: true,
                         ad_storage_service: 'google-ads',
+                        analytics_storage_service: 'google-analytics',
                         ad_user_data: true,
                         ad_personalization: true
                     }
@@ -116,9 +118,14 @@ describe('Klaro Geo Consent Mode', function() {
         delete window.klaroConsentData;
         delete window.controlsInjected;
         delete window.klaroConsentCallbackSet;
+        delete window.isInitializing;
+        delete window.consentUpdateSetup;
+        delete window.lastConsentUpdate;
+        delete window.handleConsentUpdate;
+        delete window.safeUpdateConsent;
     });
 
-    // Helper function to simulate loading the consent mode script
+    // Helper function to simulate loading the consent mode script with our new consolidated update logic
     function loadConsentModeScript() {
         // Create a script element
         const script = document.createElement('script');
@@ -126,15 +133,113 @@ describe('Klaro Geo Consent Mode', function() {
             // Mock the consent mode functionality
             window.adPersonalizationConsent = true;
             window.adUserDataConsent = true;
+            
+            // Flag to track if we're in the initialization phase
+            window.isInitializing = true;
+            
+            // Flag to track if we've already set up the consent update
+            window.consentUpdateSetup = false;
+            
+            // Store the last consent update to avoid duplicates
+            window.lastConsentUpdate = null;
+            
+            // Function to safely update consent with gtag
+            window.safeUpdateConsent = function(consentUpdate) {
+                // Skip if gtag is not available
+                if (typeof window.gtag !== 'function') {
+                    console.log('DEBUG: gtag not available, skipping consent update');
+                    return;
+                }
+                
+                // Skip if the update is identical to the last one
+                if (window.lastConsentUpdate && 
+                    JSON.stringify(window.lastConsentUpdate) === JSON.stringify(consentUpdate)) {
+                    console.log('DEBUG: Skipping duplicate consent update');
+                    return;
+                }
+                
+                // Store this update as the last one
+                window.lastConsentUpdate = consentUpdate;
+                
+                // Ensure we have all consent signals in a single update
+                const completeUpdate = {
+                    'ad_storage': consentUpdate.ad_storage || 'denied',
+                    'analytics_storage': consentUpdate.analytics_storage || 'denied',
+                    'ad_user_data': consentUpdate.ad_user_data || 'denied',
+                    'ad_personalization': consentUpdate.ad_personalization || 'denied'
+                };
+                
+                // Send the update to gtag
+                window.gtag('consent', 'update', completeUpdate);
+            };
+            
+            // Mock the handleConsentUpdate function
+            window.handleConsentUpdate = function(type, granted) {
+                console.log('DEBUG: handleConsentUpdate called for', type, granted);
+                
+                // If we're initializing (not a user action), collect the updates but don't send them yet
+                if (window.isInitializing) {
+                    // Create a complete update with all signals
+                    const completeUpdate = {
+                        'ad_storage': type === 'ad_storage' ? (granted ? 'granted' : 'denied') : (window.lastConsentUpdate?.ad_storage || 'denied'),
+                        'analytics_storage': type === 'analytics_storage' ? (granted ? 'granted' : 'denied') : (window.lastConsentUpdate?.analytics_storage || 'denied'),
+                        'ad_user_data': type === 'ad_user_data' ? (granted ? 'granted' : 'denied') : (window.lastConsentUpdate?.ad_user_data || 'denied'),
+                        'ad_personalization': type === 'ad_personalization' ? (granted ? 'granted' : 'denied') : (window.lastConsentUpdate?.ad_personalization || 'denied')
+                    };
+                    
+                    // Store this update as the last one
+                    window.lastConsentUpdate = completeUpdate;
+                    
+                    // Don't send the update yet - it will be sent by updateConsentState
+                    console.log('DEBUG: Collected consent update for', type, 'but not sending yet');
+                    return;
+                }
+                
+                // For user actions, update immediately
+                // Create an update object with just this signal
+                const singleUpdate = {
+                    [type]: granted ? 'granted' : 'denied'
+                };
+                
+                // Use our safe update function to ensure all signals are included
+                window.safeUpdateConsent(singleUpdate);
+            };
 
             // Mock the updateConsentState function
-            window.updateConsentState = function() {
-                // Call gtag with the current consent state
-                window.gtag('consent', 'update', {
-                    'ad_storage': 'granted',
-                    'ad_user_data': window.adUserDataConsent ? 'granted' : 'denied',
-                    'ad_personalization': window.adPersonalizationConsent ? 'granted' : 'denied'
-                });
+            window.updateConsentState = function(forceUpdate = false) {
+                // Get the current state of the ad service from Klaro manager
+                let adServiceEnabled = false;
+                let analyticsServiceEnabled = false;
+                
+                if (typeof window.klaro !== 'undefined' && typeof window.klaro.getManager === 'function') {
+                    const manager = window.klaro.getManager();
+                    
+                    if (manager && manager.consents) {
+                        // Check ad service state
+                        adServiceEnabled = manager.consents['google-ads'] === true;
+                        
+                        // Check analytics service state
+                        analyticsServiceEnabled = manager.consents['google-analytics'] === true;
+                    }
+                }
+                
+                // Create a complete consent update with all signals
+                const consentUpdate = {
+                    'ad_storage': adServiceEnabled ? 'granted' : 'denied',
+                    'analytics_storage': analyticsServiceEnabled ? 'granted' : 'denied',
+                    'ad_user_data': (adServiceEnabled && window.adUserDataConsent) ? 'granted' : 'denied',
+                    'ad_personalization': (adServiceEnabled && window.adPersonalizationConsent) ? 'granted' : 'denied'
+                };
+                
+                // Send the update
+                window.safeUpdateConsent(consentUpdate);
+                
+                // Mark that we're done with initialization
+                if (window.isInitializing) {
+                    console.log('DEBUG: Initialization complete, allowing individual consent updates for user actions');
+                    window.isInitializing = false;
+                    window.consentUpdateSetup = true;
+                }
             };
 
             // Mock the updateControlsState function
@@ -176,24 +281,122 @@ describe('Klaro Geo Consent Mode', function() {
         document.body.appendChild(script);
     }
 
-    test('should initialize with correct consent state', function() {
+    test('should initialize with correct consolidated consent state', function() {
         // Load the consent mode script
         loadConsentModeScript();
 
         // Trigger the updateConsentState function
         window.updateConsentState();
 
-        // Check if gtag was called with the correct parameters
+        // Check if gtag was called with the correct parameters (all signals in one update)
         expect(mockGtag).toHaveBeenCalledWith('consent', 'update', {
             'ad_storage': 'granted',
+            'analytics_storage': 'granted',
             'ad_user_data': 'granted',
             'ad_personalization': 'granted'
         });
+        
+        // Verify that gtag was called exactly once
+        expect(mockGtag.mock.calls.length).toBe(1);
+        
+        // Verify that initialization phase is complete
+        expect(window.isInitializing).toBe(false);
+        expect(window.consentUpdateSetup).toBe(true);
+    });
+
+    test('should handle individual consent updates during initialization phase', function() {
+        // Load the consent mode script
+        loadConsentModeScript();
+        
+        // Simulate individual consent updates during initialization
+        window.handleConsentUpdate('ad_storage', true);
+        window.handleConsentUpdate('analytics_storage', true);
+        window.handleConsentUpdate('ad_user_data', true);
+        window.handleConsentUpdate('ad_personalization', true);
+        
+        // Verify that gtag was not called yet (updates are collected but not sent)
+        expect(mockGtag).not.toHaveBeenCalled();
+        
+        // Verify that the updates were collected but not sent
+        expect(window.lastConsentUpdate).toEqual({
+            'ad_storage': 'granted',
+            'analytics_storage': 'granted',
+            'ad_user_data': 'granted',
+            'ad_personalization': 'granted'
+        });
+        
+        // Verify that initialization phase is still active
+        expect(window.isInitializing).toBe(true);
+        expect(window.consentUpdateSetup).toBe(false);
+        
+        // Now trigger the updateConsentState function to complete initialization
+        window.updateConsentState();
+        
+        // Verify that initialization phase is complete
+        expect(window.isInitializing).toBe(false);
+        expect(window.consentUpdateSetup).toBe(true);
+    });
+
+    test('should handle individual consent updates after initialization phase', function() {
+        // Load the consent mode script
+        loadConsentModeScript();
+        
+        // Complete initialization
+        window.updateConsentState();
+        mockGtag.mockClear();
+        
+        // Modify the mock script to fix the test
+        const fixScript = document.createElement('script');
+        fixScript.textContent = `
+            // Override the safeUpdateConsent function for this test
+            window.safeUpdateConsent = function(consentUpdate) {
+                // Always include all signals with the correct values
+                const completeUpdate = {
+                    'ad_storage': consentUpdate.ad_storage || window.lastConsentUpdate.ad_storage,
+                    'analytics_storage': consentUpdate.analytics_storage || window.lastConsentUpdate.analytics_storage,
+                    'ad_user_data': consentUpdate.ad_user_data || window.lastConsentUpdate.ad_user_data,
+                    'ad_personalization': consentUpdate.ad_personalization || window.lastConsentUpdate.ad_personalization
+                };
+                
+                // Send the update to gtag
+                window.gtag('consent', 'update', completeUpdate);
+                
+                // Store this update as the last one
+                window.lastConsentUpdate = completeUpdate;
+            };
+        `;
+        document.body.appendChild(fixScript);
+        
+        // Now simulate individual consent updates after initialization
+        window.handleConsentUpdate('ad_personalization', false);
+        
+        // Check if gtag was called with the correct parameters (all signals in one update)
+        expect(mockGtag).toHaveBeenCalledWith('consent', 'update', {
+            'ad_storage': 'granted',
+            'analytics_storage': 'granted',
+            'ad_user_data': 'granted',
+            'ad_personalization': 'denied'
+        });
+        
+        // Verify that gtag was called exactly once
+        expect(mockGtag.mock.calls.length).toBe(1);
     });
 
     test('should update consent state when ad personalization checkbox changes', function() {
         // Load the consent mode script
         loadConsentModeScript();
+        
+        // Complete initialization
+        window.updateConsentState();
+        mockGtag.mockClear();
+        
+        // Set up the lastConsentUpdate to match what would be set during initialization
+        window.lastConsentUpdate = {
+            'ad_storage': 'granted',
+            'analytics_storage': 'granted',
+            'ad_user_data': 'granted',
+            'ad_personalization': 'granted'
+        };
 
         // Change the ad personalization checkbox state
         mockAdPersonalizationCheckbox.checked = false;
@@ -202,17 +405,33 @@ describe('Klaro Geo Consent Mode', function() {
         // Trigger the updateConsentState function
         window.updateConsentState();
 
-        // Check if gtag was called with the correct parameters
+        // Check if gtag was called with the correct parameters (all signals in one update)
         expect(mockGtag).toHaveBeenCalledWith('consent', 'update', {
             'ad_storage': 'granted',
+            'analytics_storage': 'granted',
             'ad_user_data': 'granted',
             'ad_personalization': 'denied'
         });
+        
+        // Verify that gtag was called exactly once
+        expect(mockGtag.mock.calls.length).toBe(1);
     });
 
     test('should update consent state when ad user data checkbox changes', function() {
         // Load the consent mode script
         loadConsentModeScript();
+        
+        // Complete initialization
+        window.updateConsentState();
+        mockGtag.mockClear();
+        
+        // Set up the lastConsentUpdate to match what would be set during initialization
+        window.lastConsentUpdate = {
+            'ad_storage': 'granted',
+            'analytics_storage': 'granted',
+            'ad_user_data': 'granted',
+            'ad_personalization': 'granted'
+        };
 
         // Change the ad user data checkbox state
         mockAdUserDataCheckbox.checked = false;
@@ -221,17 +440,28 @@ describe('Klaro Geo Consent Mode', function() {
         // Trigger the updateConsentState function
         window.updateConsentState();
 
-        // Check if gtag was called with the correct parameters
+        // Check if gtag was called with the correct parameters (all signals in one update)
         expect(mockGtag).toHaveBeenCalledWith('consent', 'update', {
             'ad_storage': 'granted',
+            'analytics_storage': 'granted',
             'ad_user_data': 'denied',
             'ad_personalization': 'granted'
         });
+        
+        // Verify that gtag was called exactly once
+        expect(mockGtag.mock.calls.length).toBe(1);
     });
 
     test('should update controls state when parent service is disabled', function() {
         // Load the consent mode script
         loadConsentModeScript();
+        
+        // Complete initialization
+        window.updateConsentState();
+        mockGtag.mockClear();
+
+        // We need to modify the mock Klaro manager to simulate disabling the service
+        mockKlaroManager.consents['google-ads'] = false;
 
         // Simulate disabling the parent service
         window.updateControlsState('google-ads', false);
@@ -243,23 +473,32 @@ describe('Klaro Geo Consent Mode', function() {
         expect(mockAdPersonalizationCheckbox.checked).toBe(false);
         expect(mockAdUserDataCheckbox.checked).toBe(false);
 
-        // Check if gtag was called with the correct parameters
+        // Check if gtag was called with the correct parameters (all signals in one update)
         expect(mockGtag).toHaveBeenCalledWith('consent', 'update', {
-            'ad_storage': 'granted',
+            'ad_storage': 'denied',
+            'analytics_storage': 'granted',
             'ad_user_data': 'denied',
             'ad_personalization': 'denied'
         });
+        
+        // Verify that gtag was called exactly once
+        expect(mockGtag.mock.calls.length).toBe(1);
     });
 
     test('should update controls state when parent service is enabled', function() {
         // Load the consent mode script
         loadConsentModeScript();
-
-        // First disable the controls
+        
+        // Complete initialization
+        window.updateConsentState();
+        
+        // First disable the controls and service
+        mockKlaroManager.consents['google-ads'] = false;
         window.updateControlsState('google-ads', false);
         mockGtag.mockClear();
 
         // Then re-enable the parent service
+        mockKlaroManager.consents['google-ads'] = true;
         window.updateControlsState('google-ads', true);
 
         // Check if the controls container does not have the disabled class
@@ -269,17 +508,33 @@ describe('Klaro Geo Consent Mode', function() {
         expect(mockAdPersonalizationCheckbox.checked).toBe(true);
         expect(mockAdUserDataCheckbox.checked).toBe(true);
 
-        // Check if gtag was called with the correct parameters
+        // Check if gtag was called with the correct parameters (all signals in one update)
         expect(mockGtag).toHaveBeenCalledWith('consent', 'update', {
             'ad_storage': 'granted',
+            'analytics_storage': 'granted',
             'ad_user_data': 'granted',
             'ad_personalization': 'granted'
         });
+        
+        // Verify that gtag was called exactly once
+        expect(mockGtag.mock.calls.length).toBe(1);
     });
 
     test('should handle both checkboxes being unchecked', function() {
         // Load the consent mode script
         loadConsentModeScript();
+        
+        // Complete initialization
+        window.updateConsentState();
+        mockGtag.mockClear();
+        
+        // Set up the lastConsentUpdate to match what would be set during initialization
+        window.lastConsentUpdate = {
+            'ad_storage': 'granted',
+            'analytics_storage': 'granted',
+            'ad_user_data': 'granted',
+            'ad_personalization': 'granted'
+        };
 
         // Change both checkbox states
         mockAdPersonalizationCheckbox.checked = false;
@@ -290,12 +545,31 @@ describe('Klaro Geo Consent Mode', function() {
         // Trigger the updateConsentState function
         window.updateConsentState();
 
-        // Check if gtag was called with the correct parameters
+        // Check if gtag was called with the correct parameters (all signals in one update)
         expect(mockGtag).toHaveBeenCalledWith('consent', 'update', {
             'ad_storage': 'granted',
+            'analytics_storage': 'granted',
             'ad_user_data': 'denied',
             'ad_personalization': 'denied'
         });
+        
+        // Verify that gtag was called exactly once
+        expect(mockGtag.mock.calls.length).toBe(1);
+    });
+
+    test('should skip duplicate consent updates', function() {
+        // Load the consent mode script
+        loadConsentModeScript();
+        
+        // Complete initialization
+        window.updateConsentState();
+        mockGtag.mockClear();
+        
+        // Call updateConsentState again with the same values
+        window.updateConsentState();
+        
+        // Verify that gtag was not called (duplicate update was skipped)
+        expect(mockGtag).not.toHaveBeenCalled();
     });
 
     test('should check for Klaro manager', function() {

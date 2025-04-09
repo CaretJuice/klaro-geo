@@ -128,8 +128,8 @@ var klaroConfig = {
             ],
             "cookies": [],
             "onInit": "",
-            "onAccept": "\nwindow.gtag('consent', 'update', {\n  analytics_storage: 'granted',\n});\n\nconst adPersonalizationCheckbox = document.querySelector('#klaro-geo-ad-personalization');\nconst adUserDataCheckbox = document.querySelector('#klaro-geo-ad-user-data');\nif (adPersonalizationCheckbox) {\n    adPersonalizationCheckbox.checked = true;\n}\nif (adUserDataCheckbox) {\n    adUserDataCheckbox.checked = true;\n}\n// Remove disabled class from controls container\nconst controlsContainer = document.querySelector('.klaro-geo-ad-controls');\nif (controlsContainer) {\n    controlsContainer.classList.remove('klaro-geo-controls-disabled');\n}\n",
-            "onDecline": "\nwindow.gtag('consent', 'update', {\n  analytics_storage: 'denied',\n});\n\nconst adPersonalizationCheckbox = document.querySelector('#klaro-geo-ad-personalization');\nconst adUserDataCheckbox = document.querySelector('#klaro-geo-ad-user-data');\nif (adPersonalizationCheckbox) {\n    adPersonalizationCheckbox.checked = false;\n}\nif (adUserDataCheckbox) {\n    adUserDataCheckbox.checked = false;\n}\n// Add disabled class to controls container\nconst controlsContainer = document.querySelector('.klaro-geo-ad-controls');\nif (controlsContainer) {\n    controlsContainer.classList.add('klaro-geo-controls-disabled');\n}\n",
+            "onAccept": "\n// Note: Consent updates are now handled by klaro-geo-consent-mode.js\n\nconst adPersonalizationCheckbox = document.querySelector('#klaro-geo-ad-personalization');\nconst adUserDataCheckbox = document.querySelector('#klaro-geo-ad-user-data');\nif (adPersonalizationCheckbox) {\n    adPersonalizationCheckbox.checked = true;\n}\nif (adUserDataCheckbox) {\n    adUserDataCheckbox.checked = true;\n}\n// Remove disabled class from controls container\nconst controlsContainer = document.querySelector('.klaro-geo-ad-controls');\nif (controlsContainer) {\n    controlsContainer.classList.remove('klaro-geo-controls-disabled');\n}\n",
+            "onDecline": "\n// Note: Consent updates are now handled by klaro-geo-consent-mode.js\n\nconst adPersonalizationCheckbox = document.querySelector('#klaro-geo-ad-personalization');\nconst adUserDataCheckbox = document.querySelector('#klaro-geo-ad-user-data');\nif (adPersonalizationCheckbox) {\n    adPersonalizationCheckbox.checked = false;\n}\nif (adUserDataCheckbox) {\n    adUserDataCheckbox.checked = false;\n}\n// Add disabled class to controls container\nconst controlsContainer = document.querySelector('.klaro-geo-ad-controls');\nif (controlsContainer) {\n    controlsContainer.classList.add('klaro-geo-controls-disabled');\n}\n",
             "required": false,
             "default": false,
             "translations": {
@@ -146,8 +146,8 @@ var klaroConfig = {
             ],
             "cookies": [],
             "onInit": "",
-            "onAccept": "\nwindow.gtag('consent', 'update', {\n  ad_storage: 'granted',\n  ad_user_data: 'granted',\n  ad_personalization: 'granted'\n});\n\nconst adPersonalizationCheckbox = document.querySelector('#klaro-geo-ad-personalization');\nconst adUserDataCheckbox = document.querySelector('#klaro-geo-ad-user-data');\nif (adPersonalizationCheckbox) {\n    adPersonalizationCheckbox.checked = true;\n}\nif (adUserDataCheckbox) {\n    adUserDataCheckbox.checked = true;\n}\n// Remove disabled class from controls container\nconst controlsContainer = document.querySelector('.klaro-geo-ad-controls');\nif (controlsContainer) {\n    controlsContainer.classList.remove('klaro-geo-controls-disabled');\n}\n",
-            "onDecline": "\nwindow.gtag('consent', 'update', {\n  ad_storage: 'denied',\n  ad_user_data: 'denied',\n  ad_personalization: 'denied'\n});\n\nconst adPersonalizationCheckbox = document.querySelector('#klaro-geo-ad-personalization');\nconst adUserDataCheckbox = document.querySelector('#klaro-geo-ad-user-data');\nif (adPersonalizationCheckbox) {\n    adPersonalizationCheckbox.checked = false;\n}\nif (adUserDataCheckbox) {\n    adUserDataCheckbox.checked = false;\n}\n// Add disabled class to controls container\nconst controlsContainer = document.querySelector('.klaro-geo-ad-controls');\nif (controlsContainer) {\n    controlsContainer.classList.add('klaro-geo-controls-disabled');\n}\n",
+            "onAccept": "\n// Note: Consent updates are now handled by klaro-geo-consent-mode.js\n\nconst adPersonalizationCheckbox = document.querySelector('#klaro-geo-ad-personalization');\nconst adUserDataCheckbox = document.querySelector('#klaro-geo-ad-user-data');\nif (adPersonalizationCheckbox) {\n    adPersonalizationCheckbox.checked = true;\n}\nif (adUserDataCheckbox) {\n    adUserDataCheckbox.checked = true;\n}\n// Remove disabled class from controls container\nconst controlsContainer = document.querySelector('.klaro-geo-ad-controls');\nif (controlsContainer) {\n    controlsContainer.classList.remove('klaro-geo-controls-disabled');\n}\n",
+            "onDecline": "\n// Note: Consent updates are now handled by klaro-geo-consent-mode.js\n\nconst adPersonalizationCheckbox = document.querySelector('#klaro-geo-ad-personalization');\nconst adUserDataCheckbox = document.querySelector('#klaro-geo-ad-user-data');\nif (adPersonalizationCheckbox) {\n    adPersonalizationCheckbox.checked = false;\n}\nif (adUserDataCheckbox) {\n    adUserDataCheckbox.checked = false;\n}\n// Add disabled class to controls container\nconst controlsContainer = document.querySelector('.klaro-geo-ad-controls');\nif (controlsContainer) {\n    controlsContainer.classList.add('klaro-geo-controls-disabled');\n}\n",
             "required": false,
             "default": false,
             "translations": {
@@ -253,7 +253,7 @@ window.klaroConsentData = {
     detectedRegion: "",
     adminOverride: false,
     ajaxUrl: "http://localhost:8000/wp-admin/admin-ajax.php",
-    nonce: "e26fc40534",
+    nonce: "388d33212a",
     enableConsentLogging: true,
     consentMode: "v2",
     templateSettings: {

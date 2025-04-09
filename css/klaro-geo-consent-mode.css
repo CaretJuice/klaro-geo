@@ -2,52 +2,113 @@
  * Klaro Geo Consent Mode Extension CSS
  */
 
-/* Styling for the separate controls list item */
-.klaro-geo-consent-mode-controls {
-    background-color: #f9f9f9;
-    border-left: 3px solid #ddd;
-    margin-left: 15px !important;
-    margin-top: -5px !important;
-    margin-bottom: 10px !important;
-    padding-top: 5px !important;
-    padding-bottom: 5px !important;
-}
-
-.klaro-geo-consent-mode-controls .cm-list-title {
-    font-size: 0.9em;
-    font-weight: bold;
-    color: #555;
-    margin-bottom: 8px;
-    display: block;
-}
-
 /* Container for the additional controls */
 .klaro-geo-ad-controls {
-    margin-top: 5px;
-    padding-left: 10px;
+    margin: 15px 0 10px 0;
+    padding: 10px;
+    background-color: #f9f9f9;
+    border-left: 3px solid #ddd;
     font-size: 0.9em;
+    position: relative;
+    z-index: 1000;
 }
 
-/* Sub-control styling */
-.klaro-geo-sub-control {
+/* Heading in the controls container */
+.klaro-geo-ad-controls .klaro-geo-heading {
+    font-weight: bold;
     margin-bottom: 10px;
+    color: #333;
 }
 
-.klaro-geo-sub-control .cm-list-title {
+/* Description in the controls container */
+.klaro-geo-ad-controls .klaro-geo-description {
     font-size: 0.9em;
-    font-weight: normal;
-}
-
-.klaro-geo-sub-control .purposes {
-    font-size: 0.85em;
+    margin-bottom: 15px;
     color: #666;
-    margin-top: 2px;
-    margin-bottom: 2px;
 }
 
-/* Smaller switch for sub-controls */
-.klaro-geo-sub-control .cm-switch {
-    transform: scale(0.85);
+/* Toggle control container */
+.klaro-geo-toggle-control {
+    margin-bottom: 15px;
+    margin-left: 5px;
+    position: relative;
+    z-index: 1000;
+}
+
+/* Flex container for label and toggle */
+.klaro-geo-toggle-control .klaro-geo-flex-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Label in toggle control */
+.klaro-geo-toggle-control label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 3px;
+    flex: 1;
+    cursor: pointer;
+}
+
+/* Toggle switch container */
+.klaro-geo-toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 24px;
+    z-index: 1001;
+}
+
+/* Hide default checkbox */
+.klaro-geo-toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    z-index: 1002;
+}
+
+/* Slider for toggle switch */
+.klaro-geo-toggle-switch .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 34px;
+}
+
+/* Slider knob */
+.klaro-geo-toggle-switch .slider::after {
+    content: "";
+    position: absolute;
+    height: 16px;
+    width: 16px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+/* Checked state for slider */
+.klaro-geo-toggle-switch input:checked + .slider {
+    background-color: #2196F3;
+}
+
+/* Checked state for slider knob */
+.klaro-geo-toggle-switch input:checked + .slider::after {
+    transform: translateX(16px);
+}
+
+/* Description text in toggle control */
+.klaro-geo-toggle-control p {
+    font-size: 0.8em;
+    margin: 0 0 5px 0;
+    color: #666;
 }
 
 /* Disabled state for controls when parent service is disabled */
@@ -56,11 +117,7 @@
     pointer-events: none !important;
 }
 
-.klaro-geo-controls-disabled .klaro-geo-sub-control {
-    cursor: not-allowed !important;
-}
-
-.klaro-geo-controls-disabled .cm-list-input {
+.klaro-geo-controls-disabled .klaro-geo-toggle-control {
     cursor: not-allowed !important;
 }
 
@@ -69,11 +126,7 @@
     pointer-events: auto !important;
 }
 
-.klaro-geo-ad-controls:not(.klaro-geo-controls-disabled) .klaro-geo-sub-control {
-    cursor: pointer !important;
-}
-
-.klaro-geo-ad-controls:not(.klaro-geo-controls-disabled) .cm-list-input {
+.klaro-geo-ad-controls:not(.klaro-geo-controls-disabled) .klaro-geo-toggle-control {
     cursor: pointer !important;
 }
 

@@ -32,7 +32,7 @@ class ServicesTest extends WP_UnitTestCase {
         foreach ($GLOBALS['default_services'] as $service) {
             if ($service['name'] === 'google-tag-manager') {
                 $gtm_found = true;
-                $this->assertEquals(['analytics', 'advertising'], $service['purposes']);
+                $this->assertEquals(['functional'], $service['purposes']);
                 break;
             }
         }
