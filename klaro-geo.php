@@ -113,6 +113,16 @@ function klaro_geo_enqueue_scripts() {
         window.klaroGeo = window.klaroGeo || {};
     ");
 
+        wp_enqueue_script(
+            'klaro-geo-js',
+            plugins_url('js/klaro-geo.js', __FILE__),
+            array('klaro-js'), // Dependency!
+            KLARO_GEO_VERSION,
+            array('strategy' => 'defer', 'in_footer' => true)
+        );
+    
+
+
     if ($klaro_variant === 'klaro-no-css.js') {
         wp_enqueue_style(
             'klaro-cdn-css',

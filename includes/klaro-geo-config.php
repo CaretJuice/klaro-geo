@@ -331,6 +331,70 @@ function klaro_geo_generate_config_file() {
     function handleConsentUpdate(manager, eventType, data) {
         console.log('Klaro consent update:', eventType, data);
 
+        // -------------------- MERGED safeUpdateConsent LOGIC --------------------
+
+        // Check if gtag is available (PHP needs to generate this check)
+        if (typeof window.gtag !== 'function') {
+            console.log('DEBUG: gtag not available, skipping consent update');
+            return;
+        }
+
+        // Check for duplicate update (PHP needs to generate this check)
+        if (window.lastConsentUpdate && 
+            JSON.stringify(window.lastConsentUpdate) === JSON.stringify(data)) { // Assuming 'data' is the update
+            console.log('DEBUG: Skipping duplicate consent update');
+            return;
+        }
+
+        // Clear any pending update timer (PHP needs to manage this)
+        if (window.consentUpdateTimer) {
+            console.log('DEBUG: Clearing pending consent update timer');
+            clearTimeout(window.consentUpdateTimer);
+        }
+
+        // Set a new timer to debounce (PHP needs to generate this)
+        console.log('DEBUG: Setting debounced consent update timer');
+        window.consentUpdateTimer = setTimeout(function() {
+
+            // Get consent state from Klaro (PHP needs to generate this)
+            let adServiceEnabled = false;
+            let analyticsServiceEnabled = false;
+            try {
+                if (typeof window.klaro !== 'undefined' && typeof window.klaro.getManager === 'function') {
+                    const klaroManager = window.klaro.getManager();
+                    if (klaroManager && klaroManager.consents && window.adStorageServiceName) {
+                        adServiceEnabled = klaroManager.consents[window.adStorageServiceName] === true;
+                        // ... (Get analyticsServiceEnabled similarly)
+                    }
+                }
+            } catch (e) {
+                console.error('DEBUG: Error getting consent state from Klaro manager:', e);
+                adServiceEnabled = data.ad_storage === 'granted'; // Fallback
+                analyticsServiceEnabled = data.analytics_storage === 'granted'; // Fallback
+            }
+
+            // Create complete update (PHP needs to generate this)
+            const completeUpdate = {
+                'ad_storage': adServiceEnabled ? 'granted' : 'denied',
+                'analytics_storage': analyticsServiceEnabled ? 'granted' : 'denied',
+                'ad_user_data': (adServiceEnabled && window.adUserDataConsent) ? 'granted' : 'denied',
+                'ad_personalization': (adServiceEnabled && window.adPersonalizationConsent) ? 'granted' : 'denied'
+            };
+
+            // Store last update (PHP needs to generate this)
+            window.lastConsentUpdate = completeUpdate;
+
+            // Send to gtag (PHP needs to generate this)
+            window.gtag('consent', 'update', completeUpdate);
+            console.log('DEBUG: Consent state updated with:', completeUpdate);
+
+            // Reset timer (PHP needs to generate this)
+            window.consentUpdateTimer = null;
+
+        }, window.consentUpdateDelay || 50); // Default delay
+
+        // -------------------- ORIGINAL handleConsentUpdate LOGIC --------------------
+
         if (eventType === 'saveConsents') {
             // Get the current consents
             var consents = manager.consents;

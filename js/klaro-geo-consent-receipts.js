@@ -57,7 +57,7 @@ function handleConsentChange(e) {
 
         // Push to dataLayer
         window.dataLayer.push({
-            'event': 'klaro_geo_consent_receipt',
+            'event': 'Klaro Geo Consent Receipt',
             'klaro_geo_consent_receipt': consentReceipt
         });
 
@@ -144,7 +144,7 @@ function handleConsentChange(e) {
 
     // Push to dataLayer
     window.dataLayer.push({
-        'event': 'klaro_geo_consent_receipt',
+        'event': 'Klaro Geo Consent Receipt',
         'klaro_geo_consent_receipt': consentReceipt,
         'klaro_geo_template_source': consentReceipt.template_source,
         'klaro_geo_admin_override': consentReceipt.admin_override
