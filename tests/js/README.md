@@ -4,7 +4,8 @@ This directory contains JavaScript tests for the Klaro Geo plugin.
 
 ## Test Files
 
-- `test-klaro-geo.js`: Tests for the core functionality in `klaro-geo.js`
+- `test-klaro-geo.js`: Basic tests for the core functionality in `klaro-geo.js`
+- `test-klaro-geo-comprehensive.js`: Comprehensive tests with mocking for `klaro-geo.js`
 - `setup.js`: Setup file for Jest
 - `run-tests.js`: Custom test runner
 
@@ -16,11 +17,17 @@ You can run the tests using npm:
 # Run all tests
 npm test
 
-# Run only the klaro-geo tests
+# Run only the basic klaro-geo tests
 npm run test:klaro-geo
+
+# Run the comprehensive klaro-geo tests
+npm run test:klaro-geo-comprehensive
 
 # Run tests in watch mode (automatically re-run when files change)
 npm run test:watch
+
+# Run tests with coverage report
+npm run test:coverage
 ```
 
 ## Test Structure

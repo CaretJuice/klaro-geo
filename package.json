@@ -6,7 +6,9 @@
     "scripts": {
       "test": "jest",
       "test:watch": "jest --watch",
-      "test:klaro-geo": "jest tests/js/test-klaro-geo.js"
+      "test:klaro-geo": "jest tests/js/test-klaro-geo.js",
+      "test:klaro-geo-comprehensive": "jest tests/js/test-klaro-geo-comprehensive.js",
+      "test:coverage": "jest --coverage"
     },
     "author": "",
     "license": "ISC",
@@ -36,9 +38,7 @@
       "setupFiles": [
         "./tests/js/setup.js"
       ],
-      "collectCoverage": true,
-      "coverageDirectory": "coverage",
-      "coverageReporters": ["text", "lcov"],
+      "collectCoverage": false,
       "collectCoverageFrom": [
         "js/*.js",
         "!js/vendor/**"
