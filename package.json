@@ -5,7 +5,8 @@
     "main": "index.js",
     "scripts": {
       "test": "jest",
-      "test:watch": "jest --watch"
+      "test:watch": "jest --watch",
+      "test:klaro-geo": "jest tests/js/test-klaro-geo.js"
     },
     "author": "",
     "license": "ISC",
@@ -22,17 +23,25 @@
         "js"
       ],
       "testMatch": [
-        "**/tests/js/**/*.js"
+        "**/tests/js/test-*.js"
       ],
       "testPathIgnorePatterns": [
         "/node_modules/",
-        "/tests/js/jest.setup.js"
+        "/tests/js/setup.js",
+        "/tests/js/run-tests.js"
       ],
       "transform": {
         "^.+\\.js$": "babel-jest"
       },
       "setupFiles": [
-        "./tests/js/jest.setup.js"
+        "./tests/js/setup.js"
+      ],
+      "collectCoverage": true,
+      "coverageDirectory": "coverage",
+      "coverageReporters": ["text", "lcov"],
+      "collectCoverageFrom": [
+        "js/*.js",
+        "!js/vendor/**"
       ]
     }
   }

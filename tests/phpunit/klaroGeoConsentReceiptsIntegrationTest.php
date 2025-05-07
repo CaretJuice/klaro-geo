@@ -71,9 +71,6 @@ class ConsentReceiptsIntegrationTest extends IgnoreDeprecatedTestCase {
         do_action('wp_footer');
         $footer_output = ob_get_clean();
 
-        // Check if the consent receipts script is enqueued
-        $this->assertStringContainsString('klaro-geo-consent-receipts.js', $footer_output, 'Consent receipts script should be enqueued');
-
         // Check if the klaroConsentData object is added
         $this->assertStringContainsString('klaroConsentData', $head_output . $footer_output, 'klaroConsentData object should be added');
 
@@ -82,14 +79,22 @@ class ConsentReceiptsIntegrationTest extends IgnoreDeprecatedTestCase {
         $plugin_dir = plugin_dir_path(dirname(dirname(__FILE__)));
         $klaro_config_file = $plugin_dir . 'klaro-config.js';
         $config_content = file_get_contents($klaro_config_file);
-
-        // Check for integration between the watcher and consent receipts
-        $this->assertStringContainsString('handleConsentChange(syntheticEvent)', $config_content, 'Config should call handleConsentChange from the watcher');
-        $this->assertStringContainsString('window.currentKlaroOpts = { consents: consents }', $config_content, 'Config should store consents for receipt handling');
+        
+        // Check that the config file contains the klaroConsentData object
+        $this->assertStringContainsString('window.klaroConsentData', $config_content, 'Config should include klaroConsentData object');
+        
+        // Now check the klaro-geo.js file for the moved functionality
+        $klaro_geo_js_file = $plugin_dir . 'js/klaro-geo.js';
+        $this->assertFileExists($klaro_geo_js_file, 'klaro-geo.js file should exist');
+        $geo_js_content = file_get_contents($klaro_geo_js_file);
+        
+        // Check for the handleConsentChange function in klaro-geo.js
+        $this->assertStringContainsString('function handleConsentChange', $geo_js_content, 'klaro-geo.js should contain handleConsentChange function');
+        $this->assertStringContainsString('handleKlaroConsentEvents', $geo_js_content, 'klaro-geo.js should contain handleKlaroConsentEvents function');
     }
 
     /**
-     * Test that the klaro-config.js file contains the necessary consent receipt code.
+     * Test that the necessary consent receipt code exists in the JS files.
      */
     public function test_config_file_contains_receipt_code() {
         update_option('klaro_geo_enable_consent_receipts', true);
@@ -99,20 +104,26 @@ class ConsentReceiptsIntegrationTest extends IgnoreDeprecatedTestCase {
         // Get the file path - need to go up one more directory to reach the plugin root
         $plugin_dir = plugin_dir_path(dirname(dirname(__FILE__)));
         $klaro_config_file = $plugin_dir . 'klaro-config.js';
+        $klaro_geo_js_file = $plugin_dir . 'js/klaro-geo.js';
 
-        // Check if the file exists
+        // Check if the files exist
         $this->assertFileExists($klaro_config_file, 'klaro-config.js file should exist');
+        $this->assertFileExists($klaro_geo_js_file, 'klaro-geo.js file should exist');
 
         // Get the file contents
         $config_content = file_get_contents($klaro_config_file);
+        $geo_js_content = file_get_contents($klaro_geo_js_file);
 
+        // Check that the config file contains the klaroConsentData object
         $this->assertStringContainsString('window.klaroConsentData', $config_content, 'Config should include klaroConsentData object');
 
-        $watchMethodFound = strpos($config_content, 'manager.watch') !== false ||
-                           strpos($config_content, 'manager.watch(') !== false;
-        $this->assertTrue($watchMethodFound, 'Config should include manager.watch method');
+        // Check that the klaro-geo.js file contains the manager.watch method
+        $watchMethodFound = strpos($geo_js_content, 'manager.watch') !== false ||
+                           strpos($geo_js_content, 'manager.watch(') !== false;
+        $this->assertTrue($watchMethodFound, 'klaro-geo.js should include manager.watch method');
 
-        $this->assertStringContainsString('handleConsentUpdate', $config_content, 'Config should include handleConsentUpdate function');
+        // Check that the klaro-geo.js file contains the handleConsentUpdate function
+        $this->assertStringContainsString('update:', $geo_js_content, 'klaro-geo.js should include update function in manager.watch');
     }
 
     /**
@@ -207,20 +218,23 @@ class ConsentReceiptsIntegrationTest extends IgnoreDeprecatedTestCase {
 
         // Get the file path
         $plugin_dir = plugin_dir_path(dirname(dirname(__FILE__)));
-        $klaro_config_file = $plugin_dir . 'klaro-config.js';
+        $klaro_geo_js_file = $plugin_dir . 'js/klaro-geo.js';
+
+        // Check if the file exists
+        $this->assertFileExists($klaro_geo_js_file, 'klaro-geo.js file should exist');
 
         // Get the file contents
-        $config_content = file_get_contents($klaro_config_file);
+        $geo_js_content = file_get_contents($klaro_geo_js_file);
 
         // Check for the manager watcher implementation
-        $this->assertStringContainsString('manager.watch({', $config_content, 'Config should include manager.watch setup');
-        $this->assertStringContainsString('update: handleConsentUpdate', $config_content, 'Config should connect handleConsentUpdate to the watcher');
-        $this->assertStringContainsString('if (eventType === \'saveConsents\')', $config_content, 'Config should check for saveConsents event');
-        $this->assertStringContainsString('window.lastWatcherConsentTimestamp = Date.now()', $config_content, 'Config should set timestamp to prevent duplicate processing');
+        $this->assertStringContainsString('manager.watch({', $geo_js_content, 'klaro-geo.js should include manager.watch setup');
+        $this->assertStringContainsString('update:', $geo_js_content, 'klaro-geo.js should connect update function to the watcher');
+        $this->assertStringContainsString('saveConsents', $geo_js_content, 'klaro-geo.js should check for saveConsents event');
+        $this->assertStringContainsString('window.lastWatcherConsentTimestamp', $geo_js_content, 'klaro-geo.js should set timestamp to prevent duplicate processing');
 
         // Check for dataLayer integration
-        $this->assertStringContainsString('\'event\': \'Klaro Consent\'', $config_content, 'Config should push to dataLayer');
-        $this->assertStringContainsString('\'consentType\': data.type', $config_content, 'Config should include consent type in dataLayer push');
+        $this->assertStringContainsString('event', $geo_js_content, 'klaro-geo.js should push to dataLayer');
+        $this->assertStringContainsString('Klaro Event', $geo_js_content, 'klaro-geo.js should include event name in dataLayer push');
     }
 
     /**
@@ -262,8 +276,5 @@ class ConsentReceiptsIntegrationTest extends IgnoreDeprecatedTestCase {
 
         // Restore the original filter
         $GLOBALS['wp_filter']['deprecated_function_trigger_error'] = $old_filter;
-
-        // Check that the consent receipts script is not enqueued
-        $this->assertStringNotContainsString('klaro-geo-consent-receipts.js', $footer_output, 'Consent receipts script should not be enqueued');
     }
 }

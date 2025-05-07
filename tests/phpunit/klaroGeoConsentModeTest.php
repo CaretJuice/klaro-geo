@@ -104,17 +104,21 @@ class KlaroGeoConsentModeTest extends WP_UnitTestCase {
     }
     
     /**
-     * Test that consent mode script is enqueued when enabled
+     * Test that consent mode functionality exists
      */
     public function test_consent_mode_script_enqueued() {
-        // Skip the enqueuing test and just check if the file exists
-        $script_path = plugin_dir_path(dirname(dirname(__FILE__))) . 'js/klaro-geo-consent-mode.js';
-        $this->assertFileExists($script_path, 'Consent mode script file should exist');
+        // Check if the compatibility file exists (for backward compatibility)
+        $compat_script_path = plugin_dir_path(dirname(dirname(__FILE__))) . 'js/klaro-geo-consent-mode.js';
+        $this->assertFileExists($compat_script_path, 'Consent mode compatibility script file should exist');
 
-        // Check if the file contains the expected content
-        $script_content = file_get_contents($script_path);
-        $this->assertStringContainsString('Klaro Geo Consent Mode Extension', $script_content,
-            'Script should contain the expected content');
+        // Check if the main file exists (where the functionality has been moved)
+        $main_script_path = plugin_dir_path(dirname(dirname(__FILE__))) . 'js/klaro-geo.js';
+        $this->assertFileExists($main_script_path, 'Main klaro-geo.js file should exist');
+
+        // Check if the main file contains the consent mode functionality
+        $main_script_content = file_get_contents($main_script_path);
+        $this->assertStringContainsString('updateGoogleConsentMode', $main_script_content,
+            'Main script should contain the consent mode functionality');
     }
     
     /**

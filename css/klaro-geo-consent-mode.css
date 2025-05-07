@@ -115,9 +115,22 @@
 .klaro-geo-controls-disabled {
     opacity: 0.6;
     pointer-events: none !important;
+    background-color: #f0f0f0 !important;
+    border-left-color: #ccc !important;
 }
 
 .klaro-geo-controls-disabled .klaro-geo-toggle-control {
+    cursor: not-allowed !important;
+}
+
+/* Style for disabled individual controls */
+.klaro-geo-toggle-control input:disabled + .slider {
+    background-color: #ccc !important;
+    cursor: not-allowed !important;
+}
+
+.klaro-geo-toggle-control input:disabled ~ label {
+    color: #999 !important;
     cursor: not-allowed !important;
 }
 

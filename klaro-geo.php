@@ -113,14 +113,14 @@ function klaro_geo_enqueue_scripts() {
         window.klaroGeo = window.klaroGeo || {};
     ");
 
-        wp_enqueue_script(
-            'klaro-geo-js',
-            plugins_url('js/klaro-geo.js', __FILE__),
-            array('klaro-js'), // Dependency!
-            KLARO_GEO_VERSION,
-            array('strategy' => 'defer', 'in_footer' => true)
-        );
-    
+    wp_enqueue_script(
+        'klaro-geo-js',
+        plugins_url('js/klaro-geo.js', __FILE__),
+        array('klaro-js'), // Dependency!
+        KLARO_GEO_VERSION,
+        array('strategy' => 'defer', 'in_footer' => true)
+    );
+
 
 
     if ($klaro_variant === 'klaro-no-css.js') {
@@ -187,35 +187,6 @@ function klaro_geo_enqueue_scripts() {
     // Debug log the consent mode settings
     klaro_geo_debug_log('Consent mode enabled check in wp_enqueue_scripts: ' . ($initialize_consent_mode ? 'true' : 'false'));
     klaro_geo_debug_log('Template config consent_mode_settings: ' . print_r($consent_mode_settings, true));
-
-    if ($initialize_consent_mode) {
-        klaro_geo_debug_log('Enqueuing klaro-geo-consent-mode.js script');
-        wp_enqueue_script(
-            'klaro-geo-consent-mode-js',
-            plugins_url('js/klaro-geo-consent-mode.js', __FILE__),
-            array('klaro-js'),
-            KLARO_GEO_VERSION,
-            array('strategy' => 'defer', 'in_footer' => true)
-        );
-        
-        // Create the consent mode settings array
-        $consent_mode_data = array(
-            'templateSettings' => array(
-                'config' => array(
-                    'consent_mode_settings' => $consent_mode_settings
-                )
-            ),
-            'detectedCountry' => $user_country,
-            'detectedRegion' => $user_region,
-            'adminOverride' => $using_debug_geo ? true : false
-        );
-
-        // Debug log the consent mode data
-        klaro_geo_debug_log('Consent mode data for JavaScript: ' . print_r($consent_mode_data, true));
-
-        // Localize the script with the consent mode settings
-        wp_localize_script('klaro-geo-consent-mode-js', 'klaroConsentData', $consent_mode_data);
-    }
 
     if (get_option('klaro_geo_enable_consent_receipts', false)) {
         wp_enqueue_script(
@@ -350,6 +321,10 @@ function klaro_geo_add_gtm_head_script() {
     // Output the GTM script with Klaro attributes
     ?>
     <!-- Google Tag Manager (Klaro-compatible) -->
+    <script>
+        // Initialize the dataLayer if it doesn't exist
+        window.dataLayer = window.dataLayer || [];
+    </script>
     <script data-type="application/javascript" type="text/plain" data-name="google-tag-manager">
     (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],

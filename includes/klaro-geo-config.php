@@ -1,4 +1,4 @@
-<?php 
+<?php
 
 // Function to generate klaro-config.js
 function klaro_geo_generate_config_file() {
@@ -16,28 +16,8 @@ function klaro_geo_generate_config_file() {
 
     klaro_geo_debug_log('Services to be used in config: ' . print_r($services, true));
 
-
     // Initialize config with template settings
     $klaro_config = array();
-
-    // Get settings using new nested structure
-    $settings_option = get_option('klaro_geo_country_settings');
-
-    // Check if the option is already an array (not JSON encoded)
-    if (is_array($settings_option)) {
-        $settings = $settings_option;
-        klaro_geo_debug_log('Country settings already an array, no decoding needed');
-    } else {
-        // Try to decode the JSON string
-        $settings = json_decode($settings_option, true);
-        klaro_geo_debug_log('Decoded country settings from JSON string');
-    }
-
-    // If empty or invalid, use default settings
-    if (empty($settings) || !is_array($settings)) {
-        $settings = klaro_geo_get_default_geo_settings();
-        klaro_geo_debug_log('Using default geo settings');
-    }
 
     // Get user location
     $location = klaro_geo_get_user_location();
@@ -322,147 +302,6 @@ function klaro_geo_generate_config_file() {
         $klaro_config['services'][] = $service_config;
     }
 
-    // Add global consent handlers for GTM integration using the new callback approach
-    $global_consent_js = <<<JS
-    // Global variable to store the current Klaro opts
-    window.currentKlaroOpts = null;
-
-    // Function to handle consent updates and trigger dataLayer events
-    function handleConsentUpdate(manager, eventType, data) {
-        console.log('Klaro consent update:', eventType, data);
-
-        // -------------------- MERGED safeUpdateConsent LOGIC --------------------
-
-        // Check if gtag is available (PHP needs to generate this check)
-        if (typeof window.gtag !== 'function') {
-            console.log('DEBUG: gtag not available, skipping consent update');
-            return;
-        }
-
-        // Check for duplicate update (PHP needs to generate this check)
-        if (window.lastConsentUpdate && 
-            JSON.stringify(window.lastConsentUpdate) === JSON.stringify(data)) { // Assuming 'data' is the update
-            console.log('DEBUG: Skipping duplicate consent update');
-            return;
-        }
-
-        // Clear any pending update timer (PHP needs to manage this)
-        if (window.consentUpdateTimer) {
-            console.log('DEBUG: Clearing pending consent update timer');
-            clearTimeout(window.consentUpdateTimer);
-        }
-
-        // Set a new timer to debounce (PHP needs to generate this)
-        console.log('DEBUG: Setting debounced consent update timer');
-        window.consentUpdateTimer = setTimeout(function() {
-
-            // Get consent state from Klaro (PHP needs to generate this)
-            let adServiceEnabled = false;
-            let analyticsServiceEnabled = false;
-            try {
-                if (typeof window.klaro !== 'undefined' && typeof window.klaro.getManager === 'function') {
-                    const klaroManager = window.klaro.getManager();
-                    if (klaroManager && klaroManager.consents && window.adStorageServiceName) {
-                        adServiceEnabled = klaroManager.consents[window.adStorageServiceName] === true;
-                        // ... (Get analyticsServiceEnabled similarly)
-                    }
-                }
-            } catch (e) {
-                console.error('DEBUG: Error getting consent state from Klaro manager:', e);
-                adServiceEnabled = data.ad_storage === 'granted'; // Fallback
-                analyticsServiceEnabled = data.analytics_storage === 'granted'; // Fallback
-            }
-
-            // Create complete update (PHP needs to generate this)
-            const completeUpdate = {
-                'ad_storage': adServiceEnabled ? 'granted' : 'denied',
-                'analytics_storage': analyticsServiceEnabled ? 'granted' : 'denied',
-                'ad_user_data': (adServiceEnabled && window.adUserDataConsent) ? 'granted' : 'denied',
-                'ad_personalization': (adServiceEnabled && window.adPersonalizationConsent) ? 'granted' : 'denied'
-            };
-
-            // Store last update (PHP needs to generate this)
-            window.lastConsentUpdate = completeUpdate;
-
-            // Send to gtag (PHP needs to generate this)
-            window.gtag('consent', 'update', completeUpdate);
-            console.log('DEBUG: Consent state updated with:', completeUpdate);
-
-            // Reset timer (PHP needs to generate this)
-            window.consentUpdateTimer = null;
-
-        }, window.consentUpdateDelay || 50); // Default delay
-
-        // -------------------- ORIGINAL handleConsentUpdate LOGIC --------------------
-
-        if (eventType === 'saveConsents') {
-            // Get the current consents
-            var consents = manager.consents;
-            console.log('Klaro consent data:', consents);
-
-            // Store the current opts for use by the consent receipt handler
-            window.currentKlaroOpts = { consents: consents };
-
-            // Populate acceptedServices for dataLayer
-            var acceptedServices = [];
-            for (var serviceName in consents) {
-                if (consents[serviceName] === true) {
-                    acceptedServices.push(serviceName);
-                }
-            }
-
-            // Get custom template settings
-            var customTemplateSettings = window.klaroConsentData || {};
-
-            // Push to dataLayer
-            window.dataLayer = window.dataLayer || [];
-            window.dataLayer.push({
-                'event': 'Klaro Consent',
-                'acceptedServices': acceptedServices,
-                'consentType': data.type // 'save', 'accept', or 'decline'
-            });
-
-            // Set a timestamp to help prevent duplicate processing
-            window.lastWatcherConsentTimestamp = Date.now();
-
-            // Create a synthetic event object for the handleConsentChange function
-            var syntheticEvent = {
-                detail: {
-                    manager: manager
-                }
-            };
-
-            // Call the existing handleConsentChange function from klaro-geo-consent-receipts.js
-            if (typeof handleConsentChange === 'function') {
-                console.log('Triggering handleConsentChange from watcher');
-                handleConsentChange(syntheticEvent);
-            } else {
-                console.warn('handleConsentChange function not found. Make sure klaro-geo-consent-receipts.js is loaded.');
-            }
-        }
-    }
-
-    // Initialize the consent manager watcher when Klaro is loaded
-    document.addEventListener('DOMContentLoaded', function() {
-        // Wait for Klaro to be available
-        var klaroWatcherInterval = setInterval(function() {
-            if (window.klaro && typeof window.klaro.getManager === 'function') {
-                clearInterval(klaroWatcherInterval);
-
-                // Get the manager and set up the watcher
-                var manager = window.klaro.getManager();
-                if (manager) {
-                    manager.watch({
-                        update: handleConsentUpdate
-                    });
-                    console.log('Klaro consent manager watcher initialized');
-                }
-            }
-        }, 100);
-    });
-    JS;
-
-    // Store the global consent JS for later use
     // Transform styling settings from object to array format if needed
     if (isset($klaro_config['styling']) && isset($klaro_config['styling']['theme'])) {
         klaro_geo_debug_log('Found styling theme settings: ' . print_r($klaro_config['styling']['theme'], true));
@@ -482,28 +321,29 @@ function klaro_geo_generate_config_file() {
 
             if ($is_associative) {
 
-            // Extract values from the object
-            $theme_values = array();
+                // Extract values from the object
+                $theme_values = array();
 
-            // Add color if it exists
-            if (isset($klaro_config['styling']['theme']['color'])) {
-                $theme_values[] = $klaro_config['styling']['theme']['color'];
+                // Add color if it exists
+                if (isset($klaro_config['styling']['theme']['color'])) {
+                    $theme_values[] = $klaro_config['styling']['theme']['color'];
+                }
+
+                // Add position if it exists
+                if (isset($klaro_config['styling']['theme']['position'])) {
+                    $theme_values[] = $klaro_config['styling']['theme']['position'];
+                }
+
+                // Add width if it exists
+                if (isset($klaro_config['styling']['theme']['width'])) {
+                    $theme_values[] = $klaro_config['styling']['theme']['width'];
+                }
+
+                // Replace the object with the array
+                $klaro_config['styling']['theme'] = $theme_values;
+
+                klaro_geo_debug_log('Transformed styling theme from object to array format: ' . print_r($theme_values, true));
             }
-
-            // Add position if it exists
-            if (isset($klaro_config['styling']['theme']['position'])) {
-                $theme_values[] = $klaro_config['styling']['theme']['position'];
-            }
-
-            // Add width if it exists
-            if (isset($klaro_config['styling']['theme']['width'])) {
-                $theme_values[] = $klaro_config['styling']['theme']['width'];
-            }
-
-            // Replace the object with the array
-            $klaro_config['styling']['theme'] = $theme_values;
-
-            klaro_geo_debug_log('Transformed styling theme from object to array format: ' . print_r($theme_values, true));
         }
     }
 
@@ -521,18 +361,16 @@ function klaro_geo_generate_config_file() {
     // Add a clear separator comment to help with parsing
     $klaro_config_content .= "// ===== END OF KLARO CONFIG =====\n\n";
 
-    // Add the global consent handler (always included for compatibility)
-    $klaro_config_content .= $global_consent_js . "\n";
-
-
     // Add dataLayer push for debugging
     $dataLayer_push = array(
-        'event' => 'Klaro Config Loaded',
-        'klaro_geo_consent_template' => $template_to_use,
-        'klaro_geo_template_source' => $template_source,
-        'klaro_geo_detected_country' => !empty($user_country) ? $user_country : null,
-        'klaro_geo_detected_region' => !empty($user_region) ? $user_region : null,
-        'klaro_geo_admin_override' => $using_debug_geo
+        'event' => 'Klaro Event',
+        'eventSource' => 'klaro-geo',
+        'klaroEventName'=> 'klaroConfigLoaded',
+        'klaroGeoConsentTemplate' => $template_to_use,
+        'klaroGeoTemplateSource' => $template_source,
+        'klaroGeoDetectedCountry' => !empty($user_country) ? $user_country : null,
+        'klaroGeoDetectedRegion' => !empty($user_region) ? $user_region : null,
+        'klaroGeoAdminOverride' => $using_debug_geo
     );
 
     klaro_geo_debug_log('enableConsentLogging setting: ' . ($custom_template_settings['enableConsentLogging'] ? 'true' : 'false'));
@@ -557,22 +395,20 @@ function klaro_geo_generate_config_file() {
     klaro_geo_debug_log('Using consent_mode: ' . $consent_mode);
     klaro_geo_debug_log('Template config consent_mode_settings: ' . print_r($consent_mode_settings, true));
 
-    // No need to append gtag initialization code here as it's added to the Google Tag Manager service
-
     // Add consent receipt functionality if enabled
     if ($enable_consent_receipts) {
         // Prepare template settings values
-        $modal_title = isset($template_config['config']['translations']['en']['consentModal']['title']) ?
-            $template_config['config']['translations']['en']['consentModal']['title'] : 'Privacy Settings';
+        $modal_title = isset($template_config['config']['translations']['zz']['consentModal']['title']) ?
+            $template_config['config']['translations']['zz']['consentModal']['title'] : 'Privacy Settings';
 
-        $modal_description = isset($template_config['config']['translations']['en']['consentModal']['description']) ?
-            $template_config['config']['translations']['en']['consentModal']['description'] : '';
+        $modal_description = isset($template_config['config']['translations']['zz']['consentModal']['description']) ?
+            $template_config['config']['translations']['zz']['consentModal']['description'] : '';
 
-        $accept_all_text = isset($template_config['config']['translations']['en']['acceptAll']) ?
-            $template_config['config']['translations']['en']['acceptAll'] : 'Accept All';
+        $accept_all_text = isset($template_config['config']['translations']['zz']['acceptAll']) ?
+            $template_config['config']['translations']['zz']['acceptAll'] : 'Accept All';
 
-        $decline_all_text = isset($template_config['config']['translations']['en']['declineAll']) ?
-            $template_config['config']['translations']['en']['declineAll'] : 'Decline All';
+        $decline_all_text = isset($template_config['config']['translations']['zz']['decline']) ?
+            $template_config['config']['translations']['zz']['decline'] : 'Decline All';
 
         $default_consent = isset($template_config['config']['default']) && $template_config['config']['default'] ? 'true' : 'false';
         $required_consent = isset($template_config['config']['required']) && $template_config['config']['required'] ? 'true' : 'false';
@@ -620,11 +456,6 @@ JS;
     // Write the content to klaro-config.js in the plugin root directory
     $plugin_dir = plugin_dir_path(dirname(__FILE__));
     $klaro_config_file = $plugin_dir . 'klaro-config.js';
-    
-    klaro_geo_debug_log('Plugin directory: ' . $plugin_dir);
-    klaro_geo_debug_log('Config file path: ' . $klaro_config_file);
-    klaro_geo_debug_log('Directory writable: ' . (is_writable(dirname($klaro_config_file)) ? 'yes' : 'no'));
-    klaro_geo_debug_log('File exists: ' . (file_exists($klaro_config_file) ? 'yes' : 'no'));
 
     $result = file_put_contents($klaro_config_file, $klaro_config_content);
     if ($result === false) {
@@ -632,5 +463,3 @@ JS;
     }
     return $result;
 }
-}
-?>
