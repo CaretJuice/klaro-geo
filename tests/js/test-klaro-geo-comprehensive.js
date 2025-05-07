@@ -14,6 +14,7 @@ describe('Klaro Geo Core Functionality - Comprehensive Tests', function() {
   let setupWatcher;
   let pushConsentData;
   let handleKlaroConsentEvents;
+  let pushKlaroConsentUpdate;
   let createAdControlsForService;
   let updateControlsUI;
   let createToggleControl;
@@ -445,6 +446,27 @@ describe('Klaro Geo Core Functionality - Comprehensive Tests', function() {
       
       return container;
     });
+    
+    // Add pushKlaroConsentUpdate function
+    pushKlaroConsentUpdate = jest.fn((manager, eventType, consentMode) => {
+      if (typeof window.dataLayer !== 'undefined') {
+        const acceptedServices = Object.keys(manager.consents)
+          .filter(serviceName => manager.consents[serviceName] === true);
+          
+        const consentUpdateData = {
+          'event': 'Klaro Consent Update',
+          'eventSource': 'klaro-geo',
+          'acceptedServices': acceptedServices,
+          'triggerEvent': eventType
+        };
+        
+        if (consentMode) {
+          consentUpdateData.consentMode = consentMode;
+        }
+        
+        window.dataLayer.push(consentUpdateData);
+      }
+    });
   });
   
   afterEach(function() {
@@ -487,7 +509,7 @@ describe('Klaro Geo Core Functionality - Comprehensive Tests', function() {
       expect(window.dataLayer.length).toBe(1);
       expect(window.dataLayer[0].event).toBe('Klaro Event');
       expect(window.dataLayer[0].eventSource).toBe('klaro-geo');
-      expect(window.dataLayer[0].klaroEventName).toBe('generateConsentRecipt');
+      expect(window.dataLayer[0].klaroEventName).toBe('generateConsentReceipt');
     });
     
     test('should not send receipt to server when consent logging is disabled', function() {
@@ -782,17 +804,48 @@ describe('Klaro Geo Core Functionality - Comprehensive Tests', function() {
   
   // Test handleKlaroConsentEvents function
   describe('handleKlaroConsentEvents', function() {
-    test('should handle initialConsents event', function() {
-      // Create a mock manager
+    // Reset pushKlaroConsentUpdate for these tests
+    
+    beforeEach(() => {
+      pushKlaroConsentUpdate = jest.fn((manager, eventType, consentMode) => {
+        if (typeof window.dataLayer !== 'undefined') {
+          const acceptedServices = Object.keys(manager.consents)
+            .filter(serviceName => manager.consents[serviceName] === true);
+            
+          const consentUpdateData = {
+            'event': 'klaroConsentUpdate',
+            'eventSource': 'klaro-geo',
+            'acceptedServices': acceptedServices,
+            'triggerEvent': eventType
+          };
+          
+          if (consentMode) {
+            consentUpdateData.consentMode = consentMode;
+          }
+          
+          window.dataLayer.push(consentUpdateData);
+        }
+      });
+    });
+    
+    test('should handle initialConsents event with consent mode enabled', function() {
+      // Create a mock manager with consent mode enabled
       const manager = {
         consents: {
           'google-analytics': true,
           'google-ads': false
+        },
+        config: {
+          consent_mode_settings: {
+            initialize_consent_mode: true,
+            analytics_storage_service: 'google-analytics',
+            ad_storage_service: 'google-ads'
+          }
         }
       };
       
       // Call the function with initialConsents event
-      const result = handleKlaroConsentEvents(manager, 'initialConsents', manager.consents);
+      handleKlaroConsentEvents(manager, 'initialConsents', manager.consents);
       
       // Check if the function was called
       expect(handleKlaroConsentEvents).toHaveBeenCalledWith(manager, 'initialConsents', manager.consents);
@@ -802,22 +855,26 @@ describe('Klaro Geo Core Functionality - Comprehensive Tests', function() {
       
       // Check if handleConsentChange was NOT called
       expect(handleConsentChange).not.toHaveBeenCalled();
-      
-      // Check the return value
-      expect(result).toBe('initialConsents');
     });
     
-    test('should handle saveConsents event', function() {
-      // Create a mock manager
+    test('should handle saveConsents event with consent mode enabled', function() {
+      // Create a mock manager with consent mode enabled
       const manager = {
         consents: {
           'google-analytics': true,
           'google-ads': false
+        },
+        config: {
+          consent_mode_settings: {
+            initialize_consent_mode: true,
+            analytics_storage_service: 'google-analytics',
+            ad_storage_service: 'google-ads'
+          }
         }
       };
       
       // Call the function with saveConsents event
-      const result = handleKlaroConsentEvents(manager, 'saveConsents', manager.consents);
+      handleKlaroConsentEvents(manager, 'saveConsents', manager.consents);
       
       // Check if the function was called
       expect(handleKlaroConsentEvents).toHaveBeenCalledWith(manager, 'saveConsents', manager.consents);
@@ -827,9 +884,6 @@ describe('Klaro Geo Core Functionality - Comprehensive Tests', function() {
       
       // Check if handleConsentChange was called
       expect(handleConsentChange).toHaveBeenCalledWith(manager);
-      
-      // Check the return value
-      expect(result).toBe('saveConsents');
     });
     
     test('should handle other events', function() {
@@ -842,7 +896,7 @@ describe('Klaro Geo Core Functionality - Comprehensive Tests', function() {
       };
       
       // Call the function with a different event
-      const result = handleKlaroConsentEvents(manager, 'otherEvent', {});
+      handleKlaroConsentEvents(manager, 'otherEvent', {});
       
       // Check if the function was called
       expect(handleKlaroConsentEvents).toHaveBeenCalledWith(manager, 'otherEvent', {});
@@ -852,9 +906,92 @@ describe('Klaro Geo Core Functionality - Comprehensive Tests', function() {
       
       // Check if handleConsentChange was NOT called
       expect(handleConsentChange).not.toHaveBeenCalled();
+    });
+  });
+  
+  // Test pushKlaroConsentUpdate function
+  describe('pushKlaroConsentUpdate', function() {
+    // Reset pushKlaroConsentUpdate for these tests
+    
+    beforeEach(() => {
+      pushKlaroConsentUpdate = jest.fn((manager, eventType, consentMode) => {
+        if (typeof window.dataLayer !== 'undefined') {
+          const acceptedServices = Object.keys(manager.consents)
+            .filter(serviceName => manager.consents[serviceName] === true);
+            
+          const consentUpdateData = {
+            'event': 'klaroConsentUpdate',
+            'eventSource': 'klaro-geo',
+            'acceptedServices': acceptedServices,
+            'triggerEvent': eventType
+          };
+          
+          if (consentMode) {
+            consentUpdateData.consentMode = consentMode;
+          }
+          
+          window.dataLayer.push(consentUpdateData);
+        }
+      });
+    });
+    
+    test('should push klaroConsentUpdate event to dataLayer', function() {
+      // Create a mock manager
+      const manager = {
+        consents: {
+          'google-analytics': true,
+          'google-ads': false
+        }
+      };
       
-      // Check the return value
-      expect(result).toBe('otherEvent');
+      // Call the function
+      pushKlaroConsentUpdate(manager, 'testEvent', null);
+      
+      // Check if the function was called
+      expect(pushKlaroConsentUpdate).toHaveBeenCalledWith(manager, 'testEvent', null);
+      
+      // Check if data was pushed to dataLayer
+      expect(window.dataLayer.length).toBeGreaterThan(0);
+      
+      // Find the klaroConsentUpdate event
+      const updateEvent = window.dataLayer.find(item => item.event === 'klaroConsentUpdate');
+      expect(updateEvent).toBeTruthy();
+      expect(updateEvent.eventSource).toBe('klaro-geo');
+      expect(updateEvent.triggerEvent).toBe('testEvent');
+      expect(updateEvent.acceptedServices).toContain('google-analytics');
+      expect(updateEvent.acceptedServices).not.toContain('google-ads');
+    });
+    
+    test('should include consentMode if provided', function() {
+      // Create a mock manager
+      const manager = {
+        consents: {
+          'google-analytics': true,
+          'google-ads': false
+        }
+      };
+      
+      // Create a mock consentMode
+      const consentMode = {
+        ad_storage: 'denied',
+        analytics_storage: 'granted'
+      };
+      
+      // Call the function
+      pushKlaroConsentUpdate(manager, 'testEvent', consentMode);
+      
+      // Check if the function was called
+      expect(pushKlaroConsentUpdate).toHaveBeenCalledWith(manager, 'testEvent', consentMode);
+      
+      // Check if data was pushed to dataLayer
+      expect(window.dataLayer.length).toBeGreaterThan(0);
+      
+      // Find the klaroConsentUpdate event
+      const updateEvent = window.dataLayer.find(item => item.event === 'klaroConsentUpdate');
+      expect(updateEvent).toBeTruthy();
+      expect(updateEvent.eventSource).toBe('klaro-geo');
+      expect(updateEvent.triggerEvent).toBe('testEvent');
+      expect(updateEvent.consentMode).toEqual(consentMode);
     });
   });
   

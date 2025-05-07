@@ -269,13 +269,55 @@ The plugin will automatically:
 - Add the GTM noscript iframe to your site's body with the proper Klaro attributes
 - Configure consent callbacks to manage GTM's consent mode
 
+### Integrating Klaro Geo into Google Tag Manager
+
+Klaro Geo adds two dataLayer pushes: 'Klaro Event' and 'Klaro Consent Update'.
+
+#### Klaro Event
+
+This event is fired when Klaro fires internal events as well as when Klaro Geo fires internal events. They are useful for debugging and adding consent data as Data Layer variables.
+
+These events can include the following parameters:
+- `event: "Klaro Event"`: Hard-coded value for all of these events
+- `eventSource: "klaro|klaro-geo"`: Indicates whether the event came from Klaro or Klaro Geo
+- `klaroEventName: "klaroConfigLoaded|initialConsents|consents|saveConsents|applyConsents|generateConsentReceipt"`: The name of the event. This is the `manager.name` value for Klaro events.
+- `klaroEventData: {google-tag-manager: true, google-analytics: true}`: An object containing the names and consent settings for all services currently set by Klaro.
+- `acceptedServices: ["google-tag-manager", "google-analytics"]` (initialConsents and saveConsents only): An array of service names that are currently accepted.
+- `klaroConfig: {version: "1", ...}`: The complete Klaro configuration object.
+- `klaroGeoConsentTemplate: "Default"` (klaroConfigLoaded only): The name of the assigned template
+- `klaroGeoTemplateSource: "default|fallback|admin-override|geo-match"` (klaroConfigLoaded only): The source rule that assigned this template.
+- `klaroGeoDetectedCountry: "US"` (klaroConfigLoaded only): The detected country
+- `klaroGeoDetectedRegion: "US-CA"` (klaroConfigLoaded only): The detected region
+- `klaroGeoAdminOverride: false` (klaroConfigLoaded only): Whether the admin override was applied to the location detection rules
+- `klaroGeoEnableConsentLogging: true|false` (klaroConfigLoaded and generateConsentReceipt): Whether consent receipt logging is enabled for the current template/country
+- `klaroGeoConsentReceipt: {...}` (klaroConfigLoaded and generateConsentReceipt): The complete consent receipt object if available. For klaroConfigLoaded, this will be the most recent consent receipt stored in localStorage, if one exists.
+
+#### Klaro Consent Update
+
+This event is the main firing trigger for most Google Tag Manager tags. It is triggered after initialConsents and saveConsents and Google Consent Mode Consent Update events. It simplifies the trigger setup in GTM and resolves race conditions between Klaro and Consent Mode.
+
+This event can include the following parameters:
+- `event: "Klaro Consent Update"`: Hard-coded value for all of these events
+- `eventSource: "klaro-geo"`: This should always be klaro-geo
+- `acceptedServices: ["google-tag-manager", "google-analytics"]`: An array of service names that are currently accepted.
+- `triggerEvent: "initialConsents|saveConsents"`: The name of the event that triggered this event.
+
+It is expected that you will created a Data Layer Variable named `acceptedServices` and then use the Data Layer Variable contains "google-analytics" to trigger the Google Analytics tag, for example. Note that the names of Klaro services are lowercased and hyphenated when set in acceptedServices.
+
 ### How It Works
+
+Klaro Geo uses Klaro's native consent management to control the loading of Google Tag Manager.
 
 When a user visits your site:
 
-1. GTM scripts are initially blocked (using `type="text/plain"` and `data-type="application/javascript"`)
-2. When the user gives consent, Klaro enables the scripts
-3. The `onInit` Klaro callback initializes Google Consent Mode, if configured
+1. GTM tags are initially blocked (we set an invalid `type="text/plain"`)
+2. Consent Mode defaults are added after the klaroConfig object
+3. When the user gives consent (or is defaulted in, or reads consent settings from a previous page) to Google Tag Manager, Klaro changes the type to `text/javascript` which triggers Google Tag Manager
+4. Klaro Geo fires the initialConsents event which triggers Consent Mode Consent Update events and `Klaro Consent Update` events
+5. Google Tag Manager reads the consent settings and Data Layer variables and triggers tags as configured
+6. Saving consent changes triggers Consent Mode Consent Update events and `Klaro Consent Update` events
+7. Google Tag Manager reads these updated settings and Data Layer variables and triggers tags as configured
+
 
 ## Geo Detection
 

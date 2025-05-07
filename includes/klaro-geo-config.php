@@ -361,8 +361,58 @@ function klaro_geo_generate_config_file() {
     // Add a clear separator comment to help with parsing
     $klaro_config_content .= "// ===== END OF KLARO CONFIG =====\n\n";
 
-    // Add dataLayer push for debugging
-    $dataLayer_push = array(
+    // Add dataLayer push for debugging with JavaScript to include latest consent receipt
+    $klaro_config_content .= "// Push debug information to dataLayer with latest consent receipt\n";
+    $klaro_config_content .= "window.dataLayer = window.dataLayer || [];\n";
+    $klaro_config_content .= "
+// Get the latest consent receipt if available
+var latestReceipt = null;
+try {
+    if (typeof getLatestConsentReceipt === 'function') {
+        latestReceipt = getLatestConsentReceipt();
+    } else {
+        // Fallback if the function isn't loaded yet
+        var existingData = window.localStorage.getItem('klaro_consent_receipts');
+        if (existingData) {
+            var receipts = JSON.parse(existingData);
+            if (Array.isArray(receipts) && receipts.length > 0) {
+                latestReceipt = receipts[receipts.length - 1];
+            }
+        }
+    }
+} catch (e) {
+    console.error('Error retrieving latest consent receipt:', e);
+}
+
+// Create the dataLayer push object
+var klaroConfigLoadedData = {
+    'event': 'Klaro Event',
+    'eventSource': 'klaro-geo',
+    'klaroEventName': 'klaroConfigLoaded',
+    'klaroGeoConsentTemplate': " . wp_json_encode($template_to_use) . ",
+    'klaroGeoTemplateSource': " . wp_json_encode($template_source) . ",
+    'klaroGeoDetectedCountry': " . (!empty($user_country) ? wp_json_encode($user_country) : 'null') . ",
+    'klaroGeoDetectedRegion': " . (!empty($user_region) ? wp_json_encode($user_region) : 'null') . ",
+    'klaroGeoAdminOverride': " . ($using_debug_geo ? 'true' : 'false') . ",
+    'klaroGeoEnableConsentLogging': " . ($custom_template_settings['enableConsentLogging'] ? 'true' : 'false') . "
+};
+
+// Add the consent receipt if available
+if (latestReceipt) {
+    klaroConfigLoadedData.klaroGeoConsentReceipt = latestReceipt;
+    console.log('Adding latest consent receipt to klaroConfigLoaded event:', latestReceipt.receipt_id);
+}
+
+// Push to dataLayer
+window.dataLayer.push(klaroConfigLoadedData);\n\n";
+
+    klaro_geo_debug_log('enableConsentLogging setting: ' . ($custom_template_settings['enableConsentLogging'] ? 'true' : 'false'));
+
+    // Echo the content for testing purposes
+    klaro_geo_debug_log('var klaroConfig = ' . wp_json_encode($klaro_config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . ";");
+    
+    // Create a sample of what the dataLayer push would look like for logging
+    $sample_push = array(
         'event' => 'Klaro Event',
         'eventSource' => 'klaro-geo',
         'klaroEventName'=> 'klaroConfigLoaded',
@@ -370,18 +420,11 @@ function klaro_geo_generate_config_file() {
         'klaroGeoTemplateSource' => $template_source,
         'klaroGeoDetectedCountry' => !empty($user_country) ? $user_country : null,
         'klaroGeoDetectedRegion' => !empty($user_region) ? $user_region : null,
-        'klaroGeoAdminOverride' => $using_debug_geo
+        'klaroGeoAdminOverride' => $using_debug_geo,
+        'klaroGeoEnableConsentLogging' => $custom_template_settings['enableConsentLogging'],
+        'klaroGeoConsentReceipt' => '(Will be added by JavaScript if available)'
     );
-
-    klaro_geo_debug_log('enableConsentLogging setting: ' . ($custom_template_settings['enableConsentLogging'] ? 'true' : 'false'));
-
-    $klaro_config_content .= "// Push debug information to dataLayer\n";
-    $klaro_config_content .= "window.dataLayer = window.dataLayer || [];\n";
-    $klaro_config_content .= "window.dataLayer.push(" . wp_json_encode($dataLayer_push, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . ");\n\n";
-
-    // Echo the content for testing purposes
-    klaro_geo_debug_log('var klaroConfig = ' . wp_json_encode($klaro_config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . ";");
-    klaro_geo_debug_log('dataLayer push: ' . wp_json_encode($dataLayer_push, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+    klaro_geo_debug_log('dataLayer push sample: ' . wp_json_encode($sample_push, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
 
     // Define variables for consent receipts

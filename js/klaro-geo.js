@@ -20,11 +20,36 @@
 
   // Function to handle consent changes (moved from PHP)
   function handleConsentChange(manager) {
-      // Only proceed if consent receipts are enabled
-      if (window.klaroConsentData && (window.klaroConsentData.enableConsentLogging === "0" ||
-          window.klaroConsentData.enableConsentLogging === false ||
-          window.klaroConsentData.enableConsentLogging === undefined)) {
-          console.log('Server-side consent logging is disabled for this template. Receipt stored locally only.');
+      // Check if consent logging is enabled from the dataLayer first (country-specific setting)
+      let enableConsentLogging = true; // Default to true
+      
+      // Try to find the enableConsentLogging value from the dataLayer
+      if (window.dataLayer && Array.isArray(window.dataLayer)) {
+          // Look for the most recent klaroConfigLoaded event
+          for (let i = window.dataLayer.length - 1; i >= 0; i--) {
+              const item = window.dataLayer[i];
+              if (item && 
+                  item.event === 'Klaro Event' && 
+                  item.klaroEventName === 'klaroConfigLoaded' &&
+                  typeof item.klaroGeoEnableConsentLogging !== 'undefined') {
+                  enableConsentLogging = item.klaroGeoEnableConsentLogging === true;
+                  console.log('Found enableConsentLogging in dataLayer:', enableConsentLogging);
+                  break;
+              }
+          }
+      }
+      
+      // Fall back to the global setting if not found in dataLayer
+      if (window.klaroConsentData && 
+          (window.klaroConsentData.enableConsentLogging === "0" ||
+           window.klaroConsentData.enableConsentLogging === false ||
+           window.klaroConsentData.enableConsentLogging === undefined)) {
+          enableConsentLogging = false;
+      }
+      
+      // If consent logging is disabled, store locally only and return
+      if (!enableConsentLogging) {
+          console.log('Consent logging is disabled for this template/country. Receipt stored locally only.');
           return;
       }
 
@@ -55,13 +80,29 @@
 
       // Store the receipt in localStorage
       storeReceiptLocally(consentReceipt);
-
-      // Check if server-side consent logging is enabled
-      var enableConsentLogging = typeof window.klaroConsentData !== 'undefined' &&
-          typeof window.klaroConsentData.enableConsentLogging !== 'undefined'
-          ? (window.klaroConsentData.enableConsentLogging !== "0" &&
-             window.klaroConsentData.enableConsentLogging !== false)
-          : true; // Default to true if not set
+      
+      // Try to find the enableConsentLogging value from the dataLayer
+      if (window.dataLayer && Array.isArray(window.dataLayer)) {
+          // Look for the most recent klaroConfigLoaded event
+          for (let i = window.dataLayer.length - 1; i >= 0; i--) {
+              const item = window.dataLayer[i];
+              if (item && 
+                  item.event === 'Klaro Event' && 
+                  item.klaroEventName === 'klaroConfigLoaded' &&
+                  typeof item.klaroGeoEnableConsentLogging !== 'undefined') {
+                  enableConsentLogging = item.klaroGeoEnableConsentLogging === true;
+                  console.log('Found enableConsentLogging in dataLayer for server send:', enableConsentLogging);
+                  break;
+              }
+          }
+      }
+      
+      // Fall back to the global setting if not found in dataLayer
+      if (!enableConsentLogging && typeof window.klaroConsentData !== 'undefined' &&
+          typeof window.klaroConsentData.enableConsentLogging !== 'undefined') {
+          enableConsentLogging = window.klaroConsentData.enableConsentLogging !== "0" &&
+                                window.klaroConsentData.enableConsentLogging !== false;
+      }
 
       // Only send to server if consent logging is enabled
       if (enableConsentLogging) {
@@ -70,17 +111,18 @@
                   console.error('Error from server when sending receipt:', error);
               });
       } else {
-          console.log('Server-side consent logging is disabled for this template. Receipt stored locally only.');
+          console.log('Server-side consent logging is disabled for this template/country. Receipt stored locally only.');
       }
 
       // Push to dataLayer
       window.dataLayer.push({
           'event': 'Klaro Event',
           'eventSource': 'klaro-geo',
-          'klaroEventName': 'generateConsentRecipt',
+          'klaroEventName': 'generateConsentReceipt',
           'klaroGeoConsentReceipt': consentReceipt,
           'klaroGeoTemplateSource': consentReceipt.template_source,
-          'klaroGeoAdminOverride': consentReceipt.admin_override
+          'klaroGeoAdminOverride': consentReceipt.admin_override,
+          'klaroGeoEnableConsentLogging': enableConsentLogging
       });
 }
 
@@ -119,6 +161,37 @@ function storeReceiptLocally(receipt) {
         window.localStorage.setItem('klaro_consent_receipts', JSON.stringify(receipts));
     } catch (e) {
         console.error('Failed to store consent receipt locally:', e);
+    }
+}
+
+/**
+ * Get the latest consent receipt from localStorage
+ * @returns {Object|null} The latest consent receipt or null if none exists
+ */
+function getLatestConsentReceipt() {
+    try {
+        // Get existing receipts
+        var existingData = window.localStorage.getItem('klaro_consent_receipts');
+        
+        if (existingData) {
+            try {
+                var receipts = JSON.parse(existingData);
+                
+                // Ensure receipts is an array
+                if (Array.isArray(receipts) && receipts.length > 0) {
+                    // Return the most recent receipt (last in the array)
+                    return receipts[receipts.length - 1];
+                }
+            } catch (parseError) {
+                console.error('Failed to parse existing receipts:', parseError);
+            }
+        }
+        
+        // Return null if no receipts exist or there was an error
+        return null;
+    } catch (e) {
+        console.error('Failed to retrieve latest consent receipt:', e);
+        return null;
     }
 }
 
@@ -213,18 +286,21 @@ function setupWatcher(manager) {
       manager.watch({
           update: function(obj, name, data) {
               if (typeof window.dataLayer !== 'undefined') {
-                  // Create acceptedServices array
-                  const acceptedServices = Object.keys(manager.consents)
-                      .filter(serviceName => manager.consents[serviceName] === true);
-
+                  // Only include acceptedServices for initialConsents and saveConsents events
                   const pushData = {
                       'event': 'Klaro Event',
                       'eventSource': 'klaro',
                       'klaroEventName': name,
                       'klaroEventData': data,
-                      'acceptedServices': acceptedServices,
                       'klaroConfig': obj.config
                   };
+                  
+                  // Only add acceptedServices for initialConsents and saveConsents events
+                  if (name === 'initialConsents' || name === 'saveConsents') {
+                      const acceptedServices = Object.keys(manager.consents)
+                          .filter(serviceName => manager.consents[serviceName] === true);
+                      pushData.acceptedServices = acceptedServices;
+                  }
 
                   console.log('DEBUG: Pushing Klaro event to dataLayer:', pushData);
                   window.dataLayer.push(pushData);
@@ -262,9 +338,6 @@ function pushConsentData(manager) {
       console.log('DEBUG: Pushing initial Klaro event to dataLayer:', initialData);
       window.dataLayer.push(initialData);
 
-      // Call consent handling functions
-      handleKlaroConsentEvents(manager, 'initialConsents', manager.consents);
-
       // Set global variables for consent mode
       if (manager.config && manager.config.consent_mode_settings) {
           window.adStorageServiceName = manager.config.consent_mode_settings.ad_storage_service;
@@ -272,6 +345,9 @@ function pushConsentData(manager) {
           window.adUserDataConsent = manager.config.consent_mode_settings.ad_user_data;
           window.adPersonalizationConsent = manager.config.consent_mode_settings.ad_personalization;
       }
+      
+      // Call consent handling functions
+      handleKlaroConsentEvents(manager, 'initialConsents', manager.consents);
   } else {
       console.warn('DEBUG: dataLayer is not defined, cannot push initial Klaro event');
   }
@@ -281,20 +357,65 @@ function pushConsentData(manager) {
 function handleKlaroConsentEvents(manager, eventName, data) {
   console.log('DEBUG: Handling Klaro consent event:', eventName);
 
+  // Check if consent mode is enabled
+  const isConsentModeEnabled = manager.config && 
+                              manager.config.consent_mode_settings && 
+                              manager.config.consent_mode_settings.initialize_consent_mode === true;
+  
   if (eventName === 'initialConsents') {
       // For initial consents, update the Google consent mode
       console.log('DEBUG: Initial consents detected, updating Google consent mode');
-      updateGoogleConsentMode(manager, eventName, data);
+      
+      if (isConsentModeEnabled) {
+          // If consent mode is enabled, updateGoogleConsentMode will push klaroConsentUpdate
+          updateGoogleConsentMode(manager, eventName, data);
+      } else {
+          // If consent mode is not enabled, push klaroConsentUpdate directly
+          pushKlaroConsentUpdate(manager, eventName, null);
+      }
   } 
   else if (eventName === 'saveConsents') {
       // For save consents, update the Google consent mode and store the consent receipt
       console.log('DEBUG: Save consents detected, updating Google consent mode and storing receipt');
-      updateGoogleConsentMode(manager, eventName, data);
+      
+      if (isConsentModeEnabled) {
+          // If consent mode is enabled, updateGoogleConsentMode will push klaroConsentUpdate
+          updateGoogleConsentMode(manager, eventName, data);
+      } else {
+          // If consent mode is not enabled, push klaroConsentUpdate directly
+          pushKlaroConsentUpdate(manager, eventName, null);
+      }
+      
+      // Always store the consent receipt
       handleConsentChange(manager);
   }
   else {
       // For other events, just log them but don't trigger updates
       console.log('DEBUG: Other Klaro event detected:', eventName, '- not triggering consent update');
+  }
+}
+
+// Function to push klaroConsentUpdate event to dataLayer when consent mode is not enabled
+function pushKlaroConsentUpdate(manager, eventType, consentMode) {
+  if (typeof window.dataLayer !== 'undefined') {
+      // Create acceptedServices array for the update event
+      const acceptedServices = Object.keys(manager.consents)
+          .filter(serviceName => manager.consents[serviceName] === true);
+          
+      const consentUpdateData = {
+          'event': 'Klaro Consent Update',
+          'eventSource': 'klaro-geo',
+          'acceptedServices': acceptedServices,
+          'triggerEvent': eventType
+      };
+      
+      // Add consentMode if provided
+      if (consentMode) {
+          consentUpdateData.consentMode = consentMode;
+      }
+      
+      console.log('DEBUG: Pushing klaroConsentUpdate to dataLayer (consent mode disabled):', consentUpdateData);
+      window.dataLayer.push(consentUpdateData);
   }
 }
 
@@ -392,6 +513,24 @@ function updateGoogleConsentMode(manager, eventType, data) {
               const serviceElement = document.getElementById('service-item-' + window.adStorageServiceName);
               updateControlsUI(manager, serviceElement, adServiceEnabled);
           }
+      }
+      
+      // Push klaroConsentUpdate event to dataLayer after consent mode is updated
+      if (typeof window.dataLayer !== 'undefined') {
+          // Create acceptedServices array for the update event
+          const acceptedServices = Object.keys(manager.consents)
+              .filter(serviceName => manager.consents[serviceName] === true);
+              
+          const consentUpdateData = {
+              'event': 'Klaro Consent Update',
+              'eventSource': 'klaro-geo',
+              'consentMode': completeUpdate,
+              'acceptedServices': acceptedServices,
+              'triggerEvent': eventType
+          };
+          
+          console.log('DEBUG: Pushing klaroConsentUpdate to dataLayer:', consentUpdateData);
+          window.dataLayer.push(consentUpdateData);
       }
 
       // Reset timer
