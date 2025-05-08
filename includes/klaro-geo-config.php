@@ -244,19 +244,6 @@ function klaro_geo_generate_config_file() {
 
             // Check if this service matches the ad storage event
             $is_ad_service = $ad_storage_service !== 'no_service' && $service['name'] === $ad_storage_service;
-            
-            // Note: We no longer add direct gtag('consent', 'update') calls to the callbacks
-            // because the klaro-geo-consent-mode.js script now handles all consent updates
-            // This prevents duplicate consent updates on page load
-            klaro_geo_debug_log('Using klaro-geo-consent-mode.js for consent updates instead of direct callbacks');
-            
-            // Add a comment to the callbacks to explain why we're not adding direct gtag calls
-            if ($is_analytics_service || $is_ad_service) {
-                $comment_code = "\n// Note: Consent updates are now handled by klaro-geo-consent-mode.js\n";
-                $service_config['onAccept'] = $service_config['onAccept'] . $comment_code;
-                $service_config['onDecline'] = $service_config['onDecline'] . $comment_code;
-                klaro_geo_debug_log('Added explanatory comments to callbacks for ' . $service['name']);
-            }
 
             // Our custom code to control the 'checked' attribute
             // This code should be executed *after* the consent mode updates

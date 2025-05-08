@@ -119,7 +119,7 @@
           'event': 'Klaro Event',
           'eventSource': 'klaro-geo',
           'klaroEventName': 'generateConsentReceipt',
-          'klaroGeoConsentReceipt': consentReceipt,
+          'klaroGeoConsentReceipt': consentReceipt.receipt_id,
           'klaroGeoTemplateSource': consentReceipt.template_source,
           'klaroGeoAdminOverride': consentReceipt.admin_override,
           'klaroGeoEnableConsentLogging': enableConsentLogging
@@ -797,6 +797,107 @@ function createAdControlsForService(serviceElement) {
         // The update will be triggered when the user saves the changes
         console.log('DEBUG: Parent checkbox changed, waiting for save to trigger consent update');
     });
+    
+    // Find the purpose toggle that might control this service
+    // First, find the parent purpose element
+    const purposeElement = serviceListItem.closest('.cm-purpose');
+    if (purposeElement) {
+        console.log('DEBUG: Found parent purpose element for service');
+        
+        // Function to update sub-controls based on service state
+        const updateSubControlsFromPurposeToggle = function() {
+            // Use setTimeout to let Klaro process the toggle first
+            setTimeout(function() {
+                // Check the current state of the service checkbox after Klaro has processed the purpose toggle
+                const isServiceChecked = serviceCheckbox.checked;
+                console.log('DEBUG: Purpose toggle clicked, service checkbox state after Klaro processing:', isServiceChecked);
+                
+                // Update child checkboxes and their disabled state
+                if (adPersonalizationCheckbox) {
+                    // Always sync the checkbox state with the parent service
+                    adPersonalizationCheckbox.checked = isServiceChecked;
+                    window.adPersonalizationConsent = isServiceChecked;
+                    
+                    // Always update disabled state
+                    adPersonalizationCheckbox.disabled = !isServiceChecked;
+                    console.log('DEBUG: Purpose toggle - updated ad personalization checkbox to:', adPersonalizationCheckbox.checked, 
+                        'and consent to:', window.adPersonalizationConsent);
+                }
+                
+                if (adUserDataCheckbox) {
+                    // Always sync the checkbox state with the parent service
+                    adUserDataCheckbox.checked = isServiceChecked;
+                    window.adUserDataConsent = isServiceChecked;
+                    
+                    // Always update disabled state
+                    adUserDataCheckbox.disabled = !isServiceChecked;
+                    console.log('DEBUG: Purpose toggle - updated ad user data checkbox to:', adUserDataCheckbox.checked, 
+                        'and consent to:', window.adUserDataConsent);
+                }
+                
+                // Log the change but don't trigger a consent update
+                // The update will be triggered when the user saves the changes
+                console.log('DEBUG: Purpose toggle changed service state, waiting for save to trigger consent update');
+            }, 50); // Small delay to let Klaro process the toggle first
+        };
+        
+        // Find the purpose toggle checkbox
+        const purposeToggle = purposeElement.querySelector('input[type="checkbox"]');
+        if (purposeToggle) {
+            console.log('DEBUG: Found purpose toggle checkbox');
+            
+            // Add a click event listener to the purpose toggle checkbox
+            purposeToggle.addEventListener('click', updateSubControlsFromPurposeToggle);
+            console.log('DEBUG: Added click event listener to purpose toggle checkbox');
+            
+            // Also add listeners to the label and slider which users might click instead
+            const purposeLabel = purposeElement.querySelector('label.cm-list-label');
+            if (purposeLabel) {
+                purposeLabel.addEventListener('click', updateSubControlsFromPurposeToggle);
+                console.log('DEBUG: Added click event listener to purpose toggle label');
+            }
+            
+            const purposeSlider = purposeElement.querySelector('.cm-switch .slider');
+            if (purposeSlider) {
+                purposeSlider.addEventListener('click', updateSubControlsFromPurposeToggle);
+                console.log('DEBUG: Added click event listener to purpose toggle slider');
+            }
+        }
+        
+        // Also set up a MutationObserver to watch for changes to the service slider's active class
+        // This will catch changes that happen when the purpose toggle is clicked
+        const serviceSlider = serviceListItem.querySelector('.cm-switch .slider');
+        if (serviceSlider) {
+            const sliderObserver = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                        // Check if the active class was added or removed
+                        const isActive = serviceSlider.classList.contains('active');
+                        console.log('DEBUG: Service slider class changed, active:', isActive);
+                        
+                        // Update the sub-controls based on the slider's active state
+                        if (adPersonalizationCheckbox) {
+                            adPersonalizationCheckbox.checked = isActive;
+                            window.adPersonalizationConsent = isActive;
+                            adPersonalizationCheckbox.disabled = !isActive;
+                            console.log('DEBUG: Slider class change - updated ad personalization checkbox to:', isActive);
+                        }
+                        
+                        if (adUserDataCheckbox) {
+                            adUserDataCheckbox.checked = isActive;
+                            window.adUserDataConsent = isActive;
+                            adUserDataCheckbox.disabled = !isActive;
+                            console.log('DEBUG: Slider class change - updated ad user data checkbox to:', isActive);
+                        }
+                    }
+                });
+            });
+            
+            // Start observing the slider for class changes
+            sliderObserver.observe(serviceSlider, { attributes: true });
+            console.log('DEBUG: Set up observer for service slider class changes');
+        }
+    }
 
     serviceListItem.parentNode.insertBefore(controlsContainer, serviceListItem.nextSibling);
 }
