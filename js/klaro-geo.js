@@ -1,5 +1,5 @@
 (function() {
-  console.log('DEBUG: klaro-geo.js loaded (early capture attempt)');
+  klaroGeoLog('DEBUG: klaro-geo.js loaded (early capture attempt)');
 
   // Global variables for consent mode
   window.lastConsentUpdate = null;
@@ -33,7 +33,7 @@
                   item.klaroEventName === 'klaroConfigLoaded' &&
                   typeof item.klaroGeoEnableConsentLogging !== 'undefined') {
                   enableConsentLogging = item.klaroGeoEnableConsentLogging === true;
-                  console.log('Found enableConsentLogging in dataLayer:', enableConsentLogging);
+                  klaroGeoLog('Found enableConsentLogging in dataLayer:', enableConsentLogging);
                   break;
               }
           }
@@ -49,7 +49,7 @@
       
       // If consent logging is disabled, store locally only and return
       if (!enableConsentLogging) {
-          console.log('Consent logging is disabled for this template/country. Receipt stored locally only.');
+          klaroGeoLog('Consent logging is disabled for this template/country. Receipt stored locally only.');
           return;
       }
 
@@ -91,7 +91,7 @@
                   item.klaroEventName === 'klaroConfigLoaded' &&
                   typeof item.klaroGeoEnableConsentLogging !== 'undefined') {
                   enableConsentLogging = item.klaroGeoEnableConsentLogging === true;
-                  console.log('Found enableConsentLogging in dataLayer for server send:', enableConsentLogging);
+                  klaroGeoLog('Found enableConsentLogging in dataLayer for server send:', enableConsentLogging);
                   break;
               }
           }
@@ -111,7 +111,7 @@
                   console.error('Error from server when sending receipt:', error);
               });
       } else {
-          console.log('Server-side consent logging is disabled for this template/country. Receipt stored locally only.');
+          klaroGeoLog('Server-side consent logging is disabled for this template/country. Receipt stored locally only.');
       }
 
       // Push to dataLayer
@@ -215,7 +215,7 @@ function sendReceiptToServer(receipt) {
     receipt.admin_override = receipt.admin_override === true;
 
     // Log the receipt data before sending
-    console.log('Sending receipt data to server:', receipt);
+    klaroGeoLog('Sending receipt data to server:', receipt);
 
     // Stringify the receipt data
     formData.append('receipt_data', JSON.stringify(receipt));
@@ -262,11 +262,11 @@ function setupKlaroDataLayerWatcher() {
     try {
       const manager = window.klaro.getManager();
       if (manager) {
-        console.log('DEBUG: Klaro manager available early, setting up watcher');
+        klaroGeoLog('DEBUG: Klaro manager available early, setting up watcher');
         setupWatcher(manager);
         return; // Success, don't retry
       } else {
-        console.warn('DEBUG: Klaro manager is undefined, even though klaro is defined.');
+        klaroGeoWarn('DEBUG: Klaro manager is undefined, even though klaro is defined.');
       }
     } catch (error) {
       console.error('DEBUG: Error getting manager early:', error);
@@ -274,7 +274,7 @@ function setupKlaroDataLayerWatcher() {
   }
 
   // Fallback: Retry with setTimeout
-  console.log('DEBUG: Klaro not fully ready, retrying setupKlaroDataLayerWatcher');
+  klaroGeoLog('DEBUG: Klaro not fully ready, retrying setupKlaroDataLayerWatcher');
   setTimeout(setupKlaroDataLayerWatcher, 50); // Very short delay
 }
 
@@ -302,17 +302,17 @@ function setupWatcher(manager) {
                       pushData.acceptedServices = acceptedServices;
                   }
 
-                  console.log('DEBUG: Pushing Klaro event to dataLayer:', pushData);
+                  klaroGeoLog('DEBUG: Pushing Klaro event to dataLayer:', pushData);
                   window.dataLayer.push(pushData);
 
                   // Call consent handling functions
                   handleKlaroConsentEvents(manager, name, data);
               } else {
-                  console.warn('DEBUG: dataLayer is not defined, cannot push Klaro event');
+                  klaroGeoWarn('DEBUG: dataLayer is not defined, cannot push Klaro event');
               }
           }
       });
-      console.log('DEBUG: Generic Klaro dataLayer watcher setup complete');
+      klaroGeoLog('DEBUG: Generic Klaro dataLayer watcher setup complete');
 
   } catch (error) {
       console.error('DEBUG: Error setting up Klaro dataLayer watcher:', error);
@@ -335,7 +335,7 @@ function pushConsentData(manager) {
           'klaroConfig': manager.config
       };
 
-      console.log('DEBUG: Pushing initial Klaro event to dataLayer:', initialData);
+      klaroGeoLog('DEBUG: Pushing initial Klaro event to dataLayer:', initialData);
       window.dataLayer.push(initialData);
 
       // Set global variables for consent mode
@@ -349,13 +349,13 @@ function pushConsentData(manager) {
       // Call consent handling functions
       handleKlaroConsentEvents(manager, 'initialConsents', manager.consents);
   } else {
-      console.warn('DEBUG: dataLayer is not defined, cannot push initial Klaro event');
+      klaroGeoWarn('DEBUG: dataLayer is not defined, cannot push initial Klaro event');
   }
 }
 
 // Consolidated function to handle consent events
 function handleKlaroConsentEvents(manager, eventName, data) {
-  console.log('DEBUG: Handling Klaro consent event:', eventName);
+  klaroGeoLog('DEBUG: Handling Klaro consent event:', eventName);
 
   // Check if consent mode is enabled
   const isConsentModeEnabled = manager.config && 
@@ -364,7 +364,7 @@ function handleKlaroConsentEvents(manager, eventName, data) {
   
   if (eventName === 'initialConsents') {
       // For initial consents, update the Google consent mode
-      console.log('DEBUG: Initial consents detected, updating Google consent mode');
+      klaroGeoLog('DEBUG: Initial consents detected, updating Google consent mode');
       
       if (isConsentModeEnabled) {
           // If consent mode is enabled, updateGoogleConsentMode will push klaroConsentUpdate
@@ -376,7 +376,7 @@ function handleKlaroConsentEvents(manager, eventName, data) {
   } 
   else if (eventName === 'saveConsents') {
       // For save consents, update the Google consent mode and store the consent receipt
-      console.log('DEBUG: Save consents detected, updating Google consent mode and storing receipt');
+      klaroGeoLog('DEBUG: Save consents detected, updating Google consent mode and storing receipt');
       
       if (isConsentModeEnabled) {
           // If consent mode is enabled, updateGoogleConsentMode will push klaroConsentUpdate
@@ -391,7 +391,7 @@ function handleKlaroConsentEvents(manager, eventName, data) {
   }
   else {
       // For other events, just log them but don't trigger updates
-      console.log('DEBUG: Other Klaro event detected:', eventName, '- not triggering consent update');
+      klaroGeoLog('DEBUG: Other Klaro event detected:', eventName, '- not triggering consent update');
   }
 }
 
@@ -414,37 +414,37 @@ function pushKlaroConsentUpdate(manager, eventType, consentMode) {
           consentUpdateData.consentMode = consentMode;
       }
       
-      console.log('DEBUG: Pushing klaroConsentUpdate to dataLayer (consent mode disabled):', consentUpdateData);
+      klaroGeoLog('DEBUG: Pushing klaroConsentUpdate to dataLayer (consent mode disabled):', consentUpdateData);
       window.dataLayer.push(consentUpdateData);
   }
 }
 
 // Function to handle consent updates and trigger dataLayer events
 function updateGoogleConsentMode(manager, eventType, data) {
-  console.log('DEBUG: Google consent mode update triggered by:', eventType, 
+  klaroGeoLog('DEBUG: Google consent mode update triggered by:', eventType, 
     'with data:', data ? (typeof data === 'object' ? 'consent object' : data) : 'no data');
 
   // Check if gtag is available
   if (typeof window.gtag !== 'function') {
-      console.log('DEBUG: gtag not available, skipping consent update');
+      klaroGeoLog('DEBUG: gtag not available, skipping consent update');
       return;
   }
 
   // Check for duplicate update if data is provided
   if (data && window.lastConsentUpdate &&
       JSON.stringify(window.lastConsentUpdate) === JSON.stringify(data)) {
-      console.log('DEBUG: Skipping duplicate consent update');
+      klaroGeoLog('DEBUG: Skipping duplicate consent update');
       return;
   }
 
   // Clear any pending update timer
   if (window.consentUpdateTimer) {
-      console.log('DEBUG: Clearing pending consent update timer');
+      klaroGeoLog('DEBUG: Clearing pending consent update timer');
       clearTimeout(window.consentUpdateTimer);
   }
 
   // Set a new timer to debounce
-  console.log('DEBUG: Setting debounced consent update timer');
+  klaroGeoLog('DEBUG: Setting debounced consent update timer');
   window.consentUpdateTimer = setTimeout(function() {
 
       // Get consent state from Klaro
@@ -453,7 +453,7 @@ function updateGoogleConsentMode(manager, eventType, data) {
       
       // First try to use the provided manager
       if (manager && manager.consents) {
-          console.log('DEBUG: Using provided manager for consent state');
+          klaroGeoLog('DEBUG: Using provided manager for consent state');
           if (window.adStorageServiceName) {
               adServiceEnabled = manager.consents[window.adStorageServiceName] === true;
           }
@@ -464,7 +464,7 @@ function updateGoogleConsentMode(manager, eventType, data) {
           // If no manager provided or it doesn't have consents, try to get one
           try {
               if (typeof window.klaro !== 'undefined' && typeof window.klaro.getManager === 'function') {
-                  console.log('DEBUG: Getting fresh Klaro manager for consent state');
+                  klaroGeoLog('DEBUG: Getting fresh Klaro manager for consent state');
                   const klaroManager = window.klaro.getManager();
                   if (klaroManager && klaroManager.consents) {
                       if (window.adStorageServiceName) {
@@ -486,7 +486,7 @@ function updateGoogleConsentMode(manager, eventType, data) {
       }
 
       // Log the current state of the sub-controls
-      console.log('DEBUG: Current sub-control states - adUserDataConsent:', window.adUserDataConsent, 'adPersonalizationConsent:', window.adPersonalizationConsent);
+      klaroGeoLog('DEBUG: Current sub-control states - adUserDataConsent:', window.adUserDataConsent, 'adPersonalizationConsent:', window.adPersonalizationConsent);
       
       // Create complete update
       const completeUpdate = {
@@ -497,14 +497,14 @@ function updateGoogleConsentMode(manager, eventType, data) {
       };
       
       // Log the complete update being sent
-      console.log('DEBUG: Sending consent update to gtag:', completeUpdate);
+      klaroGeoLog('DEBUG: Sending consent update to gtag:', completeUpdate);
 
       // Store last update
       window.lastConsentUpdate = completeUpdate;
 
       // Send to gtag
       window.gtag('consent', 'update', completeUpdate);
-      console.log('DEBUG: Consent state updated with:', completeUpdate);
+      klaroGeoLog('DEBUG: Consent state updated with:', completeUpdate);
 
       // Update UI controls
       if (manager.services) {
@@ -529,7 +529,7 @@ function updateGoogleConsentMode(manager, eventType, data) {
               'triggerEvent': eventType
           };
           
-          console.log('DEBUG: Pushing klaroConsentUpdate to dataLayer:', consentUpdateData);
+          klaroGeoLog('DEBUG: Pushing klaroConsentUpdate to dataLayer:', consentUpdateData);
           window.dataLayer.push(consentUpdateData);
       }
 
@@ -552,13 +552,13 @@ function updateGoogleConsentMode(manager, eventType, data) {
     controlsContainer = document.querySelector('.klaro-geo-ad-controls');
 
     if (controlsContainer) {
-        console.log('DEBUG: Found controls container in document');
+        klaroGeoLog('DEBUG: Found controls container in document');
 
         adPersonalizationCheckbox = controlsContainer.querySelector('#klaro-geo-ad-personalization');
         adUserDataCheckbox = controlsContainer.querySelector('#klaro-geo-ad-user-data');
 
         if (adPersonalizationCheckbox && adUserDataCheckbox) {
-            console.log('DEBUG: Found control checkboxes');
+            klaroGeoLog('DEBUG: Found control checkboxes');
         }
     }
 
@@ -566,24 +566,24 @@ function updateGoogleConsentMode(manager, eventType, data) {
     if (!adPersonalizationCheckbox) {
         adPersonalizationCheckbox = document.querySelector('#klaro-geo-ad-personalization');
         if (adPersonalizationCheckbox) {
-            console.log('DEBUG: Found ad personalization checkbox directly');
+            klaroGeoLog('DEBUG: Found ad personalization checkbox directly');
         }
     }
 
     if (!adUserDataCheckbox) {
         adUserDataCheckbox = document.querySelector('#klaro-geo-ad-user-data');
         if (adUserDataCheckbox) {
-            console.log('DEBUG: Found ad user data checkbox directly');
+            klaroGeoLog('DEBUG: Found ad user data checkbox directly');
         }
     }
 
     if (controlsContainer) {
         if (isServiceEnabled) {
             controlsContainer.classList.remove('klaro-geo-controls-disabled');
-            console.log('DEBUG: Removed klaro-geo-controls-disabled class');
+            klaroGeoLog('DEBUG: Removed klaro-geo-controls-disabled class');
         } else {
             controlsContainer.classList.add('klaro-geo-controls-disabled');
-            console.log('DEBUG: Added klaro-geo-controls-disabled class');
+            klaroGeoLog('DEBUG: Added klaro-geo-controls-disabled class');
         }
     }
 
@@ -597,7 +597,7 @@ function updateGoogleConsentMode(manager, eventType, data) {
         // Always update the disabled state
         adPersonalizationCheckbox.disabled = !isServiceEnabled;
         
-        console.log('DEBUG: Updated ad personalization checkbox from', oldState, 'to', adPersonalizationCheckbox.checked, 
+        klaroGeoLog('DEBUG: Updated ad personalization checkbox from', oldState, 'to', adPersonalizationCheckbox.checked, 
             'disabled:', adPersonalizationCheckbox.disabled, 'global consent:', window.adPersonalizationConsent);
     }
 
@@ -611,7 +611,7 @@ function updateGoogleConsentMode(manager, eventType, data) {
         // Always update the disabled state
         adUserDataCheckbox.disabled = !isServiceEnabled;
         
-        console.log('DEBUG: Updated ad user data checkbox from', oldState, 'to', adUserDataCheckbox.checked, 
+        klaroGeoLog('DEBUG: Updated ad user data checkbox from', oldState, 'to', adUserDataCheckbox.checked, 
             'disabled:', adUserDataCheckbox.disabled, 'global consent:', window.adUserDataConsent);
     }
 }
@@ -619,24 +619,24 @@ function updateGoogleConsentMode(manager, eventType, data) {
 // Function to inject controls for a service element (used by the createServiceListItems override)
 // Function to create ad controls for a service element
 function createAdControlsForService(serviceElement) {
-    console.log('DEBUG: Creating ad controls for service element');
+    klaroGeoLog('DEBUG: Creating ad controls for service element');
 
     if (!serviceElement) {
-        console.log('DEBUG: Service element is null, cannot create controls');
+        klaroGeoLog('DEBUG: Service element is null, cannot create controls');
         return;
     }
 
     // Find the parent li.cm-service element
     const serviceListItem = serviceElement.closest('li.cm-service');
     if (!serviceListItem) {
-        console.log('DEBUG: Could not find parent li.cm-service element');
+        klaroGeoLog('DEBUG: Could not find parent li.cm-service element');
         return;
     }
 
     // Check if we already have controls for this service
     const existingControls = document.querySelector('.klaro-geo-ad-controls');
     if (existingControls) {
-        console.log('DEBUG: Controls already exist somewhere in the document');
+        klaroGeoLog('DEBUG: Controls already exist somewhere in the document');
         return;
     }
 
@@ -687,11 +687,11 @@ function createAdControlsForService(serviceElement) {
               
               // Log the change but don't trigger a consent update
               // The update will be triggered when the user saves the changes
-              console.log('DEBUG: Ad personalization consent updated to:', isChecked, 
+              klaroGeoLog('DEBUG: Ad personalization consent updated to:', isChecked, 
                   '- waiting for save to trigger consent update');
           } else {
               // If parent is disabled, prevent toggling and reset to off state
-              console.log('DEBUG: Preventing toggle of ad personalization when parent is disabled');
+              klaroGeoLog('DEBUG: Preventing toggle of ad personalization when parent is disabled');
               event.stopPropagation();
               event.preventDefault();
               return false;
@@ -721,11 +721,11 @@ function createAdControlsForService(serviceElement) {
                 
                 // Log the change but don't trigger a consent update
                 // The update will be triggered when the user saves the changes
-                console.log('DEBUG: Ad user data consent updated to:', isChecked, 
+                klaroGeoLog('DEBUG: Ad user data consent updated to:', isChecked, 
                     '- waiting for save to trigger consent update');
             } else {
                 // If parent is disabled, prevent toggling and reset to off state
-                console.log('DEBUG: Preventing toggle of ad user data when parent is disabled');
+                klaroGeoLog('DEBUG: Preventing toggle of ad user data when parent is disabled');
                 event.stopPropagation();
                 event.preventDefault();
                 return false;
@@ -749,7 +749,7 @@ function createAdControlsForService(serviceElement) {
         // Update the global variable
         window.adPersonalizationConsent = isServiceEnabled;
         
-        console.log('DEBUG: Set ad personalization checkbox state:', isServiceEnabled, 
+        klaroGeoLog('DEBUG: Set ad personalization checkbox state:', isServiceEnabled, 
             'disabled:', !isServiceEnabled, 'global consent:', window.adPersonalizationConsent);
     }
     
@@ -761,14 +761,14 @@ function createAdControlsForService(serviceElement) {
         // Update the global variable
         window.adUserDataConsent = isServiceEnabled;
         
-        console.log('DEBUG: Set ad user data checkbox state:', isServiceEnabled, 
+        klaroGeoLog('DEBUG: Set ad user data checkbox state:', isServiceEnabled, 
             'disabled:', !isServiceEnabled, 'global consent:', window.adUserDataConsent);
     }
 
     // Add event listener to the parent checkbox to control child checkboxes
     serviceCheckbox.addEventListener('change', function() {
         const isParentChecked = this.checked;
-        console.log('DEBUG: Parent checkbox changed, new state:', isParentChecked);
+        klaroGeoLog('DEBUG: Parent checkbox changed, new state:', isParentChecked);
 
         // Update child checkboxes and their disabled state
         if (adPersonalizationCheckbox) {
@@ -778,7 +778,7 @@ function createAdControlsForService(serviceElement) {
             
             // Always update disabled state
             adPersonalizationCheckbox.disabled = !isParentChecked;
-            console.log('DEBUG: Parent change - updated ad personalization checkbox to:', adPersonalizationCheckbox.checked, 
+            klaroGeoLog('DEBUG: Parent change - updated ad personalization checkbox to:', adPersonalizationCheckbox.checked, 
                 'and consent to:', window.adPersonalizationConsent);
         }
         
@@ -789,20 +789,20 @@ function createAdControlsForService(serviceElement) {
             
             // Always update disabled state
             adUserDataCheckbox.disabled = !isParentChecked;
-            console.log('DEBUG: Parent change - updated ad user data checkbox to:', adUserDataCheckbox.checked, 
+            klaroGeoLog('DEBUG: Parent change - updated ad user data checkbox to:', adUserDataCheckbox.checked, 
                 'and consent to:', window.adUserDataConsent);
         }
 
         // Log the change but don't trigger a consent update
         // The update will be triggered when the user saves the changes
-        console.log('DEBUG: Parent checkbox changed, waiting for save to trigger consent update');
+        klaroGeoLog('DEBUG: Parent checkbox changed, waiting for save to trigger consent update');
     });
     
     // Find the purpose toggle that might control this service
     // First, find the parent purpose element
     const purposeElement = serviceListItem.closest('.cm-purpose');
     if (purposeElement) {
-        console.log('DEBUG: Found parent purpose element for service');
+        klaroGeoLog('DEBUG: Found parent purpose element for service');
         
         // Function to update sub-controls based on service state
         const updateSubControlsFromPurposeToggle = function() {
@@ -810,7 +810,7 @@ function createAdControlsForService(serviceElement) {
             setTimeout(function() {
                 // Check the current state of the service checkbox after Klaro has processed the purpose toggle
                 const isServiceChecked = serviceCheckbox.checked;
-                console.log('DEBUG: Purpose toggle clicked, service checkbox state after Klaro processing:', isServiceChecked);
+                klaroGeoLog('DEBUG: Purpose toggle clicked, service checkbox state after Klaro processing:', isServiceChecked);
                 
                 // Update child checkboxes and their disabled state
                 if (adPersonalizationCheckbox) {
@@ -820,7 +820,7 @@ function createAdControlsForService(serviceElement) {
                     
                     // Always update disabled state
                     adPersonalizationCheckbox.disabled = !isServiceChecked;
-                    console.log('DEBUG: Purpose toggle - updated ad personalization checkbox to:', adPersonalizationCheckbox.checked, 
+                    klaroGeoLog('DEBUG: Purpose toggle - updated ad personalization checkbox to:', adPersonalizationCheckbox.checked, 
                         'and consent to:', window.adPersonalizationConsent);
                 }
                 
@@ -831,36 +831,36 @@ function createAdControlsForService(serviceElement) {
                     
                     // Always update disabled state
                     adUserDataCheckbox.disabled = !isServiceChecked;
-                    console.log('DEBUG: Purpose toggle - updated ad user data checkbox to:', adUserDataCheckbox.checked, 
+                    klaroGeoLog('DEBUG: Purpose toggle - updated ad user data checkbox to:', adUserDataCheckbox.checked, 
                         'and consent to:', window.adUserDataConsent);
                 }
                 
                 // Log the change but don't trigger a consent update
                 // The update will be triggered when the user saves the changes
-                console.log('DEBUG: Purpose toggle changed service state, waiting for save to trigger consent update');
+                klaroGeoLog('DEBUG: Purpose toggle changed service state, waiting for save to trigger consent update');
             }, 50); // Small delay to let Klaro process the toggle first
         };
         
         // Find the purpose toggle checkbox
         const purposeToggle = purposeElement.querySelector('input[type="checkbox"]');
         if (purposeToggle) {
-            console.log('DEBUG: Found purpose toggle checkbox');
+            klaroGeoLog('DEBUG: Found purpose toggle checkbox');
             
             // Add a click event listener to the purpose toggle checkbox
             purposeToggle.addEventListener('click', updateSubControlsFromPurposeToggle);
-            console.log('DEBUG: Added click event listener to purpose toggle checkbox');
+            klaroGeoLog('DEBUG: Added click event listener to purpose toggle checkbox');
             
             // Also add listeners to the label and slider which users might click instead
             const purposeLabel = purposeElement.querySelector('label.cm-list-label');
             if (purposeLabel) {
                 purposeLabel.addEventListener('click', updateSubControlsFromPurposeToggle);
-                console.log('DEBUG: Added click event listener to purpose toggle label');
+                klaroGeoLog('DEBUG: Added click event listener to purpose toggle label');
             }
             
             const purposeSlider = purposeElement.querySelector('.cm-switch .slider');
             if (purposeSlider) {
                 purposeSlider.addEventListener('click', updateSubControlsFromPurposeToggle);
-                console.log('DEBUG: Added click event listener to purpose toggle slider');
+                klaroGeoLog('DEBUG: Added click event listener to purpose toggle slider');
             }
         }
         
@@ -873,21 +873,21 @@ function createAdControlsForService(serviceElement) {
                     if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
                         // Check if the active class was added or removed
                         const isActive = serviceSlider.classList.contains('active');
-                        console.log('DEBUG: Service slider class changed, active:', isActive);
+                        klaroGeoLog('DEBUG: Service slider class changed, active:', isActive);
                         
                         // Update the sub-controls based on the slider's active state
                         if (adPersonalizationCheckbox) {
                             adPersonalizationCheckbox.checked = isActive;
                             window.adPersonalizationConsent = isActive;
                             adPersonalizationCheckbox.disabled = !isActive;
-                            console.log('DEBUG: Slider class change - updated ad personalization checkbox to:', isActive);
+                            klaroGeoLog('DEBUG: Slider class change - updated ad personalization checkbox to:', isActive);
                         }
                         
                         if (adUserDataCheckbox) {
                             adUserDataCheckbox.checked = isActive;
                             window.adUserDataConsent = isActive;
                             adUserDataCheckbox.disabled = !isActive;
-                            console.log('DEBUG: Slider class change - updated ad user data checkbox to:', isActive);
+                            klaroGeoLog('DEBUG: Slider class change - updated ad user data checkbox to:', isActive);
                         }
                     }
                 });
@@ -895,7 +895,7 @@ function createAdControlsForService(serviceElement) {
             
             // Start observing the slider for class changes
             sliderObserver.observe(serviceSlider, { attributes: true });
-            console.log('DEBUG: Set up observer for service slider class changes');
+            klaroGeoLog('DEBUG: Set up observer for service slider class changes');
         }
     }
 
@@ -904,8 +904,8 @@ function createAdControlsForService(serviceElement) {
 
 // Function to create a toggle control
 function createToggleControl(id, serviceElement, label, description, initialState, onChange) {
-    console.log(`DEBUG: Creating toggle control for ${id} with initial state ${initialState}`);
-    console.log('DEBUG: serviceElement:', serviceElement);
+    klaroGeoLog(`DEBUG: Creating toggle control for ${id} with initial state ${initialState}`);
+    klaroGeoLog('DEBUG: serviceElement:', serviceElement);
 
     // Create the container
     const container = document.createElement('div');
@@ -949,7 +949,7 @@ function createToggleControl(id, serviceElement, label, description, initialStat
         // Stop propagation to prevent Klaro from capturing the event
         event.stopPropagation();
 
-        console.log(`DEBUG: ${id} checkbox changed to:`, this.checked);
+        klaroGeoLog(`DEBUG: ${id} checkbox changed to:`, this.checked);
 
         if (onChange) {
             onChange(this.checked, event);
@@ -970,7 +970,7 @@ function createToggleControl(id, serviceElement, label, description, initialStat
             const changeEvent = new Event('change');
             checkbox.dispatchEvent(changeEvent);
         } else {
-            console.log('DEBUG: Ignoring click on disabled slider');
+            klaroGeoLog('DEBUG: Ignoring click on disabled slider');
         }
     });
 
@@ -988,7 +988,7 @@ function createToggleControl(id, serviceElement, label, description, initialStat
             const changeEvent = new Event('change');
             checkbox.dispatchEvent(changeEvent);
         } else {
-            console.log('DEBUG: Ignoring click on disabled label');
+            klaroGeoLog('DEBUG: Ignoring click on disabled label');
         }
     });
 
@@ -999,7 +999,7 @@ function createToggleControl(id, serviceElement, label, description, initialStat
         // If the checkbox is disabled, prevent any interaction
         if (checkbox.disabled) {
             event.preventDefault();
-            console.log('DEBUG: Preventing interaction with disabled control container');
+            klaroGeoLog('DEBUG: Preventing interaction with disabled control container');
         }
     });
 
@@ -1008,37 +1008,37 @@ function createToggleControl(id, serviceElement, label, description, initialStat
 
    // Function to inject controls for a service element (used by the createServiceListItems override)
     function injectAdControlsForService(serviceElement) {
-        console.log('DEBUG: injectAdControlsForService called for element:', serviceElement);
+        klaroGeoLog('DEBUG: injectAdControlsForService called for element:', serviceElement);
         
         // Check if controls are already injected
         if (controlsInjected) {
             // Double-check if controls actually exist in the DOM
             const existingControls = document.querySelector('.klaro-geo-consent-mode-controls');
             if (existingControls) {
-                console.log('DEBUG: Controls already injected and found in DOM, skipping injection');
+                klaroGeoLog('DEBUG: Controls already injected and found in DOM, skipping injection');
                 return;
             } else {
-                console.log('DEBUG: Controls marked as injected but not found in DOM, will try to inject again');
+                klaroGeoLog('DEBUG: Controls marked as injected but not found in DOM, will try to inject again');
                 controlsInjected = false;
             }
         }
         
         // Use the global ad storage service name
         if (!adStorageServiceName || adStorageServiceName === 'no_service') {
-            console.log('DEBUG: No ad storage service configured, skipping injection');
+            klaroGeoLog('DEBUG: No ad storage service configured, skipping injection');
             return;
         }
         
         // Make sure we have a valid service element
         if (!serviceElement || !serviceElement.classList.contains('cm-service')) {
-            console.log('DEBUG: Invalid service element, skipping injection');
+            klaroGeoLog('DEBUG: Invalid service element, skipping injection');
             return;
         }
         
         // Find the service ID from the element
         const serviceId = serviceElement.querySelector('input[type="checkbox"]')?.id;
         if (!serviceId) {
-            console.log('DEBUG: Could not find service ID, trying to inject directly');
+            klaroGeoLog('DEBUG: Could not find service ID, trying to inject directly');
             
             // Try to inject directly if we can't find the ID
             createAdControlsForService(serviceElement);
@@ -1050,7 +1050,7 @@ function createToggleControl(id, serviceElement, label, description, initialStat
         const serviceName = serviceIdParts.length > 2 ? serviceIdParts.slice(2).join('-') : null;
         
         if (!serviceName) {
-            console.log('DEBUG: Could not extract service name from ID, trying to inject directly');
+            klaroGeoLog('DEBUG: Could not extract service name from ID, trying to inject directly');
             
             // Try to inject directly if we can't extract the service name
             createAdControlsForService(serviceElement);
@@ -1062,17 +1062,17 @@ function createToggleControl(id, serviceElement, label, description, initialStat
     }
 
     function setupModalObserver() {
-        console.log('DEBUG: setupModalObserver called');
+        klaroGeoLog('DEBUG: setupModalObserver called');
         
         // Find the Klaro container
         const klaroContainer = document.getElementById('klaro');
         if (!klaroContainer) {
-            console.log('DEBUG: Klaro container not found, will try again later');
+            klaroGeoLog('DEBUG: Klaro container not found, will try again later');
             setTimeout(setupModalObserver, 500);
             return;
         }
         
-        console.log('DEBUG: Found Klaro container, setting up observer');
+        klaroGeoLog('DEBUG: Found Klaro container, setting up observer');
         
         // Set up the observer
         let modalVisible = false;
@@ -1081,14 +1081,14 @@ function createToggleControl(id, serviceElement, label, description, initialStat
             const modal = document.querySelector('#klaro .cookie-modal');
             if (modal && !modalVisible) {
                 modalVisible = true;
-                console.log('DEBUG: Modal open detected by MutationObserver');
+                klaroGeoLog('DEBUG: Modal open detected by MutationObserver');
                 
                 // Also call our handler directly
                 handleModalOpen();
-                console.log('DEBUG: Calling handleModalOpen in MutationObserver');
+                klaroGeoLog('DEBUG: Calling handleModalOpen in MutationObserver');
             } else if (!modal && modalVisible) {
                 modalVisible = false;
-                console.log('DEBUG: Modal close detected by MutationObserver');
+                klaroGeoLog('DEBUG: Modal close detected by MutationObserver');
             }
         });
         
@@ -1100,25 +1100,25 @@ function createToggleControl(id, serviceElement, label, description, initialStat
             characterData: true
         });
         
-        console.log('DEBUG: Modal observer setup complete');
+        klaroGeoLog('DEBUG: Modal observer setup complete');
     }
 
     function handleModalOpen() {
-        console.log('DEBUG: handleModalOpen called');
+        klaroGeoLog('DEBUG: handleModalOpen called');
         
         // Set the editing flag to true when the modal opens
         isEditingInModal = true;
         needsConsentUpdate = false;
-        console.log('DEBUG: Set isEditingInModal to true');
+        klaroGeoLog('DEBUG: Set isEditingInModal to true');
         
         // Check if the modal is actually visible
         const klaroModal = document.querySelector('.klaro .cookie-modal');
-        console.log('DEBUG: Klaro modal found in DOM:', klaroModal ? 'yes' : 'no');
+        klaroGeoLog('DEBUG: Klaro modal found in DOM:', klaroModal ? 'yes' : 'no');
         
         if (!klaroModal) {
-            console.log('DEBUG: Modal not found in DOM, will try again later');
+            klaroGeoLog('DEBUG: Modal not found in DOM, will try again later');
             setTimeout(handleModalOpen, 300);
-            console.log('DEBUG: handleModalOpen called recursively from documnet.querySelector');
+            klaroGeoLog('DEBUG: handleModalOpen called recursively from documnet.querySelector');
             return;
         }
         
@@ -1128,25 +1128,25 @@ function createToggleControl(id, serviceElement, label, description, initialStat
                         klaroModal.querySelector('button[data-role="accept"]');
         
         if (saveButton) {
-            console.log('DEBUG: Found save button in modal:', saveButton);
+            klaroGeoLog('DEBUG: Found save button in modal:', saveButton);
             
             // Add click event listener to the save button
             saveButton.addEventListener('click', function() {
-                console.log('DEBUG: Save button clicked');
+                klaroGeoLog('DEBUG: Save button clicked');
                 
                 // Set the editing flag to false
                 isEditingInModal = false;
                 
                 // If we need to update consent, do it now
                 if (needsConsentUpdate) {
-                    console.log('DEBUG: Sending deferred consent update after save');
+                    klaroGeoLog('DEBUG: Sending deferred consent update after save');
                     setTimeout(function() {
                         updateConsentState(true); // Force update
                     }, 100); // Short delay to allow Klaro to process the changes
                 }
             });
         } else {
-            console.log('DEBUG: Save button not found in modal');
+            klaroGeoLog('DEBUG: Save button not found in modal');
         }
         
         // Find the close button in the modal
@@ -1156,38 +1156,38 @@ function createToggleControl(id, serviceElement, label, description, initialStat
                         klaroModal.querySelector('button[data-role="decline"]');
         
         if (closeButton) {
-            console.log('DEBUG: Found close button in modal:', closeButton);
+            klaroGeoLog('DEBUG: Found close button in modal:', closeButton);
             
             // Add click event listener to the close button
             closeButton.addEventListener('click', function() {
-                console.log('DEBUG: Close button clicked');
+                klaroGeoLog('DEBUG: Close button clicked');
                 
                 // Set the editing flag to false
                 isEditingInModal = false;
                 
                 // We don't send any updates when the modal is closed without saving
-                console.log('DEBUG: Modal closed without saving, discarding pending consent updates');
+                klaroGeoLog('DEBUG: Modal closed without saving, discarding pending consent updates');
                 needsConsentUpdate = false;
             });
         } else {
-            console.log('DEBUG: Close button not found in modal');
+            klaroGeoLog('DEBUG: Close button not found in modal');
         }
         
         // Log all services in the modal for debugging
         const services = document.querySelectorAll('li.cm-service');
-        console.log('DEBUG: Found', services.length, 'services in the modal');
+        klaroGeoLog('DEBUG: Found', services.length, 'services in the modal');
         
         if (services.length === 0) {
-            console.log('DEBUG: No services found in modal, will try again later');
+            klaroGeoLog('DEBUG: No services found in modal, will try again later');
             setTimeout(handleModalOpen, 300);
-            console.log('DEBUG: handleModalOpen called recursively after services check');
+            klaroGeoLog('DEBUG: handleModalOpen called recursively after services check');
             return;
         }
         
         services.forEach((service, index) => {
             const title = service.querySelector('.cm-list-title');
             const serviceId = service.querySelector('input[type="checkbox"]')?.id;
-            console.log('DEBUG: Service', index, 'title:', title ? title.textContent : 'No title', 'ID:', serviceId || 'No ID');
+            klaroGeoLog('DEBUG: Service', index, 'title:', title ? title.textContent : 'No title', 'ID:', serviceId || 'No ID');
         });
         
         // Check if controls are already injected
@@ -1195,10 +1195,10 @@ function createToggleControl(id, serviceElement, label, description, initialStat
             // Double-check if controls actually exist in the DOM
             const existingControls = document.querySelector('.klaro-geo-consent-mode-controls');
             if (existingControls) {
-                console.log('DEBUG: Controls already injected and found in DOM, skipping modal open handler');
+                klaroGeoLog('DEBUG: Controls already injected and found in DOM, skipping modal open handler');
                 return;
             } else {
-                console.log('DEBUG: Controls marked as injected but not found in DOM, will try to inject again');
+                klaroGeoLog('DEBUG: Controls marked as injected but not found in DOM, will try to inject again');
                 controlsInjected = false;
             }
         }
@@ -1210,24 +1210,24 @@ function createToggleControl(id, serviceElement, label, description, initialStat
             !window.klaroConsentData.templateSettings.config ||
             !window.klaroConsentData.templateSettings.config.consent_mode_settings
         ) {
-            console.log('DEBUG: Consent Mode settings not found in template (modal open)');
+            klaroGeoLog('DEBUG: Consent Mode settings not found in template (modal open)');
             return;
         }
 
         // Check if consent mode is enabled
         if (!window.klaroConsentData.templateSettings.config.consent_mode_settings.initialize_consent_mode) {
-            console.log('DEBUG: Consent Mode not enabled in template (initialize_consent_mode is false) (modal open)');
-            console.log('DEBUG: Consent Mode settings (modal open):', window.klaroConsentData.templateSettings.config.consent_mode_settings);
+            klaroGeoLog('DEBUG: Consent Mode not enabled in template (initialize_consent_mode is false) (modal open)');
+            klaroGeoLog('DEBUG: Consent Mode settings (modal open):', window.klaroConsentData.templateSettings.config.consent_mode_settings);
             return;
         }
 
-        console.log('DEBUG: Consent Mode is enabled in template (modal open)');
+        klaroGeoLog('DEBUG: Consent Mode is enabled in template (modal open)');
 
         // Use the global ad storage service name
-        console.log('DEBUG: Ad storage event service name (modal open):', adStorageServiceName);
+        klaroGeoLog('DEBUG: Ad storage event service name (modal open):', adStorageServiceName);
 
         if (!adStorageServiceName || adStorageServiceName === 'no_service') {
-            console.log('DEBUG: No ad storage event configured (modal open)');
+            klaroGeoLog('DEBUG: No ad storage event configured (modal open)');
             return;
         }
         
@@ -1237,18 +1237,18 @@ function createToggleControl(id, serviceElement, label, description, initialStat
         // First try to find by ID
         const serviceById = document.getElementById('service-item-' + adStorageServiceName);
         if (serviceById) {
-            console.log('DEBUG: Found service by ID:', adStorageServiceName);
+            klaroGeoLog('DEBUG: Found service by ID:', adStorageServiceName);
             targetService = serviceById.closest('li.cm-service');
         }
         
         // If not found by ID, try to find by title
         if (!targetService) {
-            console.log('DEBUG: Service not found by ID, trying to find by title');
+            klaroGeoLog('DEBUG: Service not found by ID, trying to find by title');
             
             // Try to find by title based on the service name
             // First, check if adStorageServiceName is valid
             if (!adStorageServiceName) {
-                console.log('DEBUG: adStorageServiceName is not defined, cannot search by title');
+                klaroGeoLog('DEBUG: adStorageServiceName is not defined, cannot search by title');
                 return;
             }
             
@@ -1258,13 +1258,13 @@ function createToggleControl(id, serviceElement, label, description, initialStat
                 .map(word => word.charAt(0).toUpperCase() + word.slice(1))
                 .join(' ');
                 
-            console.log('DEBUG: Looking for service with title:', readableServiceName);
+            klaroGeoLog('DEBUG: Looking for service with title:', readableServiceName);
             
             const allServices = document.querySelectorAll('li.cm-service');
             for (let i = 0; i < allServices.length; i++) {
                 const title = allServices[i].querySelector('.cm-service-title') || allServices[i].querySelector('.cm-list-title');
                 if (title && title.textContent === readableServiceName) {
-                    console.log('DEBUG: Found service by exact title match:', readableServiceName);
+                    klaroGeoLog('DEBUG: Found service by exact title match:', readableServiceName);
                     targetService = allServices[i];
                     break;
                 }
@@ -1276,7 +1276,7 @@ function createToggleControl(id, serviceElement, label, description, initialStat
                 for (let i = 0; i < allServices.length; i++) {
                     const title = allServices[i].querySelector('.cm-service-title') || allServices[i].querySelector('.cm-list-title');
                     if (title && title.textContent.toLowerCase().includes(adStorageServiceName.toLowerCase())) {
-                        console.log('DEBUG: Found service by partial title match:', title.textContent);
+                        klaroGeoLog('DEBUG: Found service by partial title match:', title.textContent);
                         targetService = allServices[i];
                         break;
                     }
@@ -1285,13 +1285,13 @@ function createToggleControl(id, serviceElement, label, description, initialStat
         }
         
         if (!targetService) {
-            console.log('DEBUG: Could not find target service in modal, will try again later');
+            klaroGeoLog('DEBUG: Could not find target service in modal, will try again later');
             setTimeout(handleModalOpen, 500);
-            console.log('DEBUG: handleModalOpen called recursively with missing targetSerivce');
+            klaroGeoLog('DEBUG: handleModalOpen called recursively with missing targetSerivce');
             return;
         }
         
-        console.log('DEBUG: Found target service:', targetService);
+        klaroGeoLog('DEBUG: Found target service:', targetService);
         
         // Directly inject controls for the found service
         if (targetService) injectAdControlsForService(targetService);

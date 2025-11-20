@@ -35,11 +35,11 @@ function klaro_geo_get_default_templates() {
                 'cookieName' => 'klaro',
                 'cookieExpiresAfterDays' => 365,
                 'default' => false,
-                'mustConsent' => false,
+                'mustConsent' => true,
                 'acceptAll' => true,
                 'hideDeclineAll' => false,
                 'hideLearnMore' => false,
-                'noticeAsModal' => false,
+                'noticeAsModal' => true,
                 'disablePoweredBy' => false,
                 'consent_mode' => 'none',
                 'translations' => [

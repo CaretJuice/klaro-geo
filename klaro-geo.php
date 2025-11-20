@@ -24,7 +24,11 @@ function klaro_geo_debug_log($message) {
     // Always log during tests, regardless of WP_DEBUG setting
     $is_test = defined('WP_TESTS_DOMAIN') && WP_TESTS_DOMAIN;
 
-    if ($is_test || (defined('WP_DEBUG') && WP_DEBUG === true)) {
+    // Check if debug logging is enabled in plugin settings
+    $debug_enabled = get_option('klaro_geo_enable_debug_logging', false);
+
+    // Log if: (1) we're in tests, OR (2) WP_DEBUG is on AND plugin debug logging is enabled
+    if ($is_test || (defined('WP_DEBUG') && WP_DEBUG === true && $debug_enabled)) {
         // Format the message
         $formatted_message = '[Klaro Geo Debug] ';
         if (is_array($message) || is_object($message)) {
@@ -85,6 +89,15 @@ function klaro_geo_enqueue_scripts() {
     wp_enqueue_style('klaro-embedded-css', plugins_url('css/klaro-embedded.css', __FILE__), array(), KLARO_GEO_VERSION);
     wp_enqueue_style('klaro-geo-consent-mode-css', plugins_url('css/klaro-geo-consent-mode.css', __FILE__), array('klaro-css'), KLARO_GEO_VERSION);
 
+    // Enqueue debug logging utility first so it's available to all other scripts
+    wp_enqueue_script(
+        'klaro-geo-debug',
+        plugins_url('js/klaro-geo-debug.js', __FILE__),
+        array(),
+        KLARO_GEO_VERSION,
+        array('strategy' => 'defer', 'in_footer' => true)
+    );
+
     klaro_geo_generate_config_file();
     $klaro_version = get_option('klaro_geo_js_version', '0.7');
     $klaro_variant = get_option('klaro_geo_js_variant', 'klaro.js');
@@ -99,13 +112,29 @@ function klaro_geo_enqueue_scripts() {
 
     wp_add_inline_script('klaro-config', 'window.klaroVersion = "' . esc_js($klaro_version) . '";', 'before');
 
-    wp_enqueue_script(
-        'klaro-js',
-        'https://cdn.kiprotect.com/klaro/v' . $klaro_version . '/' . $klaro_variant,
-        array('klaro-config'), // Ensures klaro-config loads first
-        $klaro_version,
-        array('strategy' => 'defer', 'in_footer' => true)
-    );
+    // Check if local Klaro file exists (for E2E testing)
+    $local_klaro_path = plugin_dir_path(__FILE__) . 'e2e/klaro.js';
+    $use_local_klaro = file_exists($local_klaro_path);
+
+    if ($use_local_klaro) {
+        // Use local Klaro file for E2E testing
+        wp_enqueue_script(
+            'klaro-js',
+            plugins_url('e2e/klaro.js', __FILE__),
+            array('klaro-config'), // Ensures klaro-config loads first
+            filemtime($local_klaro_path), // Use file modification time as version
+            array('strategy' => 'defer', 'in_footer' => true)
+        );
+    } else {
+        // Use CDN version in production
+        wp_enqueue_script(
+            'klaro-js',
+            'https://cdn.kiprotect.com/klaro/v' . $klaro_version . '/' . $klaro_variant,
+            array('klaro-config'), // Ensures klaro-config loads first
+            $klaro_version,
+            array('strategy' => 'defer', 'in_footer' => true)
+        );
+    }
 
     // Add a simple script to create the Klaro Geo namespace
     wp_add_inline_script('klaro-js', "
@@ -223,12 +252,6 @@ function klaro_geo_enqueue_scripts() {
         $templates = $template_settings->get();
         $template_config = $templates[$template_to_use] ?? $templates['default'] ?? klaro_geo_get_default_templates()['default'];
 
-        // Check if consent logging is enabled for this template
-        $enable_consent_logging = true; // Default to true
-        if (isset($template_config['plugin_settings']['enable_consent_logging'])) {
-            $enable_consent_logging = (bool) $template_config['plugin_settings']['enable_consent_logging'];
-        }
-
         // Debug log the admin override value
         klaro_geo_debug_log('Admin override value being passed to JavaScript: ' . var_export($using_debug_geo, true));
 
@@ -239,7 +262,7 @@ function klaro_geo_enqueue_scripts() {
 
         // Get enableConsentLogging setting
         $enable_consent_logging = isset($plugin_settings['enable_consent_logging']) ?
-            $plugin_settings['enable_consent_logging'] : true;
+            (bool) $plugin_settings['enable_consent_logging'] : true;
 
         // Debug log the settings
         klaro_geo_debug_log('Plugin settings for template ' . $template_to_use . ': ' . print_r($plugin_settings, true));
@@ -265,6 +288,9 @@ function klaro_geo_enqueue_scripts() {
     $button_theme = get_option('klaro_geo_floating_button_theme', 'light');
     $button_position = get_option('klaro_geo_floating_button_position', 'bottom-right');
 
+    // Check if debug logging is enabled
+    $debug_enabled = get_option('klaro_geo_enable_debug_logging', false);
+
     // Create settings array
     $button_settings = array(
         'enableFloatingButton' => (bool) $enable_floating_button,
@@ -273,7 +299,8 @@ function klaro_geo_enqueue_scripts() {
         'floatingButtonPosition' => $button_position,
         'ajaxUrl' => admin_url('admin-ajax.php'),
         'nonce' => wp_create_nonce('klaro_geo_nonce'),
-        'debug' => defined('WP_DEBUG') && WP_DEBUG,
+        'debug' => defined('WP_DEBUG') && WP_DEBUG, // Kept for backward compatibility
+        'debugEnabled' => (bool) $debug_enabled, // New debug logging control
         'version' => KLARO_GEO_VERSION,
     );
 

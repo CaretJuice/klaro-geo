@@ -1,4 +1,4 @@
-// Detected/Debug Country Code: UK
+// Detected/Debug Country Code: 
 
 var klaroConfig = {
     "version": 1,
@@ -17,11 +17,11 @@ var klaroConfig = {
     "cookieName": "klaro",
     "cookieExpiresAfterDays": 365,
     "default": false,
-    "mustConsent": false,
+    "mustConsent": true,
     "acceptAll": true,
     "hideDeclineAll": false,
     "hideLearnMore": false,
-    "noticeAsModal": false,
+    "noticeAsModal": true,
     "disablePoweredBy": false,
     "consent_mode": "none",
     "translations": {
@@ -87,58 +87,105 @@ var klaroConfig = {
     },
     "services": [
         {
-            "name": "test-service",
+            "name": "google-tag-manager",
+            "purposes": [
+                "functional"
+            ],
+            "cookies": [],
+            "onInit": "",
+            "onAccept": "",
+            "onDecline": "",
+            "required": true,
+            "default": true,
+            "translations": {
+                "zz": {
+                    "title": "Google Tag Manager",
+                    "description": "Google Tag Manager is a tag management system that allows you to quickly and easily update tracking codes and related code fragments collectively known as tags on your website or mobile app."
+                }
+            }
+        },
+        {
+            "name": "google-analytics",
             "purposes": [
                 "analytics"
             ],
             "cookies": [],
             "onInit": "",
             "onAccept": "",
-            "onDecline": ""
+            "onDecline": "",
+            "required": false,
+            "default": false,
+            "translations": {
+                "zz": {
+                    "title": "Google Analytics",
+                    "description": "Google Analytics is a web analytics service that tracks and reports website traffic to help you understand how visitors interact with your website."
+                }
+            }
+        },
+        {
+            "name": "google-ads",
+            "purposes": [
+                "advertising"
+            ],
+            "cookies": [],
+            "onInit": "",
+            "onAccept": "",
+            "onDecline": "",
+            "required": false,
+            "default": false,
+            "translations": {
+                "zz": {
+                    "title": "Google Ads",
+                    "description": "Google Ads is an online advertising platform developed by Google, where advertisers pay to display brief advertisements, service offerings, product listings, and video content to web users."
+                }
+            }
         }
     ]
 };
 
 // ===== END OF KLARO CONFIG =====
 
-// Push debug information to dataLayer
+// Push debug information to dataLayer with latest consent receipt
 window.dataLayer = window.dataLayer || [];
-window.dataLayer.push({
-    "event": "Klaro Event",
-    "eventSource": "klaro-geo",
-    "klaroEventName": "klaroConfigLoaded",
-    "klaroGeoConsentTemplate": "default",
-    "klaroGeoTemplateSource": "default",
-    "klaroGeoDetectedCountry": "UK",
-    "klaroGeoDetectedRegion": null,
-    "klaroGeoAdminOverride": true
-});
 
-// Consent Receipt Configuration
-window.klaroConsentData = {
-    templateName: "default",
-    templateSource: "default",
-    detectedCountry: "UK",
-    detectedRegion: "",
-    adminOverride: true,
-    ajaxUrl: "http://example.org/wp-admin/admin-ajax.php",
-    nonce: "7ac247c49e",
-    enableConsentLogging: true,
-    consentMode: "none",
-    templateSettings: {
-        consentModalTitle: "Privacy Settings",
-        consentModalDescription: "Here you can assess and customize the services that we'd like to use on this website. You're in charge! Enable or disable services as you see fit.",
-        acceptAllText: "Accept all",
-        declineAllText: "Decline",
-        defaultConsent: false,
-        requiredConsent: false,
-        config: {
-            consent_mode_settings: {
-                initialize_consent_mode: false,
-                analytics_storage_service: "no_service",
-                ad_storage_service: "no_service",
-                initialization_code: ``
+// Get the latest consent receipt if available
+var latestReceipt = null;
+try {
+    if (typeof getLatestConsentReceipt === 'function') {
+        latestReceipt = getLatestConsentReceipt();
+    } else {
+        // Fallback if the function isn't loaded yet
+        var existingData = window.localStorage.getItem('klaro_consent_receipts');
+        if (existingData) {
+            var receipts = JSON.parse(existingData);
+            if (Array.isArray(receipts) && receipts.length > 0) {
+                latestReceipt = receipts[receipts.length - 1];
             }
         }
     }
+} catch (e) {
+    console.error('Error retrieving latest consent receipt:', e);
+}
+
+// Create the dataLayer push object
+var klaroConfigLoadedData = {
+    'event': 'Klaro Event',
+    'eventSource': 'klaro-geo',
+    'klaroEventName': 'klaroConfigLoaded',
+    'klaroGeoConsentTemplate': "",
+    'klaroGeoTemplateSource': "fallback",
+    'klaroGeoDetectedCountry': null,
+    'klaroGeoDetectedRegion': null,
+    'klaroGeoAdminOverride': false,
+    'klaroGeoEnableConsentLogging': false
 };
+
+// Add the consent receipt if available
+if (latestReceipt) {
+    klaroConfigLoadedData.klaroGeoConsentReceipt = latestReceipt;
+    console.log('Adding latest consent receipt to klaroConfigLoaded event:', latestReceipt.receipt_id);
+}
+
+// Push to dataLayer
+window.dataLayer.push(klaroConfigLoadedData);
+

@@ -48,7 +48,7 @@ jQuery(document).ready(function($) {
     }
 
     // Debug log
-    console.log('klaroGeoAdmin loaded:', klaroGeoAdmin);
+    klaroGeoLog('klaroGeoAdmin loaded:', klaroGeoAdmin);
 
     // EU country codes
     const euCountries = [
@@ -83,7 +83,7 @@ jQuery(document).ready(function($) {
             return $(this).val();
         }).get();
 
-        console.log('Saving visible countries:', selectedCountries);
+        klaroGeoLog('Saving visible countries:', selectedCountries);
 
         $.ajax({
             url: klaroGeoAdmin.ajaxurl,
@@ -95,7 +95,7 @@ jQuery(document).ready(function($) {
             },
             success: function(response) {
                 if (response.success) {
-                    console.log('Successfully saved visible countries');
+                    klaroGeoLog('Successfully saved visible countries');
                     location.reload();
                 } else {
                     console.error('Failed to save country visibility:', response);
@@ -126,7 +126,7 @@ jQuery(document).ready(function($) {
                 nonce: klaroGeoAdmin.nonce
             },
             success: function(response) {
-                console.log('AJAX response:', response);
+                klaroGeoLog('AJAX response:', response);
                 if (response.success) {
                     var regionList = modal.find('.region-list');
                     // Set the country code as a data attribute
@@ -134,7 +134,7 @@ jQuery(document).ready(function($) {
 
                     // Add or update language selector if multiple languages are available
                     var languages = response.data.languages || [];
-                    console.log('Languages:', languages);
+                    klaroGeoLog('Languages:', languages);
 
                     if (languages.length > 1) {
                         var existingSelector = modal.find('.language-selector-container');
@@ -156,7 +156,7 @@ jQuery(document).ready(function($) {
                     }
 
                     var regions = response.data.regions || {};
-                    console.log('Regions:', regions);
+                    klaroGeoLog('Regions:', regions);
 
                     var html = '<table class="wp-list-table widefat fixed striped">';
                     html += '<thead><tr><th>Region Code</th><th>Name</th><th>Template</th></tr></thead><tbody>';
@@ -176,7 +176,7 @@ jQuery(document).ready(function($) {
                             html += '<option value="inherit">Use country template</option>';
                             // Use klaroGeoAdmin.templates if available, otherwise try window.klaroTemplates
                             var templates = klaroGeoAdmin.templates || window.klaroTemplates || {};
-                            console.log('Available templates:', templates);
+                            klaroGeoLog('Available templates:', templates);
 
                             Object.keys(templates).forEach(function(key) {
                                 var template = templates[key];
@@ -219,21 +219,21 @@ jQuery(document).ready(function($) {
 
         // Get the form element
         var form = modal.find('.region-form');
-        console.log('Found form:', form.length ? 'yes' : 'no');
+        klaroGeoLog('Found form:', form.length ? 'yes' : 'no');
 
         // Collect all region settings
         var selectElements = form.find('.region-template-select');
-        console.log('Found ' + selectElements.length + ' select elements in form');
+        klaroGeoLog('Found ' + selectElements.length + ' select elements in form');
 
         if (selectElements.length === 0) {
             // Try a different selector if no elements found
             selectElements = form.find('select').not('.language-selector');
-            console.log('Alternative selector found ' + selectElements.length + ' select elements in form');
+            klaroGeoLog('Alternative selector found ' + selectElements.length + ' select elements in form');
 
             // If still no elements found, try the modal
             if (selectElements.length === 0) {
                 selectElements = modal.find('select').not('.language-selector');
-                console.log('Fallback to modal found ' + selectElements.length + ' select elements');
+                klaroGeoLog('Fallback to modal found ' + selectElements.length + ' select elements');
             }
         }
 
@@ -243,7 +243,7 @@ jQuery(document).ready(function($) {
             var region = $select.data('region');
             var value = $select.val();
 
-            console.log('Processing select - country:', country, 'region:', region, 'value:', value);
+            klaroGeoLog('Processing select - country:', country, 'region:', region, 'value:', value);
 
             if (country && region) {
                 // Initialize regions object if it doesn't exist
@@ -258,13 +258,13 @@ jQuery(document).ready(function($) {
         });
 
         // Log the collected settings
-        console.log('Collected region settings:', regionSettings);
+        klaroGeoLog('Collected region settings:', regionSettings);
 
         // Check if we have any regions
         if (Object.keys(regionSettings[countryCode]).length === 0 || 
             !regionSettings[countryCode].regions || 
             Object.keys(regionSettings[countryCode].regions || {}).length === 0) {
-            console.warn('No regions found for country:', countryCode);
+            klaroGeoWarn('No regions found for country:', countryCode);
             // Still proceed with the save to clear any existing settings
         }
 
@@ -273,7 +273,7 @@ jQuery(document).ready(function($) {
         form.find('.region-list').append('<p class="saving">Saving region settings...</p>');
 
         // Debug log to see what's being sent
-        console.log('Region settings to save:', regionSettings);
+        klaroGeoLog('Region settings to save:', regionSettings);
 
         // Make AJAX request to save region settings
         $.ajax({
@@ -289,7 +289,7 @@ jQuery(document).ready(function($) {
             success: function(response) {
                 if (response.success) {
                     // Log the response for debugging
-                    console.log('Save regions response:', response);
+                    klaroGeoLog('Save regions response:', response);
 
                     // Show success message
                     var form = modal.find('.region-form');
@@ -346,7 +346,7 @@ jQuery(document).ready(function($) {
             },
             success: function(response) {
                 if (response.success) {
-                    console.log('Country settings saved before opening region modal');
+                    klaroGeoLog('Country settings saved before opening region modal');
 
                     // Now show the modal and load regions
                     modal.show();
@@ -372,7 +372,7 @@ jQuery(document).ready(function($) {
     $(document).on('click', '.close-region-modal', function(e) {
         e.preventDefault(); // Prevent any default action
         e.stopPropagation(); // Stop event propagation
-        console.log('Close region modal button clicked');
+        klaroGeoLog('Close region modal button clicked');
 
         // Just hide the modal without submitting anything
         $(this).closest('.klaro-modal').hide();
@@ -385,7 +385,7 @@ jQuery(document).ready(function($) {
     $(document).on('click', '.save-regions', function(e) {
         e.preventDefault(); // Prevent any default action
         var countryCode = $(this).data('country');
-        console.log('Save regions button clicked for country:', countryCode);
+        klaroGeoLog('Save regions button clicked for country:', countryCode);
         saveRegions(countryCode);
     });
 

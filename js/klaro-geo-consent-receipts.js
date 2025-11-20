@@ -61,7 +61,7 @@ function handleConsentChange(e) {
             'klaro_geo_consent_receipt': consentReceipt
         });
 
-        console.log('Server-side consent logging is disabled for this template. Receipt stored locally only.');
+        klaroGeoLog('Server-side consent logging is disabled for this template. Receipt stored locally only.');
 
         return;
     }
@@ -70,8 +70,8 @@ function handleConsentChange(e) {
     var receiptId = 'receipt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 
     // Log the admin override value for debugging
-    console.log('Admin override value:', window.klaroConsentData.adminOverride);
-    console.log('Admin override type:', typeof window.klaroConsentData.adminOverride);
+    klaroGeoLog('Admin override value:', window.klaroConsentData.adminOverride);
+    klaroGeoLog('Admin override type:', typeof window.klaroConsentData.adminOverride);
 
     // Create the consent receipt
     var consentReceipt = {
@@ -88,7 +88,7 @@ function handleConsentChange(e) {
     };
 
     // Log the final admin override value
-    console.log('Final admin override value:', consentReceipt.admin_override);
+    klaroGeoLog('Final admin override value:', consentReceipt.admin_override);
 
     // Get consents from the event or opts
     var consents = {};
@@ -139,7 +139,7 @@ function handleConsentChange(e) {
                 console.error('Error from server when sending receipt:', error);
             });
     } else {
-        console.log('Server-side consent logging is disabled for this template. Receipt stored locally only.');
+        klaroGeoLog('Server-side consent logging is disabled for this template. Receipt stored locally only.');
     }
 
     // Push to dataLayer
@@ -209,7 +209,7 @@ function sendReceiptToServer(receipt) {
     receipt.admin_override = receipt.admin_override === true;
 
     // Log the receipt data before sending
-    console.log('Sending receipt data to server:', receipt);
+    klaroGeoLog('Sending receipt data to server:', receipt);
 
     // Stringify the receipt data
     formData.append('receipt_data', JSON.stringify(receipt));
@@ -274,7 +274,7 @@ function sendReceiptToServer(receipt) {
         if (window.klaroConsentData.templateSource &&
             window.klaroConsentData.templateSource.indexOf('admin-override') === 0) {
             window.klaroConsentData.adminOverride = true;
-            console.log('Setting admin override to true based on template source:',
+            klaroGeoLog('Setting admin override to true based on template source:',
                         window.klaroConsentData.templateSource);
         }
         window.klaroConsentData.templateSettings = window.klaroConsentData.templateSettings || {};
@@ -282,9 +282,9 @@ function sendReceiptToServer(receipt) {
         window.klaroConsentData.nonce = window.klaroConsentData.nonce || '';
 
         // Log the admin override value for debugging
-        console.log('Initializing with admin override:', window.klaroConsentData.adminOverride);
-        console.log('Admin override type:', typeof window.klaroConsentData.adminOverride);
-        console.log('Full klaroConsentData:', window.klaroConsentData);
+        klaroGeoLog('Initializing with admin override:', window.klaroConsentData.adminOverride);
+        klaroGeoLog('Admin override type:', typeof window.klaroConsentData.adminOverride);
+        klaroGeoLog('Full klaroConsentData:', window.klaroConsentData);
     } else {
         console.error('klaroConsentData is not defined. Consent receipts will not work properly.');
     }
@@ -302,26 +302,22 @@ function resetConsentChangeProcessed() {
 
 // Function to handle Klaro consent change events
 function handleKlaroConsentEvent(e, eventName) {
-    // Check if this event is too close to the previous one (within 3 seconds)
     var now = Date.now();
-    if (now - lastConsentTimestamp < 3000) {
-        console.log('Ignoring duplicate ' + eventName + ' event (too close to previous event)');
-        return;
-    }
 
     // Check if this event might have been triggered by the watcher
     // If the timestamps are very close (within 500ms), it's likely a duplicate
     if (window.lastWatcherConsentTimestamp && now - window.lastWatcherConsentTimestamp < 500) {
-        console.log('Ignoring ' + eventName + ' event that appears to be triggered by the watcher');
+        klaroGeoLog('Ignoring ' + eventName + ' event that appears to be triggered by the watcher');
         return;
     }
 
     // Only process if we haven't already processed a consent change recently
+    // The consentChangeProcessed flag is reset after 2 seconds via setTimeout
     if (!consentChangeProcessed) {
         consentChangeProcessed = true;
         lastConsentTimestamp = now;
 
-        console.log('Processing ' + eventName + ' event');
+        klaroGeoLog('Processing ' + eventName + ' event');
 
         // Clear any existing timeout
         if (consentChangeTimeout) {
@@ -348,13 +344,13 @@ function handleKlaroConsentEvent(e, eventName) {
 
 // Standard Klaro event
 document.addEventListener('klaro:consent-change', function(e) {
-    console.log('klaro:consent-change event detected - this may be redundant with manager.watch()');
+    klaroGeoLog('klaro:consent-change event detected - this may be redundant with manager.watch()');
     handleKlaroConsentEvent(e, 'klaro:consent-change');
 });
 
 // Alternative event name that might be used
 document.addEventListener('consent-change', function(e) {
-    console.log('consent-change event detected - this may be redundant with manager.watch()');
+    klaroGeoLog('consent-change event detected - this may be redundant with manager.watch()');
     handleKlaroConsentEvent(e, 'consent-change');
 });
 
@@ -367,11 +363,11 @@ document.addEventListener('consent-change', function(e) {
 
 // Add a function to manually trigger consent receipt handling
 window.triggerKlaroConsentReceipt = function() {
-    console.log('Manually triggering consent receipt handling');
+    klaroGeoLog('Manually triggering consent receipt handling');
 
     // If we have currentKlaroOpts, use that
     if (window.currentKlaroOpts) {
-        console.log('Using currentKlaroOpts for manual consent receipt trigger');
+        klaroGeoLog('Using currentKlaroOpts for manual consent receipt trigger');
         handleConsentChange();
         return 'Consent receipt handling triggered using currentKlaroOpts.';
     }
@@ -380,7 +376,7 @@ window.triggerKlaroConsentReceipt = function() {
     if (window.klaro && window.klaro.getManager) {
         var manager = window.klaro.getManager();
         if (manager && manager.consents) {
-            console.log('Using klaro.getManager for manual consent receipt trigger');
+            klaroGeoLog('Using klaro.getManager for manual consent receipt trigger');
             handleConsentChange({
                 detail: { manager: manager }
             });
@@ -401,7 +397,7 @@ window.triggerKlaroConsentReceipt = function() {
     });
 
     if (foundConsents) {
-        console.log('Using UI checkboxes for manual consent receipt trigger');
+        klaroGeoLog('Using UI checkboxes for manual consent receipt trigger');
         handleConsentChange({
             detail: { manager: { consents: consents } }
         });

@@ -90,7 +90,7 @@ if (typeof jQuery !== 'undefined') {
         }
 
         // Debug log
-        console.log('klaroGeoServices loaded:', klaroGeoServices);
+        klaroGeoLog('klaroGeoServices loaded:', klaroGeoServices);
 
         // Ensure default values for required and default settings are set to 'global'
         $('#service_required').val('global');
@@ -154,7 +154,7 @@ if (typeof jQuery !== 'undefined') {
 
     // Function to load languages from templates
     function loadLanguagesFromTemplates() {
-        console.log('Loading languages from templates...');
+        klaroGeoLog('Loading languages from templates...');
 
         if (typeof window.klaroTemplates === 'undefined') {
             console.error('klaroTemplates not defined');
@@ -174,7 +174,7 @@ if (typeof jQuery !== 'undefined') {
             }
         });
 
-        console.log('Found languages in templates:', Array.from(languageCodes));
+        klaroGeoLog('Found languages in templates:', Array.from(languageCodes));
 
         // Add tabs for each language
         languageCodes.forEach(function(langCode) {

@@ -45,7 +45,7 @@
     function getSettings() {
         if (settings) { // Check if settings are already cached
             if (settings.debug) {
-                console.log('Returning cached klaroGeo settings:', settings);
+                klaroGeoLog('Returning cached klaroGeo settings:', settings);
             }
             return settings;
         }
@@ -55,7 +55,7 @@
 
         // Debug: log what we found
         if (rawSettings && rawSettings.debug) {
-            console.log('klaroGeo settings found:', rawSettings);
+            klaroGeoLog('klaroGeo settings found:', rawSettings);
         }
 
         // If settings are found, merge with defaults
@@ -66,14 +66,14 @@
 
             // Debug: log merged settings
             if (mergedSettings.debug) {
-                console.log('klaroGeo merged settings:', mergedSettings);
+                klaroGeoLog('klaroGeo merged settings:', mergedSettings);
             }
             settings = mergedSettings; // Cache the settings
             return settings;
         }
 
         // Log warning and return defaults
-        console.warn('klaroGeo settings not found, using defaults');
+        klaroGeoWarn('klaroGeo settings not found, using defaults');
         settings = defaultSettings; // Cache defaults as well
         return defaultSettings;
     }
@@ -82,7 +82,7 @@
     function init() {
         if (isInitialized) {
             if (settings && settings.debug) { // Use the cached settings
-                console.log('init() already run, exiting.');
+                klaroGeoLog('init() already run, exiting.');
             }
             return;
         }
@@ -91,7 +91,7 @@
         if (!settings) return; // Prevent further execution if settings are not available
 
         if (settings.debug) {
-            console.log('Initializing Klaro Geo Consent Button, version:', settings.version);
+            klaroGeoLog('Initializing Klaro Geo Consent Button, version:', settings.version);
         }
 
         // Create and append floating button if enabled in settings
@@ -99,7 +99,7 @@
             // Check if button already exists to avoid duplicates
             if ($('.klaro-floating-button').length === 0) {
                 if (settings.debug) {
-                    console.log('Creating floating button with settings:', {
+                    klaroGeoLog('Creating floating button with settings:', {
                         text: settings.floatingButtonText,
                         theme: settings.floatingButtonTheme,
                         position: settings.floatingButtonPosition
@@ -107,10 +107,10 @@
                 }
                 createFloatingButton(settings);
             } else if (settings.debug) {
-                console.log('Floating button already exists, skipping creation');
+                klaroGeoLog('Floating button already exists, skipping creation');
             }
         } else if (settings.debug) {
-            console.log('Floating button is disabled in settings');
+            klaroGeoLog('Floating button is disabled in settings');
         }
         isInitialized = true;
     }
@@ -122,18 +122,18 @@
 
     // Initialize with Klaro check
     function initWithKlaroCheck() {
-        console.log('initWithKlaroCheck() called');
+        klaroGeoLog('initWithKlaroCheck() called');
         var settingsForCheck = typeof window.klaroGeo !== 'undefined' ? window.klaroGeo : null; // Only get raw settings for the debug log here
 
         if (settingsForCheck && settingsForCheck.debug) {
-            console.log('Checking if Klaro is loaded:', isKlaroLoaded());
+            klaroGeoLog('Checking if Klaro is loaded:', isKlaroLoaded());
         }
 
         if (isKlaroLoaded()) {
             init();
         } else {
             if (settingsForCheck && settingsForCheck.debug) {
-                console.log('Klaro not loaded yet, waiting...');
+                klaroGeoLog('Klaro not loaded yet, waiting...');
             }
             setTimeout(initWithKlaroCheck, 500);
         }
@@ -268,7 +268,7 @@
             }
         } catch (e) {
             // If jQuery methods fail, fall back to native JS
-            console.warn('jQuery methods failed, falling back to native JS:', e);
+            klaroGeoWarn('jQuery methods failed, falling back to native JS:', e);
 
             // Create button with native JS
             var button = document.createElement('button');

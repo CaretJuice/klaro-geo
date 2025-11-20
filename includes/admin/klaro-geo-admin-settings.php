@@ -151,6 +151,13 @@ function klaro_geo_settings_page_content() {
             <h2>Debug Settings</h2>
             <table class="form-table">
                 <tr valign="top">
+                    <th scope="row"><label for="klaro_geo_enable_debug_logging">Enable Plugin Debug Logging</label></th>
+                    <td>
+                        <input type="checkbox" name="klaro_geo_enable_debug_logging" id="klaro_geo_enable_debug_logging" value="1" <?php checked(get_option('klaro_geo_enable_debug_logging', false)); ?> />
+                        <p class="description">When enabled, the plugin will output debug messages to WordPress logs (PHP) and browser console (JavaScript). This is useful for troubleshooting but should be disabled in production to reduce log noise. Note: WP_DEBUG must also be enabled for PHP logging to work.</p>
+                    </td>
+                </tr>
+                <tr valign="top">
                     <th scope="row"><label for="klaro_geo_debug_countries">Debug Countries/Regions (comma-separated):</label></th>
                     <td>
                         <?php
@@ -266,6 +273,11 @@ function klaro_geo_register_main_settings() {
     ]);
     register_setting('klaro_geo_settings_group', 'klaro_geo_enable_consent_receipts');
     register_setting('klaro_geo_settings_group', 'klaro_geo_cleanup_on_deactivate');
+    register_setting('klaro_geo_settings_group', 'klaro_geo_enable_debug_logging', [
+        'type' => 'boolean',
+        'default' => false,
+        'sanitize_callback' => 'rest_sanitize_boolean',
+    ]);
 
     // Button settings
     register_setting('klaro_geo_settings_group', 'klaro_geo_enable_floating_button', [

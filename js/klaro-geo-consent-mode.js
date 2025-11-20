@@ -6,6 +6,6 @@
  */
 
 // This is a compatibility file for tests
-console.log('Klaro Geo Consent Mode Extension loaded (compatibility mode)');
+klaroGeoLog('Klaro Geo Consent Mode Extension loaded (compatibility mode)');
 
 // The actual functionality is now in klaro-geo.js
