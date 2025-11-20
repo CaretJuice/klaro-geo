@@ -24,7 +24,7 @@ This plugin gives you a lot of control over how consent is managed and tracked a
 
 ## Requirements
 
-- Tested on Wordpress 6.3 and 6.4 (earlier versions may work but are untested)
+- Tested on WordPress 6.3 and 6.4 (earlier versions may work but are untested)
 - [GeoIP Detection](https://wordpress.org/plugins/geoip-detect/) plugin (for geolocation features to work)
 
 ## Installation
@@ -62,7 +62,7 @@ Follow this quick start guide to minimize the need to revisit settings.
 
 Navigate to **Klaro Geo > Klaro Geo** to configure the general plugin settings:
 - **Klaro Geo Settings**: 
-  - Enabled Consent Receipts: Toggle to save receipt number and Klaro Config to browser local storage and the Wordpress database
+  - Enabled Consent Receipts: Toggle to save receipt number and Klaro Config to browser local storage and the WordPress database
   - Klaro JS Version: Set the Klaro script version (changing this may not work as expected, this plugin has been tested with 0.7)
   - Klaro Script Variant: Choose between standard Klaro script or the no-CSS variant
 - **Google Tag Manager**:
@@ -70,21 +70,22 @@ Navigate to **Klaro Geo > Klaro Geo** to configure the general plugin settings:
 - **Country Settings**:
   - Enable/disable geo detection
   - Manage regions within countries
-- **Consent Button Buttons**:
-  - Enable Floating Consent Button: Create a persistent floating button that opens the Klaro service mangement modal
+- **Consent Buttons**:
+  - Enable Floating Consent Button: Create a persistent floating button that opens the Klaro service management modal
   - Button Theme: Select a style for the button
   - Button Position: Select where the button should appear on the screen
-  - Wordpress Menu Integration: Add a link that opens the Klaro service management modal into your WordPress menus
+  - WordPress Menu Integration: Add a link that opens the Klaro service management modal into your WordPress menus
   - Shortcode: Use shortcode to add a link that opens the Klaro service management modal into your WordPress pages
 - **Purposes**:
   - Purposes (comma-separated): List of purposes by which you want to group your tags
 - **Debug Settings**:
+  - Enable Plugin Debug Logging: When enabled, the plugin will output debug messages to WordPress logs (PHP) and browser console (JavaScript). Useful for troubleshooting but should be disabled in production to reduce log noise. Note: WP_DEBUG must also be enabled for PHP logging to work.
   - Debug Countries/Regions (comma-separated): Enter two-digit country codes or hyphen-separated ISO 3166-2 region codes for debugging, separated by commas (e.g., US,UK,CA,FR,AU,US-CA,CA-QC)
   - Plugin Cleanup: Remove all settings when deactivating the plugin
 
 ### Templates
 
-Templates define the language, layout, and behavior of the consent banner displayed to users. Templates get assigned to countries and regions so that you can change consent feautures and language by jurisdiction. 
+Templates define the language, layout, and behavior of the consent banner displayed to users. Templates get assigned to countries and regions so that you can change consent features and language by jurisdiction. 
 
 You can not delete templates that are currently assigned to countries or regions. To remove a template, you must first unassign it on the Country Settings page.
 
@@ -114,7 +115,7 @@ Navigate to **Klaro Geo > Templates** to manage consent banner templates.
 - **Consent Modal Settings**:
   - Must Consent: If enabled, users must make a choice before using the site.
   - Accept All: Show an "Accept All" button.
-  - Hide Decling All: Hide the "Decline All" button.
+  - Hide Declining All: Hide the "Decline All" button.
   - Hide Learn More: Hide the "Learn More" link.
   - Show Notice Title: Show the title in the consent notice.
   - Show Description for Empty Store: Show description text even when no services are defined.
@@ -205,7 +206,8 @@ You can add a consent management button to any WordPress menu using a custom lin
    - **Link Text**: "Manage Cookies" or whatever text you prefer
 4. Click "Add to Menu"
 5. Expand the newly added menu item
-6. In the "CSS Classes (optional)" field, add the class `open-klaro-modal`
+6. In the **"CSS Classes (optional)"** field, add the class `open-klaro-modal`
+   - **IMPORTANT**: While the field is labeled "optional" in WordPress, the `open-klaro-modal` class is **required** for the menu item to open the Klaro modal. Without this class, the link will not function.
 7. Save the menu
 
 When clicked, this menu item will open the Klaro consent management popup, allowing users to update their consent preferences at any time.
@@ -232,7 +234,7 @@ Examples:
 
 ### Floating Button
 
-The plugin also provides a floating button option that can be enabled in the settings. This button appears at the bottom right of your site and is always accessible to visitors.
+The plugin also provides a floating button option that can be enabled in the settings. This button can be configured to appear at the bottom or top to the left or right of the viewport and is always accessible to visitors.
 
 ## Customizing Klaro Appearance
 
@@ -240,7 +242,7 @@ Klaro has built-in theme settings and Klaro Geo has theme settings for the float
 
 Klaro Geo allows you to select either the standard Klaro script (`klaro.js`) or a version that does not load its own CSS (`klaro-no-css.js`). Both scripts provide similar functionality, but they differ in their approach to styling.
 
-The translation settings for in template configuration.
+The translation settings for the plugin are managed in template and service configurations.
 
 Developers can set custom CSS classes and override Klaro's default styles. 
 
@@ -294,7 +296,7 @@ These events can include the following parameters:
 
 #### Klaro Consent Update
 
-This event is the main firing trigger for most Google Tag Manager tags. It is triggered after initialConsents and saveConsents and Google Consent Mode Consent Update events. It simplifies the trigger setup in GTM and resolves race conditions between Klaro and Consent Mode.
+This event is the main firing trigger for most Google Tag Manager tags. It is triggered after initialConsents and saveConsents and Google Consent Mode `Consent Update` events. It simplifies the trigger setup in GTM and resolves race conditions between Klaro and Consent Mode.
 
 This event can include the following parameters:
 - `event: "Klaro Consent Update"`: Hard-coded value for all of these events
@@ -313,9 +315,9 @@ When a user visits your site:
 1. GTM tags are initially blocked (we set an invalid `type="text/plain"`)
 2. Consent Mode defaults are added after the klaroConfig object
 3. When the user gives consent (or is defaulted in, or reads consent settings from a previous page) to Google Tag Manager, Klaro changes the type to `text/javascript` which triggers Google Tag Manager
-4. Klaro Geo fires the initialConsents event which triggers Consent Mode Consent Update events and `Klaro Consent Update` events
+4. Klaro Geo fires the initialConsents event which triggers Consent Mode `Consent Update` events and `Klaro Consent Update` events
 5. Google Tag Manager reads the consent settings and Data Layer variables and triggers tags as configured
-6. Saving consent changes triggers Consent Mode Consent Update events and `Klaro Consent Update` events
+6. Saving consent changes triggers Consent Mode `Consent Update` events and `Klaro Consent Update` events
 7. Google Tag Manager reads these updated settings and Data Layer variables and triggers tags as configured
 
 
