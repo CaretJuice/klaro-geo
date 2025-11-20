@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  wordpress_e2e:
+    image: wordpress:latest
+    container_name: klaro-geo-wordpress-e2e
+    ports:
+      - "8080:80"
+    user: "root:root"
+    entrypoint: ["/bin/bash", "-c", "chmod +x /usr/local/bin/docker-entrypoint-e2e.sh && /usr/local/bin/docker-entrypoint-e2e.sh"]
+    environment:
+      WORDPRESS_DB_HOST: db_e2e:3306
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DB_NAME: wordpress_e2e
+      WORDPRESS_DEBUG: 1
+      WP_ADMIN_USER: admin
+      WP_ADMIN_PASSWORD: password
+      WP_ADMIN_EMAIL: admin@example.com
+      WP_SITE_TITLE: "Klaro Geo E2E Tests"
+      WP_SITE_URL: "http://localhost:8080"
+      WORDPRESS_CONFIG_EXTRA: |
+        define( 'WP_DEBUG', true );
+        define( 'WP_DEBUG_LOG', true );
+        define( 'WP_DEBUG_DISPLAY', false );
+    volumes:
+      - wordpress_e2e_data:/var/www/html
+      - ./:/var/www/html/wp-content/plugins/klaro-geo
+      - ./docker-entrypoint-e2e.sh:/usr/local/bin/docker-entrypoint-e2e.sh
+    depends_on:
+      db_e2e:
+        condition: service_healthy
+    networks:
+      - klaro-e2e
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  db_e2e:
+    image: mysql:5.7
+    container_name: klaro-geo-db-e2e
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: wordpress_e2e
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: wordpress
+    volumes:
+      - db_e2e_data:/var/lib/mysql
+    networks:
+      - klaro-e2e
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  wordpress_e2e_data:
+  db_e2e_data:
+
+networks:
+  klaro-e2e:
+    driver: bridge

@@ -185,7 +185,7 @@ describe('Klaro Geo Core Functionality - Comprehensive Tests', function() {
       window.dataLayer.push({
         'event': 'Klaro Event',
         'eventSource': 'klaro-geo',
-        'klaroEventName': 'generateConsentRecipt',
+        'klaroEventName': 'generateConsentReceipt',
         'klaroGeoConsentReceipt': consentReceipt,
         'klaroGeoTemplateSource': consentReceipt.template_source,
         'klaroGeoAdminOverride': consentReceipt.admin_override

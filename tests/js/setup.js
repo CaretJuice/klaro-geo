@@ -54,3 +54,20 @@ document.querySelectorAll = function(selector) {
 };
 
 // Add any other global setup needed for the tests
+
+// Set up debug logging functions for tests
+// Mock the debug logging functions to prevent errors in tests
+global.klaroGeoLog = jest.fn();
+global.klaroGeoWarn = jest.fn();
+global.klaroGeoInfo = jest.fn();
+global.klaroGeoError = jest.fn();
+global.klaroGeoDebugLog = jest.fn();
+
+// Also make them available on window for browser-like environment
+if (typeof window !== 'undefined') {
+    window.klaroGeoLog = global.klaroGeoLog;
+    window.klaroGeoWarn = global.klaroGeoWarn;
+    window.klaroGeoInfo = global.klaroGeoInfo;
+    window.klaroGeoError = global.klaroGeoError;
+    window.klaroGeoDebugLog = global.klaroGeoDebugLog;
+}

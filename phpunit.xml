@@ -21,4 +21,18 @@
         <ini name="display_errors" value="On" />
         <ini name="display_startup_errors" value="On" />
     </php>
+    <coverage>
+        <include>
+            <directory suffix=".php">./includes</directory>
+            <file>./klaro-geo.php</file>
+        </include>
+        <exclude>
+            <directory>./vendor</directory>
+            <directory>./tests</directory>
+        </exclude>
+        <report>
+            <html outputDirectory="coverage/html"/>
+            <text outputFile="php://stdout" showUncoveredFiles="true"/>
+        </report>
+    </coverage>
 </phpunit>

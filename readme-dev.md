@@ -347,3 +347,40 @@ When you're ready to create a production version of the plugin:
 - For more detailed information about Docker setup, see [docker/readme.md](docker/readme.md)
 - For user documentation, see [readme.md](readme.md)
 - For JavaScript testing details, see the test files in `tests/js/`
+## Known Issues
+
+### E2E Test Status (as of 2025-11-19)
+
+**Current Status: 22 passing / 38 tests (58%)**
+
+#### Failing Tests (10 tests):
+The following consent receipt E2E tests are currently failing due to an issue with the consent receipt generation system:
+
+- `should generate receipt when consent is saved` (chromium & firefox)
+- `should include required fields in receipt` (chromium & firefox)  
+- `should send receipt to server when logging enabled` (chromium & firefox)
+- `should handle multiple consent changes` (chromium & firefox)
+- `should include consent choices in receipt` (chromium & firefox)
+
+**Root Cause:**
+Tests timeout waiting for the `'Klaro Geo Consent Receipt'` dataLayer event. The consent receipt JavaScript may not be triggering properly from the `klaro:consent-change` events or there may be an initialization timing issue.
+
+**Bugs Fixed (but tests still failing):**
+1. ✅ Removed overly aggressive 3-second debounce in `js/klaro-geo-consent-receipts.js:305-310`
+2. ✅ Added boolean casting for `enableConsentLogging` in `klaro-geo.php:271`
+3. ✅ Updated E2E helper methods to search dataLayer by `event` property
+
+**Next Steps:**
+- Investigate why `klaro:consent-change` events aren't triggering consent receipt generation
+- Check if `manager.watch()` needs to be implemented for consent receipts
+- Verify event listener setup timing in relation to Klaro initialization
+
+#### Skipped Tests (6 tests):
+- Individual service consent changes
+- EU template loading  
+- localStorage limit tests
+
+**Test Results Location:**
+- HTML Report: `e2e-report/index.html` (view with `npx playwright show-report e2e-report`)
+- Failed test artifacts: `test-results/` directory
+

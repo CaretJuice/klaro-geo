@@ -1,0 +1,72 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - link "Skip to content" [ref=e2] [cursor=pointer]:
+    - /url: "#wp--skip-link--target"
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e7]:
+        - paragraph [ref=e8]:
+          - link "Klaro Geo E2E Tests" [ref=e9] [cursor=pointer]:
+            - /url: http://localhost:8080
+        - navigation [ref=e11]:
+          - list [ref=e16]:
+            - list [ref=e17]:
+              - listitem [ref=e18]:
+                - link "Sample Page" [ref=e19] [cursor=pointer]:
+                  - /url: http://localhost:8080/?page_id=2
+    - main [ref=e20]:
+      - heading "Blog" [level=1] [ref=e21]
+      - list [ref=e23]:
+        - listitem [ref=e24]:
+          - generic [ref=e25]:
+            - heading "Hello world!" [level=2] [ref=e26]:
+              - link "Hello world!" [ref=e27] [cursor=pointer]:
+                - /url: http://localhost:8080/?p=1
+            - paragraph [ref=e29]: Welcome to WordPress. This is your first post. Edit or delete it, then start writing!
+            - time [ref=e31]:
+              - link "November 19, 2025" [ref=e32] [cursor=pointer]:
+                - /url: http://localhost:8080/?p=1
+    - contentinfo [ref=e34]:
+      - generic [ref=e36]:
+        - generic [ref=e37]:
+          - heading "Klaro Geo E2E Tests" [level=2] [ref=e40]:
+            - link "Klaro Geo E2E Tests" [ref=e41] [cursor=pointer]:
+              - /url: http://localhost:8080
+          - generic [ref=e42]:
+            - navigation [ref=e43]:
+              - list [ref=e44]:
+                - listitem [ref=e45]:
+                  - link "Blog" [ref=e46] [cursor=pointer]:
+                    - /url: "#"
+                - listitem [ref=e47]:
+                  - link "About" [ref=e48] [cursor=pointer]:
+                    - /url: "#"
+                - listitem [ref=e49]:
+                  - link "FAQs" [ref=e50] [cursor=pointer]:
+                    - /url: "#"
+                - listitem [ref=e51]:
+                  - link "Authors" [ref=e52] [cursor=pointer]:
+                    - /url: "#"
+            - navigation [ref=e53]:
+              - list [ref=e54]:
+                - listitem [ref=e55]:
+                  - link "Events" [ref=e56] [cursor=pointer]:
+                    - /url: "#"
+                - listitem [ref=e57]:
+                  - link "Shop" [ref=e58] [cursor=pointer]:
+                    - /url: "#"
+                - listitem [ref=e59]:
+                  - link "Patterns" [ref=e60] [cursor=pointer]:
+                    - /url: "#"
+                - listitem [ref=e61]:
+                  - link "Themes" [ref=e62] [cursor=pointer]:
+                    - /url: "#"
+        - generic [ref=e64]:
+          - paragraph [ref=e65]: Twenty Twenty-Five
+          - paragraph [ref=e66]:
+            - text: Designed with
+            - link "WordPress" [ref=e67] [cursor=pointer]:
+              - /url: https://wordpress.org
+```

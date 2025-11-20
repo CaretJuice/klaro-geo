@@ -143,7 +143,7 @@ describe('Klaro Geo Core Functionality', function() {
                 window.dataLayer.push({
                     'event': 'Klaro Event',
                     'eventSource': 'klaro-geo',
-                    'klaroEventName': 'generateConsentRecipt',
+                    'klaroEventName': 'generateConsentReceipt',
                     'klaroGeoConsentReceipt': {
                         'receipt_id': 'test_receipt',
                         'consent_choices': manager.consents
@@ -165,7 +165,7 @@ describe('Klaro Geo Core Functionality', function() {
             // Check if data was pushed to dataLayer
             expect(window.dataLayer.length).toBe(1);
             expect(window.dataLayer[0].event).toBe('Klaro Event');
-            expect(window.dataLayer[0].klaroEventName).toBe('generateConsentRecipt');
+            expect(window.dataLayer[0].klaroEventName).toBe('generateConsentReceipt');
         });
     });
     
