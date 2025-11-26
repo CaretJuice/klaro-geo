@@ -34,6 +34,7 @@ function klaro_geo_get_default_templates() {
                 'storageMethod' => 'cookie',
                 'cookieName' => 'klaro',
                 'cookieExpiresAfterDays' => 365,
+                'cookieDomain' => '', // Empty string means auto-detect with leading dot for subdomain sharing
                 'default' => false,
                 'mustConsent' => true,
                 'acceptAll' => true,
@@ -125,6 +126,7 @@ function klaro_geo_get_default_templates() {
                 'storageMethod' => 'cookie',
                 'cookieName' => 'klaro',
                 'cookieExpiresAfterDays' => 365,
+                'cookieDomain' => '', // Empty string means auto-detect with leading dot for subdomain sharing
                 'default' => false,
                 'mustConsent' => true,
                 'acceptAll' => true,
@@ -216,6 +218,7 @@ function klaro_geo_get_default_templates() {
                 'storageMethod' => 'cookie',
                 'cookieName' => 'klaro',
                 'cookieExpiresAfterDays' => 365,
+                'cookieDomain' => '', // Empty string means auto-detect with leading dot for subdomain sharing
                 'default' => true,
                 'mustConsent' => false,
                 'acceptAll' => true,

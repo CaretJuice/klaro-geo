@@ -142,6 +142,26 @@ function klaro_geo_generate_config_file() {
         $klaro_config['disablePoweredBy'] = false;
         $klaro_config['cookiePath'] = '/';
     }
+
+    // Set default cookiePath if not configured
+    if (!isset($klaro_config['cookiePath']) || empty($klaro_config['cookiePath'])) {
+        $klaro_config['cookiePath'] = '/';
+    }
+
+    // Auto-detect cookieDomain with leading dot for subdomain sharing if not explicitly set
+    if (!isset($klaro_config['cookieDomain']) || $klaro_config['cookieDomain'] === '') {
+        // Get the site's domain from WordPress
+        $site_url = parse_url(get_site_url(), PHP_URL_HOST);
+        if ($site_url) {
+            // Add leading dot for subdomain sharing (e.g., ".example.com")
+            $klaro_config['cookieDomain'] = '.' . preg_replace('/^www\./', '', $site_url);
+            klaro_geo_debug_log('Auto-detected cookieDomain with leading dot: ' . $klaro_config['cookieDomain']);
+        }
+    } else {
+        // Use the explicitly set value without modification
+        klaro_geo_debug_log('Using explicit cookieDomain from template: ' . $klaro_config['cookieDomain']);
+    }
+
     klaro_geo_debug_log('Template config applied: ' . print_r($klaro_config, true));
 
     // Build the services configuration

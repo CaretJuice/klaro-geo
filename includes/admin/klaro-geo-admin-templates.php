@@ -1050,7 +1050,7 @@ function klaro_geo_templates_page() {
                         <td>
                             <input type="text" name="template_config[cookieDomain]" id="template_config_cookieDomain" class="regular-text"
                                 value="<?php echo esc_attr(isset($current_config['cookieDomain']) ? $current_config['cookieDomain'] : ''); ?>">
-                            <p class="description">Domain for the consent cookie (leave empty for current domain).</p>
+                            <p class="description">Domain for the consent cookie. Leave empty to auto-detect from site URL with a leading dot (e.g., ".example.com") for subdomain sharing. Enter a value to use it exactly as specified.</p>
                         </td>
                     </tr>
                     <tr>
