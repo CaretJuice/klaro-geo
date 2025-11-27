@@ -1,7 +1,18 @@
 #!/bin/bash
 
+# Get the script's directory (the plugin root)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Fix permissions on host before running Docker
+# These files need to be writable by www-data (UID 33) inside the container
+echo "Setting up file permissions on host..."
+touch "$SCRIPT_DIR/klaro-config.js"
+touch "$SCRIPT_DIR/.phpunit.result.cache"
+chmod 666 "$SCRIPT_DIR/klaro-config.js"
+chmod 666 "$SCRIPT_DIR/.phpunit.result.cache"
+
 # Change to the docker directory
-cd "$(dirname "$0")/docker"
+cd "$SCRIPT_DIR/docker"
 
 # Clean up orphaned containers
 docker compose down --remove-orphans 2>/dev/null || true
@@ -43,8 +54,5 @@ if [ "$1" == "js" ]; then
   fi
 else
   echo "Running PHP tests..."
-  # First, ensure the tests directory is properly mounted
-  docker compose run wordpress_test bash -c "mkdir -p /var/www/html/wp-content/plugins/klaro-geo/tests/phpunit && cp -r /var/www/html/wp-content/plugins/klaro-geo/tests/phpunit/* /var/www/html/wp-content/plugins/klaro-geo/tests/phpunit/ 2>/dev/null || true"
-  # Then run the tests
   docker compose run wordpress_test bash -c "cd /var/www/html/wp-content/plugins/klaro-geo && phpunit -c phpunit.xml"
 fi

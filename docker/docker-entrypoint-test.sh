@@ -96,6 +96,11 @@ mkdir -p /var/www/html/wp-content/plugins/klaro-geo/docker/logs
 chmod -R 777 /var/www/html/wp-content/plugins/klaro-geo/docker/logs
 chown -R www-data:www-data /var/www/html/wp-content/plugins/klaro-geo/docker/logs
 
+# Ensure klaro-config.js is writable (tests need to write to this file)
+touch /var/www/html/wp-content/plugins/klaro-geo/klaro-config.js
+chmod 666 /var/www/html/wp-content/plugins/klaro-geo/klaro-config.js
+chown www-data:www-data /var/www/html/wp-content/plugins/klaro-geo/klaro-config.js
+
 # Print debug information
 echo "Debug log permissions:"
 ls -la /var/www/html/wp-content/debug.log

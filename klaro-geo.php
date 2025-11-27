@@ -221,7 +221,7 @@ function klaro_geo_enqueue_scripts() {
         wp_enqueue_script(
             'klaro-consent-receipts-js',
             plugins_url('js/klaro-geo-consent-receipts.js', __FILE__),
-            array('klaro-js'),
+            array('klaro-js', 'klaro-geo-debug'),
             KLARO_GEO_VERSION,
             true
         );
