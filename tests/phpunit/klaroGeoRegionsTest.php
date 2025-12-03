@@ -96,45 +96,6 @@ class KlaroGeoRegionsTest extends WP_UnitTestCase {
         $this->assertEquals('strict', $decoded_settings['US']['regions']['CA']['template'], 'Region template should match');
     }
 
-    /**
-     * Test region settings retrieval
-     */
-    public function test_region_settings_retrieval() {
-        // Set up test data with templates
-        $settings = array(
-            'default_template' => 'default',
-            'fallback_behavior' => 'default',
-            'US' => array(
-                'template' => 'relaxed',
-                'regions' => array(
-                    'CA' => array('template' => 'strict')
-                )
-            )
-        );
-        // Store settings and verify they are stored correctly
-        update_option('klaro_geo_country_settings', wp_json_encode($settings));
-        $stored = get_option('klaro_geo_country_settings');
-        $this->assertNotFalse($stored, 'Settings should be stored');
-        $decoded = json_decode($stored, true);
-        $this->assertNotNull($decoded, 'Settings should be valid JSON');
-        $this->assertEquals($settings, $decoded, 'Stored settings should match original');
-
-        // Test getting settings for a specific region
-        $_GET['klaro_geo_debug_geo'] = 'US-CA';
-        $effective_settings = klaro_geo_get_effective_settings('US-CA');
-        $this->assertEquals('strict', $effective_settings['template'], 'Should get region-specific template');
-        unset($_GET['klaro_geo_debug_geo']);
-
-        // Test getting settings for a country
-        $_GET['klaro_geo_debug_geo'] = 'US';
-        $effective_settings = klaro_geo_get_effective_settings('US');
-        $this->assertEquals('relaxed', $effective_settings['template'], 'Should get country-level template');
-        unset($_GET['klaro_geo_debug_geo']);
-
-        // Test fallback to default
-        $_GET['klaro_geo_debug_geo'] = 'FR';
-        $effective_settings = klaro_geo_get_effective_settings('FR');
-        $this->assertEquals('default', $effective_settings['template'], 'Should fall back to default template');
-        unset($_GET['klaro_geo_debug_geo']);
-    }
+    // NOTE: test_region_settings_retrieval was removed as it is now covered by
+    // ContractVerificationTest::test_contract_template_resolution_order
 }
