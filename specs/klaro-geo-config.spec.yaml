@@ -1,0 +1,284 @@
+# klaro-geo-config.spec.yaml
+# Specification for Klaro Config Generation
+#
+# This file defines contracts for the config generation flow, focusing on:
+# - Template retrieval and application
+# - cookieDomain handling
+# - Fallback behavior
+
+file_meta:
+  purpose: "Generates klaro-config.js file with proper template application and geo-detection"
+  dependencies:
+    - "class-klaro-geo-template-settings.php"
+    - "class-klaro-geo-country-settings.php"
+    - "klaro-geo-settings.php"
+    - "klaro-geo-defaults.php"
+  related_specs:
+    - "datalayer-events.spec.yaml"  # DataLayer events this file generates
+  stability: "stable"
+  last_updated: "2025-12-03"
+
+# =============================================================================
+# ARCHITECTURE: DATALAYER-FIRST DESIGN
+# =============================================================================
+architecture:
+  principle: "All significant events push to window.dataLayer"
+  rationale: "Enables GTM integration, analytics, event-driven activation"
+  see_also: "datalayer-events.spec.yaml for full event contracts"
+
+  generated_events:
+    - "klaroConfigLoaded - pushed when config executes in browser"
+
+  event_data_source:
+    template_info: "From template lookup in this file"
+    geo_info: "From klaro_geo_get_user_location()"
+    consent_info: "From consent receipt system"
+
+# =============================================================================
+# CRITICAL BUSINESS RULES
+# =============================================================================
+business_rules:
+  template_priority:
+    description: "Template selection priority order"
+    rules:
+      - "Database-stored templates MUST be preferred over hardcoded defaults"
+      - "Fallback template (from Country Settings) MUST be used when no geo-match"
+      - "Hardcoded defaults are ONLY used when database returns empty/corrupt data"
+      - "Template key from Country Settings MUST match a key in Templates database"
+
+  cookieDomain_handling:
+    description: "How cookieDomain values should be processed"
+    rules:
+      - "If template has explicit cookieDomain (non-empty string), use it exactly"
+      - "If template cookieDomain is empty string '', auto-detect from site URL"
+      - "Auto-detected cookieDomain MUST have leading dot for subdomain sharing"
+      - "If auto-detection fails, log a WARNING and set cookieDomain to empty string"
+      - "NEVER silently fail - always log when fallbacks are used"
+
+  no_silent_failures:
+    description: "All fallback scenarios must be logged"
+    rules:
+      - "Log WARNING when requested template not found in database"
+      - "Log WARNING when falling back to 'default' template"
+      - "Log WARNING when falling back to hardcoded defaults"
+      - "Log WARNING when auto-detection of cookieDomain fails"
+
+# =============================================================================
+# FUNCTIONS
+# =============================================================================
+functions:
+  klaro_geo_generate_config_file:
+    purpose: "Generate the klaro-config.js file with geo-aware template settings"
+    signature: "klaro_geo_generate_config_file(): int|false"
+    stability: "stable"
+
+    returns:
+      success:
+        type: "int"
+        description: "Number of bytes written to file"
+      failure:
+        type: "false"
+        description: "File write failed"
+
+    side_effects:
+      - "Writes klaro-config.js to plugin root directory"
+      - "Logs debug information about template selection"
+      - "Logs warnings when fallbacks are used"
+
+    # CRITICAL: This is the data flow that must be preserved
+    data_flow:
+      step_1_geo_detection:
+        action: "Get user location"
+        function: "klaro_geo_get_user_location()"
+        returns:
+          country: "string|empty"
+          region: "string|empty"
+          is_admin_override: "bool"
+
+      step_2_effective_settings:
+        action: "Determine which template to use based on geo"
+        function: "klaro_geo_get_effective_settings(location_code, is_admin_override)"
+        returns:
+          template: "string - template key (e.g., 'opt-in', 'opt-out', 'default')"
+          source: "string - one of: 'default', 'fallback', 'country', 'region'"
+        contract: "Returned template key MUST exist in database OR be 'default'"
+
+      step_3_template_retrieval:
+        action: "Load templates from database"
+        function: "new Klaro_Geo_Template_Settings()->get()"
+        returns: "array of templates keyed by template_key"
+        contract: "MUST return database templates, falling back to defaults ONLY if database empty"
+
+      step_4_template_lookup:
+        action: "Find the specific template config"
+        logic: |
+          1. Try $templates[$template_to_use]
+          2. If not found, try $templates['default']
+          3. If still not found, use klaro_geo_get_default_templates()['default']
+        contract: |
+          - Step 1 and 2 use database templates
+          - Step 3 (hardcoded) should RARELY happen
+          - Log WARNING for each fallback step
+
+      step_5_config_application:
+        action: "Apply template config to klaroConfig"
+        logic: "Copy all values from template['config'] to klaro_config"
+        contract: |
+          - ALL values from template config MUST be copied
+          - This includes cookieDomain (even if empty string)
+
+      step_6_cookieDomain_processing:
+        action: "Handle cookieDomain auto-detection if needed"
+        logic: |
+          IF cookieDomain is not set OR cookieDomain === '':
+            - Auto-detect from get_site_url()
+            - Add leading dot for subdomain sharing
+            - Log the auto-detected value
+          ELSE:
+            - Use the explicit value from template
+            - Log that explicit value is being used
+        contract: |
+          - Empty string triggers auto-detection
+          - Non-empty string is used as-is
+          - Auto-detection failure MUST be logged as WARNING
+
+    test_scenarios:
+      critical:
+        - "Template with explicit cookieDomain uses that value exactly"
+        - "Template with empty cookieDomain triggers auto-detection"
+        - "Geo-detected template (e.g., US -> opt-out) applies correctly"
+        - "Fallback template is used when no geo match"
+        - "All template config values are copied to klaroConfig"
+
+      edge_cases:
+        - "Requested template key doesn't exist in database"
+        - "Database returns empty templates array"
+        - "get_site_url() returns invalid URL"
+        - "Template config missing expected keys"
+
+# =============================================================================
+# DATA STRUCTURES
+# =============================================================================
+data_structures:
+  template:
+    name: "string - Human-readable name"
+    description: "string - Template description"
+    config:
+      version: "int"
+      elementID: "string"
+      styling: "object"
+      htmlTexts: "bool"
+      embedded: "bool"
+      groupByPurpose: "bool"
+      storageMethod: "string - 'cookie' or 'localStorage'"
+      cookieName: "string"
+      cookieExpiresAfterDays: "int"
+      cookieDomain: "string - Empty means auto-detect, non-empty means explicit"
+      cookiePath: "string - Default '/'"
+      default: "bool - Default consent state for services"
+      mustConsent: "bool"
+      acceptAll: "bool"
+      hideDeclineAll: "bool"
+      hideLearnMore: "bool"
+      noticeAsModal: "bool"
+      disablePoweredBy: "bool"
+      translations: "object - Language translations"
+    plugin_settings:
+      enable_consent_logging: "bool"
+    consent_mode_settings:
+      initialize_consent_mode: "bool"
+      analytics_storage_service: "string"
+      ad_storage_service: "string"
+      initialization_code: "string"
+
+  effective_settings:
+    template: "string - Template key to use"
+    source: "string - Where the template came from: 'default', 'fallback', 'country', 'region'"
+    fallback_behavior: "string - How to handle fallback (deprecated?)"
+
+  klaro_config:
+    description: "Final JavaScript config object written to klaro-config.js"
+    required_fields:
+      - cookieDomain
+      - cookiePath
+      - services
+    contract: "All required fields MUST be set after config generation"
+
+# =============================================================================
+# STATE TRANSITIONS
+# =============================================================================
+state_transitions:
+  template_selection:
+    description: "How template selection flows based on geo-detection"
+
+    no_geo_detected:
+      from: "initial"
+      to: "using_fallback_template"
+      triggered_by: "klaro_geo_get_user_location() returns empty country"
+      result: "Use fallback template from Country Settings"
+
+    geo_detected_with_match:
+      from: "initial"
+      to: "using_country_template"
+      triggered_by: "Country has explicit template in Country Settings"
+      result: "Use the country's configured template"
+
+    geo_detected_no_match:
+      from: "initial"
+      to: "using_fallback_template"
+      triggered_by: "Country detected but not configured in Country Settings"
+      result: "Use fallback template from Country Settings"
+
+    template_not_found:
+      from: "using_*_template"
+      to: "using_database_default"
+      triggered_by: "Template key not found in templates database"
+      result: "Log WARNING and use 'default' template from database"
+      contract: "MUST log warning, MUST use database default not hardcoded"
+
+    database_default_not_found:
+      from: "using_database_default"
+      to: "using_hardcoded_default"
+      triggered_by: "'default' template not found in database"
+      result: "Log WARNING and use klaro_geo_get_default_templates()['default']"
+      contract: "This should be rare - indicates database issue"
+
+# =============================================================================
+# INTEGRATION POINTS
+# =============================================================================
+integration_points:
+  wordpress_database:
+    purpose: "Store and retrieve templates and country settings"
+    functions:
+      - "get_option('klaro_geo_templates')"
+      - "get_option('klaro_geo_country_settings')"
+    contract: "Database values ALWAYS take precedence over hardcoded defaults"
+
+  wordpress_site_url:
+    purpose: "Auto-detect domain for cookieDomain"
+    function: "get_site_url()"
+    contract: "If this fails, log WARNING and continue with empty cookieDomain"
+
+  file_system:
+    purpose: "Write generated config to klaro-config.js"
+    function: "file_put_contents()"
+    contract: "Return false if write fails, log error"
+
+# =============================================================================
+# DEBUGGING REQUIREMENTS
+# =============================================================================
+debugging:
+  required_log_entries:
+    - "User location detection result"
+    - "Effective settings (template key and source)"
+    - "Available template keys in database"
+    - "Template lookup result (match found or fallback used)"
+    - "cookieDomain value from template (before processing)"
+    - "cookieDomain final value (after processing)"
+
+  warning_conditions:
+    - "Requested template not found in database"
+    - "Falling back to 'default' template"
+    - "Falling back to hardcoded defaults"
+    - "Auto-detection of cookieDomain failed"
+    - "File write failed"

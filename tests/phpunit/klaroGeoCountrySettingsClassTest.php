@@ -22,10 +22,28 @@ class KlaroGeoCountrySettingsClassTest extends WP_UnitTestCase {
         // Make sure the options don't exist
         delete_option($this->option_name);
         delete_option($this->visible_countries_option);
+        delete_option('klaro_geo_templates');
 
         // Mock the option name for testing
         add_filter('pre_option_klaro_geo_country_settings', array($this, 'mock_country_settings'));
         add_filter('pre_option_klaro_geo_visible_countries', array($this, 'mock_visible_countries'));
+
+        // Create the templates that tests need for validation
+        // This is required because get_effective_settings validates templates exist
+        $template_settings = new Klaro_Geo_Template_Settings();
+        $template_settings->set_template('default', array(
+            'name' => 'Default Template',
+            'config' => array('default' => false)
+        ));
+        $template_settings->set_template('strict', array(
+            'name' => 'Strict Template',
+            'config' => array('default' => false, 'mustConsent' => true)
+        ));
+        $template_settings->set_template('relaxed', array(
+            'name' => 'Relaxed Template',
+            'config' => array('default' => true, 'mustConsent' => false)
+        ));
+        $template_settings->save();
     }
 
     /**
@@ -35,6 +53,7 @@ class KlaroGeoCountrySettingsClassTest extends WP_UnitTestCase {
         // Clean up
         delete_option($this->option_name);
         delete_option($this->visible_countries_option);
+        delete_option('klaro_geo_templates');
 
         // Remove filters
         remove_filter('pre_option_klaro_geo_country_settings', array($this, 'mock_country_settings'));

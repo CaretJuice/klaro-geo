@@ -1,0 +1,253 @@
+# class-klaro-geo-template-settings.spec.yaml
+# Specification for Template Settings Class
+#
+# This class handles template storage and retrieval from WordPress options
+
+file_meta:
+  purpose: "Manages template configurations stored in WordPress database"
+  dependencies:
+    - "class-klaro-geo-option.php"
+    - "klaro-geo-defaults.php"
+  stability: "stable"
+  last_updated: "2025-12-03"
+
+# =============================================================================
+# CRITICAL BUSINESS RULES
+# =============================================================================
+business_rules:
+  database_first:
+    description: "Database values take priority"
+    rules:
+      - "Always attempt to load from database first"
+      - "Only use hardcoded defaults when database is empty OR returns invalid data"
+      - "Hardcoded defaults from klaro_geo_get_default_templates() are last resort"
+      - "Log when falling back to defaults"
+
+  template_structure:
+    description: "Every template must have required structure"
+    rules:
+      - "Every template MUST have 'name' key"
+      - "Every template MUST have 'config' key containing an array"
+      - "Template keys should be lowercase with hyphens (e.g., 'opt-in', 'opt-out')"
+
+  preserve_user_data:
+    description: "User-configured values must be preserved"
+    rules:
+      - "User-set cookieDomain MUST NOT be overwritten by defaults"
+      - "User-set translations MUST be preserved during updates"
+      - "When updating template, merge rather than replace where appropriate"
+
+# =============================================================================
+# CLASS DEFINITION
+# =============================================================================
+classes:
+  Klaro_Geo_Template_Settings:
+    purpose: "Handle template settings stored in WordPress options"
+    extends: "Klaro_Geo_Option"
+    option_name: "klaro_geo_templates"
+
+    methods:
+      __construct:
+        purpose: "Initialize template settings, loading from database or defaults"
+        signature: "__construct(string $option_name = 'klaro_geo_templates', array $default_value = [])"
+
+        behavior:
+          - "Call parent constructor to load from database"
+          - "If database returns empty, initialize with hardcoded defaults"
+          - "Set is_modified = true when falling back to defaults (so they get saved)"
+
+        contract: |
+          Post-conditions:
+          - $this->value is ALWAYS an array (never null)
+          - $this->value contains at least the 'default' template
+          - Each template has 'name' and 'config' keys
+
+        potential_issues:
+          - "If database is corrupted, may lose user templates"
+          - "Need to ensure defaults don't overwrite user data on every load"
+
+      get:
+        purpose: "Get all templates"
+        signature: "get(): array"
+        returns:
+          type: "array"
+          description: "All templates keyed by template_key"
+          example: "['default' => [...], 'opt-in' => [...], 'opt-out' => [...]]"
+
+        contract: |
+          - ALWAYS returns array (never null)
+          - Array contains template_key => template pairs
+          - Each template has at minimum 'name' and 'config'
+
+      get_template:
+        purpose: "Get a specific template by key"
+        signature: "get_template(string $template_key): array|null"
+
+        inputs:
+          template_key:
+            type: "string"
+            format: "Template identifier (e.g., 'opt-in', 'opt-out', 'default')"
+            required: true
+
+        returns:
+          success:
+            type: "array"
+            description: "Complete template array with name, description, config"
+          failure:
+            type: "null"
+            description: "Template key not found"
+
+        contract: |
+          - Returns null if template_key doesn't exist (doesn't auto-create)
+          - Caller is responsible for handling null case
+
+      get_template_config:
+        purpose: "Get just the config portion of a template"
+        signature: "get_template_config(string $template_key): array|null"
+
+        returns:
+          success:
+            type: "array"
+            description: "The template's config array"
+            example: "{'version': 1, 'cookieDomain': '.example.com', ...}"
+          failure:
+            type: "null"
+            description: "Template not found OR template has no 'config' key"
+
+        contract: |
+          - Returns template['config'] if exists
+          - Returns null if template doesn't exist OR config key missing
+          - Does NOT fall back to defaults - caller handles that
+
+      set_template:
+        purpose: "Set or update a complete template"
+        signature: "set_template(string $template_key, array $template): self"
+
+        inputs:
+          template_key:
+            type: "string"
+            required: true
+          template:
+            type: "array"
+            required: true
+            description: "Complete template with name, description, config"
+
+        contract: |
+          - Overwrites existing template with same key
+          - Creates new template if key doesn't exist
+          - Marks option as modified for later save
+          - Does NOT automatically save to database
+
+      set_template_config:
+        purpose: "Update just the config portion of a template"
+        signature: "set_template_config(string $template_key, array $config): self"
+
+        inputs:
+          template_key:
+            type: "string"
+            required: true
+          config:
+            type: "array"
+            required: true
+            description: "Template config values (cookieDomain, translations, etc.)"
+
+        behavior:
+          - "If template doesn't exist, creates new template with the config"
+          - "If template exists, updates only the config portion"
+          - "CRITICAL: Preserves existing translations if new config lacks them"
+          - "Processes boolean values correctly"
+          - "Handles consent_mode_settings specially"
+
+        contract: |
+          - Preserves template name and description
+          - Merges config, doesn't replace entirely
+          - Translations are preserved if not provided in new config
+          - Returns self for method chaining
+
+      get_default_templates:
+        purpose: "Get hardcoded default templates"
+        signature: "get_default_templates(): array"
+
+        returns:
+          type: "array"
+          description: "Default templates from klaro_geo_get_default_templates()"
+
+        contract: |
+          - ONLY used when database is empty
+          - Returns templates with empty cookieDomain (triggers auto-detect)
+          - Includes 'default', 'strict', 'relaxed' templates
+
+# =============================================================================
+# DATA FLOW
+# =============================================================================
+data_flow:
+  load_templates:
+    description: "How templates are loaded on instantiation"
+    steps:
+      1:
+        action: "Call parent::__construct() which loads from database"
+        function: "get_option('klaro_geo_templates', [])"
+      2:
+        action: "Check if returned value is empty"
+        condition: "empty($this->value)"
+      3a:
+        if_empty: "Load hardcoded defaults and mark as modified"
+        action: "$this->value = $this->get_default_templates()"
+      3b:
+        if_not_empty: "Use database values as-is"
+        action: "Templates already in $this->value from parent"
+
+    contract: |
+      The result is ALWAYS:
+      - An array of templates
+      - At minimum contains 'default' template
+      - Each template has 'name' and 'config'
+
+  save_templates:
+    description: "How templates are persisted to database"
+    steps:
+      1:
+        action: "Check if modified"
+        condition: "$this->is_modified"
+      2:
+        action: "Call update_option"
+        function: "update_option('klaro_geo_templates', $this->value)"
+
+    contract: |
+      - Only saves if changes were made
+      - Saves entire template array (all templates)
+      - User-configured values are preserved
+
+# =============================================================================
+# TEST SCENARIOS
+# =============================================================================
+test_scenarios:
+  critical:
+    - "get() returns array even when database is empty"
+    - "get_template('opt-in') returns template if exists"
+    - "get_template('nonexistent') returns null"
+    - "set_template_config() preserves translations"
+    - "Database templates are preferred over defaults"
+    - "User-configured cookieDomain is preserved on load"
+
+  edge_cases:
+    - "Database returns corrupted/non-array data"
+    - "Template exists but has no 'config' key"
+    - "Multiple rapid save operations"
+    - "Template key contains special characters"
+
+# =============================================================================
+# KNOWN ISSUES / INVESTIGATION AREAS
+# =============================================================================
+known_issues:
+  cookieDomain_not_persisting:
+    description: "User reports cookieDomain showing as empty despite setting it"
+    possible_causes:
+      - "Template being loaded doesn't have cookieDomain set"
+      - "Wrong template key being used for lookup"
+      - "Database template being overwritten by defaults on load"
+      - "Save operation not being called after set"
+    investigation:
+      - "Add logging to get_template() to show what's actually returned"
+      - "Verify database contains expected cookieDomain value"
+      - "Check if constructor is overwriting database with defaults"

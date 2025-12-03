@@ -1,0 +1,271 @@
+# class-klaro-geo-country-settings.spec.yaml
+# Specification for Country Settings and Effective Settings
+#
+# This handles geo-detection to template mapping
+
+file_meta:
+  purpose: "Maps geographic locations to consent templates"
+  dependencies:
+    - "class-klaro-geo-option.php"
+    - "class-klaro-geo-template-settings.php"
+  stability: "stable"
+  last_updated: "2025-12-03"
+
+# =============================================================================
+# CRITICAL BUSINESS RULES
+# =============================================================================
+business_rules:
+  template_resolution_order:
+    description: "Order of precedence for template selection"
+    rules:
+      - "1. Region-specific template (if configured)"
+      - "2. Country-specific template (if configured)"
+      - "3. Fallback template (default_template in settings)"
+      - "NEVER return a template key that doesn't exist in templates database"
+
+  template_key_validation:
+    description: "Template keys must be validated"
+    rules:
+      - "get_effective_settings() MUST return a template key that exists"
+      - "If configured template doesn't exist, fall back to default_template"
+      - "If default_template doesn't exist, fall back to 'default'"
+      - "Log WARNING when configured template doesn't exist"
+
+  inherit_behavior:
+    description: "How 'inherit' value works"
+    rules:
+      - "Country template = 'inherit' means use fallback template"
+      - "Region template = 'inherit' means use country's template"
+
+# =============================================================================
+# FUNCTIONS
+# =============================================================================
+functions:
+  klaro_geo_get_effective_settings:
+    purpose: "Wrapper function to get effective settings for a location"
+    signature: "klaro_geo_get_effective_settings(string $location_code, bool $is_admin_override = false): array"
+    file: "klaro-geo-settings.php"
+
+    inputs:
+      location_code:
+        type: "string"
+        format: "Country code or Country-Region code (e.g., 'US', 'US-CA')"
+        required: true
+      is_admin_override:
+        type: "bool"
+        default: false
+        description: "Whether this is an admin debug override"
+
+    returns:
+      type: "array"
+      structure:
+        template: "string - Template key to use"
+        source: "string - Where template came from: 'default', 'fallback', 'country', 'region'"
+        fallback_behavior: "string - Fallback behavior setting (may be deprecated)"
+
+    contract: |
+      Post-conditions:
+      - 'template' key ALWAYS exists and is a string
+      - 'template' value MUST correspond to an existing template in database
+      - 'source' indicates where the template decision came from
+
+    business_logic:
+      step_1: "Parse location_code into country and optional region"
+      step_2: "Check if country is in visible_countries list"
+      step_3: "If country has settings, check for region override first"
+      step_4: "If no region override, use country template"
+      step_5: "If country template is 'inherit', use fallback"
+      step_6: "Validate that returned template exists in database"
+      step_7: "If template doesn't exist, fall back and log WARNING"
+
+# =============================================================================
+# CLASS DEFINITION
+# =============================================================================
+classes:
+  Klaro_Geo_Country_Settings:
+    purpose: "Manage country-to-template mappings"
+    extends: "Klaro_Geo_Option"
+    option_name: "klaro_geo_country_settings"
+
+    properties:
+      visible_countries_option:
+        type: "string"
+        value: "klaro_geo_visible_countries"
+        description: "Option name for list of countries shown in admin"
+
+      visible_countries:
+        type: "array"
+        description: "List of country codes that are visible in admin UI"
+
+    methods:
+      get_default_template:
+        purpose: "Get the fallback template key"
+        signature: "get_default_template(): string"
+
+        returns:
+          type: "string"
+          description: "Template key to use as fallback"
+
+        behavior:
+          - "First check settings for 'default_template' value"
+          - "If not set, get first available template from database"
+          - "If no templates available, return empty string"
+
+        contract: |
+          - Returns a template key string
+          - Should correspond to an existing template
+          - Empty string indicates no templates configured (edge case)
+
+      get_effective_settings:
+        purpose: "Determine effective template for a location"
+        signature: "get_effective_settings(string $location_code, bool $is_admin_override = false): array"
+
+        inputs:
+          location_code:
+            type: "string"
+            format: "e.g., 'US' or 'US-CA'"
+            required: true
+          is_admin_override:
+            type: "bool"
+            default: false
+
+        returns:
+          type: "array"
+          structure:
+            template: "string"
+            source: "string - 'default' | 'fallback' | 'country' | 'region'"
+            fallback_behavior: "string"
+
+        behavior:
+          1_parse:
+            action: "Split location_code to get country and region"
+          2_check_visible:
+            action: "Check if country is in visible_countries list"
+          3_country_lookup:
+            action: "Get country settings from database"
+            condition: "Country is in visible_countries"
+          4_check_inherit:
+            action: "If country template is 'inherit', use fallback"
+          5_region_override:
+            action: "Check for region-specific template override"
+          6_validate_template:
+            action: "Verify returned template exists in templates database"
+            contract: "MUST verify template exists, fall back if not"
+
+        contract: |
+          Post-conditions:
+          - Always returns array with 'template' and 'source' keys
+          - 'template' value MUST be validated against templates database
+          - If template doesn't exist, use fallback and log WARNING
+
+        validation_step:
+          description: "Critical validation that template exists"
+          code_reference: "Lines 628-677 in class-klaro-geo-country-settings.php"
+          current_behavior: |
+            - Creates Klaro_Geo_Template_Settings instance
+            - Gets templates from database
+            - Checks if effective_settings['template'] exists in templates
+            - Falls back to fallback template if not found
+          contract: |
+            - This validation MUST happen before returning
+            - Log WARNING if configured template doesn't exist
+            - Never return a template key that doesn't exist
+
+# =============================================================================
+# DATA STRUCTURES
+# =============================================================================
+data_structures:
+  country_settings:
+    description: "Settings stored per country in database"
+    example:
+      default_template: "opt-in"
+      US:
+        template: "opt-out"
+        regions:
+          CA: "strict-opt-in"
+      DE:
+        template: "inherit"
+      GB:
+        template: "opt-in"
+
+  location_code:
+    description: "Format for location identifiers"
+    formats:
+      - "US (country only)"
+      - "US-CA (country with region)"
+      - "DE (country only)"
+
+# =============================================================================
+# STATE TRANSITIONS
+# =============================================================================
+state_transitions:
+  template_resolution:
+    description: "How template is resolved for a location"
+
+    states:
+      - initial
+      - country_found
+      - region_found
+      - using_country_template
+      - using_region_template
+      - using_fallback
+      - validated
+
+    transitions:
+      location_parsed:
+        from: "initial"
+        to: "country_found OR using_fallback"
+        condition: "Country in visible_countries"
+
+      region_check:
+        from: "country_found"
+        to: "region_found OR using_country_template"
+        condition: "Region configured for country"
+
+      inherit_check:
+        from: "using_country_template"
+        to: "using_fallback"
+        condition: "Country template is 'inherit'"
+
+      validation:
+        from: "using_*_template"
+        to: "validated"
+        action: "Verify template exists in database"
+        on_failure: "Fall back to default_template, log WARNING"
+
+# =============================================================================
+# TEST SCENARIOS
+# =============================================================================
+test_scenarios:
+  critical:
+    - "US returns 'opt-out' when configured"
+    - "Unconfigured country uses fallback template"
+    - "Region override takes precedence over country"
+    - "Country with 'inherit' uses fallback"
+    - "Returned template key exists in templates database"
+    - "WARNING logged when configured template doesn't exist"
+
+  edge_cases:
+    - "Country configured but template deleted"
+    - "Region configured but country has no settings"
+    - "Empty location_code"
+    - "Invalid country code format"
+    - "All templates deleted from database"
+
+# =============================================================================
+# KNOWN ISSUES / INVESTIGATION
+# =============================================================================
+known_issues:
+  template_mismatch_possibility:
+    description: "Template keys in country settings might not match template database"
+    scenario: |
+      1. Admin creates template "My Opt-Out" with key "my-opt-out"
+      2. Admin assigns US to use "my-opt-out"
+      3. Admin later deletes "my-opt-out" template
+      4. Country settings still reference "my-opt-out"
+      5. get_effective_settings returns "my-opt-out" which doesn't exist
+    current_handling: |
+      Lines 655-676 check if template exists and fall back
+    verification_needed: |
+      Confirm this validation is actually working correctly
+      Add test case specifically for this scenario

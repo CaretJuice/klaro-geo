@@ -625,46 +625,30 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
         $effective_settings = apply_filters('klaro_geo_effective_settings', $effective_settings);
 
         // Get the template configuration to verify it exists (using class methods)
+        // IMPORTANT: Always use database templates - no hardcoded fallbacks here
+        // Per contract: Database values MUST be preferred over hardcoded defaults
         $template_settings = new Klaro_Geo_Template_Settings();
         $templates = $template_settings->get();
 
         // Allow filtering of templates
-        $templates = apply_filters('klaro_geo_default_templates', $templates);
+        $templates = apply_filters('klaro_geo_templates', $templates);
 
-        
-        // In tests, we need to use mock templates
-        if (defined('WP_TESTS_DOMAIN') && WP_TESTS_DOMAIN) {
-            // For tests, use a simple array of templates
-            $templates = array(
-                'default' => array('name' => 'Default Template'),
-                'strict' => array('name' => 'Strict Template'),
-                'relaxed' => array('name' => 'Relaxed Template')
-            );
-
-            // Allow tests to filter templates
-            $templates = apply_filters('klaro_geo_test_templates', $templates);
-        } else {
-            // For normal operation, get the user-defined templates
-            $template_settings = new Klaro_Geo_Template_Settings();
-            $templates = $template_settings->get();
-
-            // Allow filtering of templates
-            $templates = apply_filters('klaro_geo_templates', $templates);
-        }
+        // Log available templates for debugging
+        klaro_geo_debug_log('Available templates for validation: ' . implode(', ', array_keys($templates)));
         
         if (isset($templates[$effective_settings['template']])) {
-            if (defined('WP_TESTS_DOMAIN') && WP_TESTS_DOMAIN) {
-                klaro_geo_debug_log('Template "' . $effective_settings['template'] . '" exists in test templates');
-            } else {
-                klaro_geo_debug_log('Template "' . $effective_settings['template'] . '" exists in user-defined templates');
+            klaro_geo_debug_log('Template "' . $effective_settings['template'] . '" found in database');
 
-                // Log the default setting for this template
-                $template_config = isset($templates[$effective_settings['template']]['config']) ?
-                    $templates[$effective_settings['template']]['config'] : array();
-                $default_setting = isset($template_config['default']) ?
-                    ($template_config['default'] ? 'true' : 'false') : 'not set';
-                klaro_geo_debug_log('Template "' . $effective_settings['template'] . '" default setting: ' . $default_setting);
-            }
+            // Log the default setting for this template
+            $template_config = isset($templates[$effective_settings['template']]['config']) ?
+                $templates[$effective_settings['template']]['config'] : array();
+            $default_setting = isset($template_config['default']) ?
+                ($template_config['default'] ? 'true' : 'false') : 'not set';
+            klaro_geo_debug_log('Template "' . $effective_settings['template'] . '" default setting: ' . $default_setting);
+
+            // Log cookieDomain for debugging the specific issue
+            $cookie_domain = isset($template_config['cookieDomain']) ? $template_config['cookieDomain'] : '(not set)';
+            klaro_geo_debug_log('Template "' . $effective_settings['template'] . '" cookieDomain: "' . $cookie_domain . '"');
         } else {
             klaro_geo_debug_log('WARNING: Template "' . $effective_settings['template'] . '" not found in templates!');
             klaro_geo_debug_log('Available templates: ' . implode(', ', array_keys($templates)));

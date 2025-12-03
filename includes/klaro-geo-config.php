@@ -59,7 +59,26 @@ function klaro_geo_generate_config_file() {
         // If the function doesn't exist, include the defaults file that defines it
         require_once dirname(__FILE__) . '/klaro-geo-defaults.php';
     }
-    $template_config = $templates[$template_to_use] ?? $templates['default'] ?? klaro_geo_get_default_templates()['default'];
+
+    // Debug: Log available template keys for troubleshooting
+    klaro_geo_debug_log('Available template keys in database: ' . implode(', ', array_keys($templates)));
+
+    // Try to get the template, tracking which fallback was used
+    $template_source_detail = '';
+    if (isset($templates[$template_to_use])) {
+        $template_config = $templates[$template_to_use];
+        $template_source_detail = 'exact match from database';
+    } elseif (isset($templates['default'])) {
+        $template_config = $templates['default'];
+        $template_source_detail = 'fallback to "default" template (requested "' . $template_to_use . '" not found)';
+        klaro_geo_debug_log('WARNING: Requested template "' . $template_to_use . '" not found in database, falling back to "default"');
+    } else {
+        $template_config = klaro_geo_get_default_templates()['default'];
+        $template_source_detail = 'fallback to hardcoded defaults (neither "' . $template_to_use . '" nor "default" found in database)';
+        klaro_geo_debug_log('WARNING: Neither requested template "' . $template_to_use . '" nor "default" found in database, using hardcoded defaults');
+    }
+
+    klaro_geo_debug_log('Template lookup result: ' . $template_source_detail);
     klaro_geo_debug_log('Template config: ' . print_r($template_config, true));
 
     // Check if consent receipts are enabled
@@ -149,13 +168,24 @@ function klaro_geo_generate_config_file() {
     }
 
     // Auto-detect cookieDomain with leading dot for subdomain sharing if not explicitly set
+    // Debug: Log the cookieDomain value from template before auto-detection
+    klaro_geo_debug_log('cookieDomain from template config: ' . (isset($klaro_config['cookieDomain']) ? '"' . $klaro_config['cookieDomain'] . '"' : '(not set)'));
+
     if (!isset($klaro_config['cookieDomain']) || $klaro_config['cookieDomain'] === '') {
         // Get the site's domain from WordPress
-        $site_url = parse_url(get_site_url(), PHP_URL_HOST);
+        $raw_site_url = get_site_url();
+        $site_url = parse_url($raw_site_url, PHP_URL_HOST);
+        klaro_geo_debug_log('Auto-detecting cookieDomain - raw site URL: ' . $raw_site_url . ', parsed host: ' . ($site_url ?: '(empty)'));
+
         if ($site_url) {
             // Add leading dot for subdomain sharing (e.g., ".example.com")
             $klaro_config['cookieDomain'] = '.' . preg_replace('/^www\./', '', $site_url);
             klaro_geo_debug_log('Auto-detected cookieDomain with leading dot: ' . $klaro_config['cookieDomain']);
+        } else {
+            // Fallback: leave cookieDomain empty but log a warning
+            klaro_geo_debug_log('WARNING: Could not auto-detect cookieDomain - get_site_url() returned: "' . $raw_site_url . '"');
+            // Set to empty string explicitly to prevent undefined behavior
+            $klaro_config['cookieDomain'] = '';
         }
     } else {
         // Use the explicitly set value without modification

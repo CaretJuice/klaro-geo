@@ -11,12 +11,31 @@ class KlaroGeoRegionsTest extends WP_UnitTestCase {
         parent::setUp();
         // Reset options before each test
         delete_option('klaro_geo_country_settings');
+        delete_option('klaro_geo_templates');
+
+        // Create the templates that tests need for validation
+        // This is required because get_effective_settings validates templates exist
+        $template_settings = new Klaro_Geo_Template_Settings();
+        $template_settings->set_template('default', array(
+            'name' => 'Default Template',
+            'config' => array('default' => false)
+        ));
+        $template_settings->set_template('strict', array(
+            'name' => 'Strict Template',
+            'config' => array('default' => false, 'mustConsent' => true)
+        ));
+        $template_settings->set_template('relaxed', array(
+            'name' => 'Relaxed Template',
+            'config' => array('default' => true, 'mustConsent' => false)
+        ));
+        $template_settings->save();
     }
 
     public function tearDown(): void {
         parent::tearDown();
         // Clean up after each test
         delete_option('klaro_geo_country_settings');
+        delete_option('klaro_geo_templates');
     }
 
     /**
