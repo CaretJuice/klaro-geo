@@ -64,7 +64,10 @@ function klaro_geo_generate_config_file() {
     klaro_geo_debug_log('Available template keys in database: ' . implode(', ', array_keys($templates)));
 
     // Try to get the template, tracking which fallback was used
+    // IMPORTANT: Update $template_to_use and $template_source when falling back
+    // so that metadata (klaroGeoConsentTemplate, klaroGeoTemplateSource) reflects actual template used
     $template_source_detail = '';
+    $original_template_requested = $template_to_use;
     if (isset($templates[$template_to_use])) {
         $template_config = $templates[$template_to_use];
         $template_source_detail = 'exact match from database';
@@ -72,10 +75,16 @@ function klaro_geo_generate_config_file() {
         $template_config = $templates['default'];
         $template_source_detail = 'fallback to "default" template (requested "' . $template_to_use . '" not found)';
         klaro_geo_debug_log('WARNING: Requested template "' . $template_to_use . '" not found in database, falling back to "default"');
+        // Update variables so metadata reflects actual template used
+        $template_to_use = 'default';
+        $template_source = 'fallback';
     } else {
         $template_config = klaro_geo_get_default_templates()['default'];
-        $template_source_detail = 'fallback to hardcoded defaults (neither "' . $template_to_use . '" nor "default" found in database)';
-        klaro_geo_debug_log('WARNING: Neither requested template "' . $template_to_use . '" nor "default" found in database, using hardcoded defaults');
+        $template_source_detail = 'fallback to hardcoded defaults (neither "' . $original_template_requested . '" nor "default" found in database)';
+        klaro_geo_debug_log('WARNING: Neither requested template "' . $original_template_requested . '" nor "default" found in database, using hardcoded defaults');
+        // Update variables so metadata reflects actual template used
+        $template_to_use = 'default';
+        $template_source = 'hardcoded-fallback';
     }
 
     klaro_geo_debug_log('Template lookup result: ' . $template_source_detail);
