@@ -54,6 +54,30 @@ function klaro_geo_country_settings_page_content() {
     // Check if 'default' template exists
     $has_default_template = isset($templates['default']);
 
+    // Check for invalid template references in country settings
+    $invalid_template_refs = array();
+    $available_template_keys = array_keys($templates);
+
+    if (!empty($geo_settings) && is_array($geo_settings)) {
+        // Check default_template
+        if (isset($geo_settings['default_template']) &&
+            !empty($geo_settings['default_template']) &&
+            !in_array($geo_settings['default_template'], $available_template_keys)) {
+            $invalid_template_refs['Fallback Template'] = $geo_settings['default_template'];
+        }
+
+        // Check each country's template
+        foreach ($geo_settings as $code => $config) {
+            if ($code === 'default_template') continue;
+            if (is_array($config) && isset($config['template']) &&
+                $config['template'] !== 'inherit' &&
+                !in_array($config['template'], $available_template_keys)) {
+                $country_name = isset($countries[$code]) ? $countries[$code] : $code;
+                $invalid_template_refs[$country_name . ' (' . $code . ')'] = $config['template'];
+            }
+        }
+    }
+
     // Add data to JavaScript - use the consolidated script
     wp_localize_script('klaro-geo-admin-js', 'klaroGeoAdmin', array(
         'ajaxurl' => admin_url('admin-ajax.php'),
@@ -65,6 +89,26 @@ function klaro_geo_country_settings_page_content() {
     ?>
     <div class="wrap">
         <h1>Klaro Geo Country Settings</h1>
+
+        <?php if (!empty($invalid_template_refs)) : ?>
+        <div class="notice notice-error">
+            <p><strong>Warning:</strong> The following settings reference templates that don't exist:</p>
+            <ul style="margin-left: 20px; list-style: disc;">
+                <?php foreach ($invalid_template_refs as $location => $template_key) : ?>
+                <li><?php echo esc_html($location); ?>: "<strong><?php echo esc_html($template_key); ?></strong>"</li>
+                <?php endforeach; ?>
+            </ul>
+            <p>Available templates: <strong><?php echo esc_html(implode(', ', $available_template_keys)); ?></strong></p>
+            <p>Please update these settings to use valid template keys, or <a href="<?php echo admin_url('admin.php?page=klaro_geo_templates_page'); ?>">create the missing templates</a>.</p>
+        </div>
+        <?php endif; ?>
+
+        <?php if (empty($templates)) : ?>
+        <div class="notice notice-warning">
+            <p><strong>No templates found.</strong> Please <a href="<?php echo admin_url('admin.php?page=klaro_geo_templates_page'); ?>">save your templates</a> first before configuring country settings.</p>
+        </div>
+        <?php endif; ?>
+
         <form method="post" action="options.php" id="klaro-country-settings-form" onsubmit="return true;">
             <?php settings_fields('klaro_geo_country_settings_group'); ?>
 

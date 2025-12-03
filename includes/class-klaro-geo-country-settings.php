@@ -291,8 +291,20 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
             return $this;
         }
 
-        // Get the default template
+        // Get available templates for validation
+        $template_settings = new Klaro_Geo_Template_Settings();
+        $available_templates = $template_settings->get();
+        $available_keys = array_keys($available_templates);
+        klaro_geo_debug_log('Available template keys for validation: ' . implode(', ', $available_keys));
+
+        // Get the default template and validate it exists
         $default_template = isset($submitted_settings['default_template']) ? $submitted_settings['default_template'] : 'default';
+        if (!empty($available_keys) && !in_array($default_template, $available_keys) && $default_template !== 'inherit') {
+            klaro_geo_debug_log('WARNING: Default template "' . $default_template . '" does not exist in templates database. Available: ' . implode(', ', $available_keys));
+            // Fall back to first available template or 'default'
+            $default_template = in_array('default', $available_keys) ? 'default' : (isset($available_keys[0]) ? $available_keys[0] : 'default');
+            klaro_geo_debug_log('Falling back to template: ' . $default_template);
+        }
 
         // Get current settings to preserve region settings
         $current_settings = $this->get();
@@ -351,6 +363,16 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
                 (!isset($config['regions']) || empty($config['regions']))) {
                 klaro_geo_debug_log('Skipping country ' . $code . ' (uses default template or inherits from fallback with no region overrides)');
                 continue;
+            }
+
+            // Validate country template exists (if not 'inherit')
+            if (isset($config['template']) && $config['template'] !== 'inherit' && !empty($available_keys)) {
+                if (!in_array($config['template'], $available_keys)) {
+                    klaro_geo_debug_log('WARNING: Country ' . $code . ' references non-existent template "' . $config['template'] . '". Available: ' . implode(', ', $available_keys));
+                    // Fall back to inherit (use fallback template)
+                    $config['template'] = 'inherit';
+                    klaro_geo_debug_log('Country ' . $code . ' template reset to "inherit"');
+                }
             }
 
             // Add the country to the new settings
