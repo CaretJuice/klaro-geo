@@ -6,18 +6,35 @@ class KlaroGeoSettingsTest extends WP_UnitTestCase {
     public function setUp(): void {
         parent::setUp();
         delete_option('klaro_geo_country_settings');
+        delete_option('klaro_geo_templates');
+
+        // Create templates for consistency with other test files
+        // and to support any future template validation
+        $template_settings = new Klaro_Geo_Template_Settings();
+        $template_settings->set_template('default', array(
+            'name' => 'Default Template',
+            'config' => array('default' => false)
+        ));
+        $template_settings->set_template('us_template', array(
+            'name' => 'US Template',
+            'config' => array('default' => false, 'required' => false)
+        ));
+        $template_settings->set_template('california_template', array(
+            'name' => 'California Template',
+            'config' => array('default' => false, 'required' => false)
+        ));
+        $template_settings->set_template('new_york_template', array(
+            'name' => 'New York Template',
+            'config' => array('default' => false, 'required' => false)
+        ));
+        $template_settings->save();
+
         $this->country_settings = new Klaro_Geo_Country_Settings();
     }
 
     public function tearDown(): void {
         delete_option('klaro_geo_country_settings');
-
-        // Remove the filter if it was added
-        if (isset($this->template_filter_callback)) {
-            remove_filter('klaro_geo_default_templates', $this->template_filter_callback, 10);
-            unset($this->template_filter_callback);
-        }
-
+        delete_option('klaro_geo_templates');
         parent::tearDown();
     }
 
@@ -99,31 +116,7 @@ class KlaroGeoSettingsTest extends WP_UnitTestCase {
     }
 
     public function test_region_settings_inheritance() {
-        // Add a filter to make our test templates available to the function
-        $filter_callback = function($templates) {
-            // Add our test templates to the list
-            return array_merge($templates, array(
-                'us_template' => array(
-                    'name' => 'US Template',
-                    'config' => array(
-                        'default' => false,
-                        'required' => false
-                    )
-                ),
-                'california_template' => array(
-                    'name' => 'California Template',
-                    'config' => array(
-                        'default' => false,
-                        'required' => false
-                    )
-                )
-            ));
-        };
-
-        // Store the callback for removal in tearDown
-        $this->template_filter_callback = $filter_callback;
-
-        add_filter('klaro_geo_default_templates', $filter_callback, 10, 1);
+        // Templates are now created in setUp() - no filter needed
 
         // Set up test data with multiple settings
         $test_settings = array(
