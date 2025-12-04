@@ -142,11 +142,15 @@ function klaro_geo_enqueue_scripts() {
     $klaro_version = get_option('klaro_geo_js_version', '0.7');
     $klaro_variant = get_option('klaro_geo_js_variant', 'klaro.js');
 
+    // Use file modification time as cache buster to ensure fresh config after changes
+    $config_file = plugin_dir_path(__FILE__) . 'klaro-config.js';
+    $config_version = file_exists($config_file) ? filemtime($config_file) : time();
+
     wp_enqueue_script(
         'klaro-config',
         plugins_url('klaro-config.js', __FILE__),
         array(),
-        KLARO_GEO_VERSION,
+        KLARO_GEO_VERSION . '.' . $config_version,
         array('strategy' => 'defer', 'in_footer' => true)
     );
 

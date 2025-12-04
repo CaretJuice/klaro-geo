@@ -11,8 +11,6 @@ function klaro_geo_country_settings_page_content() {
     if (empty($geo_settings)) {
         $geo_settings = klaro_geo_get_default_geo_settings();
     }
-    // Debug log to see what's being loaded
-    klaro_geo_debug_log('Country settings loaded: ' . print_r($geo_settings, true));
     // Define default visible countries
     $default_visible_countries = array(
         // EU countries
@@ -311,9 +309,6 @@ function klaro_geo_save_country_settings() {
     }
 
     parse_str($_POST['settings'], $settings);
-
-    // Debug log
-    klaro_geo_debug_log('Parsed settings from AJAX: ' . print_r($settings, true));
 
     // Get the submitted settings
     $submitted_settings = isset($settings['klaro_geo_country_settings']) ? $settings['klaro_geo_country_settings'] : array();
