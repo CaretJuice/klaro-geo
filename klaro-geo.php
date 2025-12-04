@@ -19,11 +19,8 @@ if (!defined('KLARO_GEO_URL')) {
 }
 // Default services are defined in includes/admin/klaro-geo-admin.php
 
-// Debug logging function with call counter to identify repeated code paths
+// Debug logging function
 function klaro_geo_debug_log($message) {
-    // Static counter to track how many times each log message fires
-    static $call_counts = array();
-
     // Always log during tests, regardless of WP_DEBUG setting
     $is_test = defined('WP_TESTS_DOMAIN') && WP_TESTS_DOMAIN;
 
@@ -32,26 +29,8 @@ function klaro_geo_debug_log($message) {
 
     // Log if: (1) we're in tests, OR (2) WP_DEBUG is on AND plugin debug logging is enabled
     if ($is_test || (defined('WP_DEBUG') && WP_DEBUG === true && $debug_enabled)) {
-        // Convert message to string for counting
-        $message_key = is_array($message) || is_object($message) ? print_r($message, true) : $message;
-
-        // Create a short key for tracking (first 80 chars to group similar messages)
-        $short_key = substr(preg_replace('/[0-9a-f]{8,}/', 'XXX', $message_key), 0, 80);
-
-        // Increment counter
-        if (!isset($call_counts[$short_key])) {
-            $call_counts[$short_key] = 0;
-        }
-        $call_counts[$short_key]++;
-        $count = $call_counts[$short_key];
-
-        // Format the message with count prefix
+        // Format the message
         $formatted_message = '[Klaro Geo Debug] ';
-        // Add count indicator - highlight if called more than once
-        if ($count > 1) {
-            $formatted_message .= '[' . $count . 'x] ';
-        }
-
         if (is_array($message) || is_object($message)) {
             $formatted_message .= print_r($message, true);
         } else {
