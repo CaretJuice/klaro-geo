@@ -476,4 +476,153 @@ jQuery(document).ready(function($) {
             }
         });
     });
+
+    // ===== AUTOSAVE FUNCTIONALITY =====
+
+    // Add CSS for autosave indicators
+    $('<style>')
+        .text(`
+            .klaro-autosave-indicator {
+                position: fixed;
+                top: 50px;
+                right: 20px;
+                padding: 10px 15px;
+                border-radius: 4px;
+                z-index: 9999;
+                font-weight: bold;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                transition: opacity 0.3s ease;
+            }
+            .klaro-autosave-saving {
+                background-color: #f8f9fa;
+                border: 1px solid #dee2e6;
+                color: #495057;
+            }
+            .klaro-autosave-success {
+                background-color: #d4edda;
+                border: 1px solid #c3e6cb;
+                color: #155724;
+            }
+            .klaro-autosave-error {
+                background-color: #f8d7da;
+                border: 1px solid #f5c6cb;
+                color: #721c24;
+            }
+            .klaro-field-saving {
+                opacity: 0.7;
+                pointer-events: none;
+            }
+            .klaro-field-saved {
+                animation: klaro-highlight-saved 1s ease;
+            }
+            @keyframes klaro-highlight-saved {
+                0% { background-color: #d4edda; }
+                100% { background-color: transparent; }
+            }
+        `)
+        .appendTo('head');
+
+    // Autosave timer reference
+    var autosaveTimer = null;
+    var autosaveDelay = 1000; // 1 second debounce
+
+    // Function to show autosave indicator
+    function showAutosaveIndicator(type, message) {
+        // Remove any existing indicators
+        $('.klaro-autosave-indicator').remove();
+
+        var indicator = $('<div class="klaro-autosave-indicator klaro-autosave-' + type + '">' + message + '</div>');
+        $('body').append(indicator);
+
+        // Auto-remove success/error indicators after delay
+        if (type !== 'saving') {
+            setTimeout(function() {
+                indicator.fadeOut(300, function() {
+                    $(this).remove();
+                });
+            }, type === 'error' ? 3000 : 2000);
+        }
+
+        return indicator;
+    }
+
+    // Function to autosave country settings
+    function autosaveCountrySettings(changedElement) {
+        // Show saving indicator
+        var savingIndicator = showAutosaveIndicator('saving', 'Saving...');
+
+        // Add saving class to the changed element
+        if (changedElement) {
+            $(changedElement).addClass('klaro-field-saving');
+        }
+
+        // Serialize the form data
+        var formData = $('#klaro-country-settings-form').serialize();
+
+        // Make AJAX request
+        $.ajax({
+            url: klaroGeoAdmin.ajaxurl,
+            type: 'POST',
+            data: {
+                action: 'save_klaro_country_settings',
+                settings: formData,
+                nonce: klaroGeoAdmin.nonce
+            },
+            success: function(response) {
+                savingIndicator.remove();
+
+                if (response.success) {
+                    showAutosaveIndicator('success', 'Saved');
+
+                    // Add saved animation to the changed element
+                    if (changedElement) {
+                        $(changedElement).removeClass('klaro-field-saving').addClass('klaro-field-saved');
+                        setTimeout(function() {
+                            $(changedElement).removeClass('klaro-field-saved');
+                        }, 1000);
+                    }
+
+                    klaroGeoLog('Country settings autosaved successfully');
+                } else {
+                    showAutosaveIndicator('error', 'Save failed: ' + (response.data || 'Unknown error'));
+                    if (changedElement) {
+                        $(changedElement).removeClass('klaro-field-saving');
+                    }
+                    console.error('Autosave failed:', response);
+                }
+            },
+            error: function(xhr, status, error) {
+                savingIndicator.remove();
+                showAutosaveIndicator('error', 'Save error: ' + error);
+                if (changedElement) {
+                    $(changedElement).removeClass('klaro-field-saving');
+                }
+                console.error('Autosave AJAX error:', status, error);
+            }
+        });
+    }
+
+    // Autosave on country/fallback template dropdown change
+    $(document).on('change', '#klaro-country-settings-form select', function() {
+        var changedElement = this;
+
+        // Clear any pending autosave
+        if (autosaveTimer) {
+            clearTimeout(autosaveTimer);
+        }
+
+        // Debounce the autosave
+        autosaveTimer = setTimeout(function() {
+            autosaveCountrySettings(changedElement);
+        }, autosaveDelay);
+    });
+
+    // Also handle the form submit to prevent double-saving
+    $('#klaro-country-settings-form').on('submit', function() {
+        // Clear any pending autosave since we're doing a full form submit
+        if (autosaveTimer) {
+            clearTimeout(autosaveTimer);
+            autosaveTimer = null;
+        }
+    });
 });
