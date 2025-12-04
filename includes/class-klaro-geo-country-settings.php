@@ -20,10 +20,45 @@ if (!class_exists('Klaro_Geo_Template_Settings')) {
 
 /**
  * Class Klaro_Geo_Country_Settings
- * 
+ *
  * Class for handling country settings stored in WordPress options
  */
 class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
+    /**
+     * Static instance cache to avoid repeated database loads
+     * Key is the option name, value is the instance
+     *
+     * @var array
+     */
+    private static $instances = array();
+
+    /**
+     * Get a cached instance or create a new one
+     * This avoids repeated database loads when the class is instantiated multiple times
+     *
+     * @param string $option_name The option name in the WordPress database
+     * @return Klaro_Geo_Country_Settings
+     */
+    public static function get_instance($option_name = 'klaro_geo_country_settings') {
+        if (!isset(self::$instances[$option_name])) {
+            self::$instances[$option_name] = new self($option_name);
+        }
+        return self::$instances[$option_name];
+    }
+
+    /**
+     * Clear the instance cache (useful for testing or after saves)
+     *
+     * @param string|null $option_name Specific option to clear, or null for all
+     */
+    public static function clear_instance_cache($option_name = null) {
+        if ($option_name === null) {
+            self::$instances = array();
+        } elseif (isset(self::$instances[$option_name])) {
+            unset(self::$instances[$option_name]);
+        }
+    }
+
     /**
      * The option name for visible countries
      *
@@ -292,7 +327,7 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
         }
 
         // Get available templates for validation
-        $template_settings = new Klaro_Geo_Template_Settings();
+        $template_settings = Klaro_Geo_Template_Settings::get_instance();
         $available_templates = $template_settings->get();
         $available_keys = array_keys($available_templates);
         klaro_geo_debug_log('Available template keys for validation: ' . implode(', ', $available_keys));
@@ -649,7 +684,7 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
         // Get the template configuration to verify it exists (using class methods)
         // IMPORTANT: Always use database templates - no hardcoded fallbacks here
         // Per contract: Database values MUST be preferred over hardcoded defaults
-        $template_settings = new Klaro_Geo_Template_Settings();
+        $template_settings = Klaro_Geo_Template_Settings::get_instance();
         $templates = $template_settings->get();
 
         // Allow filtering of templates

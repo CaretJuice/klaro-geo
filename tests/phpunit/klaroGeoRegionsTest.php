@@ -9,9 +9,15 @@ class KlaroGeoRegionsTest extends WP_UnitTestCase {
     
     public function setUp(): void {
         parent::setUp();
+
         // Reset options before each test
         delete_option('klaro_geo_country_settings');
         delete_option('klaro_geo_templates');
+
+        // Clear singleton caches AFTER deleting options to ensure fresh data
+        Klaro_Geo_Template_Settings::clear_instance_cache();
+        Klaro_Geo_Country_Settings::clear_instance_cache();
+        Klaro_Geo_Service_Settings::clear_instance_cache();
 
         // Create the templates that tests need for validation
         // This is required because get_effective_settings validates templates exist

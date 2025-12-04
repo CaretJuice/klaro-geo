@@ -177,7 +177,7 @@ function klaro_geo_enqueue_scripts() {
     );
 
     // Enqueue the consent mode extension script if needed
-    $template_settings = new Klaro_Geo_Template_Settings();
+    $template_settings = Klaro_Geo_Template_Settings::get_instance();
     $templates = $template_settings->get();
 
     // Get user location
@@ -248,7 +248,7 @@ function klaro_geo_enqueue_scripts() {
         }
 
         // Get template settings from the database
-        $template_settings = new Klaro_Geo_Template_Settings();
+        $template_settings = Klaro_Geo_Template_Settings::get_instance();
         $templates = $template_settings->get();
         $template_config = $templates[$template_to_use] ?? $templates['default'] ?? klaro_geo_get_default_templates()['default'];
 
@@ -484,7 +484,7 @@ function klaro_geo_embedded_shortcode($atts) {
     ), $atts, 'klaro_embedded');
 
     // Get the current template
-    $template_settings = new Klaro_Geo_Template_Settings();
+    $template_settings = Klaro_Geo_Template_Settings::get_instance();
     $templates = $template_settings->get();
 
     // Get user location

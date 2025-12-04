@@ -33,6 +33,11 @@ class ContractVerificationTest extends WP_UnitTestCase {
         delete_option('klaro_geo_country_settings');
         delete_option('klaro_geo_visible_countries');
 
+        // Clear singleton caches AFTER deleting options to ensure fresh data
+        Klaro_Geo_Template_Settings::clear_instance_cache();
+        Klaro_Geo_Country_Settings::clear_instance_cache();
+        Klaro_Geo_Service_Settings::clear_instance_cache();
+
         // Initialize fresh instances
         $this->template_settings = new Klaro_Geo_Template_Settings();
         $this->country_settings = new Klaro_Geo_Country_Settings();

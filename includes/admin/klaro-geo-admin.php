@@ -304,7 +304,7 @@ function klaro_geo_get_template_config($template_key) {
 
     if (!$template) {
         // Get the fallback template key from country settings
-        $country_settings = new Klaro_Geo_Country_Settings();
+        $country_settings = Klaro_Geo_Country_Settings::get_instance();
         $fallback_template_key = $country_settings->get_default_template();
 
         // Get the fallback template

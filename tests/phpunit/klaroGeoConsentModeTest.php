@@ -11,11 +11,16 @@ class KlaroGeoConsentModeTest extends WP_UnitTestCase {
      */
     public function setUp(): void {
         parent::setUp();
-        
+
         // Reset options
         delete_option('klaro_geo_templates');
         delete_option('klaro_geo_services');
-        
+
+        // Clear singleton caches AFTER deleting options to ensure fresh data
+        Klaro_Geo_Template_Settings::clear_instance_cache();
+        Klaro_Geo_Country_Settings::clear_instance_cache();
+        Klaro_Geo_Service_Settings::clear_instance_cache();
+
         // Set up default templates with consent mode settings
         $templates = array(
             'default' => array(

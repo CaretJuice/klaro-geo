@@ -50,7 +50,7 @@ function klaro_geo_generate_config_file() {
     klaro_geo_debug_log('Using template: ' . $template_to_use);
 
     // Get template configuration from the database
-    $template_settings = new Klaro_Geo_Template_Settings();
+    $template_settings = Klaro_Geo_Template_Settings::get_instance();
     $templates = $template_settings->get();
     klaro_geo_debug_log('Available templates from database: ' . print_r($templates, true));
 

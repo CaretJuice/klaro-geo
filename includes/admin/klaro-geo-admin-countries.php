@@ -274,7 +274,7 @@ function klaro_geo_country_settings_page_content() {
         $submitted_settings = isset($_POST['klaro_geo_country_settings']) ? $_POST['klaro_geo_country_settings'] : array();
 
         // Use the new country settings class
-        $country_settings = new Klaro_Geo_Country_Settings();
+        $country_settings = Klaro_Geo_Country_Settings::get_instance();
 
         // Update from form data
         $country_settings->update_from_form($submitted_settings);
@@ -319,7 +319,7 @@ function klaro_geo_save_country_settings() {
     $submitted_settings = isset($settings['klaro_geo_country_settings']) ? $settings['klaro_geo_country_settings'] : array();
 
     // Use the new country settings class
-    $country_settings = new Klaro_Geo_Country_Settings();
+    $country_settings = Klaro_Geo_Country_Settings::get_instance();
 
     // Update from form data
     $country_settings->update_from_form($submitted_settings);
@@ -369,7 +369,7 @@ function klaro_geo_save_region_settings_ajax() {
     klaro_geo_debug_log('Region settings received: ' . print_r($settings, true));
 
     // Use the new country settings class
-    $country_settings = new Klaro_Geo_Country_Settings();
+    $country_settings = Klaro_Geo_Country_Settings::get_instance();
 
     // Update regions from AJAX data
     $country_settings->update_regions_from_ajax($settings);
@@ -545,7 +545,7 @@ function klaro_geo_save_visible_countries() {
     klaro_geo_debug_log('Saving visible countries: ' . print_r($countries, true));
 
     // Use the new country settings class
-    $country_settings = new Klaro_Geo_Country_Settings();
+    $country_settings = Klaro_Geo_Country_Settings::get_instance();
 
     // Set and save visible countries
     $country_settings->set_visible_countries($countries);

@@ -19,10 +19,16 @@ class KlaroGeoCountrySettingsClassTest extends WP_UnitTestCase {
      */
     public function setUp(): void {
         parent::setUp();
+
         // Make sure the options don't exist
         delete_option($this->option_name);
         delete_option($this->visible_countries_option);
         delete_option('klaro_geo_templates');
+
+        // Clear singleton caches AFTER deleting options to ensure fresh data
+        Klaro_Geo_Template_Settings::clear_instance_cache();
+        Klaro_Geo_Country_Settings::clear_instance_cache();
+        Klaro_Geo_Service_Settings::clear_instance_cache();
 
         // Mock the option name for testing
         add_filter('pre_option_klaro_geo_country_settings', array($this, 'mock_country_settings'));

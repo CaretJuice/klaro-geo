@@ -15,7 +15,7 @@ if (!defined('ABSPATH')) exit;
  * @return array|null Settings for the location or null if not found
  */
 function klaro_geo_get_location_settings($location_code) {
-    $country_settings_class = new Klaro_Geo_Country_Settings();
+    $country_settings_class = Klaro_Geo_Country_Settings::get_instance();
     return $country_settings_class->get_location_settings($location_code);
 }
 
@@ -27,7 +27,7 @@ function klaro_geo_get_location_settings($location_code) {
  * @return bool Success status
  */
 function klaro_geo_update_location_settings($location_code, $new_settings) {
-    $country_settings_class = new Klaro_Geo_Country_Settings();
+    $country_settings_class = Klaro_Geo_Country_Settings::get_instance();
     return $country_settings_class->update_location_settings($location_code, $new_settings);
 }
 
@@ -38,7 +38,7 @@ function klaro_geo_update_location_settings($location_code, $new_settings) {
  * @return array Array of region settings
  */
 function klaro_geo_get_country_regions($country_code) {
-    $country_settings_class = new Klaro_Geo_Country_Settings();
+    $country_settings_class = Klaro_Geo_Country_Settings::get_instance();
     return $country_settings_class->get_country_regions($country_code);
 }
 
@@ -51,7 +51,7 @@ function klaro_geo_get_country_regions($country_code) {
  * @return array The effective settings
  */
 function klaro_geo_get_effective_settings($location_code, $is_admin_override = false) {
-    $country_settings_class = new Klaro_Geo_Country_Settings();
+    $country_settings_class = Klaro_Geo_Country_Settings::get_instance();
     return $country_settings_class->get_effective_settings($location_code, $is_admin_override);
 }
 
@@ -63,7 +63,7 @@ function klaro_geo_get_effective_settings($location_code, $is_admin_override = f
  */
 function klaro_geo_get_template_data($template_key) {
     // Initialize the template settings class
-    $template_settings = new Klaro_Geo_Template_Settings();
+    $template_settings = Klaro_Geo_Template_Settings::get_instance();
 
     // Get the template
     $template = $template_settings->get_template($template_key);
@@ -71,7 +71,7 @@ function klaro_geo_get_template_data($template_key) {
     // If template not found, return the fallback template
     if (!$template) {
         // Get the fallback template key from country settings
-        $country_settings = new Klaro_Geo_Country_Settings();
+        $country_settings = Klaro_Geo_Country_Settings::get_instance();
         $fallback_template_key = $country_settings->get_default_template();
 
         // Get the fallback template
