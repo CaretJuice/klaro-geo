@@ -14,7 +14,7 @@ function klaro_geo_generate_config_file() {
         $service_settings->save();
     }
 
-    klaro_geo_debug_log('Services to be used in config: ' . print_r($services, true));
+    klaro_geo_debug_log('Services: ' . count($services) . ' services configured');
 
     // Initialize config with template settings
     $klaro_config = array();
@@ -52,16 +52,13 @@ function klaro_geo_generate_config_file() {
     // Get template configuration from the database
     $template_settings = Klaro_Geo_Template_Settings::get_instance();
     $templates = $template_settings->get();
-    klaro_geo_debug_log('Available templates from database: ' . print_r($templates, true));
+    klaro_geo_debug_log('Templates available: ' . implode(', ', array_keys($templates)));
 
     // Get the template config from the database, or fall back to default if not found
     if (!function_exists('klaro_geo_get_default_templates')) {
         // If the function doesn't exist, include the defaults file that defines it
         require_once dirname(__FILE__) . '/klaro-geo-defaults.php';
     }
-
-    // Debug: Log available template keys for troubleshooting
-    klaro_geo_debug_log('Available template keys in database: ' . implode(', ', array_keys($templates)));
 
     // Try to get the template, tracking which fallback was used
     // IMPORTANT: Update $template_to_use and $template_source when falling back
@@ -87,8 +84,7 @@ function klaro_geo_generate_config_file() {
         $template_source = 'hardcoded-fallback';
     }
 
-    klaro_geo_debug_log('Template lookup result: ' . $template_source_detail);
-    klaro_geo_debug_log('Template config: ' . print_r($template_config, true));
+    klaro_geo_debug_log('Template lookup: ' . $template_source_detail);
 
     // Check if consent receipts are enabled
     $enable_consent_receipts = get_option('klaro_geo_enable_consent_receipts', false);
@@ -104,29 +100,21 @@ function klaro_geo_generate_config_file() {
         // Get enableConsentLogging setting
         if (isset($template_config['plugin_settings']['enable_consent_logging'])) {
             $custom_template_settings['enableConsentLogging'] = $template_config['plugin_settings']['enable_consent_logging'];
-            klaro_geo_debug_log('Using enableConsentLogging from plugin_settings: ' . ($custom_template_settings['enableConsentLogging'] ? 'true' : 'false'));
         }
     }
 
     // Apply template configuration
     if (isset($template_config['config'])) {
-        // Log the template config for debugging
-        klaro_geo_debug_log('Template config before applying: ' . print_r($template_config['config'], true));
-
         // Copy all config values
         foreach ($template_config['config'] as $key => $value) {
             // Skip translations for now, we'll handle them separately
             if ($key === 'translations' || $key === 'translations_json') {
                 continue;
             }
-            
+
             // Copy the value directly to klaroConfig
             $klaro_config[$key] = $value;
         }
-
-        // Log the klaro_config after applying template settings
-        klaro_geo_debug_log('klaro_config after applying template settings: ' . print_r($klaro_config, true));
-        klaro_geo_debug_log('Custom template settings: ' . print_r($custom_template_settings, true));
 
         // Handle translations - prioritize translations_json if it exists and is valid
         if (isset($template_config['config']['translations_json'])) {
@@ -148,16 +136,9 @@ function klaro_geo_generate_config_file() {
             klaro_geo_debug_log('Using basic translations');
         }
 
-        klaro_geo_debug_log('Applied template settings - default: ' .
-            (($klaro_config['default'] ?? false) ? 'true' : 'false') . ', required: ' .
-            (($klaro_config['required'] ?? false) ? 'true' : 'false'));
-
-        // Log additional settings
-        klaro_geo_debug_log('Additional settings - noAutoLoad: ' .
-            (($klaro_config['noAutoLoad'] ?? false) ? 'true' : 'false') . ', embedded: ' .
-            (($klaro_config['embedded'] ?? false) ? 'true' : 'false') . ', autoFocus: ' .
-            (($klaro_config['autoFocus'] ?? false) ? 'true' : 'false') . ', showNoticeTitle: ' .
-            (($klaro_config['showNoticeTitle'] ?? false) ? 'true' : 'false'));
+        // Log applied template settings (compact)
+        klaro_geo_debug_log('Config applied: default=' . (($klaro_config['default'] ?? false) ? 'true' : 'false') .
+            ', mustConsent=' . (($klaro_config['mustConsent'] ?? false) ? 'true' : 'false'));
     } else {
         // Ensure default values are set if template config is missing
         $klaro_config['default'] = false;
@@ -177,31 +158,23 @@ function klaro_geo_generate_config_file() {
     }
 
     // Auto-detect cookieDomain with leading dot for subdomain sharing if not explicitly set
-    // Debug: Log the cookieDomain value from template before auto-detection
-    klaro_geo_debug_log('cookieDomain from template config: ' . (isset($klaro_config['cookieDomain']) ? '"' . $klaro_config['cookieDomain'] . '"' : '(not set)'));
-
     if (!isset($klaro_config['cookieDomain']) || $klaro_config['cookieDomain'] === '') {
         // Get the site's domain from WordPress
         $raw_site_url = get_site_url();
         $site_url = parse_url($raw_site_url, PHP_URL_HOST);
-        klaro_geo_debug_log('Auto-detecting cookieDomain - raw site URL: ' . $raw_site_url . ', parsed host: ' . ($site_url ?: '(empty)'));
 
         if ($site_url) {
             // Add leading dot for subdomain sharing (e.g., ".example.com")
             $klaro_config['cookieDomain'] = '.' . preg_replace('/^www\./', '', $site_url);
-            klaro_geo_debug_log('Auto-detected cookieDomain with leading dot: ' . $klaro_config['cookieDomain']);
+            klaro_geo_debug_log('cookieDomain auto-detected: ' . $klaro_config['cookieDomain']);
         } else {
             // Fallback: leave cookieDomain empty but log a warning
-            klaro_geo_debug_log('WARNING: Could not auto-detect cookieDomain - get_site_url() returned: "' . $raw_site_url . '"');
-            // Set to empty string explicitly to prevent undefined behavior
+            klaro_geo_debug_log('WARNING: Could not auto-detect cookieDomain');
             $klaro_config['cookieDomain'] = '';
         }
     } else {
-        // Use the explicitly set value without modification
-        klaro_geo_debug_log('Using explicit cookieDomain from template: ' . $klaro_config['cookieDomain']);
+        klaro_geo_debug_log('cookieDomain from template: ' . $klaro_config['cookieDomain']);
     }
-
-    klaro_geo_debug_log('Template config applied: ' . print_r($klaro_config, true));
 
     // Build the services configuration
     $klaro_config['services'] = array();
@@ -230,14 +203,13 @@ function klaro_geo_generate_config_file() {
         $initialization_code = isset($consent_mode_settings['initialization_code']) ?
             $consent_mode_settings['initialization_code'] : '';
 
-    klaro_geo_debug_log('Consent mode settings from template - initialize_consent_mode: ' . ($initialize_consent_mode ? 'true' : 'false'));
-    klaro_geo_debug_log('Consent mode settings from template - analytics_storage_service: ' . $analytics_storage_service);
-    klaro_geo_debug_log('Consent mode settings from template - ad_storage_service: ' . $ad_storage_service);
-    klaro_geo_debug_log('Consent mode settings from template - initialization_code: ' . $initialization_code);
+    // Log consent mode only if enabled
+    if ($initialize_consent_mode) {
+        klaro_geo_debug_log('Consent mode enabled: analytics=' . $analytics_storage_service . ', ads=' . $ad_storage_service);
+    }
 
     // Process each service
     foreach ($services as $service) {
-        klaro_geo_debug_log('Processing service: ' . print_r($service, true));
         $service_config = array(
             'name' => $service['name'] ?? 'undefined',
             'purposes' => $service['purposes'] ?? $service['service_purposes'] ?? array('analytics'),
@@ -251,18 +223,10 @@ function klaro_geo_generate_config_file() {
         // This allows inheriting these values from the template
         if (isset($service['required']) && $service['required'] !== null) {
             $service_config['required'] = filter_var($service['required'], FILTER_VALIDATE_BOOLEAN);
-            klaro_geo_debug_log('Service ' . $service['name'] . ' has explicit required setting: ' .
-                ($service_config['required'] ? 'true' : 'false'));
-        } else {
-            klaro_geo_debug_log('Service ' . $service['name'] . ' inherits required setting from template');
         }
 
         if (isset($service['default']) && $service['default'] !== null) {
             $service_config['default'] = filter_var($service['default'], FILTER_VALIDATE_BOOLEAN);
-            klaro_geo_debug_log('Service ' . $service['name'] . ' has explicit default setting: ' .
-                ($service_config['default'] ? 'true' : 'false'));
-        } else {
-            klaro_geo_debug_log('Service ' . $service['name'] . ' inherits default setting from template');
         }
 
         // Add optional fields if they exist
@@ -282,12 +246,6 @@ function klaro_geo_generate_config_file() {
         if (isset($service['translations']) && !empty($service['translations'])) {
             $service_config['translations'] = $service['translations'];
         }
-
-        // Log the callback values for debugging
-        klaro_geo_debug_log('Service ' . $service['name'] . ' callbacks:');
-        klaro_geo_debug_log('  onInit: ' . (isset($service['callback']['onInit']) ? 'From callback array' : 'From direct property'));
-        klaro_geo_debug_log('  onAccept: ' . (isset($service['callback']['onAccept']) ? 'From callback array' : 'From direct property'));
-        klaro_geo_debug_log('  onDecline: ' . (isset($service['callback']['onDecline']) ? 'From callback array' : 'From direct property'));
 
         // Apply Google Consent Mode modifications if enabled
         if ($initialize_consent_mode) {
@@ -350,11 +308,8 @@ function klaro_geo_generate_config_file() {
 
     // Transform styling settings from object to array format if needed
     if (isset($klaro_config['styling']) && isset($klaro_config['styling']['theme'])) {
-        klaro_geo_debug_log('Found styling theme settings: ' . print_r($klaro_config['styling']['theme'], true));
-
         if (is_array($klaro_config['styling']['theme'])) {
             // Check if theme is in object format (with keys like 'color', 'position', 'width')
-            // We need to check if it's an associative array rather than a numeric array
             $is_associative = false;
             foreach (array_keys($klaro_config['styling']['theme']) as $key) {
                 if (is_string($key)) {
@@ -363,10 +318,7 @@ function klaro_geo_generate_config_file() {
                 }
             }
 
-            klaro_geo_debug_log('Styling theme is ' . ($is_associative ? 'an associative array (object format)' : 'a numeric array (already in correct format)'));
-
             if ($is_associative) {
-
                 // Extract values from the object
                 $theme_values = array();
 
@@ -387,15 +339,8 @@ function klaro_geo_generate_config_file() {
 
                 // Replace the object with the array
                 $klaro_config['styling']['theme'] = $theme_values;
-
-                klaro_geo_debug_log('Transformed styling theme from object to array format: ' . print_r($theme_values, true));
             }
         }
-    }
-
-    // Log the final config for debugging
-    if (isset($klaro_config['styling'])) {
-        klaro_geo_debug_log('Final styling configuration: ' . print_r($klaro_config['styling'], true));
     }
 
     // Generate the JavaScript content
@@ -452,26 +397,9 @@ if (latestReceipt) {
 // Push to dataLayer
 window.dataLayer.push(klaroConfigLoadedData);\n\n";
 
-    klaro_geo_debug_log('enableConsentLogging setting: ' . ($custom_template_settings['enableConsentLogging'] ? 'true' : 'false'));
-
-    // Echo the content for testing purposes
-    klaro_geo_debug_log('var klaroConfig = ' . wp_json_encode($klaro_config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . ";");
-    
-    // Create a sample of what the dataLayer push would look like for logging
-    $sample_push = array(
-        'event' => 'Klaro Event',
-        'eventSource' => 'klaro-geo',
-        'klaroEventName'=> 'klaroConfigLoaded',
-        'klaroGeoConsentTemplate' => $template_to_use,
-        'klaroGeoTemplateSource' => $template_source,
-        'klaroGeoDetectedCountry' => !empty($user_country) ? $user_country : null,
-        'klaroGeoDetectedRegion' => !empty($user_region) ? $user_region : null,
-        'klaroGeoAdminOverride' => $using_debug_geo,
-        'klaroGeoEnableConsentLogging' => $custom_template_settings['enableConsentLogging'],
-        'klaroGeoConsentReceipt' => '(Will be added by JavaScript if available)'
-    );
-    klaro_geo_debug_log('dataLayer push sample: ' . wp_json_encode($sample_push, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-
+    // Log summary of config generation
+    klaro_geo_debug_log('Config generated: template=' . $template_to_use . ', services=' . count($klaro_config['services']) .
+        ', consentLogging=' . ($custom_template_settings['enableConsentLogging'] ? 'true' : 'false'));
 
     // Define variables for consent receipts
     $admin_ajax_url = admin_url('admin-ajax.php');
@@ -480,9 +408,6 @@ window.dataLayer.push(klaroConfigLoadedData);\n\n";
     // Get the consent_mode value for JavaScript
     $consent_mode = $initialize_consent_mode ? 'v2' : 'none';
     $consent_mode_js = wp_json_encode($consent_mode);
-
-    klaro_geo_debug_log('Using consent_mode: ' . $consent_mode);
-    klaro_geo_debug_log('Template config consent_mode_settings: ' . print_r($consent_mode_settings, true));
 
     // Add consent receipt functionality if enabled
     if ($enable_consent_receipts) {

@@ -47,6 +47,46 @@ function klaro_geo_debug_log($message) {
     }
 }
 
+/**
+ * Log an array in compact JSON format (one line)
+ * Use this instead of print_r for shorter logs
+ *
+ * @param string $label Label for the log entry
+ * @param array $data Array to log
+ * @param bool $summarize If true, only log keys and counts for nested arrays
+ */
+function klaro_geo_debug_log_compact($label, $data, $summarize = false) {
+    if ($summarize && is_array($data)) {
+        // Create a summary: show keys and counts instead of full data
+        $summary = array();
+        foreach ($data as $key => $value) {
+            if (is_array($value)) {
+                $summary[$key] = '[' . count($value) . ' items]';
+            } else {
+                $summary[$key] = $value;
+            }
+        }
+        $json = wp_json_encode($summary, JSON_UNESCAPED_SLASHES);
+    } else {
+        $json = wp_json_encode($data, JSON_UNESCAPED_SLASHES);
+    }
+    klaro_geo_debug_log($label . ': ' . $json);
+}
+
+/**
+ * Track which logs have already been output this request
+ * Used to prevent duplicate verbose logging
+ */
+function klaro_geo_log_once($key, $message) {
+    static $logged = array();
+    if (!isset($logged[$key])) {
+        $logged[$key] = true;
+        klaro_geo_debug_log($message);
+        return true;
+    }
+    return false;
+}
+
 // Include defaults file first
 require_once plugin_dir_path(__FILE__) . 'includes/klaro-geo-defaults.php';
 

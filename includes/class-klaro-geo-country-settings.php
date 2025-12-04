@@ -605,19 +605,18 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
      * @return array The effective settings for the location
      */
     public function get_effective_settings($location_code, $is_admin_override = false) {
-        klaro_geo_debug_log('Getting effective settings for location: ' . $location_code . ($is_admin_override ? ' (admin override)' : ''));
+        klaro_geo_debug_log('Getting effective settings for: ' . $location_code . ($is_admin_override ? ' (admin override)' : ''));
 
         // Split location code to check if it's a region request
         $parts = explode('-', $location_code);
         $country_code = $parts[0];
         $region_code = isset($parts[1]) ? $parts[1] : null;
 
-        klaro_geo_debug_log('Parsed location - Country: ' . $country_code . ', Region: ' . ($region_code ?? 'none'));
-
         // Load country settings (using class methods)
         $geo_settings = $this->get();
 
-        klaro_geo_debug_log('Global settings: ' . print_r($geo_settings, true));
+        // Log global settings only once per request (use summarized format)
+        klaro_geo_log_once('global_settings', 'Country settings: ' . count($geo_settings) . ' entries, default_template=' . ($geo_settings['default_template'] ?? 'not set'));
 
         // Get the default template
         $default_template = $this->get_default_template();
@@ -717,7 +716,7 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
             klaro_geo_debug_log('Falling back to fallback template: ' . $fallback_template);
         }
         
-        klaro_geo_debug_log('Final effective settings: ' . print_r($effective_settings, true));
+        klaro_geo_debug_log('Effective settings: template=' . ($effective_settings['template'] ?? 'none') . ', source=' . ($effective_settings['source'] ?? 'unknown'));
         return $effective_settings;
     }
 

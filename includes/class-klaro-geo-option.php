@@ -60,43 +60,29 @@ class Klaro_Geo_Option {
      * @return array The option value
      */
     public function load() {
-        klaro_geo_debug_log('Loading option: ' . $this->option_name);
         $value = get_option($this->option_name, $this->default_value);
-
-        // Log the type and content of the retrieved value
-        $type = gettype($value);
-        klaro_geo_debug_log('Retrieved ' . $this->option_name . ' from database - Type: ' . $type);
-
-        if ($type === 'array') {
-            klaro_geo_debug_log('Array value count: ' . count($value));
-        } elseif ($type === 'string') {
-            klaro_geo_debug_log('String value length: ' . strlen($value));
-        }
 
         // If the value is a string, try to decode it as JSON
         if (is_string($value)) {
             $decoded = json_decode($value, true);
             if (json_last_error() === JSON_ERROR_NONE) {
                 $value = $decoded;
-                klaro_geo_debug_log('Decoded ' . $this->option_name . ' from JSON string - Result type: ' . gettype($value));
-                if (is_array($value)) {
-                    klaro_geo_debug_log('Decoded array count: ' . count($value));
-                }
             } else {
-                klaro_geo_debug_log('Failed to decode ' . $this->option_name . ' from JSON string - Error: ' . json_last_error_msg());
+                klaro_geo_debug_log('Failed to decode ' . $this->option_name . ' from JSON: ' . json_last_error_msg());
             }
         }
 
         // Ensure we have an array
         if (!is_array($value)) {
-            klaro_geo_debug_log('Invalid value for ' . $this->option_name . ', using default - Type: ' . gettype($value));
+            klaro_geo_debug_log('Invalid value for ' . $this->option_name . ', using default');
             $value = $this->default_value;
         }
 
         $this->value = $value;
         $this->is_modified = false;
 
-        klaro_geo_debug_log('Loaded ' . $this->option_name . ' - Final value type: ' . gettype($this->value) . ', count: ' . (is_array($this->value) ? count($this->value) : 'N/A'));
+        // Single compact log entry for the load operation
+        klaro_geo_debug_log('Loaded ' . $this->option_name . ' (' . count($this->value) . ' items)');
 
         return $this->value;
     }
@@ -107,32 +93,8 @@ class Klaro_Geo_Option {
      * @return bool Whether the option was saved successfully
      */
     public function save() {
-        klaro_geo_debug_log('Attempting to save option: ' . $this->option_name);
-
         if (!$this->is_modified) {
-            klaro_geo_debug_log('Option ' . $this->option_name . ' not modified, skipping save');
             return true;
-        }
-
-        // Log the value being saved
-        klaro_geo_debug_log('Saving ' . $this->option_name . ' - Type: ' . gettype($this->value) . ', count: ' . (is_array($this->value) ? count($this->value) : 'N/A'));
-
-        // For country settings, log the full value for debugging
-        if ($this->option_name === 'klaro_geo_country_settings') {
-            klaro_geo_debug_log('Country settings before save: ' . print_r($this->value, true));
-
-            // Check for region settings
-            $regions_found = false;
-            foreach ($this->value as $code => $config) {
-                if ($code !== 'default_template' && isset($config['regions']) && !empty($config['regions'])) {
-                    $regions_found = true;
-                    klaro_geo_debug_log('Found regions for country ' . $code . ': ' . print_r($config['regions'], true));
-                }
-            }
-
-            if (!$regions_found) {
-                klaro_geo_debug_log('WARNING: No regions found in country settings before save!');
-            }
         }
 
         // Check for any potential issues with the value
@@ -142,7 +104,6 @@ class Klaro_Geo_Option {
 
         // Special handling for services - always save as JSON string
         if ($this->option_name === 'klaro_geo_services') {
-            klaro_geo_debug_log('Converting services to JSON string before saving');
             $json_value = wp_json_encode($this->value, JSON_PRETTY_PRINT);
             $result = update_option($this->option_name, $json_value);
         } else {
@@ -152,29 +113,9 @@ class Klaro_Geo_Option {
 
         if ($result) {
             $this->is_modified = false;
-            klaro_geo_debug_log('Successfully saved ' . $this->option_name . ' to database');
-
-            // Verify the saved value
-            $saved_value = get_option($this->option_name);
-            $saved_type = gettype($saved_value);
-            klaro_geo_debug_log('Verified saved ' . $this->option_name . ' - Type: ' . $saved_type . ', count: ' . (is_array($saved_value) ? count($saved_value) : 'N/A'));
-
-            // For country settings, verify regions were saved correctly
-            if ($this->option_name === 'klaro_geo_country_settings' && is_array($saved_value)) {
-                $regions_found = false;
-                foreach ($saved_value as $code => $config) {
-                    if ($code !== 'default_template' && isset($config['regions']) && !empty($config['regions'])) {
-                        $regions_found = true;
-                        klaro_geo_debug_log('Verified regions for country ' . $code . ' after save: ' . print_r($config['regions'], true));
-                    }
-                }
-
-                if (!$regions_found) {
-                    klaro_geo_debug_log('WARNING: No regions found in country settings after save!');
-                }
-            }
+            klaro_geo_debug_log('Saved ' . $this->option_name . ' (' . count($this->value) . ' items)');
         } else {
-            klaro_geo_debug_log('Failed to save ' . $this->option_name . ' to database');
+            klaro_geo_debug_log('Failed to save ' . $this->option_name);
         }
 
         return $result;
