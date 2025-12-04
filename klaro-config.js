@@ -155,7 +155,7 @@ window.klaroConsentData = {
     detectedRegion: "",
     adminOverride: true,
     ajaxUrl: "http://example.org/wp-admin/admin-ajax.php",
-    nonce: "aef3fc1ed4",
+    nonce: "f4625daeaf",
     enableConsentLogging: true,
     consentMode: "none",
     templateSettings: {
