@@ -55,7 +55,7 @@ add_action('admin_menu', 'klaro_geo_admin_menu');
 // Activation function
 function klaro_geo_activate() {
     // Set up the default services using the service settings class
-    $service_settings = new Klaro_Geo_Service_Settings();
+    $service_settings = Klaro_Geo_Service_Settings::get_instance();
     $default_services = $service_settings->get_default_services();
 
     // Make default services available globally
@@ -275,7 +275,7 @@ function klaro_geo_get_config() {
     $config = $template_config['config'];
 
     // Add services configuration using the service settings class
-    $service_settings = new Klaro_Geo_Service_Settings();
+    $service_settings = Klaro_Geo_Service_Settings::get_instance();
     $services = $service_settings->get();
     if (!empty($services)) {
         $config['services'] = $services;

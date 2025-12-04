@@ -9,7 +9,7 @@ function klaro_geo_settings_page_content() {
     add_filter('pre_update_option_klaro_geo_debug_countries', 'klaro_geo_process_debug_countries', 10, 2);
 
     // Get existing services or initialize with defaults using the service settings class
-    $service_settings = new Klaro_Geo_Service_Settings();
+    $service_settings = Klaro_Geo_Service_Settings::get_instance();
     $default_services = $service_settings->get();
 
     if (empty($default_services)) {

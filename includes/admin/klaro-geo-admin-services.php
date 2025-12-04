@@ -6,7 +6,7 @@ function klaro_geo_services_page_content() {
     $purposes = explode(',', get_option('klaro_geo_purposes', 'functional,analytics,advertising')); // Get available purposes from settings
 
     // Initialize the service settings class
-    $service_settings = new Klaro_Geo_Service_Settings();
+    $service_settings = Klaro_Geo_Service_Settings::get_instance();
     $services = $service_settings->get();
     klaro_geo_debug_log('Services page content - services: ' . print_r($services, true));
 
@@ -230,7 +230,7 @@ function klaro_geo_save_services(){
 
     if (isset($_POST['services'])) {
         // Initialize the service settings class
-        $service_settings = new Klaro_Geo_Service_Settings();
+        $service_settings = Klaro_Geo_Service_Settings::get_instance();
 
         // Use wp_unslash() to remove escaping, only if necessary.
         $services = json_decode(wp_unslash($_POST['services']), true);
@@ -274,7 +274,7 @@ function klaro_geo_delete_service() {
     }
 
     // Initialize the service settings class
-    $service_settings = new Klaro_Geo_Service_Settings();
+    $service_settings = Klaro_Geo_Service_Settings::get_instance();
 
     // Get the existing services
     $services = $service_settings->get();

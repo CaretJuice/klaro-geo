@@ -1171,7 +1171,7 @@ function klaro_geo_templates_page() {
                                 <option value="no_service" <?php selected(isset($current_config['consent_mode_settings']['analytics_storage_service']) ? $current_config['consent_mode_settings']['analytics_storage_service'] : 'no_service', 'no_service'); ?>>No service</option>
                                 <?php
                                 // Get services for dropdown
-                                $service_settings = new Klaro_Geo_Service_Settings();
+                                $service_settings = Klaro_Geo_Service_Settings::get_instance();
                                 $services = $service_settings->get();
                                 foreach ($services as $service) {
                                     if (isset($service['name'])) {

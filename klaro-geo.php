@@ -570,7 +570,7 @@ function klaro_geo_validate_services() {
     $is_validating = true;
 
     // Use the service settings class to get and validate services
-    $service_settings = new Klaro_Geo_Service_Settings();
+    $service_settings = Klaro_Geo_Service_Settings::get_instance();
     $services = $service_settings->get();
 
     // Make sure we have the default services available globally

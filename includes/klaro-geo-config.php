@@ -3,7 +3,7 @@
 // Function to generate klaro-config.js
 function klaro_geo_generate_config_file() {
     // Get the services using the service settings class
-    $service_settings = new Klaro_Geo_Service_Settings();
+    $service_settings = Klaro_Geo_Service_Settings::get_instance();
     $services = $service_settings->get();
 
     if (empty($services) || !is_array($services) || !isset($services[0]['name'])) {

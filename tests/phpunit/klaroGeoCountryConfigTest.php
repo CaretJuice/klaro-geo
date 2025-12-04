@@ -18,6 +18,9 @@ class CountryConfigTest extends WP_UnitTestCase {
         delete_option('klaro_geo_country_settings');
         delete_option('klaro_geo_templates');
 
+        // Clear singleton caches to ensure fresh data from database
+        Klaro_Geo_Service_Settings::clear_instance_cache();
+
         // Set up default templates
         $templates = klaro_geo_get_default_templates();
 
