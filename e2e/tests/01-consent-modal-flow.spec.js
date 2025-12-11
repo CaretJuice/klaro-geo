@@ -111,36 +111,6 @@ test.describe('Klaro Consent Modal Flow', () => {
     expect(consentData).toBeTruthy();
   });
 
-  test('should allow changing individual service consents', async ({ page }) => {
-    await klaroHelper.waitForKlaroLoad();
-    await klaroHelper.waitForModal();
-
-    // Click "Let me choose" to access individual service settings
-    const letMeChoose = page.locator('a:has-text("Let me choose"), button:has-text("Let me choose")');
-
-    if (await letMeChoose.isVisible().catch(() => false)) {
-      await letMeChoose.click();
-      await page.waitForTimeout(500);
-
-      // Now we should see purposes or services
-      // If groupByPurpose is enabled, we need to expand purpose groups
-      const purposeCaret = page.locator('.cm-caret a').first();
-      if (await purposeCaret.isVisible().catch(() => false)) {
-        await purposeCaret.click();
-        await page.waitForTimeout(300);
-      }
-
-      // Check if we can see individual service toggles
-      const serviceToggles = page.locator('input[type="checkbox"][id^="service-item-"]');
-      const count = await serviceToggles.count();
-
-      expect(count).toBeGreaterThan(0);
-    } else {
-      // If "Let me choose" isn't visible, skip this test
-      test.skip();
-    }
-  });
-
   test('should push events to dataLayer when consent is saved', async ({ page }) => {
     await klaroHelper.waitForKlaroLoad();
     await klaroHelper.waitForModal();

@@ -46,6 +46,10 @@ assets/dist/
 # Testing and Coverage
 coverage/
 .phpunit.result.cache
+test-results/
+e2e-report/
+playwright-report/
+playwright/.cache/
 
 # Temporary Files
 *.log
@@ -61,6 +65,8 @@ temp/
 
 # Debugging Files
 debug.log
+docker/logs/*.log
+docker/logs/npm/
 
 # Backup Files
 *.bak

@@ -29,11 +29,11 @@ test.describe('Consent Receipt Generation', () => {
     await klaroHelper.acceptAll();
 
     // Wait for receipt generation event in dataLayer
-    // The actual event name is 'Klaro Geo Consent Receipt' per klaro-geo-consent-receipts.js:147
-    const receiptEvent = await klaroHelper.waitForDataLayerEventByName('Klaro Geo Consent Receipt', 5000);
+    // The actual event is 'Klaro Event' with klaroEventName: 'generateConsentReceipt'
+    const receiptEvent = await klaroHelper.waitForDataLayerEvent('generateConsentReceipt', 5000);
 
     expect(receiptEvent).toBeTruthy();
-    expect(receiptEvent.klaro_geo_consent_receipt).toBeTruthy();
+    expect(receiptEvent.klaroGeoConsentReceipt).toBeTruthy();
 
     // Also verify receipt is in localStorage (as backup storage)
     const receipts = await klaroHelper.getConsentReceipts();
@@ -51,23 +51,35 @@ test.describe('Consent Receipt Generation', () => {
     await klaroHelper.acceptAll();
 
     // Wait for receipt generation event in dataLayer
-    const receiptEvent = await klaroHelper.waitForDataLayerEventByName('Klaro Geo Consent Receipt', 5000);
+    const receiptEvent = await klaroHelper.waitForDataLayerEvent('generateConsentReceipt', 5000);
 
     expect(receiptEvent).toBeTruthy();
-    expect(receiptEvent.klaro_geo_consent_receipt).toBeTruthy();
+    expect(receiptEvent.klaroGeoConsentReceipt).toBeTruthy();
 
-    const receipt = receiptEvent.klaro_geo_consent_receipt;
+    // The dataLayer event contains the receipt ID
+    const receiptId = receiptEvent.klaroGeoConsentReceipt;
+    expect(receiptId).toMatch(/^receipt_/);
 
-    // Check required fields
+    // Verify additional fields in the event
+    expect(receiptEvent.klaroGeoTemplateSource).toBeTruthy();
+    expect(typeof receiptEvent.klaroGeoAdminOverride).toBe('boolean');
+
+    // Check localStorage for full receipt details
+    const receipts = await klaroHelper.getConsentReceipts();
+    expect(receipts).toBeTruthy();
+    expect(receipts.length).toBeGreaterThan(0);
+
+    const receipt = receipts[receipts.length - 1];
+
+    // Check required fields in stored receipt
     expect(receipt).toHaveProperty('receipt_id');
     expect(receipt).toHaveProperty('timestamp');
     expect(receipt).toHaveProperty('consent_choices');
     expect(receipt).toHaveProperty('template_name');
     expect(receipt).toHaveProperty('template_source');
 
-    // Receipt ID should be unique
-    expect(receipt.receipt_id).toBeTruthy();
-    expect(receipt.receipt_id).toMatch(/^receipt_/);
+    // Receipt ID should match
+    expect(receipt.receipt_id).toBe(receiptId);
 
     // Timestamp should be reasonable
     expect(receipt.timestamp).toBeGreaterThan(0);
@@ -132,7 +144,7 @@ test.describe('Consent Receipt Generation', () => {
     await klaroHelper.acceptAll();
 
     // Wait for first receipt
-    await klaroHelper.waitForDataLayerEventByName('Klaro Geo Consent Receipt', 5000);
+    await klaroHelper.waitForDataLayerEvent('generateConsentReceipt', 5000);
 
     // Open modal again to change consent
     await klaroHelper.openModal();
@@ -151,47 +163,10 @@ test.describe('Consent Receipt Generation', () => {
 
     // Check we have multiple receipts via dataLayer
     const dataLayer = await klaroHelper.getDataLayerEvents();
-    const receiptEvents = dataLayer.filter(event => event.event === 'Klaro Geo Consent Receipt');
+    const receiptEvents = dataLayer.filter(event => event.klaroEventName === 'generateConsentReceipt');
 
     // Should have at least 2 receipt generation events
     expect(receiptEvents.length).toBeGreaterThanOrEqual(2);
-  });
-
-  // NOTE: Skipping this test because declining after accepting is not possible
-  // The decline button is only available on initial modal, not after consent is given
-  test.skip('should limit receipts to maximum 10 in localStorage', async ({ page }) => {
-    await page.goto('/');
-    await klaroHelper.waitForKlaroLoad();
-
-    // Generate 12 consent changes
-    for (let i = 0; i < 12; i++) {
-      await klaroHelper.waitForModal();
-
-      if (i % 2 === 0) {
-        await klaroHelper.acceptAll();
-      } else {
-        await klaroHelper.declineAll();
-      }
-
-      await page.waitForTimeout(500);
-
-      // Reopen modal for next iteration (except last)
-      if (i < 11) {
-        await klaroHelper.openModal();
-      }
-    }
-
-    // Wait for all receipts to be processed
-    await page.waitForTimeout(2000);
-
-    // Check localStorage
-    const receipts = await page.evaluate(() => {
-      const data = localStorage.getItem('klaro_consent_receipts');
-      return data ? JSON.parse(data) : null;
-    });
-
-    // Should have max 10 receipts
-    expect(receipts.length).toBeLessThanOrEqual(10);
   });
 
   test('should include consent choices in receipt', async ({ page }) => {
@@ -202,12 +177,17 @@ test.describe('Consent Receipt Generation', () => {
     await klaroHelper.acceptAll();
 
     // Wait for receipt generation event in dataLayer
-    const receiptEvent = await klaroHelper.waitForDataLayerEventByName('Klaro Geo Consent Receipt', 5000);
+    const receiptEvent = await klaroHelper.waitForDataLayerEvent('generateConsentReceipt', 5000);
 
     expect(receiptEvent).toBeTruthy();
-    expect(receiptEvent.klaro_geo_consent_receipt).toBeTruthy();
+    expect(receiptEvent.klaroGeoConsentReceipt).toBeTruthy();
 
-    const receipt = receiptEvent.klaro_geo_consent_receipt;
+    // Get full receipt from localStorage
+    const receipts = await klaroHelper.getConsentReceipts();
+    expect(receipts).toBeTruthy();
+    expect(receipts.length).toBeGreaterThan(0);
+
+    const receipt = receipts[receipts.length - 1];
 
     // Consent choices should have at least one service
     expect(receipt.consent_choices).toBeTruthy();
@@ -232,16 +212,11 @@ test.describe('Consent Receipt Generation', () => {
     const dataLayer = await klaroHelper.getDataLayerEvents();
 
     const receiptEvent = dataLayer.find(event =>
-      event.event === 'Klaro Geo Consent Receipt' ||
-      event.klaro_geo_consent_receipt
+      event.klaroEventName === 'generateConsentReceipt'
     );
 
-    if (receiptEvent) {
-      expect(receiptEvent.klaro_geo_consent_receipt).toBeTruthy();
-
-      const receipt = receiptEvent.klaro_geo_consent_receipt;
-      expect(receipt.timestamp).toBeTruthy();
-      expect(receipt.consent_choices).toBeTruthy();
-    }
+    expect(receiptEvent).toBeTruthy();
+    expect(receiptEvent.klaroGeoConsentReceipt).toBeTruthy();
+    expect(receiptEvent.klaroGeoTemplateSource).toBeTruthy();
   });
 });

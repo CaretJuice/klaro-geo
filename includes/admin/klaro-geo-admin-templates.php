@@ -307,14 +307,15 @@ function klaro_geo_templates_page() {
 
                 if (is_array($value)) {
                     // Special handling for consent mode settings
+                    // NOTE: initialize_consent_mode has been removed - consent mode is always enabled
                     if ($key === 'consent_mode_settings') {
                         $template_config[$key] = array();
 
                         // Process each consent mode setting
                         foreach ($value as $setting_key => $setting_value) {
+                            // Skip legacy initialize_consent_mode
                             if ($setting_key === 'initialize_consent_mode') {
-                                // Handle checkbox value
-                                $template_config[$key][$setting_key] = isset($value['initialize_consent_mode']);
+                                continue;
                             } else if ($setting_key === 'initialization_code') {
                                 // Handle JavaScript code - don't sanitize too aggressively
                                 $template_config[$key][$setting_key] = stripslashes($setting_value);
@@ -1153,17 +1154,8 @@ function klaro_geo_templates_page() {
                     </tr>
                 </table>
                 <h3>Consent Mode Settings</h3>
+                <p class="description">Consent mode is always enabled. Configure which services control Google Consent Mode signals below. Dynamic consent keys are automatically generated for all services.</p>
                 <table class="form-table">
-                    <tr>
-                        <th><label for="consent_mode_settings_initialize_consent_mode">Initialize Consent Mode:</label></th>
-                        <td>
-                            <!-- Hidden field to ensure the value is sent even when unchecked -->
-                            <input type="hidden" name="template_config[consent_mode_settings][initialize_consent_mode]" value="false">
-                            <input type="checkbox" name="template_config[consent_mode_settings][initialize_consent_mode]" id="consent_mode_settings_initialize_consent_mode" value="true"
-                                <?php checked(isset($current_config['consent_mode_settings']['initialize_consent_mode']) ? filter_var($current_config['consent_mode_settings']['initialize_consent_mode'], FILTER_VALIDATE_BOOLEAN) : false); ?>>
-                            <p class="description">Initialize all consent signals (denied) when Google Tag Manager loads and enable other consent mode operations.</p>
-                        </td>
-                    </tr>
                     <tr>
                         <th><label for="consent_mode_settings_analytics_storage_service">Map analytics_storage to service:</label></th>
                         <td>

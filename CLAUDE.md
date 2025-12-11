@@ -136,16 +136,17 @@ Use the custom `/commit` command which:
 ## Current Session Goals
 
 <!-- Update this section for each working session -->
-- Investigating cookieDomain not applying from templates
-- Creating contracts to document expected behavior
-- Writing tests to verify contracts
+- Improve the experience of using this plugin
+- Implement the [Dynamic Custom Consent Keys] (/home/damon/dev/cj/wp/klaro-geo/plan/dynamic-custom-consent-keys.md) described in the linked Markdown file
+- Update the documentation (in particular, the README; I don't think this affects inline documentation much or at all)
 
 ## Working Memory
 
 <!-- Update as you work -->
-- Current task: Contract creation and bug investigation
-- Context boundaries: Template system, config generation, geo-detection
-- Recent decisions: Using contract-driven approach to diagnose issues
+- Check which contracts need updating first
+- We want to lock unaffected contracts and document which contracts we are working on in this session
+- Document the contracts that we are working on in this file
+- After the unaffected contracts are locked and we've settled on which contracts need to be unlocked, edit the contracts and start editing the code, updating tests, etc...
 
 ## Debug Logging
 

@@ -16,7 +16,7 @@ file_meta:
   related_specs:
     - "datalayer-events.spec.yaml"  # DataLayer events this file generates
   stability: "stable"
-  last_updated: "2025-12-03"
+  last_updated: "2025-12-10"
 
 # =============================================================================
 # ARCHITECTURE: DATALAYER-FIRST DESIGN
@@ -186,10 +186,11 @@ data_structures:
     plugin_settings:
       enable_consent_logging: "bool"
     consent_mode_settings:
-      initialize_consent_mode: "bool"
-      analytics_storage_service: "string"
-      ad_storage_service: "string"
-      initialization_code: "string"
+      # NOTE: initialize_consent_mode has been REMOVED - consent mode is always enabled
+      # This simplifies the codebase and ensures all tag managers can read the consentMode object
+      analytics_storage_service: "string - Service name that controls analytics_storage"
+      ad_storage_service: "string - Service name that controls ad_storage"
+      initialization_code: "string - Custom initialization code for GTM"
 
   effective_settings:
     template: "string - Template key to use"
@@ -282,3 +283,58 @@ debugging:
     - "Falling back to hardcoded defaults"
     - "Auto-detection of cookieDomain failed"
     - "File write failed"
+
+# =============================================================================
+# CONSENT MODE BEHAVIOR
+# =============================================================================
+consent_mode:
+  description: "Google Consent Mode v2 and dynamic service consent keys"
+
+  always_enabled:
+    description: "Consent mode is ALWAYS enabled - there is no toggle"
+    rationale: |
+      - Simplifies the codebase by removing conditional logic
+      - Ensures all tag managers can read the consentMode object in dataLayer
+      - Provides consistent behavior across all deployments
+    contract: |
+      - The config MUST always output consent mode v2 initialization
+      - The dataLayer event 'Klaro Consent Update' MUST always include consentMode object
+      - gtag('consent', 'update', {...}) MUST always be called on consent changes
+
+  standard_google_keys:
+    description: "Standard Google Consent Mode v2 keys"
+    keys:
+      ad_storage: "Controlled by ad_storage_service setting"
+      analytics_storage: "Controlled by analytics_storage_service setting"
+      ad_user_data: "Derived from ad_storage + user checkbox"
+      ad_personalization: "Derived from ad_storage + user checkbox"
+
+  dynamic_service_keys:
+    description: "Dynamic consent keys generated for each service"
+    key_format: "[sanitized_service_name]_consent"
+    sanitization_rules:
+      - "Replace all hyphens (-) with underscores (_)"
+      - "Append '_consent' suffix"
+      - "Lowercase the service name"
+    examples:
+      - input: "google-analytics"
+        output: "google_analytics_consent"
+      - input: "piwik"
+        output: "piwik_consent"
+      - input: "contact-form-7"
+        output: "contact_form_7_consent"
+    reserved_keys:
+      - "ad_storage"
+      - "analytics_storage"
+      - "ad_user_data"
+      - "ad_personalization"
+    conflict_resolution: |
+      Reserved keys take precedence. If a service name would generate a key
+      that conflicts with a reserved key (e.g., service named "ad-storage"
+      would generate "ad_storage_consent"), the dynamic key is still generated
+      since it has the "_consent" suffix.
+    contract: |
+      - Dynamic keys MUST be generated for ALL services in the Klaro config
+      - Services with consent=true MUST have value 'granted'
+      - Services with consent=false MUST have value 'denied'
+      - Dynamic keys are included in both gtag() call and dataLayer event

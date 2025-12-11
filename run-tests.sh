@@ -18,7 +18,11 @@ cd "$SCRIPT_DIR/docker"
 docker compose down --remove-orphans 2>/dev/null || true
 
 # Check for the first argument to determine which tests to run
-if [ "$1" == "js" ]; then
+if [ "$1" == "e2e" ]; then
+  echo "Running E2E tests..."
+  cd "$SCRIPT_DIR"
+  npm run e2e:full
+elif [ "$1" == "js" ]; then
   # First, fix permissions using root
   echo "Setting up npm permissions..."
   docker compose run --user root wordpress_test bash -c "

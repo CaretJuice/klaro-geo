@@ -191,8 +191,9 @@ function klaro_geo_generate_config_file() {
         $consent_mode_settings = [];
     }
 
-    $initialize_consent_mode = isset($consent_mode_settings['initialize_consent_mode']) ?
-        filter_var($consent_mode_settings['initialize_consent_mode'], FILTER_VALIDATE_BOOLEAN) : false;
+    // NOTE: Consent mode is ALWAYS enabled - no toggle check needed
+    // Remove any legacy initialize_consent_mode from settings
+    unset($consent_mode_settings['initialize_consent_mode']);
 
     $analytics_storage_service = isset($consent_mode_settings['analytics_storage_service']) ?
         $consent_mode_settings['analytics_storage_service'] : 'no_service';
@@ -200,13 +201,11 @@ function klaro_geo_generate_config_file() {
     $ad_storage_service = isset($consent_mode_settings['ad_storage_service']) ?
         $consent_mode_settings['ad_storage_service'] : 'no_service';
 
-        $initialization_code = isset($consent_mode_settings['initialization_code']) ?
-            $consent_mode_settings['initialization_code'] : '';
+    $initialization_code = isset($consent_mode_settings['initialization_code']) ?
+        $consent_mode_settings['initialization_code'] : '';
 
-    // Log consent mode only if enabled
-    if ($initialize_consent_mode) {
-        klaro_geo_debug_log('Consent mode enabled: analytics=' . $analytics_storage_service . ', ads=' . $ad_storage_service);
-    }
+    // Log consent mode configuration (always enabled)
+    klaro_geo_debug_log('Consent mode enabled (always on): analytics=' . $analytics_storage_service . ', ads=' . $ad_storage_service);
 
     // Process each service
     foreach ($services as $service) {
@@ -247,60 +246,58 @@ function klaro_geo_generate_config_file() {
             $service_config['translations'] = $service['translations'];
         }
 
-        // Apply Google Consent Mode modifications if enabled
-        if ($initialize_consent_mode) {
-            // Check if this is the Google Tag Manager service and if initialize_consent_mode is true
-            if ($service['name'] === 'google-tag-manager' && $initialize_consent_mode && !empty($initialization_code)) {
-                // Add the initialization code directly to the onInit callback without safety checks
-                $service_config['onInit'] = $service_config['onInit'] . "\n" . $initialization_code;
-                klaro_geo_debug_log('Added initialization code to GTM onInit callback');
-            }
+        // Apply Google Consent Mode modifications (always enabled)
+        // Check if this is the Google Tag Manager service
+        if ($service['name'] === 'google-tag-manager' && !empty($initialization_code)) {
+            // Add the initialization code directly to the onInit callback without safety checks
+            $service_config['onInit'] = $service_config['onInit'] . "\n" . $initialization_code;
+            klaro_geo_debug_log('Added initialization code to GTM onInit callback');
+        }
 
-            // Check if this service matches the analytics storage event
-            $is_analytics_service = $analytics_storage_service !== 'no_service' && $service['name'] === $analytics_storage_service;
+        // Check if this service matches the analytics storage event
+        $is_analytics_service = $analytics_storage_service !== 'no_service' && $service['name'] === $analytics_storage_service;
 
-            // Check if this service matches the ad storage event
-            $is_ad_service = $ad_storage_service !== 'no_service' && $service['name'] === $ad_storage_service;
+        // Check if this service matches the ad storage event
+        $is_ad_service = $ad_storage_service !== 'no_service' && $service['name'] === $ad_storage_service;
 
-            // Our custom code to control the 'checked' attribute
-            // This code should be executed *after* the consent mode updates
-            if ($is_ad_service || $is_analytics_service) {
-                $checkbox_accept_code = "\n" .
-                "const adPersonalizationCheckbox = document.querySelector('#klaro-geo-ad-personalization');\n" .
-                "const adUserDataCheckbox = document.querySelector('#klaro-geo-ad-user-data');\n" .
-                "if (adPersonalizationCheckbox) {\n" .
-                "    adPersonalizationCheckbox.checked = true;\n" .
-                "}\n" .
-                "if (adUserDataCheckbox) {\n" .
-                "    adUserDataCheckbox.checked = true;\n" .
-                "}\n" .
-                "// Remove disabled class from controls container\n" .
-                "const controlsContainer = document.querySelector('.klaro-geo-ad-controls');\n" .
-                "if (controlsContainer) {\n" .
-                "    controlsContainer.classList.remove('klaro-geo-controls-disabled');\n" .
-                "}\n";
+        // Our custom code to control the 'checked' attribute
+        // This code should be executed *after* the consent mode updates
+        if ($is_ad_service || $is_analytics_service) {
+            $checkbox_accept_code = "\n" .
+            "const adPersonalizationCheckbox = document.querySelector('#klaro-geo-ad-personalization');\n" .
+            "const adUserDataCheckbox = document.querySelector('#klaro-geo-ad-user-data');\n" .
+            "if (adPersonalizationCheckbox) {\n" .
+            "    adPersonalizationCheckbox.checked = true;\n" .
+            "}\n" .
+            "if (adUserDataCheckbox) {\n" .
+            "    adUserDataCheckbox.checked = true;\n" .
+            "}\n" .
+            "// Remove disabled class from controls container\n" .
+            "const controlsContainer = document.querySelector('.klaro-geo-ad-controls');\n" .
+            "if (controlsContainer) {\n" .
+            "    controlsContainer.classList.remove('klaro-geo-controls-disabled');\n" .
+            "}\n";
 
-                $service_config['onAccept'] = $service_config['onAccept'] . $checkbox_accept_code;
-                klaro_geo_debug_log('Added checkbox control code to onAccept for ' . $service['name']);
+            $service_config['onAccept'] = $service_config['onAccept'] . $checkbox_accept_code;
+            klaro_geo_debug_log('Added checkbox control code to onAccept for ' . $service['name']);
 
-                $checkbox_decline_code = "\n" .
-                "const adPersonalizationCheckbox = document.querySelector('#klaro-geo-ad-personalization');\n" .
-                "const adUserDataCheckbox = document.querySelector('#klaro-geo-ad-user-data');\n" .
-                "if (adPersonalizationCheckbox) {\n" .
-                "    adPersonalizationCheckbox.checked = false;\n" .
-                "}\n" .
-                "if (adUserDataCheckbox) {\n" .
-                "    adUserDataCheckbox.checked = false;\n" .
-                "}\n" .
-                "// Add disabled class to controls container\n" .
-                "const controlsContainer = document.querySelector('.klaro-geo-ad-controls');\n" .
-                "if (controlsContainer) {\n" .
-                "    controlsContainer.classList.add('klaro-geo-controls-disabled');\n" .
-                "}\n";
+            $checkbox_decline_code = "\n" .
+            "const adPersonalizationCheckbox = document.querySelector('#klaro-geo-ad-personalization');\n" .
+            "const adUserDataCheckbox = document.querySelector('#klaro-geo-ad-user-data');\n" .
+            "if (adPersonalizationCheckbox) {\n" .
+            "    adPersonalizationCheckbox.checked = false;\n" .
+            "}\n" .
+            "if (adUserDataCheckbox) {\n" .
+            "    adUserDataCheckbox.checked = false;\n" .
+            "}\n" .
+            "// Add disabled class to controls container\n" .
+            "const controlsContainer = document.querySelector('.klaro-geo-ad-controls');\n" .
+            "if (controlsContainer) {\n" .
+            "    controlsContainer.classList.add('klaro-geo-controls-disabled');\n" .
+            "}\n";
 
-                $service_config['onDecline'] = $service_config['onDecline'] . $checkbox_decline_code;
-                klaro_geo_debug_log('Added checkbox control code to onDecline for ' . $service['name']);
-            }
+            $service_config['onDecline'] = $service_config['onDecline'] . $checkbox_decline_code;
+            klaro_geo_debug_log('Added checkbox control code to onDecline for ' . $service['name']);
         }
 
         $klaro_config['services'][] = $service_config;
@@ -405,8 +402,8 @@ window.dataLayer.push(klaroConfigLoadedData);\n\n";
     $admin_ajax_url = admin_url('admin-ajax.php');
     $consent_nonce = wp_create_nonce('klaro_geo_consent_nonce');
 
-    // Get the consent_mode value for JavaScript
-    $consent_mode = $initialize_consent_mode ? 'v2' : 'none';
+    // Get the consent_mode value for JavaScript (always v2 - consent mode is always enabled)
+    $consent_mode = 'v2';
     $consent_mode_js = wp_json_encode($consent_mode);
 
     // Add consent receipt functionality if enabled
@@ -431,12 +428,12 @@ window.dataLayer.push(klaroConfigLoadedData);\n\n";
         // Prepare custom template settings for JavaScript
         $enable_consent_logging_value = $custom_template_settings['enableConsentLogging'] ? 'true' : 'false';
 
-        // Pre-calculate values for heredoc
-        $initialize_consent_mode_js = $initialize_consent_mode ? 'true' : 'false';
+        // NOTE: initialize_consent_mode has been removed - consent mode is always enabled
 
         // Add variables for the consent receipts script
         $klaro_config_content .= <<<JS
 // Consent Receipt Configuration
+// NOTE: Consent mode is ALWAYS enabled - no initialize_consent_mode toggle
 window.klaroConsentData = {
     templateName: "{$template_to_use}",
     templateSource: "{$template_source}",
@@ -456,7 +453,6 @@ window.klaroConsentData = {
         requiredConsent: {$required_consent},
         config: {
             consent_mode_settings: {
-                initialize_consent_mode: {$initialize_consent_mode_js},
                 analytics_storage_service: "{$analytics_storage_service}",
                 ad_storage_service: "{$ad_storage_service}",
                 initialization_code: `{$initialization_code}`

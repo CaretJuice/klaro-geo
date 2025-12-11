@@ -1,4 +1,4 @@
-// Detected/Debug Country Code: UK
+// Detected/Debug Country Code: FR
 
 var klaroConfig = {
     "version": 1,
@@ -16,7 +16,7 @@ var klaroConfig = {
     "storageMethod": "cookie",
     "cookieName": "klaro",
     "cookieExpiresAfterDays": 365,
-    "cookieDomain": ".example.org",
+    "cookieDomain": ".localhost",
     "default": false,
     "mustConsent": true,
     "acceptAll": true,
@@ -89,14 +89,58 @@ var klaroConfig = {
     "cookiePath": "/",
     "services": [
         {
-            "name": "test-service",
+            "name": "google-tag-manager",
+            "purposes": [
+                "functional"
+            ],
+            "cookies": [],
+            "onInit": "",
+            "onAccept": "",
+            "onDecline": "",
+            "required": true,
+            "default": true,
+            "translations": {
+                "zz": {
+                    "title": "Google Tag Manager",
+                    "description": "Google Tag Manager is a tag management system that allows you to quickly and easily update tracking codes and related code fragments collectively known as tags on your website or mobile app."
+                }
+            }
+        },
+        {
+            "name": "google-analytics",
             "purposes": [
                 "analytics"
             ],
             "cookies": [],
             "onInit": "",
             "onAccept": "",
-            "onDecline": ""
+            "onDecline": "",
+            "required": false,
+            "default": false,
+            "translations": {
+                "zz": {
+                    "title": "Google Analytics",
+                    "description": "Google Analytics is a web analytics service that tracks and reports website traffic to help you understand how visitors interact with your website."
+                }
+            }
+        },
+        {
+            "name": "google-ads",
+            "purposes": [
+                "advertising"
+            ],
+            "cookies": [],
+            "onInit": "",
+            "onAccept": "",
+            "onDecline": "",
+            "required": false,
+            "default": false,
+            "translations": {
+                "zz": {
+                    "title": "Google Ads",
+                    "description": "Google Ads is an online advertising platform developed by Google, where advertisers pay to display brief advertisements, service offerings, product listings, and video content to web users."
+                }
+            }
         }
     ]
 };
@@ -131,8 +175,8 @@ var klaroConfigLoadedData = {
     'eventSource': 'klaro-geo',
     'klaroEventName': 'klaroConfigLoaded',
     'klaroGeoConsentTemplate': "default",
-    'klaroGeoTemplateSource': "default",
-    'klaroGeoDetectedCountry': "UK",
+    'klaroGeoTemplateSource': "fallback",
+    'klaroGeoDetectedCountry': "FR",
     'klaroGeoDetectedRegion': null,
     'klaroGeoAdminOverride': true,
     'klaroGeoEnableConsentLogging': true
@@ -148,16 +192,17 @@ if (latestReceipt) {
 window.dataLayer.push(klaroConfigLoadedData);
 
 // Consent Receipt Configuration
+// NOTE: Consent mode is ALWAYS enabled - no initialize_consent_mode toggle
 window.klaroConsentData = {
     templateName: "default",
-    templateSource: "default",
-    detectedCountry: "UK",
+    templateSource: "fallback",
+    detectedCountry: "FR",
     detectedRegion: "",
     adminOverride: true,
-    ajaxUrl: "http://example.org/wp-admin/admin-ajax.php",
-    nonce: "f4625daeaf",
+    ajaxUrl: "http://localhost:8080/wp-admin/admin-ajax.php",
+    nonce: "25becd912c",
     enableConsentLogging: true,
-    consentMode: "none",
+    consentMode: "v2",
     templateSettings: {
         consentModalTitle: "Privacy Settings",
         consentModalDescription: "Here you can assess and customize the services that we'd like to use on this website. You're in charge! Enable or disable services as you see fit.",
@@ -167,7 +212,6 @@ window.klaroConsentData = {
         requiredConsent: false,
         config: {
             consent_mode_settings: {
-                initialize_consent_mode: false,
                 analytics_storage_service: "no_service",
                 ad_storage_service: "no_service",
                 initialization_code: ``

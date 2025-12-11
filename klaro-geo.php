@@ -242,11 +242,12 @@ function klaro_geo_enqueue_scripts() {
     // Get the template config
     $template_config = $templates[$template_to_use] ?? $templates['default'] ?? klaro_geo_get_default_templates()['default'];
 
-    // Check if consent mode is enabled in the template
+    // Get consent mode settings from template
+    // NOTE: Consent mode is ALWAYS enabled - no toggle check needed
     // First check if consent_mode_settings is directly in the template
     if (isset($template_config['consent_mode_settings'])) {
         $consent_mode_settings = $template_config['consent_mode_settings'];
-    } 
+    }
     // Then check if it's in the config array (as set by the admin form)
     else if (isset($template_config['config']) && isset($template_config['config']['consent_mode_settings'])) {
         $consent_mode_settings = $template_config['config']['consent_mode_settings'];
@@ -254,11 +255,11 @@ function klaro_geo_enqueue_scripts() {
         $consent_mode_settings = [];
     }
 
-    $initialize_consent_mode = isset($consent_mode_settings['initialize_consent_mode']) ?
-        filter_var($consent_mode_settings['initialize_consent_mode'], FILTER_VALIDATE_BOOLEAN) : false;
+    // Remove legacy initialize_consent_mode if present
+    unset($consent_mode_settings['initialize_consent_mode']);
 
-    // Debug log the consent mode settings
-    klaro_geo_debug_log('Consent mode enabled check in wp_enqueue_scripts: ' . ($initialize_consent_mode ? 'true' : 'false'));
+    // Debug log the consent mode settings (always enabled)
+    klaro_geo_debug_log('Consent mode enabled (always on) in wp_enqueue_scripts');
     klaro_geo_debug_log('Template config consent_mode_settings: ' . print_r($consent_mode_settings, true));
 
     if (get_option('klaro_geo_enable_consent_receipts', false)) {

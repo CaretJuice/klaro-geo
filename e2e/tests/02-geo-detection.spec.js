@@ -2,7 +2,7 @@
  * E2E Test: Geo-Detection and Template Loading
  *
  * Tests that Klaro Geo correctly:
- * - Detects user location (mocked)
+ * - Detects user location (using debug query parameter)
  * - Loads appropriate template based on location
  * - Pushes geo data to dataLayer
  */
@@ -19,31 +19,7 @@ test.describe('Geo-Detection and Template Loading', () => {
     await klaroHelper.clearConsent();
   });
 
-  // NOTE: Geo-detection doesn't work on localhost with free geo library
-  // This test verifies the dataLayer event structure, not actual geo-detection
-  test('should detect location and load appropriate template', async ({ page, context }) => {
-    // Mock geo-detection API response for US location
-    await context.route('**/wp-admin/admin-ajax.php*', async (route) => {
-      const request = route.request();
-      const postData = request.postData();
-
-      if (postData && postData.includes('action=klaro_geo_detect')) {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            success: true,
-            country: 'US',
-            region: 'CA',
-            template: 'default_template',
-            template_source: 'geo_detection'
-          })
-        });
-      } else {
-        await route.continue();
-      }
-    });
-
+  test('should detect location and load appropriate template', async ({ page }) => {
     // Navigate to page
     await page.goto('/');
     await klaroHelper.waitForKlaroLoad();
@@ -56,49 +32,13 @@ test.describe('Geo-Detection and Template Loading', () => {
 
     expect(configLoadedEvent).toBeTruthy();
 
-    // NOTE: On localhost, geo-detection often returns null
-    // We're just verifying the dataLayer event structure exists
+    // Verify the dataLayer event structure exists
     // Field name is klaroGeoConsentTemplate (not klaroGeoTemplateName) per klaro-config.js:175
     expect(configLoadedEvent).toHaveProperty('klaroGeoConsentTemplate');
     expect(configLoadedEvent.klaroGeoTemplateSource).toBeTruthy();
 
     // Country may be null on localhost - that's expected
     expect(configLoadedEvent).toHaveProperty('klaroGeoDetectedCountry');
-  });
-
-  // NOTE: Skipping this test as geo-detection doesn't work on localhost
-  test.skip('should load EU template for European location', async ({ page, context }) => {
-    // Mock geo-detection API for German location
-    await context.route('**/wp-admin/admin-ajax.php*', async (route) => {
-      const request = route.request();
-      const postData = request.postData();
-
-      if (postData && postData.includes('action=klaro_geo_detect')) {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            success: true,
-            country: 'DE',
-            region: null,
-            template: 'eu_gdpr_template',
-            template_source: 'geo_detection'
-          })
-        });
-      } else {
-        await route.continue();
-      }
-    });
-
-    await page.goto('/');
-    await klaroHelper.waitForKlaroLoad();
-    await page.waitForTimeout(2000);
-
-    const configLoadedEvent = await klaroHelper.findDataLayerEvent('klaroConfigLoaded');
-
-    if (configLoadedEvent) {
-      expect(configLoadedEvent.klaroGeoDetectedCountry).toBe('DE');
-    }
   });
 
   test('should handle geo-detection failure gracefully', async ({ page, context }) => {

@@ -242,7 +242,7 @@ function sendReceiptToServer(receipt) {
     })
     .catch(function(error) {
         // In test environments, don't log errors
-        if (process.env.NODE_ENV !== 'test') {
+        if (typeof process === 'undefined' || process.env.NODE_ENV !== 'test') {
             console.error('Error sending consent receipt:', error);
         }
         // Don't throw the error further to prevent unhandled promise rejection

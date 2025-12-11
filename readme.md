@@ -122,8 +122,8 @@ Navigate to **Klaro Geo > Templates** to manage consent banner templates.
   - Disable Powered By: Hide the "Powered by Klaro" text.
   - Additional CSS Class: Additional CSS class to add to the consent modal.
   - Default Language: Default language code (e.g., 'en', 'de'). Leave empty to use the fallback language and translation settings ('zz').
-- **Consent Mode Settings**:
-  - Initialize Consent Mode: Initialize all consent signals (denied) when Google Tag Manager loads and enable other consent mode operations.
+- **Consent Mode Settings** (always enabled):
+  Consent mode is always enabled and generates dynamic consent keys for every service. Configure which services control the standard Google Consent Mode signals:
   - Map analytics_storage to service: Select the service that enables or disables `analytics_storage`.
   - Map ad signals to service: Select the service that enables or disables `ads_storage` and under which `ad_personalization` and `ad_user_data` controls get injected.
   - Consent Mode Initialization Code: JavaScript code to initialize Google Consent Mode v2. This code will run when Google Tag Manager loads.
@@ -305,6 +305,45 @@ This event can include the following parameters:
 - `triggerEvent: "initialConsents|saveConsents"`: The name of the event that triggered this event.
 
 It is expected that you will created a Data Layer Variable named `acceptedServices` and then use the Data Layer Variable contains "google-analytics" to trigger the Google Analytics tag, for example. Note that the names of Klaro services are lowercased and hyphenated when set in acceptedServices.
+
+#### Dynamic Consent Keys
+
+In addition to the standard Google Consent Mode signals (`ad_storage`, `analytics_storage`, `ad_user_data`, `ad_personalization`), Klaro Geo automatically generates dynamic consent keys for every service defined in your configuration. This allows you to fire tags in GTM based on granular per-service consent without relying on Trigger Groups.
+
+**Key Format**: `[service_name]_consent`
+- Hyphens in service names are converted to underscores
+- A `_consent` suffix is appended
+
+**Examples**:
+| Service Name | Dynamic Consent Key |
+|-------------|---------------------|
+| `google-analytics` | `google_analytics_consent` |
+| `piwik` | `piwik_consent` |
+| `facebook` | `facebook_consent` |
+| `contact-form-7` | `contact_form_7_consent` |
+
+**Values**: Each key is set to either `'granted'` or `'denied'` based on whether the user consented to that service.
+
+**GTM Usage**: Access these keys in the `consentMode` object of the `Klaro Consent Update` event:
+```javascript
+// Example consentMode object pushed to dataLayer
+{
+  'ad_storage': 'denied',
+  'analytics_storage': 'granted',
+  'ad_user_data': 'denied',
+  'ad_personalization': 'denied',
+  'google_analytics_consent': 'granted',
+  'piwik_consent': 'granted',
+  'facebook_consent': 'denied'
+}
+```
+
+#### Using with Other Tag Managers
+
+The dataLayer format follows Google Tag Manager conventions but can be read by other tag managers (Tealium, Adobe Launch, etc.). The `Klaro Consent Update` event provides:
+- `consentMode`: Object with all consent keys (both Google standard and dynamic service keys)
+- `acceptedServices`: Array of service names with granted consent
+- `triggerEvent`: Either `'initialConsents'` or `'saveConsents'`
 
 ### How It Works
 

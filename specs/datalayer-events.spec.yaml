@@ -10,7 +10,7 @@ file_meta:
     - "klaro-geo-consent-receipts.js"
     - "external: Klaro library"
   stability: "core"
-  last_updated: "2025-12-03"
+  last_updated: "2025-12-10"
 
 # =============================================================================
 # ARCHITECTURE PRINCIPLE
@@ -120,6 +120,70 @@ events:
       - Can be used to verify correct template selection
 
   # ---------------------------------------------------------------------------
+  # KLARO CONSENT UPDATE EVENT (always fired - consent mode is always enabled)
+  # ---------------------------------------------------------------------------
+  klaroConsentUpdate:
+    purpose: "Fired when consent state changes - includes full consent mode object"
+    source: "klaro-geo.js"
+    trigger: "initialConsents or saveConsents events from Klaro manager"
+
+    required_fields:
+      event:
+        type: "string"
+        value: "Klaro Consent Update"
+        description: "Distinct event name for consent updates"
+
+      eventSource:
+        type: "string"
+        value: "klaro-geo"
+        description: "Identifies this as a Klaro Geo event"
+
+      consentMode:
+        type: "object"
+        description: "Complete consent mode object with all keys"
+        required_keys:
+          ad_storage: "'granted' | 'denied'"
+          analytics_storage: "'granted' | 'denied'"
+          ad_user_data: "'granted' | 'denied'"
+          ad_personalization: "'granted' | 'denied'"
+        dynamic_keys:
+          pattern: "[service_name]_consent"
+          value: "'granted' | 'denied'"
+          description: "One key per service in Klaro config"
+
+      acceptedServices:
+        type: "array"
+        description: "Array of service names that have consent granted"
+        example: ["google-analytics", "piwik"]
+
+      triggerEvent:
+        type: "string"
+        enum: ["initialConsents", "saveConsents"]
+        description: "Which Klaro event triggered this update"
+
+    example:
+      event: "Klaro Consent Update"
+      eventSource: "klaro-geo"
+      consentMode:
+        ad_storage: "denied"
+        analytics_storage: "granted"
+        ad_user_data: "denied"
+        ad_personalization: "denied"
+        google_analytics_consent: "granted"
+        piwik_consent: "granted"
+        facebook_consent: "denied"
+      acceptedServices: ["google-analytics", "piwik"]
+      triggerEvent: "saveConsents"
+
+    contract: |
+      - MUST always be fired on consent changes (consent mode is always enabled)
+      - MUST include consentMode object with all standard Google keys
+      - MUST include dynamic [service]_consent keys for ALL services
+      - Dynamic keys use 'granted' for true consent, 'denied' for false
+      - acceptedServices array contains only services with consent=true
+      - This event fires AFTER gtag('consent', 'update', ...) is called
+
+  # ---------------------------------------------------------------------------
   # KLARO FORWARDED EVENTS (examples - Klaro may add more)
   # ---------------------------------------------------------------------------
   klaroConsentChanged:
@@ -155,9 +219,27 @@ integration:
         condition: "event equals 'Klaro Event' AND klaroEventName equals 'klaroConfigLoaded'"
         use_case: "Initialize tracking based on detected template"
 
+      - trigger: "Klaro Consent Update"
+        condition: "event equals 'Klaro Consent Update'"
+        use_case: "Fire tags based on consent mode state changes"
+        notes: |
+          Access dynamic service keys via consentMode object:
+          - {{consentMode.google_analytics_consent}} for Google Analytics
+          - {{consentMode.piwik_consent}} for Piwik/Matomo
+          - etc.
+
       - trigger: "Consent Given"
         condition: "event equals 'Klaro Event' AND klaroEventName equals 'consent'"
         use_case: "Activate marketing tags when consent given"
+
+  other_tag_managers:
+    description: "Integration with non-GTM tag managers"
+    notes: |
+      The dataLayer format follows GTM conventions but can be read by other tag managers.
+      Key data available in 'Klaro Consent Update' event:
+      - consentMode: Object with all consent keys (both Google standard and dynamic)
+      - acceptedServices: Array of service names with granted consent
+      - triggerEvent: 'initialConsents' or 'saveConsents'
 
   debugging:
     description: "Debug events in browser console"
@@ -175,11 +257,17 @@ test_scenarios:
     - "klaroConfigLoaded includes correct template source"
     - "Geo detection results are accurate in event"
     - "Consent events are forwarded to dataLayer"
+    - "klaroConsentUpdate always includes consentMode object"
+    - "Dynamic service keys are generated for all services"
+    - "Service names with hyphens are sanitized (hyphens -> underscores)"
+    - "Denied services have value 'denied', not omitted"
 
   edge_cases:
     - "Event fires even when no geo detected"
     - "Event fires when using fallback template"
     - "Event includes consent receipt when available"
+    - "Dynamic keys don't conflict with reserved Google keys"
+    - "Empty service list still includes standard Google keys"
 
 # =============================================================================
 # DEBUGGING

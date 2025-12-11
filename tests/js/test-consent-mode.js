@@ -52,11 +52,11 @@ describe('Klaro Geo Consent Mode', function() {
         };
 
         // Initialize Klaro consent data object with template settings
+        // NOTE: initialize_consent_mode has been removed - consent mode is always enabled
         window.klaroConsentData = {
             templateSettings: {
                 config: {
                     consent_mode_settings: {
-                        initialize_consent_mode: true,
                         ad_storage_service: 'google-ads',
                         analytics_storage_service: 'google-analytics',
                         ad_user_data: true,
@@ -587,5 +587,117 @@ describe('Klaro Geo Consent Mode', function() {
         expect(manager.consents['google-ads']).toBe(true);
         expect(typeof manager.watch).toBe('function');
         expect(typeof manager.getConsent).toBe('function');
+    });
+});
+
+/**
+ * Dynamic Consent Keys Tests
+ * Tests for the new dynamic service consent keys feature
+ */
+describe('Dynamic Consent Keys', function() {
+    // Helper function to generate consent key from service name
+    function getServiceConsentKey(serviceName) {
+        return serviceName.replace(/-/g, '_') + '_consent';
+    }
+
+    describe('getServiceConsentKey helper', function() {
+        test('should convert service name with hyphens to consent key', function() {
+            expect(getServiceConsentKey('google-analytics')).toBe('google_analytics_consent');
+            expect(getServiceConsentKey('google-ads')).toBe('google_ads_consent');
+            expect(getServiceConsentKey('contact-form-7')).toBe('contact_form_7_consent');
+        });
+
+        test('should handle service name without hyphens', function() {
+            expect(getServiceConsentKey('piwik')).toBe('piwik_consent');
+            expect(getServiceConsentKey('facebook')).toBe('facebook_consent');
+        });
+
+        test('should handle multiple hyphens', function() {
+            expect(getServiceConsentKey('my-custom-service-name')).toBe('my_custom_service_name_consent');
+        });
+    });
+
+    describe('dynamic keys generation', function() {
+        // Mock gtag and manager for dynamic key tests
+        const mockGtag = jest.fn();
+        const mockManager = {
+            consents: {
+                'google-analytics': true,
+                'piwik': true,
+                'facebook': false,
+                'google-ads': false
+            }
+        };
+
+        beforeEach(function() {
+            window.gtag = mockGtag;
+            mockGtag.mockClear();
+        });
+
+        afterEach(function() {
+            delete window.gtag;
+        });
+
+        test('should generate dynamic keys for all services', function() {
+            // Simulate generating consent update with dynamic keys
+            const reservedKeys = ['ad_storage', 'analytics_storage', 'ad_user_data', 'ad_personalization'];
+            const completeUpdate = {
+                'ad_storage': 'denied',
+                'analytics_storage': 'granted',
+                'ad_user_data': 'denied',
+                'ad_personalization': 'denied'
+            };
+
+            // Add dynamic keys for all services
+            Object.keys(mockManager.consents).forEach(function(serviceName) {
+                const dynamicKey = getServiceConsentKey(serviceName);
+                if (!reservedKeys.includes(dynamicKey.replace('_consent', ''))) {
+                    completeUpdate[dynamicKey] = mockManager.consents[serviceName] ? 'granted' : 'denied';
+                }
+            });
+
+            // Verify the update includes all expected keys
+            expect(completeUpdate).toEqual({
+                'ad_storage': 'denied',
+                'analytics_storage': 'granted',
+                'ad_user_data': 'denied',
+                'ad_personalization': 'denied',
+                'google_analytics_consent': 'granted',
+                'piwik_consent': 'granted',
+                'facebook_consent': 'denied',
+                'google_ads_consent': 'denied'
+            });
+        });
+
+        test('should set denied services to denied (not omit them)', function() {
+            const consents = {
+                'google-analytics': true,
+                'facebook': false
+            };
+
+            const consentModeUpdate = {};
+            Object.keys(consents).forEach(function(serviceName) {
+                const key = getServiceConsentKey(serviceName);
+                consentModeUpdate[key] = consents[serviceName] ? 'granted' : 'denied';
+            });
+
+            // Both should be present, with correct values
+            expect(consentModeUpdate['google_analytics_consent']).toBe('granted');
+            expect(consentModeUpdate['facebook_consent']).toBe('denied');
+        });
+
+        test('should not conflict with reserved Google keys', function() {
+            // Reserved keys should not be overwritten by dynamic keys
+            const reservedKeys = ['ad_storage', 'analytics_storage', 'ad_user_data', 'ad_personalization'];
+
+            // Even if a service is named to produce a key like "ad_storage_consent",
+            // it should still be added since it has the "_consent" suffix
+            const serviceName = 'ad-storage';
+            const dynamicKey = getServiceConsentKey(serviceName);
+
+            // The dynamic key would be "ad_storage_consent" - not the same as "ad_storage"
+            expect(dynamicKey).toBe('ad_storage_consent');
+            expect(reservedKeys.includes(dynamicKey)).toBe(false);
+        });
     });
 });

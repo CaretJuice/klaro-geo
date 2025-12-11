@@ -89,22 +89,26 @@ function klaro_geo_get_template_data($template_key) {
     }
 
     // Ensure consent_mode_settings exists with default values
+    // NOTE: initialize_consent_mode has been removed - consent mode is always enabled
     if (!isset($template['consent_mode_settings'])) {
         $template['consent_mode_settings'] = array(
-            'initialize_consent_mode' => false,
             'ad_storage_service' => 'no_service',
+            'analytics_storage_service' => 'no_service',
             'ad_user_data' => false,
             'ad_personalization' => false,
         );
     } else {
-        // Ensure all required fields exist
-        if (!isset($template['consent_mode_settings']['initialize_consent_mode'])) {
-            $template['consent_mode_settings']['initialize_consent_mode'] = false;
-        }
+        // Remove legacy initialize_consent_mode if present
+        unset($template['consent_mode_settings']['initialize_consent_mode']);
 
         // Ensure ad_storage_service is set
         if (!isset($template['consent_mode_settings']['ad_storage_service'])) {
             $template['consent_mode_settings']['ad_storage_service'] = 'no_service';
+        }
+
+        // Ensure analytics_storage_service is set
+        if (!isset($template['consent_mode_settings']['analytics_storage_service'])) {
+            $template['consent_mode_settings']['analytics_storage_service'] = 'no_service';
         }
 
         if (!isset($template['consent_mode_settings']['ad_user_data'])) {
