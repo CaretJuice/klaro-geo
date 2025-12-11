@@ -313,12 +313,21 @@ function klaro_geo_templates_page() {
 
                         // Process each consent mode setting
                         foreach ($value as $setting_key => $setting_value) {
-                            // Skip legacy initialize_consent_mode
-                            if ($setting_key === 'initialize_consent_mode') {
+                            // Skip legacy initialize_consent_mode and initialization_code
+                            if ($setting_key === 'initialize_consent_mode' || $setting_key === 'initialization_code') {
                                 continue;
-                            } else if ($setting_key === 'initialization_code') {
-                                // Handle JavaScript code - don't sanitize too aggressively
-                                $template_config[$key][$setting_key] = stripslashes($setting_value);
+                            } else if ($setting_key === 'consent_defaults' && is_array($setting_value)) {
+                                // Handle nested consent_defaults array
+                                $template_config[$key][$setting_key] = array();
+                                foreach ($setting_value as $consent_key => $consent_value) {
+                                    $template_config[$key][$setting_key][$consent_key] = sanitize_text_field($consent_value);
+                                }
+                            } else if ($setting_key === 'gtag_settings' && is_array($setting_value)) {
+                                // Handle nested gtag_settings array
+                                $template_config[$key][$setting_key] = array();
+                                foreach ($setting_value as $gtag_key => $gtag_value) {
+                                    $template_config[$key][$setting_key][$gtag_key] = sanitize_text_field($gtag_value);
+                                }
                             } else {
                                 // Handle other settings normally
                                 $template_config[$key][$setting_key] = sanitize_text_field($setting_value);
@@ -1196,24 +1205,144 @@ function klaro_geo_templates_page() {
                             <p class="description">Select the service that enables or disables `ads_storage` and under which `ad_personalization` and `ad_user_data` controls get injected.</p>
                         </td>
                     </tr>
+                </table>
+
+                <h4>Google Consent Mode Defaults</h4>
+                <p class="description">Set the default consent state for Google's standard consent signals. These are set to 'denied' by default for privacy compliance.</p>
+                <table class="form-table">
                     <tr>
-                        <th><label for="consent_mode_settings_initialization_code">Consent Mode Initialization Code:</label></th>
+                        <th><label for="consent_default_ad_storage">ad_storage</label></th>
                         <td>
-                            <textarea name="template_config[consent_mode_settings][initialization_code]" id="consent_mode_settings_initialization_code" rows="8" cols="50" class="large-text code"><?php
-                                $default_code = "window.dataLayer = window.dataLayer || [];\nwindow.gtag = function(){dataLayer.push(arguments)};\ngtag('consent', 'default', {\n'ad_storage': 'denied', \n'analytics_storage': 'denied', \n'ad_user_data': 'denied', \n'ad_personalization': 'denied'});\ngtag('set', 'ads_data_redaction', true);";
-
-                                if (isset($current_config['consent_mode_settings']['initialization_code'])) {
-                                    // Make sure to strip any slashes that might have been added
-                                    $code = stripslashes($current_config['consent_mode_settings']['initialization_code']);
-                                } else {
-                                    $code = $default_code;
-                                }
-
-                                echo esc_textarea($code);
-                            ?></textarea>
-                            <p class="description">JavaScript code to initialize Google Consent Mode v2. This code will run when Google Tag Manager loads.</p>
+                            <select name="template_config[consent_mode_settings][consent_defaults][ad_storage]" id="consent_default_ad_storage">
+                                <option value="denied" <?php selected(isset($current_config['consent_mode_settings']['consent_defaults']['ad_storage']) ? $current_config['consent_mode_settings']['consent_defaults']['ad_storage'] : 'denied', 'denied'); ?>>denied</option>
+                                <option value="granted" <?php selected(isset($current_config['consent_mode_settings']['consent_defaults']['ad_storage']) ? $current_config['consent_mode_settings']['consent_defaults']['ad_storage'] : 'denied', 'granted'); ?>>granted</option>
+                            </select>
+                            <p class="description">Controls storage for advertising purposes (cookies, etc.)</p>
                         </td>
                     </tr>
+                    <tr>
+                        <th><label for="consent_default_analytics_storage">analytics_storage</label></th>
+                        <td>
+                            <select name="template_config[consent_mode_settings][consent_defaults][analytics_storage]" id="consent_default_analytics_storage">
+                                <option value="denied" <?php selected(isset($current_config['consent_mode_settings']['consent_defaults']['analytics_storage']) ? $current_config['consent_mode_settings']['consent_defaults']['analytics_storage'] : 'denied', 'denied'); ?>>denied</option>
+                                <option value="granted" <?php selected(isset($current_config['consent_mode_settings']['consent_defaults']['analytics_storage']) ? $current_config['consent_mode_settings']['consent_defaults']['analytics_storage'] : 'denied', 'granted'); ?>>granted</option>
+                            </select>
+                            <p class="description">Controls storage for analytics purposes</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label for="consent_default_ad_user_data">ad_user_data</label></th>
+                        <td>
+                            <select name="template_config[consent_mode_settings][consent_defaults][ad_user_data]" id="consent_default_ad_user_data">
+                                <option value="denied" <?php selected(isset($current_config['consent_mode_settings']['consent_defaults']['ad_user_data']) ? $current_config['consent_mode_settings']['consent_defaults']['ad_user_data'] : 'denied', 'denied'); ?>>denied</option>
+                                <option value="granted" <?php selected(isset($current_config['consent_mode_settings']['consent_defaults']['ad_user_data']) ? $current_config['consent_mode_settings']['consent_defaults']['ad_user_data'] : 'denied', 'granted'); ?>>granted</option>
+                            </select>
+                            <p class="description">Controls sending user data to Google for advertising</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label for="consent_default_ad_personalization">ad_personalization</label></th>
+                        <td>
+                            <select name="template_config[consent_mode_settings][consent_defaults][ad_personalization]" id="consent_default_ad_personalization">
+                                <option value="denied" <?php selected(isset($current_config['consent_mode_settings']['consent_defaults']['ad_personalization']) ? $current_config['consent_mode_settings']['consent_defaults']['ad_personalization'] : 'denied', 'denied'); ?>>denied</option>
+                                <option value="granted" <?php selected(isset($current_config['consent_mode_settings']['consent_defaults']['ad_personalization']) ? $current_config['consent_mode_settings']['consent_defaults']['ad_personalization'] : 'denied', 'granted'); ?>>granted</option>
+                            </select>
+                            <p class="description">Controls personalized advertising</p>
+                        </td>
+                    </tr>
+                </table>
+
+                <h4>Additional Google Settings</h4>
+                <p class="description">Additional settings that control Google tag behavior when consent is denied.</p>
+                <table class="form-table">
+                    <tr>
+                        <th><label for="consent_setting_ads_data_redaction">ads_data_redaction</label></th>
+                        <td>
+                            <select name="template_config[consent_mode_settings][gtag_settings][ads_data_redaction]" id="consent_setting_ads_data_redaction">
+                                <option value="true" <?php selected(isset($current_config['consent_mode_settings']['gtag_settings']['ads_data_redaction']) ? $current_config['consent_mode_settings']['gtag_settings']['ads_data_redaction'] : 'true', 'true'); ?>>true</option>
+                                <option value="false" <?php selected(isset($current_config['consent_mode_settings']['gtag_settings']['ads_data_redaction']) ? $current_config['consent_mode_settings']['gtag_settings']['ads_data_redaction'] : 'true', 'false'); ?>>false</option>
+                            </select>
+                            <p class="description">When true and ad_storage is denied, ad click identifiers (GCLID/DCLID) are redacted from requests.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label for="consent_setting_url_passthrough">url_passthrough</label></th>
+                        <td>
+                            <select name="template_config[consent_mode_settings][gtag_settings][url_passthrough]" id="consent_setting_url_passthrough">
+                                <option value="false" <?php selected(isset($current_config['consent_mode_settings']['gtag_settings']['url_passthrough']) ? $current_config['consent_mode_settings']['gtag_settings']['url_passthrough'] : 'false', 'false'); ?>>false</option>
+                                <option value="true" <?php selected(isset($current_config['consent_mode_settings']['gtag_settings']['url_passthrough']) ? $current_config['consent_mode_settings']['gtag_settings']['url_passthrough'] : 'false', 'true'); ?>>true</option>
+                            </select>
+                            <p class="description">When true, ad click identifiers are passed through URL parameters when storage is denied.</p>
+                        </td>
+                    </tr>
+                </table>
+
+                <h4>Service Consent Defaults</h4>
+                <p class="description">
+                    These consent keys are automatically generated for each service. The default value is determined by:
+                    <br>1. <strong>Required services</strong> (required=true) → always <code>granted</code>
+                    <br>2. <strong>Service-level override</strong> → if service has explicit default set
+                    <br>3. <strong>Template default</strong> → inherited from this template's "Default Consent State" setting above
+                    <br><br>
+                    To change a service's default, edit it in <a href="<?php echo admin_url('admin.php?page=klaro-geo-services'); ?>">Services settings</a>.
+                    Service-level overrides are recommended for "functional" purposes only.
+                </p>
+                <table class="widefat striped" style="max-width: 600px;">
+                    <thead>
+                        <tr>
+                            <th>Service</th>
+                            <th>Consent Key</th>
+                            <th>Default</th>
+                            <th>Source</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php
+                        // Get template default setting
+                        $template_default = isset($current_config['default']) && $current_config['default'] ? true : false;
+
+                        foreach ($services as $service) {
+                            if (!isset($service['name'])) continue;
+
+                            $service_name = $service['name'];
+                            $consent_key = str_replace('-', '_', $service_name) . '_consent';
+
+                            // Determine the default value and source
+                            $is_required = isset($service['required']) && filter_var($service['required'], FILTER_VALIDATE_BOOLEAN);
+                            $has_explicit_default = isset($service['default']) && $service['default'] !== null && $service['default'] !== '';
+
+                            if ($is_required) {
+                                $default_value = 'granted';
+                                $source = 'Required service';
+                            } elseif ($has_explicit_default) {
+                                $service_default = filter_var($service['default'], FILTER_VALIDATE_BOOLEAN);
+                                $default_value = $service_default ? 'granted' : 'denied';
+                                $source = 'Service override';
+                            } else {
+                                $default_value = $template_default ? 'granted' : 'denied';
+                                $source = 'Template default';
+                            }
+
+                            // Get purpose for display
+                            $purposes = isset($service['purposes']) ? implode(', ', $service['purposes']) : 'unknown';
+                            ?>
+                            <tr>
+                                <td>
+                                    <strong><?php echo esc_html($service_name); ?></strong>
+                                    <br><small style="color: #666;">Purpose: <?php echo esc_html($purposes); ?></small>
+                                </td>
+                                <td><code><?php echo esc_html($consent_key); ?></code></td>
+                                <td>
+                                    <span style="color: <?php echo $default_value === 'granted' ? '#006600' : '#cc0000'; ?>; font-weight: bold;">
+                                        <?php echo esc_html($default_value); ?>
+                                    </span>
+                                </td>
+                                <td><em><?php echo esc_html($source); ?></em></td>
+                            </tr>
+                            <?php
+                        }
+                        ?>
+                    </tbody>
                 </table>
                 <h3>Plugin Settings</h3>
                 <p>Template-level settings not related to Klaro-specific functionality.</p>

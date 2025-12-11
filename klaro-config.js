@@ -1,4 +1,4 @@
-// Detected/Debug Country Code: FR
+// Detected/Debug Country Code: UK
 
 var klaroConfig = {
     "version": 1,
@@ -16,7 +16,7 @@ var klaroConfig = {
     "storageMethod": "cookie",
     "cookieName": "klaro",
     "cookieExpiresAfterDays": 365,
-    "cookieDomain": ".localhost",
+    "cookieDomain": ".example.org",
     "default": false,
     "mustConsent": true,
     "acceptAll": true,
@@ -89,58 +89,14 @@ var klaroConfig = {
     "cookiePath": "/",
     "services": [
         {
-            "name": "google-tag-manager",
-            "purposes": [
-                "functional"
-            ],
-            "cookies": [],
-            "onInit": "",
-            "onAccept": "",
-            "onDecline": "",
-            "required": true,
-            "default": true,
-            "translations": {
-                "zz": {
-                    "title": "Google Tag Manager",
-                    "description": "Google Tag Manager is a tag management system that allows you to quickly and easily update tracking codes and related code fragments collectively known as tags on your website or mobile app."
-                }
-            }
-        },
-        {
-            "name": "google-analytics",
+            "name": "test-service",
             "purposes": [
                 "analytics"
             ],
             "cookies": [],
             "onInit": "",
             "onAccept": "",
-            "onDecline": "",
-            "required": false,
-            "default": false,
-            "translations": {
-                "zz": {
-                    "title": "Google Analytics",
-                    "description": "Google Analytics is a web analytics service that tracks and reports website traffic to help you understand how visitors interact with your website."
-                }
-            }
-        },
-        {
-            "name": "google-ads",
-            "purposes": [
-                "advertising"
-            ],
-            "cookies": [],
-            "onInit": "",
-            "onAccept": "",
-            "onDecline": "",
-            "required": false,
-            "default": false,
-            "translations": {
-                "zz": {
-                    "title": "Google Ads",
-                    "description": "Google Ads is an online advertising platform developed by Google, where advertisers pay to display brief advertisements, service offerings, product listings, and video content to web users."
-                }
-            }
+            "onDecline": ""
         }
     ]
 };
@@ -175,8 +131,8 @@ var klaroConfigLoadedData = {
     'eventSource': 'klaro-geo',
     'klaroEventName': 'klaroConfigLoaded',
     'klaroGeoConsentTemplate': "default",
-    'klaroGeoTemplateSource': "fallback",
-    'klaroGeoDetectedCountry': "FR",
+    'klaroGeoTemplateSource': "default",
+    'klaroGeoDetectedCountry': "UK",
     'klaroGeoDetectedRegion': null,
     'klaroGeoAdminOverride': true,
     'klaroGeoEnableConsentLogging': true
@@ -191,16 +147,38 @@ if (latestReceipt) {
 // Push to dataLayer
 window.dataLayer.push(klaroConfigLoadedData);
 
+// ===== CONSENT MODE INITIALIZATION =====
+// Initialize Google Consent Mode BEFORE GTM loads
+// This ensures all consent defaults are set before any tags can fire
+window.gtag = function(){dataLayer.push(arguments)};
+
+// Set all consent defaults in a single call (standard + dynamic service keys)
+gtag('consent', 'default', {
+    "ad_storage": "denied",
+    "analytics_storage": "denied",
+    "ad_user_data": "denied",
+    "ad_personalization": "denied",
+    "test_service_consent": "denied"
+});
+
+// Set additional gtag settings
+gtag('set', 'ads_data_redaction', true);
+gtag('set', 'url_passthrough', false);
+
+// Mark that consent mode defaults have been initialized
+window.klaroGeoConsentDefaultsInitialized = true;
+
+
 // Consent Receipt Configuration
 // NOTE: Consent mode is ALWAYS enabled - no initialize_consent_mode toggle
 window.klaroConsentData = {
     templateName: "default",
-    templateSource: "fallback",
-    detectedCountry: "FR",
+    templateSource: "default",
+    detectedCountry: "UK",
     detectedRegion: "",
     adminOverride: true,
-    ajaxUrl: "http://localhost:8080/wp-admin/admin-ajax.php",
-    nonce: "25becd912c",
+    ajaxUrl: "http://example.org/wp-admin/admin-ajax.php",
+    nonce: "18b95508a7",
     enableConsentLogging: true,
     consentMode: "v2",
     templateSettings: {
@@ -214,7 +192,11 @@ window.klaroConsentData = {
             consent_mode_settings: {
                 analytics_storage_service: "no_service",
                 ad_storage_service: "no_service",
-                initialization_code: ``
+                consent_defaults: {"ad_storage":"denied","analytics_storage":"denied","ad_user_data":"denied","ad_personalization":"denied","test_service_consent":"denied"},
+                gtag_settings: {
+                    ads_data_redaction: true,
+                    url_passthrough: false
+                }
             }
         }
     }

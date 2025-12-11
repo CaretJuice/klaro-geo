@@ -112,6 +112,78 @@ class WordPressHelper {
       return document.readyState === 'complete';
     });
   }
+
+  /**
+   * Update a Klaro service's settings
+   * Must be logged in and on the services admin page
+   * @param {string} serviceName - Service name (e.g., 'google-tag-manager')
+   * @param {Object} settings - Settings to update (e.g., { required: false, default: false })
+   * @returns {Promise<Object>} - Result of the update
+   */
+  async updateServiceSettings(serviceName, settings) {
+    // Navigate to services page if not already there
+    const currentUrl = this.page.url();
+    if (!currentUrl.includes('klaro-geo-services')) {
+      await this.gotoAdminPage('klaro-geo-services');
+      await this.page.waitForLoadState('networkidle');
+    }
+
+    return await this.page.evaluate(async ({ serviceName, settings }) => {
+      if (typeof klaroGeoServices === 'undefined') {
+        return { success: false, error: 'klaroGeoServices not defined' };
+      }
+
+      const services = klaroGeoServices.services || [];
+      const serviceIndex = services.findIndex(s => s.name === serviceName);
+
+      if (serviceIndex === -1) {
+        return { success: false, error: `Service ${serviceName} not found` };
+      }
+
+      // Update the service with new settings
+      Object.assign(services[serviceIndex], settings);
+
+      // Save via AJAX
+      try {
+        const response = await fetch('/wp-admin/admin-ajax.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            action: 'save_klaro_services',
+            services: JSON.stringify(services),
+            _wpnonce: klaroGeoServices.nonce
+          }),
+          credentials: 'same-origin'
+        });
+
+        const result = await response.json();
+        return result;
+      } catch (e) {
+        return { success: false, error: e.message };
+      }
+    }, { serviceName, settings });
+  }
+
+  /**
+   * Reset a Klaro service to default settings
+   * @param {string} serviceName - Service name to reset
+   * @param {Object} defaultSettings - Default settings for the service
+   * @returns {Promise<Object>} - Result of the reset
+   */
+  async resetServiceToDefaults(serviceName, defaultSettings = {}) {
+    // Default settings for GTM
+    const defaults = {
+      'google-tag-manager': { required: true, default: true },
+      'google-analytics': { required: false, default: false },
+      'google-ads': { required: false, default: false },
+      ...defaultSettings
+    };
+
+    const settings = defaults[serviceName] || {};
+    return await this.updateServiceSettings(serviceName, settings);
+  }
 }
 
 module.exports = { WordPressHelper };

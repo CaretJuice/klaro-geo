@@ -145,9 +145,9 @@ describe('DataLayer Initialization', function() {
         // Simulate the initialization code from klaro-config.js
         window.dataLayer = window.dataLayer || [];
 
-        // Define the gtag function
+        // Define the gtag function using Array.from to ensure GTM treats it as a command
         window.gtag = function() {
-            window.dataLayer.push(arguments);
+            window.dataLayer.push(Array.from(arguments));
         };
 
         // Check if gtag function was defined

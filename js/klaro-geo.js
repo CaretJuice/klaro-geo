@@ -389,11 +389,19 @@ function handleKlaroConsentEvents(manager, eventName, data) {
 // Function to handle consent updates and trigger dataLayer events
 // NOTE: Consent mode is ALWAYS enabled - dynamic service keys are generated for all services
 function updateGoogleConsentMode(manager, eventType, data) {
-  klaroGeoLog('DEBUG: Google consent mode update triggered by:', eventType, 
+  klaroGeoLog('DEBUG: Google consent mode update triggered by:', eventType,
     'with data:', data ? (typeof data === 'object' ? 'consent object' : data) : 'no data');
 
-  // Check if gtag is available
-  if (typeof window.gtag !== 'function') {
+  // For initialConsents, check if defaults were already initialized in klaro-config.js
+  // If so, skip the gtag update call but still push the dataLayer event
+  const skipGtagUpdate = eventType === 'initialConsents' && window.klaroGeoConsentDefaultsInitialized === true;
+
+  if (skipGtagUpdate) {
+      klaroGeoLog('DEBUG: Initial consents - defaults already set in klaro-config.js, skipping gtag update');
+  }
+
+  // Check if gtag is available (needed for non-initial updates)
+  if (!skipGtagUpdate && typeof window.gtag !== 'function') {
       klaroGeoLog('DEBUG: gtag not available, skipping consent update');
       return;
   }
@@ -418,7 +426,8 @@ function updateGoogleConsentMode(manager, eventType, data) {
       // Get consent state from Klaro
       let adServiceEnabled = false;
       let analyticsServiceEnabled = false;
-      
+      let activeManager = manager; // Track the manager we'll use for consent state
+
       // First try to use the provided manager
       if (manager && manager.consents) {
           klaroGeoLog('DEBUG: Using provided manager for consent state');
@@ -435,6 +444,7 @@ function updateGoogleConsentMode(manager, eventType, data) {
                   klaroGeoLog('DEBUG: Getting fresh Klaro manager for consent state');
                   const klaroManager = window.klaro.getManager();
                   if (klaroManager && klaroManager.consents) {
+                      activeManager = klaroManager; // Use this manager for dynamic keys too
                       if (window.adStorageServiceName) {
                           adServiceEnabled = klaroManager.consents[window.adStorageServiceName] === true;
                       }
@@ -468,42 +478,58 @@ function updateGoogleConsentMode(manager, eventType, data) {
       const reservedKeys = ['ad_storage', 'analytics_storage', 'ad_user_data', 'ad_personalization'];
 
       // Add dynamic service consent keys for ALL services
-      if (manager && manager.consents) {
-          Object.keys(manager.consents).forEach(function(serviceName) {
+      // Use activeManager which may have been updated if the original manager was empty
+      console.log('[klaro-geo] activeManager exists:', !!activeManager, 'has consents:', !!(activeManager && activeManager.consents));
+      if (activeManager && activeManager.consents) {
+          const consentKeys = Object.keys(activeManager.consents);
+          console.log('[klaro-geo] Processing', consentKeys.length, 'services for dynamic consent keys:', consentKeys);
+          consentKeys.forEach(function(serviceName) {
               const dynamicKey = getServiceConsentKey(serviceName);
               // Only add if not conflicting with reserved keys
               if (!reservedKeys.includes(dynamicKey.replace('_consent', ''))) {
-                  const isGranted = manager.consents[serviceName] === true;
+                  const isGranted = activeManager.consents[serviceName] === true;
                   completeUpdate[dynamicKey] = isGranted ? 'granted' : 'denied';
+                  console.log('[klaro-geo] Added dynamic key:', dynamicKey, '=', completeUpdate[dynamicKey]);
+              } else {
+                  console.log('[klaro-geo] Skipped reserved key collision:', dynamicKey);
               }
           });
+      } else {
+          console.log('[klaro-geo] No activeManager.consents available - dynamic keys will not be added');
+          console.log('[klaro-geo] activeManager:', activeManager);
       }
 
       // Log the complete update being sent (now includes dynamic keys)
-      klaroGeoLog('DEBUG: Sending consent update to gtag (with dynamic service keys):', completeUpdate);
+      klaroGeoLog('DEBUG: Consent update object (with dynamic service keys):', completeUpdate);
 
       // Store last update
       window.lastConsentUpdate = completeUpdate;
 
-      // Send to gtag
-      window.gtag('consent', 'update', completeUpdate);
-      klaroGeoLog('DEBUG: Consent state updated with:', completeUpdate);
+      // Send to gtag - skip for initialConsents if defaults were already set in klaro-config.js
+      if (!skipGtagUpdate) {
+          window.gtag('consent', 'update', completeUpdate);
+          klaroGeoLog('DEBUG: Consent state updated via gtag with:', completeUpdate);
+      } else {
+          klaroGeoLog('DEBUG: Skipped gtag update for initialConsents (defaults already set)');
+      }
 
       // Update UI controls
-      if (manager.services) {
-          const adService = manager.services.find(service => service.name === window.adStorageServiceName);
+      if (activeManager && activeManager.services) {
+          const adService = activeManager.services.find(service => service.name === window.adStorageServiceName);
           if (adService) {
               const serviceElement = document.getElementById('service-item-' + window.adStorageServiceName);
-              updateControlsUI(manager, serviceElement, adServiceEnabled);
+              updateControlsUI(activeManager, serviceElement, adServiceEnabled);
           }
       }
-      
+
       // Push klaroConsentUpdate event to dataLayer after consent mode is updated
-      if (typeof window.dataLayer !== 'undefined') {
+      // Use setTimeout(0) to defer the event push, allowing GTM to process the gtag command first
+      // This prevents a race condition where GTM receives both the command and trigger simultaneously
+      if (typeof window.dataLayer !== 'undefined' && activeManager && activeManager.consents) {
           // Create acceptedServices array for the update event
-          const acceptedServices = Object.keys(manager.consents)
-              .filter(serviceName => manager.consents[serviceName] === true);
-              
+          const acceptedServices = Object.keys(activeManager.consents)
+              .filter(serviceName => activeManager.consents[serviceName] === true);
+
           const consentUpdateData = {
               'event': 'Klaro Consent Update',
               'eventSource': 'klaro-geo',
@@ -511,9 +537,12 @@ function updateGoogleConsentMode(manager, eventType, data) {
               'acceptedServices': acceptedServices,
               'triggerEvent': eventType
           };
-          
-          klaroGeoLog('DEBUG: Pushing klaroConsentUpdate to dataLayer:', consentUpdateData);
-          window.dataLayer.push(consentUpdateData);
+
+          klaroGeoLog('DEBUG: Deferring klaroConsentUpdate push to allow GTM to process consent command');
+          setTimeout(function() {
+              klaroGeoLog('DEBUG: Pushing klaroConsentUpdate to dataLayer:', consentUpdateData);
+              window.dataLayer.push(consentUpdateData);
+          }, 0);
       }
 
       // Reset timer

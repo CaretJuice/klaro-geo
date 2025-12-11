@@ -175,7 +175,7 @@ class KlaroGeoServiceSettingsClassTest extends WP_UnitTestCase {
             'default' => false,
             'cookies' => array(),
             'callback' => array(
-                'onInit' => "window.dataLayer = window.dataLayer || []; window.gtag = function(){dataLayer.push(arguments)}",
+                'onInit' => "window.dataLayer = window.dataLayer || []; window.gtag = function(){dataLayer.push(Array.from(arguments))}",
                 'onAccept' => "console.log('accept')",
                 'onDecline' => "console.log('decline')"
             )

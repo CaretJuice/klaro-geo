@@ -70,41 +70,17 @@ echo "Activating klaro-geo plugin..."
 wp plugin activate klaro-geo --allow-root --path=/var/www/html 2>/dev/null || true
 echo "klaro-geo plugin activated!"
 
-# Set up a basic Klaro configuration for testing
-echo "Setting up Klaro configuration..."
-wp option update klaro_geo_config '{
-    "elementID": "klaro",
-    "cookieName": "klaro",
-    "cookieExpiresAfterDays": 365,
-    "default": false,
-    "mustConsent": true,
-    "acceptAll": true,
-    "hideDeclineAll": false,
-    "hideLearnMore": false,
-    "noticeAsModal": true,
-    "plugin_settings": {
-        "enable_consent_logging": true
-    },
-    "services": [
-        {
-            "name": "google-analytics",
-            "title": "Google Analytics",
-            "purposes": ["analytics"],
-            "required": false,
-            "default": false
-        },
-        {
-            "name": "facebook-pixel",
-            "title": "Facebook Pixel",
-            "purposes": ["marketing"],
-            "required": false,
-            "default": false
-        }
-    ]
-}' --format=json --allow-root --path=/var/www/html 2>/dev/null || echo "Note: Could not set Klaro config, plugin may need manual configuration"
+# Set up Google Tag Manager ID for testing
+echo "Setting up GTM configuration..."
+wp option update klaro_geo_gtm_id 'GTM-M2Z9TF4J' --allow-root --path=/var/www/html 2>/dev/null || true
+echo "GTM ID set to GTM-M2Z9TF4J"
 
 # Enable consent receipt logging (must match klaro-geo.php:220)
 wp option update klaro_geo_enable_consent_receipts 1 --allow-root --path=/var/www/html 2>/dev/null || true
+
+# Let the plugin use its default services (which includes GTM as required:true, default:true)
+# The default services are defined in includes/klaro-geo-defaults.php
+echo "Using default plugin services (GTM, Google Analytics, Google Ads)"
 
 # Set proper permissions
 echo "Setting permissions..."

@@ -42,11 +42,21 @@ function klaro_geo_admin_scripts($hook) {
         KLARO_GEO_VERSION
     );
 
-    // 2. Register and enqueue the main admin script
+    // 2. Register the debug script first (provides klaroGeoLog function)
+    wp_register_script(
+        'klaro-geo-debug-js',
+        KLARO_GEO_URL . 'js/klaro-geo-debug.js',
+        array(),
+        KLARO_GEO_VERSION,
+        true
+    );
+    wp_enqueue_script('klaro-geo-debug-js');
+
+    // 3. Register and enqueue the main admin script (depends on debug script)
     wp_register_script(
         'klaro-geo-admin-js',
         KLARO_GEO_URL . 'js/klaro-geo-admin.js',
-        array('jquery', 'jquery-ui-tabs'),
+        array('jquery', 'jquery-ui-tabs', 'klaro-geo-debug-js'),
         KLARO_GEO_VERSION,
         true
     );
@@ -69,7 +79,7 @@ function klaro_geo_admin_scripts($hook) {
 
     wp_enqueue_script('klaro-geo-admin-js');
 
-    // 3. Page-specific scripts
+    // 4. Page-specific scripts
 
     // Services page
     if (strpos($hook, 'klaro-geo-services') !== false) {

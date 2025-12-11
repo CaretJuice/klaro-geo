@@ -136,17 +136,15 @@ Use the custom `/commit` command which:
 ## Current Session Goals
 
 <!-- Update this section for each working session -->
-- Improve the experience of using this plugin
-- Implement the [Dynamic Custom Consent Keys] (/home/damon/dev/cj/wp/klaro-geo/plan/dynamic-custom-consent-keys.md) described in the linked Markdown file
-- Update the documentation (in particular, the README; I don't think this affects inline documentation much or at all)
+- Debugging and fixing Google Tag Manager dataLayer interaction
 
 ## Working Memory
 
 <!-- Update as you work -->
-- Check which contracts need updating first
-- We want to lock unaffected contracts and document which contracts we are working on in this session
-- Document the contracts that we are working on in this file
-- After the unaffected contracts are locked and we've settled on which contracts need to be unlocked, edit the contracts and start editing the code, updating tests, etc...
+- We were previously expecting users to use the acceptedServices array and filter on array contains x in Google Tag Manager to trigger tags
+- This required using Trigger Groups in GTM which are awkward and a pain to set up
+- Now we are using custom consentMode permissions which can be used at the tag-level with just a single trigger
+- We want this simplified setup to be the main one, but still support Trigger Groups because they capture more data (landing on a page without consent and then consenting on that page fires all events when using Trigger Groups but only new events with custom consent mode)
 
 ## Debug Logging
 

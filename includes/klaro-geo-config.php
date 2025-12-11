@@ -201,11 +201,57 @@ function klaro_geo_generate_config_file() {
     $ad_storage_service = isset($consent_mode_settings['ad_storage_service']) ?
         $consent_mode_settings['ad_storage_service'] : 'no_service';
 
-    $initialization_code = isset($consent_mode_settings['initialization_code']) ?
-        $consent_mode_settings['initialization_code'] : '';
-
     // Log consent mode configuration (always enabled)
     klaro_geo_debug_log('Consent mode enabled (always on): analytics=' . $analytics_storage_service . ', ads=' . $ad_storage_service);
+
+    // Get template's default consent state (for inheritance)
+    $template_default_consent = isset($template_config['config']['default']) && $template_config['config']['default'] ? true : false;
+
+    // Build consolidated consent mode initialization
+    // Use new structured settings if available, otherwise fall back to defaults
+    $consent_defaults = isset($consent_mode_settings['consent_defaults']) ? $consent_mode_settings['consent_defaults'] : array();
+    $gtag_settings = isset($consent_mode_settings['gtag_settings']) ? $consent_mode_settings['gtag_settings'] : array();
+
+    // Standard Google Consent Mode v2 keys - use settings or default to 'denied'
+    $dynamic_consent_defaults = array(
+        'ad_storage' => isset($consent_defaults['ad_storage']) ? $consent_defaults['ad_storage'] : 'denied',
+        'analytics_storage' => isset($consent_defaults['analytics_storage']) ? $consent_defaults['analytics_storage'] : 'denied',
+        'ad_user_data' => isset($consent_defaults['ad_user_data']) ? $consent_defaults['ad_user_data'] : 'denied',
+        'ad_personalization' => isset($consent_defaults['ad_personalization']) ? $consent_defaults['ad_personalization'] : 'denied',
+    );
+
+    // Add dynamic service consent keys for ALL services
+    // Respects: required services → granted, service override → explicit default, otherwise → template default
+    foreach ($services as $service) {
+        $service_name = $service['name'] ?? '';
+        if (!empty($service_name)) {
+            // Convert service name to consent key format (e.g., 'google-analytics' -> 'google_analytics_consent')
+            $consent_key = str_replace('-', '_', $service_name) . '_consent';
+
+            // Determine the default value based on priority:
+            // 1. Required services → always 'granted'
+            // 2. Service has explicit default → use it
+            // 3. Otherwise → inherit from template default
+            $is_required = isset($service['required']) && filter_var($service['required'], FILTER_VALIDATE_BOOLEAN);
+            $has_explicit_default = isset($service['default']) && $service['default'] !== null && $service['default'] !== '';
+
+            if ($is_required) {
+                $dynamic_consent_defaults[$consent_key] = 'granted';
+            } elseif ($has_explicit_default) {
+                $service_default = filter_var($service['default'], FILTER_VALIDATE_BOOLEAN);
+                $dynamic_consent_defaults[$consent_key] = $service_default ? 'granted' : 'denied';
+            } else {
+                // Inherit from template default
+                $dynamic_consent_defaults[$consent_key] = $template_default_consent ? 'granted' : 'denied';
+            }
+        }
+    }
+
+    // Get gtag settings (ads_data_redaction, url_passthrough)
+    $ads_data_redaction = isset($gtag_settings['ads_data_redaction']) ? $gtag_settings['ads_data_redaction'] : 'true';
+    $url_passthrough = isset($gtag_settings['url_passthrough']) ? $gtag_settings['url_passthrough'] : 'false';
+
+    klaro_geo_debug_log('Generated consolidated consent defaults for ' . count($dynamic_consent_defaults) . ' keys');
 
     // Process each service
     foreach ($services as $service) {
@@ -246,13 +292,9 @@ function klaro_geo_generate_config_file() {
             $service_config['translations'] = $service['translations'];
         }
 
-        // Apply Google Consent Mode modifications (always enabled)
-        // Check if this is the Google Tag Manager service
-        if ($service['name'] === 'google-tag-manager' && !empty($initialization_code)) {
-            // Add the initialization code directly to the onInit callback without safety checks
-            $service_config['onInit'] = $service_config['onInit'] . "\n" . $initialization_code;
-            klaro_geo_debug_log('Added initialization code to GTM onInit callback');
-        }
+        // NOTE: Consent mode initialization has been moved to klaro-config.js (runs before GTM loads)
+        // This ensures consent defaults are set BEFORE any GTM tags can fire
+        // The GTM onInit callback is now only used for service-specific initialization if needed
 
         // Check if this service matches the analytics storage event
         $is_analytics_service = $analytics_storage_service !== 'no_service' && $service['name'] === $analytics_storage_service;
@@ -392,7 +434,23 @@ if (latestReceipt) {
 }
 
 // Push to dataLayer
-window.dataLayer.push(klaroConfigLoadedData);\n\n";
+window.dataLayer.push(klaroConfigLoadedData);
+
+// ===== CONSENT MODE INITIALIZATION =====
+// Initialize Google Consent Mode BEFORE GTM loads
+// This ensures all consent defaults are set before any tags can fire
+window.gtag = function(){dataLayer.push(arguments)};
+
+// Set all consent defaults in a single call (standard + dynamic service keys)
+gtag('consent', 'default', " . wp_json_encode($dynamic_consent_defaults, JSON_PRETTY_PRINT) . ");
+
+// Set additional gtag settings
+gtag('set', 'ads_data_redaction', " . $ads_data_redaction . ");
+gtag('set', 'url_passthrough', " . $url_passthrough . ");
+
+// Mark that consent mode defaults have been initialized
+window.klaroGeoConsentDefaultsInitialized = true;
+\n\n";
 
     // Log summary of config generation
     klaro_geo_debug_log('Config generated: template=' . $template_to_use . ', services=' . count($klaro_config['services']) .
@@ -430,6 +488,9 @@ window.dataLayer.push(klaroConfigLoadedData);\n\n";
 
         // NOTE: initialize_consent_mode has been removed - consent mode is always enabled
 
+        // Pre-encode consent_defaults for JavaScript output
+        $consent_defaults_json = wp_json_encode($dynamic_consent_defaults);
+
         // Add variables for the consent receipts script
         $klaro_config_content .= <<<JS
 // Consent Receipt Configuration
@@ -455,7 +516,11 @@ window.klaroConsentData = {
             consent_mode_settings: {
                 analytics_storage_service: "{$analytics_storage_service}",
                 ad_storage_service: "{$ad_storage_service}",
-                initialization_code: `{$initialization_code}`
+                consent_defaults: {$consent_defaults_json},
+                gtag_settings: {
+                    ads_data_redaction: {$ads_data_redaction},
+                    url_passthrough: {$url_passthrough}
+                }
             }
         }
     }
