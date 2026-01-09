@@ -1,0 +1,16 @@
+homepage: "https://github.com/CaretJuice/klaro-geo"
+documentation: "https://github.com/CaretJuice/klaro-geo/tree/master/gtm-template"
+versions:
+  - sha: HEAD
+    changeNotes: |
+      Initial release of Klaro Geo Consent Mode template.
+
+      Features:
+      - Google Consent Mode v2 support with setDefaultConsentState and updateConsentState APIs
+      - Reads existing consent from Klaro cookie on page load
+      - Updates consent state from Klaro Consent Update dataLayer events
+      - Supports both standard consent types (analytics_storage, ad_storage) and custom service-specific types
+      - First-page attribution support via klaro_consent_granted_pageview event
+      - Configurable wait_for_update timeout
+      - Optional ads_data_redaction and url_passthrough settings
+      - Debug logging mode

@@ -260,6 +260,23 @@ The plugin supports different Klaro script variants:
 
 The plugin directly loads Google Tag Manager in a Klaro-compatible way, ensuring proper consent management.
 
+### GTM Consent Mode Template
+
+Klaro Geo includes a **Google Tag Manager Community Template** for consent mode integration. This template uses GTM's native consent APIs (`setDefaultConsentState()` and `updateConsentState()`) which update consent state immediately, avoiding timing issues with queued `gtag()` commands.
+
+**Why use the GTM template?**
+- Ensures consent is set BEFORE tags fire
+- Supports both standard signals (`analytics_storage`, `ad_storage`) and custom service-specific consent types (`google_analytics_consent`, etc.)
+- Handles first-page attribution when consent is granted after page load
+
+**Setup overview:**
+1. Import the template from `gtm-template/template.tpl` into GTM
+2. Create a "Default" tag triggered on "Consent Initialization - All Pages"
+3. Create an "Update" tag triggered on the `Klaro Consent Data` custom event
+4. Configure your GA4/Google Ads tags to require appropriate consent signals
+
+For detailed setup instructions, see the [GTM Template README](gtm-template/README.md).
+
 ### How to Set Up GTM
 
 1. Go to **Klaro Geo > Klaro Geo > Google Tag Manager**
@@ -294,17 +311,39 @@ These events can include the following parameters:
 - `klaroGeoEnableConsentLogging: true|false` (klaroConfigLoaded and generateConsentReceipt): Whether consent receipt logging is enabled for the current template/country
 - `klaroGeoConsentReceipt: {...}` (klaroConfigLoaded and generateConsentReceipt): The complete consent receipt object if available. For klaroConfigLoaded, this will be the most recent consent receipt stored in localStorage, if one exists.
 
+#### Klaro Consent Data
+
+This event is pushed by the plugin when consent state changes. It contains raw consent data for the GTM template to process.
+
+Parameters:
+- `event: "Klaro Consent Data"`: Hard-coded event name
+- `eventSource: "klaro-geo"`: This should always be klaro-geo
+- `consentMode: {...}`: Object containing all consent signals (standard and custom)
+- `acceptedServices: ["google-tag-manager", "google-analytics"]`: Array of accepted service names
+- `triggerEvent: "initialConsents|saveConsents"`: The Klaro event that triggered this
+
+**Important**: Use this event as the trigger for the GTM Update tag, NOT for your GA4/Google Ads tags.
+
 #### Klaro Consent Update
 
-This event is the main firing trigger for most Google Tag Manager tags. It is triggered after initialConsents and saveConsents and Google Consent Mode `Consent Update` events. It simplifies the trigger setup in GTM and resolves race conditions between Klaro and Consent Mode.
+This event is pushed by the GTM template AFTER calling `updateConsentState()`. This is the recommended trigger for your GA4 and Google Ads tags because consent is guaranteed to be set when this event fires.
 
-This event can include the following parameters:
-- `event: "Klaro Consent Update"`: Hard-coded value for all of these events
-- `eventSource: "klaro-geo"`: This should always be klaro-geo
-- `acceptedServices: ["google-tag-manager", "google-analytics"]`: An array of service names that are currently accepted.
-- `triggerEvent: "initialConsents|saveConsents"`: The name of the event that triggered this event.
+Parameters:
+- `event: "Klaro Consent Update"`: Hard-coded event name
+- `consent_trigger: "initialConsents|saveConsents"`: The Klaro event that triggered this
+- `analytics_storage: "granted|denied"`: Current analytics consent state
+- `ad_storage: "granted|denied"`: Current ads consent state
+- `ad_user_data: "granted|denied"`: Current ad user data consent state
+- `ad_personalization: "granted|denied"`: Current ad personalization consent state
+- `consentMode: {...}`: Complete consent mode object
+- `acceptedServices: [...]`: Array of accepted service names
 
-It is expected that you will created a Data Layer Variable named `acceptedServices` and then use the Data Layer Variable contains "google-analytics" to trigger the Google Analytics tag, for example. Note that the names of Klaro services are lowercased and hyphenated when set in acceptedServices.
+**Event Flow**:
+1. Plugin pushes `Klaro Consent Data` (raw data)
+2. GTM Update tag fires, calls `updateConsentState()`, pushes `Klaro Consent Update`
+3. Your tags trigger on `Klaro Consent Update` (consent is set)
+
+It is expected that you will create a Data Layer Variable named `acceptedServices` and then use "Data Layer Variable contains google-analytics" to trigger the Google Analytics tag, for example. Note that the names of Klaro services are lowercased and hyphenated when set in acceptedServices.
 
 #### Dynamic Consent Keys
 

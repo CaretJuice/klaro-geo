@@ -87,7 +87,12 @@ describe('DataLayer Initialization', function() {
         expect(window.dataLayer[0].klaro_geo_logging_enabled).toBe(false);
     });
 
-    test('should set default consent state', function() {
+    // NOTE: The plugin no longer calls gtag('consent', 'default') or gtag('consent', 'update').
+    // Consent mode is now handled by the GTM template using native setDefaultConsentState()
+    // and updateConsentState() APIs. The plugin only pushes 'Klaro Consent Update' events
+    // to the dataLayer with the consentMode object.
+
+    test('should NOT call gtag consent default (handled by GTM template)', function() {
         // Simulate the initialization code from klaro-config.js
         window.dataLayer = window.dataLayer || [];
         window.dataLayer.push({
@@ -100,24 +105,11 @@ describe('DataLayer Initialization', function() {
             "klaro_geo_logging_enabled": false
         });
 
-        // Simulate the default consent state call
-        window.gtag('consent', 'default', {
-            'ad_storage': 'denied',
-            'analytics_storage': 'denied',
-            'ad_user_data': 'denied',
-            'ad_personalization': 'denied'
-        });
-
-        // Check if gtag was called with the correct default consent state
-        expect(window.gtag).toHaveBeenCalledWith('consent', 'default', {
-            'ad_storage': 'denied',
-            'analytics_storage': 'denied',
-            'ad_user_data': 'denied',
-            'ad_personalization': 'denied'
-        });
+        // The plugin should NOT call gtag('consent', 'default') - GTM template handles this
+        expect(window.gtag).not.toHaveBeenCalledWith('consent', 'default', expect.anything());
     });
 
-    test('should enable data redaction by default', function() {
+    test('should NOT call gtag set ads_data_redaction (handled by GTM template)', function() {
         // Simulate the initialization code from klaro-config.js
         window.dataLayer = window.dataLayer || [];
         window.dataLayer.push({
@@ -130,11 +122,8 @@ describe('DataLayer Initialization', function() {
             "klaro_geo_logging_enabled": false
         });
 
-        // Simulate the data redaction call
-        window.gtag('set', 'ads_data_redaction', true);
-
-        // Check if gtag was called to enable data redaction
-        expect(window.gtag).toHaveBeenCalledWith('set', 'ads_data_redaction', true);
+        // The plugin should NOT call gtag('set', 'ads_data_redaction') - GTM template handles this
+        expect(window.gtag).not.toHaveBeenCalledWith('set', 'ads_data_redaction', expect.anything());
     });
 
     test('should initialize gtag function if it does not exist', function() {

@@ -10,7 +10,7 @@ file_meta:
     - "klaro-geo-consent-receipts.js"
     - "external: Klaro library"
   stability: "core"
-  last_updated: "2025-12-10"
+  last_updated: "2026-01-09"
 
 # =============================================================================
 # ARCHITECTURE PRINCIPLE
@@ -181,7 +181,9 @@ events:
       - MUST include dynamic [service]_consent keys for ALL services
       - Dynamic keys use 'granted' for true consent, 'denied' for false
       - acceptedServices array contains only services with consent=true
-      - This event fires AFTER gtag('consent', 'update', ...) is called
+      - NOTE: The plugin does NOT call gtag('consent', 'update', ...) directly
+      - The GTM template reads this event and calls updateConsentState() API
+      - This architecture ensures consent state is updated BEFORE tags evaluate
 
   # ---------------------------------------------------------------------------
   # KLARO FORWARDED EVENTS (examples - Klaro may add more)
@@ -212,8 +214,57 @@ events:
 # INTEGRATION CONTRACTS
 # =============================================================================
 integration:
+  gtm_template:
+    description: "Klaro Geo GTM Community Template (recommended approach)"
+    location: "gtm-template/ subdirectory in klaro-geo repo"
+
+    why_use_template: |
+      The GTM template uses native setDefaultConsentState() and updateConsentState()
+      APIs which update consent state IMMEDIATELY. This fixes a critical timing issue:
+      - gtag('consent', 'update', ...) commands are QUEUED and may not process
+        before the next event begins
+      - Native consent APIs update state synchronously BEFORE tags evaluate
+      - This ensures tags with consent requirements fire correctly
+
+    setup:
+      step_1: "Import Klaro Geo template into GTM workspace"
+      step_2: "Create 'Klaro Geo - Default' tag on Consent Initialization trigger"
+      step_3: "Create 'Klaro Geo - Update' tag on 'Klaro Consent Update' event trigger"
+      step_4: "Configure tags with consent requirements (analytics_storage, google_analytics_consent, etc.)"
+
+    tag_configuration:
+      default_tag:
+        trigger: "Consent Initialization - All Pages"
+        command: "default"
+        settings: "Set all consent types to 'denied' with wait_for_update timeout"
+        note: "Does NOT read Klaro cookie - waits for Klaro Consent Update event"
+
+      update_tag:
+        trigger: "Custom Event: Klaro Consent Update"
+        command: "update"
+        settings: "Reads consentMode from dataLayer and calls updateConsentState()"
+        note: "Also pushes klaro_consent_granted_pageview for first-page attribution"
+
+    supported_consent_types:
+      standard_google:
+        - analytics_storage
+        - ad_storage
+        - ad_user_data
+        - ad_personalization
+      custom_service:
+        - google_analytics_consent
+        - google_ads_consent
+        - google_tag_manager_consent
+        - "[any service]_consent keys from consentMode object"
+
+    contract: |
+      - Plugin MUST push 'Klaro Consent Update' events with consentMode object
+      - GTM template reads consentMode and calls updateConsentState()
+      - Consent state is updated BEFORE any tags evaluate
+      - First-page attribution is handled via klaro_consent_granted_pageview event
+
   google_tag_manager:
-    description: "GTM integration via dataLayer"
+    description: "GTM integration via dataLayer (legacy/advanced patterns)"
     trigger_recommendations:
       - trigger: "Klaro Config Loaded"
         condition: "event equals 'Klaro Event' AND klaroEventName equals 'klaroConfigLoaded'"
@@ -261,6 +312,16 @@ test_scenarios:
     - "Dynamic service keys are generated for all services"
     - "Service names with hyphens are sanitized (hyphens -> underscores)"
     - "Denied services have value 'denied', not omitted"
+    - "Only ONE 'Klaro Consent Update' event fires per consent state change"
+    - "Plugin does NOT call gtag('consent', 'default') or gtag('consent', 'update')"
+
+  gtm_template_integration:
+    - "GTM Default tag sets all consent to denied initially"
+    - "GTM Update tag reads consentMode from 'Klaro Consent Update' event"
+    - "updateConsentState() is called BEFORE trigger fires"
+    - "klaro_consent_granted_pageview fires on first consent grant"
+    - "Tags with analytics_storage requirement fire after consent"
+    - "Tags with custom consent types (google_analytics_consent) fire after consent"
 
   edge_cases:
     - "Event fires even when no geo detected"

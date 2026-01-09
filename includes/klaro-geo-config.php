@@ -112,6 +112,13 @@ function klaro_geo_generate_config_file() {
                 continue;
             }
 
+            // Clean up consent_mode_settings - remove legacy initialization_code
+            // The initialization code is now generated dynamically with custom service consent keys
+            if ($key === 'consent_mode_settings' && is_array($value)) {
+                unset($value['initialization_code']);
+                unset($value['initialize_consent_mode']); // Also remove legacy toggle
+            }
+
             // Copy the value directly to klaroConfig
             $klaro_config[$key] = $value;
         }
@@ -436,21 +443,13 @@ if (latestReceipt) {
 // Push to dataLayer
 window.dataLayer.push(klaroConfigLoadedData);
 
-// ===== CONSENT MODE INITIALIZATION =====
-// Initialize Google Consent Mode BEFORE GTM loads
-// This ensures all consent defaults are set before any tags can fire
-window.gtag = function(){dataLayer.push(arguments)};
-
-// Set all consent defaults in a single call (standard + dynamic service keys)
-gtag('consent', 'default', " . wp_json_encode($dynamic_consent_defaults, JSON_PRETTY_PRINT) . ");
-
-// Set additional gtag settings
-gtag('set', 'ads_data_redaction', " . $ads_data_redaction . ");
-gtag('set', 'url_passthrough', " . $url_passthrough . ");
-
-// Mark that consent mode defaults have been initialized
-window.klaroGeoConsentDefaultsInitialized = true;
-\n\n";
+// ===== DATALAYER INITIALIZATION =====
+// Initialize dataLayer and gtag function for GTM
+// NOTE: Consent mode is handled by the Klaro Geo GTM template, not via gtag commands
+// The gtag() approach has timing issues - GTM template uses native consent APIs
+window.dataLayer = window.dataLayer || [];
+window.gtag = function(){dataLayer.push(arguments);};
+\n";
 
     // Log summary of config generation
     klaro_geo_debug_log('Config generated: template=' . $template_to_use . ', services=' . count($klaro_config['services']) .
@@ -488,6 +487,9 @@ window.klaroGeoConsentDefaultsInitialized = true;
 
         // NOTE: initialize_consent_mode has been removed - consent mode is always enabled
 
+        // Get dataLayer settings
+        $suppress_consents_events = get_option('klaro_geo_suppress_consents_events', true) ? 'true' : 'false';
+
         // Pre-encode consent_defaults for JavaScript output
         $consent_defaults_json = wp_json_encode($dynamic_consent_defaults);
 
@@ -505,6 +507,7 @@ window.klaroConsentData = {
     nonce: "{$consent_nonce}",
     enableConsentLogging: {$enable_consent_logging_value},
     consentMode: {$consent_mode_js},
+    suppressConsentsEvents: {$suppress_consents_events},
     templateSettings: {
         consentModalTitle: "{$modal_title}",
         consentModalDescription: "{$modal_description}",

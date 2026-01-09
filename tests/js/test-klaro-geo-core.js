@@ -173,18 +173,22 @@ describe('Klaro Geo Core - DataLayer Integration', function() {
         });
 
         test('should include accepted services for initialConsents event', function() {
+            // The initialConsents event is pushed by pushConsentData at initialization time,
+            // not through the watcher callback. So we need to check the dataLayer that was
+            // populated when klaro-geo.js was required, not after manually triggering the watcher.
             return new Promise(resolve => setTimeout(resolve, 100)).then(() => {
+                // Re-require the module to get a fresh initialization
+                jest.resetModules();
                 window.dataLayer = [];
+                require('../../js/klaro-geo.js');
 
-                if (window.klaroWatchCallbacks && window.klaroWatchCallbacks.update) {
-                    const manager = window.klaro.getManager();
-                    window.klaroWatchCallbacks.update(manager, 'initialConsents', {});
-                }
-
-                const initEvent = window.dataLayer.find(item =>
-                    item.klaroEventName === 'initialConsents'
-                );
-                expect(initEvent.acceptedServices).toBeTruthy();
+                return new Promise(resolve => setTimeout(resolve, 100)).then(() => {
+                    const initEvent = window.dataLayer.find(item =>
+                        item.klaroEventName === 'initialConsents'
+                    );
+                    expect(initEvent).toBeTruthy();
+                    expect(initEvent.acceptedServices).toBeTruthy();
+                });
             });
         });
 

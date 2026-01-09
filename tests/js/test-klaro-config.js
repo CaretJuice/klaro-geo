@@ -27,15 +27,10 @@ describe('Klaro Config', function() {
         window.klaroConsentData.detectedCountry = 'US';
         window.klaroConsentData.detectedRegion = 'CA';
 
-        // Create a mock handleConsentUpdate function
-        mockHandleConsentUpdate = jest.fn((type, granted) => {
-            window.gtag('consent', 'update', {
-                [type]: granted ? 'granted' : 'denied'
-            });
-        });
-
-        // Define the function globally
-        window.handleConsentUpdate = mockHandleConsentUpdate;
+        // NOTE: handleConsentUpdate has been removed from the plugin.
+        // Consent mode is now handled by the GTM template using native APIs.
+        // The plugin pushes 'Klaro Consent Update' events directly to dataLayer.
+        mockHandleConsentUpdate = null;
 
         // Mock the initial dataLayer push that happens in klaro-config.js
         window.dataLayer.push({
@@ -48,15 +43,8 @@ describe('Klaro Config', function() {
             "klaro_geo_logging_enabled": false
         });
 
-        // Mock the default consent state and data redaction calls
-        window.gtag('consent', 'default', {
-            'ad_storage': 'denied',
-            'analytics_storage': 'denied',
-            'ad_user_data': 'denied',
-            'ad_personalization': 'denied'
-        });
-
-        window.gtag('set', 'ads_data_redaction', true);
+        // NOTE: The plugin no longer calls gtag('consent', 'default') or gtag('set', 'ads_data_redaction').
+        // These are now handled by the GTM template using setDefaultConsentState() API.
     });
 
     afterEach(function() {
@@ -84,45 +72,70 @@ describe('Klaro Config', function() {
         expect(window.dataLayer[0].klaro_geo_logging_enabled).toBe(false);
     });
 
-    test('should set default consent state to denied', function() {
-        // Check if gtag was called with the correct default consent state
-        expect(window.gtag).toHaveBeenCalledWith('consent', 'default', {
-            'ad_storage': 'denied',
-            'analytics_storage': 'denied',
-            'ad_user_data': 'denied',
-            'ad_personalization': 'denied'
-        });
+    // NOTE: The plugin no longer calls gtag('consent', 'default') or gtag('consent', 'update').
+    // Consent mode is handled by the GTM template using native setDefaultConsentState()
+    // and updateConsentState() APIs. The plugin pushes 'Klaro Consent Update' events.
+
+    test('should NOT call gtag consent default (handled by GTM template)', function() {
+        // The plugin should NOT call gtag('consent', 'default') - GTM template handles this
+        expect(window.gtag).not.toHaveBeenCalledWith('consent', 'default', expect.anything());
     });
 
-    test('should enable data redaction by default', function() {
-        // Check if gtag was called to enable data redaction
-        expect(window.gtag).toHaveBeenCalledWith('set', 'ads_data_redaction', true);
+    test('should NOT call gtag set ads_data_redaction (handled by GTM template)', function() {
+        // The plugin should NOT call gtag('set', 'ads_data_redaction') - GTM template handles this
+        expect(window.gtag).not.toHaveBeenCalledWith('set', 'ads_data_redaction', expect.anything());
     });
 
-    test('handleConsentUpdate should update consent state correctly when granted', function() {
-        // Reset mock to clear previous calls
-        window.gtag.mockClear();
-
-        // Call handleConsentUpdate with granted=true
-        window.handleConsentUpdate('ad_storage', true);
-
-        // Check if gtag was called with the correct consent update
-        expect(window.gtag).toHaveBeenCalledWith('consent', 'update', {
-            'ad_storage': 'granted'
+    test('Klaro Consent Update event should include consentMode object', function() {
+        // Simulate the Klaro Consent Update event that the plugin pushes
+        window.dataLayer.push({
+            'event': 'Klaro Consent Update',
+            'eventSource': 'klaro-geo',
+            'consentMode': {
+                'ad_storage': 'granted',
+                'analytics_storage': 'granted',
+                'ad_user_data': 'granted',
+                'ad_personalization': 'granted',
+                'google_analytics_consent': 'granted',
+                'google_ads_consent': 'granted'
+            },
+            'acceptedServices': ['google-analytics', 'google-ads'],
+            'triggerEvent': 'saveConsents'
         });
+
+        // Find the Klaro Consent Update event
+        const consentUpdateEvent = window.dataLayer.find(e => e.event === 'Klaro Consent Update');
+
+        // Verify the consentMode object is present and has the correct structure
+        expect(consentUpdateEvent).toBeTruthy();
+        expect(consentUpdateEvent.consentMode).toBeDefined();
+        expect(consentUpdateEvent.consentMode.ad_storage).toBe('granted');
+        expect(consentUpdateEvent.consentMode.analytics_storage).toBe('granted');
+        expect(consentUpdateEvent.consentMode.google_analytics_consent).toBe('granted');
     });
 
-    test('handleConsentUpdate should update consent state correctly when denied', function() {
-        // Reset mock to clear previous calls
-        window.gtag.mockClear();
-
-        // Call handleConsentUpdate with granted=false
-        window.handleConsentUpdate('analytics_storage', false);
-
-        // Check if gtag was called with the correct consent update
-        expect(window.gtag).toHaveBeenCalledWith('consent', 'update', {
-            'analytics_storage': 'denied'
+    test('Klaro Consent Update event should include acceptedServices array', function() {
+        // Simulate the Klaro Consent Update event that the plugin pushes
+        window.dataLayer.push({
+            'event': 'Klaro Consent Update',
+            'eventSource': 'klaro-geo',
+            'consentMode': {
+                'ad_storage': 'denied',
+                'analytics_storage': 'granted',
+                'ad_user_data': 'denied',
+                'ad_personalization': 'denied',
+                'google_analytics_consent': 'granted'
+            },
+            'acceptedServices': ['google-analytics'],
+            'triggerEvent': 'initialConsents'
         });
+
+        // Find the Klaro Consent Update event
+        const consentUpdateEvent = window.dataLayer.find(e => e.event === 'Klaro Consent Update');
+
+        // Verify the acceptedServices array is present and correct
+        expect(consentUpdateEvent).toBeTruthy();
+        expect(consentUpdateEvent.acceptedServices).toEqual(['google-analytics']);
     });
 
     test('should generate receipt number when logging is enabled', function() {

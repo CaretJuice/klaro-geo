@@ -16,7 +16,7 @@ file_meta:
   related_specs:
     - "datalayer-events.spec.yaml"  # DataLayer events this file generates
   stability: "stable"
-  last_updated: "2025-12-10"
+  last_updated: "2026-01-09"
 
 # =============================================================================
 # ARCHITECTURE: DATALAYER-FIRST DESIGN
@@ -187,10 +187,10 @@ data_structures:
       enable_consent_logging: "bool"
     consent_mode_settings:
       # NOTE: initialize_consent_mode has been REMOVED - consent mode is always enabled
+      # NOTE: The plugin does NOT call gtag consent commands - GTM template handles this
       # This simplifies the codebase and ensures all tag managers can read the consentMode object
       analytics_storage_service: "string - Service name that controls analytics_storage"
       ad_storage_service: "string - Service name that controls ad_storage"
-      initialization_code: "string - Custom initialization code for GTM"
 
   effective_settings:
     template: "string - Template key to use"
@@ -290,6 +290,29 @@ debugging:
 consent_mode:
   description: "Google Consent Mode v2 and dynamic service consent keys"
 
+  architecture:
+    description: "GTM Template-Based Consent Management"
+    rationale: |
+      The plugin does NOT call gtag('consent', 'default') or gtag('consent', 'update')
+      directly. This is because gtag commands are queued and may not be processed
+      before the next dataLayer event fires, causing tags with consent requirements
+      to not fire correctly.
+
+      Instead, the plugin:
+      1. Initializes dataLayer and gtag function
+      2. Pushes 'Klaro Consent Update' events with consentMode object
+      3. The GTM template reads these events and calls native consent APIs
+
+      The GTM template uses setDefaultConsentState() and updateConsentState() which
+      update consent state IMMEDIATELY (not queued), ensuring tags see the correct
+      consent state when they evaluate.
+
+    contract: |
+      - Plugin MUST NOT call gtag('consent', 'default') or gtag('consent', 'update')
+      - Plugin MUST push 'Klaro Consent Update' event with consentMode object
+      - GTM template handles all consent mode state management
+      - See gtm-template/ for the GTM Community Template implementation
+
   always_enabled:
     description: "Consent mode is ALWAYS enabled - there is no toggle"
     rationale: |
@@ -297,9 +320,8 @@ consent_mode:
       - Ensures all tag managers can read the consentMode object in dataLayer
       - Provides consistent behavior across all deployments
     contract: |
-      - The config MUST always output consent mode v2 initialization
       - The dataLayer event 'Klaro Consent Update' MUST always include consentMode object
-      - gtag('consent', 'update', {...}) MUST always be called on consent changes
+      - The consentMode object MUST include both standard Google keys and dynamic service keys
 
   standard_google_keys:
     description: "Standard Google Consent Mode v2 keys"
@@ -337,4 +359,4 @@ consent_mode:
       - Dynamic keys MUST be generated for ALL services in the Klaro config
       - Services with consent=true MUST have value 'granted'
       - Services with consent=false MUST have value 'denied'
-      - Dynamic keys are included in both gtag() call and dataLayer event
+      - Dynamic keys are included in the dataLayer event consentMode object

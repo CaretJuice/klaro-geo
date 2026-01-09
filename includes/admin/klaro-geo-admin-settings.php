@@ -148,6 +148,17 @@ function klaro_geo_settings_page_content() {
                     </td>
                 </tr>
             </table>
+            <h2>DataLayer Settings</h2>
+            <table class="form-table">
+                <tr valign="top">
+                    <th scope="row"><label for="klaro_geo_suppress_consents_events">Suppress Individual Klaro Consent Event dataLayer Pushes</label></th>
+                    <td>
+                        <input type="checkbox" name="klaro_geo_suppress_consents_events" id="klaro_geo_suppress_consents_events" value="1" <?php checked(get_option('klaro_geo_suppress_consents_events', true)); ?> />
+                        <p class="description">Klaro sends a "consents" event every time an individual consent toggle is changed in the consent banner. These don't take effect until the user saves their choices, at which point the plugin sends a consolidated event. Enabling this setting (recommended) suppresses the individual toggle events, which can pollute the dataLayer when users toggle multiple settings. Disable this only if you need to track individual consent toggle interactions within the banner.</p>
+                    </td>
+                </tr>
+            </table>
+
             <h2>Debug Settings</h2>
             <table class="form-table">
                 <tr valign="top">
@@ -276,6 +287,13 @@ function klaro_geo_register_main_settings() {
     register_setting('klaro_geo_settings_group', 'klaro_geo_enable_debug_logging', [
         'type' => 'boolean',
         'default' => false,
+        'sanitize_callback' => 'rest_sanitize_boolean',
+    ]);
+
+    // DataLayer settings
+    register_setting('klaro_geo_settings_group', 'klaro_geo_suppress_consents_events', [
+        'type' => 'boolean',
+        'default' => true,
         'sanitize_callback' => 'rest_sanitize_boolean',
     ]);
 
