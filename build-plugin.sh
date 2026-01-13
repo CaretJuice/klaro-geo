@@ -55,6 +55,12 @@ cp -r js "$PLUGIN_DIR/"
 echo -e "${YELLOW}Copying css/...${NC}"
 cp -r css "$PLUGIN_DIR/"
 
+# Copy assets directory if it exists (for readme images, etc.)
+if [ -d "assets" ]; then
+    echo -e "${YELLOW}Copying assets/...${NC}"
+    cp -r assets "$PLUGIN_DIR/"
+fi
+
 # Optional: Copy vendor if you have production Composer dependencies
 # Uncomment if needed:
 # if [ -d "vendor" ]; then

@@ -148,7 +148,7 @@ function klaro_geo_settings_page_content() {
                     </td>
                 </tr>
             </table>
-            <h2>DataLayer Settings</h2>
+            <h2>Data Layer Settings</h2>
             <table class="form-table">
                 <tr valign="top">
                     <th scope="row"><label for="klaro_geo_suppress_consents_events">Suppress Individual Klaro Consent Event dataLayer Pushes</label></th>

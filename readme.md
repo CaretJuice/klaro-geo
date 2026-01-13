@@ -1,10 +1,10 @@
 # Klaro Geo
 
-This plugin integrates the [Klaro](https://github.com/KIProtect/klaro) consent management tool with the [GeoIP2 PHP API](https://dev.maxmind.com/geoip/geoip2/geolite2/) to allow you to target different consent banners using Klaro.
+This plugin integrates the [Klaro](https://github.com/KIProtect/klaro) consent management tool with the [Geolocation IP Detection](https://en-ca.wordpress.org/plugins/geoip-detect/) Wordpress plugin to allow you to target different consent banners using Klaro.
 
-It is designed to work with Google Tag Manager with Klaro controlling the loading of Google Tag Manager. It is best to load Google Tag Manager via the plugin settings page rather than adding it manually to your site as integrating Google Tag Manager with Klaro requires customization of the Google Tag Manager Javascript snippet.
+It is designed to work with Google Tag Manager where Klaro controls the loading of Google Tag Manager. For optimal reliability, we recommend loading Google Tag Manager via the plugin settings page rather than manually adding it to your site. This ensures the GTM snippet is properly customized to integrate with Klaro.
 
-It allows you to create and manage multiple consent banner templates, assign them to users by location, and track consent decisions for compliance purposes.
+It allows you to create and manage multiple consent banner templates, assign each template to users by location, and track consent decisions for compliance purposes.
 
 This plugin gives you a lot of control over how consent is managed and tracked across your website. Using this plugin does not guarantee that you will be compliant with applicable laws and regulations. 
 
@@ -12,15 +12,18 @@ This plugin gives you a lot of control over how consent is managed and tracked a
 
 ## Features
 
-- **Geolocation-Based Consent Management**: Display different consent banners based on user location (country and region)
-- **Template System**: Create and manage multiple consent banner templates
-- **Google Tag Manager Integration**: Built-in support for Google Tag Manager with customizable scripts
-- **Google Consent Mode v2**: Support for Google's basic and advanced consent mode
-- **Strict Fallback Templates**: Use strict fallback templates to prevent accidental violations of local law
-- **Consent Receipts**: Track and optionally store user consent choices for compliance purposes
-- **Consent Button Options**: Add a floating button or integrate with WordPress menus to allow users to easily access consent settings
-- **Admin Debug Tools**: Test different geolocation scenarios directly from the admin bar
-- **Data Layer Integration**: Push consent events to the data layer for advanced tracking
+- **Geolocation-Based Consent Management**: Display different consent banners based on user location (country and region).
+- **Template System**: Create and manage multiple consent banner templates.
+- **Google Tag Manager Integration**: Built-in support for Google Tag Manager with including a custom community template.
+- **Google Consent Mode v2**: Support for Google's basic and advanced consent mode.
+- **Simplified GTM Consent Triggers**: Custom Consent Mode consent keys allow for a cleaner triggering of consented services in Google Tag Manager.
+- **Fallback Templates**: Use strict fallback templates to prevent accidental violations of local law.
+- **Granular Consent Receipts**: Automatically generates consent receipts stored in browser local storage for user reference if enabled. Optionally configure specific templates to archive these receipts in your WordPress database, allowing you to retain records only for jurisdictions that require it while blocking storage for others.
+- **Consent Buttons**: Add a floating button or integrate with WordPress menus to allow users to easily access consent settings.
+- **Bidirectional Data Layer Integration**: A full-duplex integration that listens for dataLayer events to trigger plugin actions, forwards native Klaro events to the dataLayer, and dispatches its own enhanced consent status events.
+- **Admin Debug Tools**: Test different geolocation scenarios directly from the admin bar.
+
+
 
 ## Requirements
 
@@ -38,9 +41,9 @@ This plugin gives you a lot of control over how consent is managed and tracked a
 
 ### Quick Start Guide
 
-Some settings are pre-requisites for other settings. For example, you must configure your consent purposes before you can assign them to tags or give them translations.
+**Important**: Configuration order matters. You must define foundational settings (like Purposes) before you can assign them to Services or configure Translations.
 
-Follow this quick start guide to minimize the need to revisit settings.
+Please follow the steps below in order to ensure a smooth setup and avoid having to backtrack.
 
 1. Go to the main settings page **Klaro Geo > Klaro Geo** and ensure the following settings are configured correctly:
   - Google Tag Manager ID is set.
@@ -51,7 +54,7 @@ Follow this quick start guide to minimize the need to revisit settings.
   - Assign each service to one or more purposes
 3. Go to the templates page **Klaro Geo > Templates** and customize the default template and create any other desired templates
   - Ensure that your templates have the **Default State** setting set the desired opt-in or opt-out behavior.
-4. Go to the countries page **Klaro Geo > Country Settings** and assign your templates to the Fallback Template and to your desired countries or regions.
+4. Go to the countries page **Klaro Geo > Country Settings** and map a template to the Fallback Template and to your desired countries or regions.
 5. Go to Google Tag Manager and use the Klaro-generated events to fire your tags 
   - Create a data layer variable assigned to the Data Layer Variable Name of `acceptedServices`.
   - Create a custom event trigger that fires on the `Klaro Consent` event when the `acceptedServices` variable contains the name of the service that you want to trigger. This will trigger page view type events for this service.
@@ -67,25 +70,28 @@ Navigate to **Klaro Geo > Klaro Geo** to configure the general plugin settings:
   - Klaro Script Variant: Choose between standard Klaro script or the no-CSS variant
 - **Google Tag Manager**:
   - Google Tag Manager ID: Enter your Google Tag Manager container ID (e.g., GTM-XXXXXX)
-- **Country Settings**:
-  - Enable/disable geo detection
-  - Manage regions within countries
-- **Consent Buttons**:
+- **Consent Management Buttons**:
   - Enable Floating Consent Button: Create a persistent floating button that opens the Klaro service management modal
+  - Button Text: Enter the text for the floating consent button
   - Button Theme: Select a style for the button
   - Button Position: Select where the button should appear on the screen
-  - WordPress Menu Integration: Add a link that opens the Klaro service management modal into your WordPress menus
-  - Shortcode: Use shortcode to add a link that opens the Klaro service management modal into your WordPress pages
+  - WordPress Menu Integration: Instructions on how to add a link that opens the Klaro service management modal into your WordPress menus
+  - Shortcode: Instructions on how to use a shortcode to add a link that opens the Klaro service management modal into your WordPress pages
 - **Purposes**:
   - Purposes (comma-separated): List of purposes by which you want to group your tags
+- **Data Layer Settings**:
+  - Suppress Individual Klaro Consent Event dataLayer Pushes: Klaro sends a "consents" event every time an individual consent toggle is changed in the consent banner. These don't take effect until the user saves their choices, at which point the plugin sends a consolidated event. Klaro Geo is configured to forward Klaro events to the dataLayer. Enabling this setting (recommended) suppresses the individual toggle events, which can pollute the dataLayer when users toggle multiple settings. Disable this only if you need to track individual consent toggle interactions within the banner.
+
 - **Debug Settings**:
   - Enable Plugin Debug Logging: When enabled, the plugin will output debug messages to WordPress logs (PHP) and browser console (JavaScript). Useful for troubleshooting but should be disabled in production to reduce log noise. Note: WP_DEBUG must also be enabled for PHP logging to work.
-  - Debug Countries/Regions (comma-separated): Enter two-digit country codes or hyphen-separated ISO 3166-2 region codes for debugging, separated by commas (e.g., US,UK,CA,FR,AU,US-CA,CA-QC)
-  - Plugin Cleanup: Remove all settings when deactivating the plugin
+  - Debug Countries/Regions (comma-separated): Enter a list of two-digit country codes or ISO 3166-2 region codes (e.g., US, UK, US-CA, CA-QC). These codes will populate a dropdown in the WordPress Admin Bar, allowing you to simulate browsing from those locations to test your Klaro configuration.
+  - Plugin Cleanup: Remove all settings when deactivating the plugin. You will need to reconfigure everything if you reactivate the plugin.
 
 ### Templates
 
 Templates define the language, layout, and behavior of the consent banner displayed to users. Templates get assigned to countries and regions so that you can change consent features and language by jurisdiction. 
+
+Most of the template settings are derived directly from Klaro settings but Klaro Geo settings, like Google Consent Mode settings and Consent Logging, that need to be managed by country or region are also set by templates.
 
 You can not delete templates that are currently assigned to countries or regions. To remove a template, you must first unassign it on the Country Settings page.
 
@@ -122,12 +128,22 @@ Navigate to **Klaro Geo > Templates** to manage consent banner templates.
   - Disable Powered By: Hide the "Powered by Klaro" text.
   - Additional CSS Class: Additional CSS class to add to the consent modal.
   - Default Language: Default language code (e.g., 'en', 'de'). Leave empty to use the fallback language and translation settings ('zz').
-- **Consent Mode Settings** (always enabled):
+#### Consent Mode Settings:
   Consent mode is always enabled and generates dynamic consent keys for every service. Configure which services control the standard Google Consent Mode signals:
   - Map analytics_storage to service: Select the service that enables or disables `analytics_storage`.
   - Map ad signals to service: Select the service that enables or disables `ads_storage` and under which `ad_personalization` and `ad_user_data` controls get injected.
-  - Consent Mode Initialization Code: JavaScript code to initialize Google Consent Mode v2. This code will run when Google Tag Manager loads.
-- **Cookie Settings**:
+  ![ad_personalization and ad_user_data controls injected by Klaro Geo](assets/ad_personalization-ad_user_data-controls.png)
+  - ##### Google Consent Mode Defaults
+    - ad_storage: Default `ad_storage` consent mode value
+    - analytics_storage: Default `analytics_storage` consent mode value
+    - ad_user_data: Default `ad_user_data` consent mode value
+    - ad_personalization: Default `ad_personalization` consent mode value
+  - ##### Additional Google Settings
+    - ads_data_redaction: Manage the redaction of ad click identifiers when `ad_storage` is denied
+    - url_passthrough: Manage the appending of ad click identifiers as URL parameters when `ad_storage` or `analytics_storage` is denied 
+  - ##### Service Consent Defaults
+    - View the custom consent key and default state of each service
+- **Plugin Settings**:
   - Enable Consent Logging: Log consent choices for this template in the WordPress database.
 
 #### Translations:
@@ -162,24 +178,30 @@ Klaro automatically manages [third-party inline scripts](https://klaro.org/docs/
 
 Klaro Geo automatically embeds Google Tag Manager this way.
 
-It should be possible to use this plugin to manage other inline scripts without using Google Tag Manager or to use the inline script method described above to manage other tag managers.
+It should be possible to use this plugin to manage other inline scripts without using Google Tag Manager or to implement other tag managers. However, it will require advanced knowledge of Klaro, Google Tag Manager, and Klaro Geo to get it to work correctly.
 
-Klaro Geo adds a `Klaro Consent` dataLayer push whenever consent is updated with an `acceptedServices` array containing the names of services that are currently accepted. This can be used to trigger tags in Google Tag Manager and is how the plugin is designed to work.
+Klaro Geo adds a `Klaro Consent Update` dataLayer push whenever consent is updated with custom consent keys as well as an `acceptedServices` array containing the names of services that are currently accepted.
+
+![standard and custom consent keys in Google Tag Manager](assets/custom_consent_keys.png)
+
+Use the `Klaro Consent Update` event with "Require additional consent fo tag to fire" set to the custom consent key for the relevant service to set up page view tags to fire when consent is given to a specific service. The `acceptedServices` array is for use in situations where Google Consent Mode is not applicable (like when using a tag manager other than Google Tag Manager).
 
 Navigate to **Klaro Geo > Services** to manage services:
 
 Use the `Add New Service`, `Edit`, and `Delete` buttons to manage services.
 
-Each service gets the following settings derived directly from Klaro:
+Each service gets the following settings that Klaro consumes and uses:
 
 - Name: The name of the service as it will appear in the acceptedServices array in lowercase with spaces replaced with hyphens.
-- Required: Display the service but do not allow visitors to turn off the service. Overrides the template-level setting of the same name. Setting a purpose to 'functional' does not mean the service is automatically loaded. You need to set each functional service's `Required` field to "Yes" in order to automatically load the service.
+- Required: Display the service but do not allow visitors to turn off the service. Overrides the template-level setting of the same name. 
+
+**Functional service warning**: Setting a purpose to 'functional' or 'security' or some other purpose that does not require consent does not mean the service is automatically loaded. You need to set each functional service's `Required` field here to "Yes" in order to automatically load the service.
 - Default: Load this service by default before the consent banner is interacted with. Overrides the template-level setting of the same name.
-- Purpose: Select the purpose(s) associated with this service. The list of purposes is managed on the main settings page at **Klaro Geo > Klaro Geo > Purposes (comma-separated)**.
+- Purpose: Select the purpose(s) associated with this service. The list of purposes is managed on the main settings page at **Klaro Geo > Klaro Geo > Purposes (comma-separated)**. It is best to decide on your list of purposes before you start assigning them here.
 - Advanced Settings: Manage additional Klaro settings for the service (these have not been tested with the plugin).
 - Callback Scripts: Customize the JavaScript functions called during consent initialization, acceptance, and decline events.
 
-#### Service Translations
+#### Service Translations (only shown when editing a specific service)
 
 The default Fallback translation tab sets the Klaro `zz` translation key for each service.
 
@@ -190,6 +212,13 @@ Manage the following service-specific translation fields here:
 - Title: This is the human-readable name of the service. It should be populated automatically in title-case from the service name.
 - Description: A brief description of what the service does.
 
+## Consent Receipts
+
+The Consent Receipts page lets you browse the consent receipts logged in Wordpress. 
+
+Consent receipts need to be enabled under **Klaro Geo > Enable Consent Receipts** for you to view data here.
+
+You will only see data from countries / regions with a template that enables consent logging under **Templates > select desired template > Enable Consent Logging**.
 
 ## Adding Consent Buttons
 
@@ -290,7 +319,7 @@ The plugin will automatically:
 
 ### Integrating Klaro Geo into Google Tag Manager
 
-Klaro Geo adds two dataLayer pushes: 'Klaro Event' and 'Klaro Consent Update'.
+Klaro Geo adds three dataLayer pushes: 'Klaro Event', 'Klaro Consent Data' and 'Klaro Consent Update'.
 
 #### Klaro Event
 
@@ -298,7 +327,7 @@ This event is fired when Klaro fires internal events as well as when Klaro Geo f
 
 These events can include the following parameters:
 - `event: "Klaro Event"`: Hard-coded value for all of these events
-- `eventSource: "klaro|klaro-geo"`: Indicates whether the event came from Klaro or Klaro Geo
+- `eventSource: "klaro|klaro-geo"`: Indicates whether the event Klaro Geo or was forwarded from Klaro
 - `klaroEventName: "klaroConfigLoaded|initialConsents|consents|saveConsents|applyConsents|generateConsentReceipt"`: The name of the event. This is the `manager.name` value for Klaro events.
 - `klaroEventData: {google-tag-manager: true, google-analytics: true}`: An object containing the names and consent settings for all services currently set by Klaro.
 - `acceptedServices: ["google-tag-manager", "google-analytics"]` (initialConsents and saveConsents only): An array of service names that are currently accepted.
@@ -322,7 +351,7 @@ Parameters:
 - `acceptedServices: ["google-tag-manager", "google-analytics"]`: Array of accepted service names
 - `triggerEvent: "initialConsents|saveConsents"`: The Klaro event that triggered this
 
-**Important**: Use this event as the trigger for the GTM Update tag, NOT for your GA4/Google Ads tags.
+**Important**: Use this event as the trigger for the GTM Update tag from the community template, NOT for your GA4/Google Ads tags in a standard setup.
 
 #### Klaro Consent Update
 
@@ -363,7 +392,7 @@ In addition to the standard Google Consent Mode signals (`ad_storage`, `analytic
 
 **Values**: Each key is set to either `'granted'` or `'denied'` based on whether the user consented to that service.
 
-**GTM Usage**: Access these keys in the `consentMode` object of the `Klaro Consent Update` event:
+**GTM Usage**: Access these keys in the `consentMode` object usually via the "Require additional consent for tag to fire" setting under "Additional Consent Checks" in your tags:
 ```javascript
 // Example consentMode object pushed to dataLayer
 {
@@ -379,7 +408,7 @@ In addition to the standard Google Consent Mode signals (`ad_storage`, `analytic
 
 #### Using with Other Tag Managers
 
-The dataLayer format follows Google Tag Manager conventions but can be read by other tag managers (Tealium, Adobe Launch, etc.). The `Klaro Consent Update` event provides:
+The dataLayer format follows Google Tag Manager conventions but can be read by other tag managers (Tealium, Adobe Launch, etc.). The `Klaro Consent Update` event relies on a Google Tag Manager community template to fire which won't work unless you are using Google Tag Manager beside this other tag manager. In cases where Google Tag Manager is not in use, use the `Klaro Consent Data` event to trigger your tags. The `Klaro Consent Data` > `Klaro Consent Update` event flow is implemented to prevent race conditions in Google Tag Manager's integration in to Google Consent Mode:
 - `consentMode`: Object with all consent keys (both Google standard and dynamic service keys)
 - `acceptedServices`: Array of service names with granted consent
 - `triggerEvent`: Either `'initialConsents'` or `'saveConsents'`
@@ -393,7 +422,7 @@ When a user visits your site:
 1. GTM tags are initially blocked (we set an invalid `type="text/plain"`)
 2. Consent Mode defaults are added after the klaroConfig object
 3. When the user gives consent (or is defaulted in, or reads consent settings from a previous page) to Google Tag Manager, Klaro changes the type to `text/javascript` which triggers Google Tag Manager
-4. Klaro Geo fires the initialConsents event which triggers Consent Mode `Consent Update` events and `Klaro Consent Update` events
+4. Klaro Geo fires the initialConsents event which triggers Consent Mode `Klaro Consent Data` events where the community template tag triggers `Consent Update` (for Consent Mode) and `Klaro Consent Update` (for triggering page view tags) events
 5. Google Tag Manager reads the consent settings and Data Layer variables and triggers tags as configured
 6. Saving consent changes triggers Consent Mode `Consent Update` events and `Klaro Consent Update` events
 7. Google Tag Manager reads these updated settings and Data Layer variables and triggers tags as configured
@@ -407,7 +436,7 @@ The GeoIP Detection plugin lets you select different IP databases. In testing, t
 
 For this reason, we recommend using strict fallback templates. 
 
-In addition, it is recommended that you test one of paid, commercial services supported by the plugin. Klaro Geo pushes a `Klaro Config Loaded` event to the datalayer that includes the following fields useful for evaluating the performance of the plugin and IP detection:
+In addition, it is recommended that you test one of the paid, commercial services supported by the plugin. Klaro Geo pushes a `Klaro Config Loaded` event to the datalayer that includes the following fields useful for evaluating the performance of the plugin and IP detection:
  
 - `klaro_geo_consent_template`: The ID of the detected template
 - `klaro_geo_template_source`: The rule used to determine the template
@@ -431,7 +460,7 @@ To assign a template to a region, follow these steps:
 2. Then go to **Klaro Geo > Country Settings**, and select **Manage Regions**. A modal will open with a list of regions.
 3. Assign the desired template to the desired region or regions.
 
-Please note that that browser privacy safeguards, like Apple's Privacy Relay, make regional detection unreliable. Beyond just the issues with IP database accuracy, these safeguards deliberately change the location of visitors. Where country regulations are relaxed but regional regulations are stricter, you should consider using the stricter templates for the entire country in order to avoid inadvertently violating regional regulations.
+Please note that browser privacy safeguards, like Apple's Privacy Relay, make regional detection unreliable. Beyond just the issues with IP database accuracy, these safeguards deliberately change the location of visitors. Where country regulations are relaxed but regional regulations are stricter, you should consider using the stricter templates for the entire country in order to avoid inadvertently violating regional regulations.
 
 ## Consent Receipts
 
@@ -451,7 +480,7 @@ Klaro Geo can store detailed records of user consent choices, which is useful fo
    - **Client-side**: In the user's browser localStorage (limited to last 10 receipts)
    - **Server-side**: In the WordPress database (if server-side logging is enabled)
 
-3. Receipts are also pushed to the dataLayer for integration with analytics tools
+3. Receipts are also pushed to the dataLayer for integration with analytics tools.
 
 ### Enabling/Disabling Consent Receipts
 
@@ -464,7 +493,7 @@ Administrators can view stored consent receipts under **Klaro Geo > Consent Rece
 
 ### Passing Consent Receipt Numbers to Analytics Tools
 
-The consent receipt number is passed to the dataLayer via a `consentReceiptNumber` property. This allows you to track consent receipts in your analytics tool of choice to faciliate deletion requests by receipt number.
+The consent receipt number is passed to the dataLayer via a `consentReceiptNumber` property. This allows you to track consent receipts in your analytics tool of choice to facilitate deletion requests by receipt number.
 
 ## Support and Contributions
 
