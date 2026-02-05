@@ -77,6 +77,189 @@
       window.dataLayer = [];
   }
 
+  // =============================================================================
+  // CONSENT QUEUE
+  // Queues dataLayer events until consent state is confirmed
+  // =============================================================================
+
+  // Initialize klaroGeo namespace (preserve any stub queue that was set up earlier)
+  // CRITICAL: Capture the existing queue BEFORE doing anything else
+  const preExistingKlaroGeo = window.klaroGeo;
+  const preExistingQueue = preExistingKlaroGeo ? preExistingKlaroGeo.queue : undefined;
+
+  klaroGeoLog('DEBUG: klaro-geo.js init - preExistingKlaroGeo:',
+      preExistingKlaroGeo ? 'exists' : 'undefined',
+      'preExistingQueue:', preExistingQueue ? preExistingQueue.length + ' events' : 'undefined');
+
+  if (preExistingQueue && preExistingQueue.length > 0) {
+      klaroGeoLog('DEBUG: Pre-existing queue contents:', JSON.stringify(preExistingQueue.map(e => e.event || 'no-event-name')));
+  }
+
+  window.klaroGeo = window.klaroGeo || {};
+  const existingQueue = window.klaroGeo.queue || [];
+
+  // Queue configuration
+  const QUEUE_MAX_SIZE = 100;
+
+  // Queue state
+  window.klaroGeo.queue = existingQueue; // Preserve events from stub
+  window.klaroGeo.consentConfirmed = false;
+
+  klaroGeoLog('DEBUG: Queue initialized - existingQueue length:', existingQueue.length);
+
+  // Note: The queue's job is TIMING (wait for consent state to be SET), not consent enforcement.
+  // GTM's consent mode handles whether tags actually fire based on consent state.
+  // We flush when the consent event fires, regardless of what consent was given.
+
+  // Determine GTM mode from klaroConsentData (set by PHP) or klaroConfig services
+  // GTM mode is enabled if:
+  // 1. klaro_geo_gtm_id is set (standalone GTM), OR
+  // 2. google-tag-manager service exists in klaroConfig (GTM as a Klaro service)
+  if (typeof window.klaroGeo.useGTM === 'undefined') {
+      // Check for standalone GTM ID first
+      const hasGtmId = typeof window.klaroConsentData !== 'undefined' &&
+                        window.klaroConsentData.gtmId &&
+                        window.klaroConsentData.gtmId !== '';
+
+      // Check if google-tag-manager is a configured Klaro service
+      const hasGtmService = typeof window.klaroConfig !== 'undefined' &&
+                            Array.isArray(window.klaroConfig.services) &&
+                            window.klaroConfig.services.some(function(s) {
+                                return s.name === 'google-tag-manager';
+                            });
+
+      window.klaroGeo.useGTM = hasGtmId || hasGtmService;
+      klaroGeoLog('DEBUG: GTM mode detection - hasGtmId=' + hasGtmId + ', hasGtmService=' + hasGtmService + ', useGTM=' + window.klaroGeo.useGTM);
+  }
+
+  /**
+   * Push an event to the consent queue or directly to dataLayer
+   * @param {Object} eventData - The dataLayer event object
+   */
+  window.klaroGeo.push = function(eventData) {
+      klaroGeoLog('DEBUG: klaroGeo.push called with:', eventData.event || 'no-event-name',
+                  'consentConfirmed:', window.klaroGeo.consentConfirmed);
+
+      if (window.klaroGeo.consentConfirmed) {
+          // Consent event already fired, push directly to dataLayer
+          klaroGeoLog('DEBUG: Consent Queue - pushing directly to dataLayer:', eventData.event || 'unknown event');
+          window.dataLayer.push(eventData);
+      } else {
+          // Consent not yet confirmed, queue the event
+          if (window.klaroGeo.queue.length >= QUEUE_MAX_SIZE) {
+              // Drop oldest event
+              const dropped = window.klaroGeo.queue.shift();
+              console.warn('[klaro-geo] Consent queue limit reached (100). Dropping oldest event:', dropped.event || 'unknown');
+          }
+          klaroGeoLog('DEBUG: Consent Queue - queuing event:', eventData.event || 'unknown event',
+                      '(queue size:', window.klaroGeo.queue.length + 1, ')');
+          window.klaroGeo.queue.push(eventData);
+      }
+  };
+
+  klaroGeoLog('DEBUG: klaroGeo.push function installed, replacing any stub');
+
+  /**
+   * Flush all queued events to dataLayer
+   */
+  function flushConsentQueue() {
+      if (window.klaroGeo.queue.length === 0) {
+          klaroGeoLog('DEBUG: Consent Queue - nothing to flush');
+          return;
+      }
+
+      klaroGeoLog('DEBUG: Consent Queue - flushing', window.klaroGeo.queue.length, 'events to dataLayer');
+
+      while (window.klaroGeo.queue.length > 0) {
+          const event = window.klaroGeo.queue.shift();
+          klaroGeoLog('DEBUG: Consent Queue - pushing event:', event.event || 'no-event-name', event);
+          window.dataLayer.push(event);
+      }
+
+      klaroGeoLog('DEBUG: Consent Queue - flush complete');
+  }
+
+  /**
+   * Handle consent event - flush queue
+   * @param {string} eventName - The consent event name that triggered this
+   */
+  function onConsentEvent(eventName) {
+      if (window.klaroGeo.consentConfirmed) {
+          klaroGeoLog('DEBUG: Consent Queue - consent already confirmed, ignoring:', eventName);
+          return;
+      }
+
+      klaroGeoLog('DEBUG: Consent Queue - consent event received:', eventName);
+      window.klaroGeo.consentConfirmed = true;
+      flushConsentQueue();
+  }
+
+  // Set up listener for consent events by intercepting dataLayer.push
+  (function setupConsentQueueListener() {
+      const originalPush = window.dataLayer.push;
+
+      window.dataLayer.push = function() {
+          // Call the original push first
+          const result = originalPush.apply(window.dataLayer, arguments);
+
+          // Check if this is a consent event we care about
+          const eventData = arguments[0];
+          if (eventData && typeof eventData === 'object') {
+              // Check for event name - could be at top level or wrapped in 'value' object
+              // GTM template sometimes wraps events in a 'value' property
+              let eventName = eventData.event;
+              if (!eventName && eventData.value && typeof eventData.value === 'object') {
+                  eventName = eventData.value.event;
+              }
+
+              // Determine which event to listen for based on GTM mode
+              const triggerEvent = window.klaroGeo.useGTM ? 'Klaro Consent Update' : 'Klaro Consent Data';
+
+              if (eventName === triggerEvent) {
+                  klaroGeoLog('DEBUG: Consent Queue - detected consent event:', eventName);
+                  onConsentEvent(eventName);
+              }
+          }
+
+          return result;
+      };
+
+      klaroGeoLog('DEBUG: Consent Queue - listener initialized, waiting for:',
+                  window.klaroGeo.useGTM ? 'Klaro Consent Update' : 'Klaro Consent Data');
+  })();
+
+  // Process any events that were queued before this script loaded (stub pattern)
+  if (existingQueue.length > 0) {
+      klaroGeoLog('DEBUG: Consent Queue - found', existingQueue.length, 'pre-queued events from stub');
+  }
+
+  // Set up a watcher for late-arriving stub events (in case inline scripts run after klaro-geo.js)
+  // This handles the case where wp_footer priority ordering causes the stub to run after us
+  const originalQueue = window.klaroGeo.queue;
+  Object.defineProperty(window.klaroGeo, 'queue', {
+      get: function() { return originalQueue; },
+      set: function(newQueue) {
+          // If someone tries to set queue to a new array with items, merge them
+          if (Array.isArray(newQueue) && newQueue.length > 0) {
+              klaroGeoLog('DEBUG: Consent Queue - detected late stub queue assignment with', newQueue.length, 'events');
+              newQueue.forEach(function(event) {
+                  if (window.klaroGeo.consentConfirmed) {
+                      klaroGeoLog('DEBUG: Consent Queue - late event pushed directly to dataLayer:', event.event || 'no-event-name');
+                      window.dataLayer.push(event);
+                  } else {
+                      klaroGeoLog('DEBUG: Consent Queue - late event queued:', event.event || 'no-event-name');
+                      originalQueue.push(event);
+                  }
+              });
+          }
+      },
+      configurable: true
+  });
+
+  // =============================================================================
+  // END CONSENT QUEUE
+  // =============================================================================
+
   // Function to handle consent changes (moved from PHP)
   function handleConsentChange(manager) {
       // Check if consent logging is enabled from the dataLayer first (country-specific setting)
@@ -404,61 +587,81 @@ function setupWatcher(manager) {
 function pushConsentData(manager) {
   // Push initial consent data to dataLayer
   if (typeof window.dataLayer !== 'undefined') {
-      // Create acceptedServices array
-      const acceptedServices = Object.keys(manager.consents)
-          .filter(serviceName => manager.consents[serviceName] === true);
-
-      const initialData = {
-          'event': 'Klaro Event',
-          'eventSource': 'klaro-geo',
-          'klaroEventName': 'initialConsents',
-          'klaroEventData': manager.consents,
-          'acceptedServices': acceptedServices,
-          'klaroConfig': manager.config
-      };
-
-      klaroGeoLog('DEBUG: Pushing initial Klaro event to dataLayer:', initialData);
-      window.dataLayer.push(initialData);
-
-      // Set global variables for consent mode
-      if (manager.config && manager.config.consent_mode_settings) {
-          window.adStorageServiceName = manager.config.consent_mode_settings.ad_storage_service;
-          window.analyticsStorageServiceName = manager.config.consent_mode_settings.analytics_storage_service;
-
-          // Check if ad_storage service is consented
-          const adServiceConsented = window.adStorageServiceName &&
-              manager.consents &&
-              manager.consents[window.adStorageServiceName] === true;
-
-          // Try to load saved ad consent sub-settings from localStorage
-          const savedSettings = loadAdConsentSettings();
-
-          if (savedSettings && adServiceConsented) {
-              // Use saved settings if available AND ad_storage is still consented
-              window.adUserDataConsent = savedSettings.ad_user_data === true;
-              window.adPersonalizationConsent = savedSettings.ad_personalization === true;
-              klaroGeoLog('DEBUG: Restored ad consent settings from localStorage');
-          } else if (adServiceConsented) {
-              // No saved settings but ad_storage is consented - default to parent service state
-              window.adUserDataConsent = true;
-              window.adPersonalizationConsent = true;
-              klaroGeoLog('DEBUG: No saved settings, defaulting to parent service state (granted)');
-          } else {
-              // ad_storage is not consented - clear any saved settings and set to false
-              window.adUserDataConsent = false;
-              window.adPersonalizationConsent = false;
-              clearAdConsentSettings();
-              klaroGeoLog('DEBUG: ad_storage not consented, setting sub-controls to denied');
+      // Defer to next event loop tick to let Klaro fully hydrate consent from cookies
+      // Without this delay, manager.consents may be empty even for returning users
+      setTimeout(function() {
+          // Get fresh manager to ensure we have the latest consent state
+          let activeManager = manager;
+          try {
+              if (typeof window.klaro !== 'undefined' && typeof window.klaro.getManager === 'function') {
+                  const freshManager = window.klaro.getManager();
+                  if (freshManager && freshManager.consents && Object.keys(freshManager.consents).length > 0) {
+                      activeManager = freshManager;
+                  }
+              }
+          } catch (e) {
+              klaroGeoLog('DEBUG: Error getting fresh manager in pushConsentData');
           }
 
-          klaroGeoLog('DEBUG: Initialized consent mode globals - adStorageService:', window.adStorageServiceName,
-              'adServiceConsented:', adServiceConsented,
-              'adUserDataConsent:', window.adUserDataConsent,
-              'adPersonalizationConsent:', window.adPersonalizationConsent);
-      }
-      
-      // Call consent handling functions
-      handleKlaroConsentEvents(manager, 'initialConsents', manager.consents);
+          // Create acceptedServices array from fresh consent state
+          const acceptedServices = Object.keys(activeManager.consents || {})
+              .filter(serviceName => activeManager.consents[serviceName] === true);
+
+          // Deep copy consents to capture current state (not a reference that changes later)
+          const consentsCopy = JSON.parse(JSON.stringify(activeManager.consents || {}));
+
+          const initialData = {
+              'event': 'Klaro Event',
+              'eventSource': 'klaro-geo',
+              'klaroEventName': 'initialConsents',
+              'klaroEventData': consentsCopy,
+              'acceptedServices': acceptedServices,
+              'klaroConfig': activeManager.config
+          };
+
+          klaroGeoLog('DEBUG: Pushing initial Klaro event to dataLayer:', initialData);
+          window.dataLayer.push(initialData);
+
+          // Set global variables for consent mode
+          if (activeManager.config && activeManager.config.consent_mode_settings) {
+              window.adStorageServiceName = activeManager.config.consent_mode_settings.ad_storage_service;
+              window.analyticsStorageServiceName = activeManager.config.consent_mode_settings.analytics_storage_service;
+
+              // Check if ad_storage service is consented
+              const adServiceConsented = window.adStorageServiceName &&
+                  activeManager.consents &&
+                  activeManager.consents[window.adStorageServiceName] === true;
+
+              // Try to load saved ad consent sub-settings from localStorage
+              const savedSettings = loadAdConsentSettings();
+
+              if (savedSettings && adServiceConsented) {
+                  // Use saved settings if available AND ad_storage is still consented
+                  window.adUserDataConsent = savedSettings.ad_user_data === true;
+                  window.adPersonalizationConsent = savedSettings.ad_personalization === true;
+                  klaroGeoLog('DEBUG: Restored ad consent settings from localStorage');
+              } else if (adServiceConsented) {
+                  // No saved settings but ad_storage is consented - default to parent service state
+                  window.adUserDataConsent = true;
+                  window.adPersonalizationConsent = true;
+                  klaroGeoLog('DEBUG: No saved settings, defaulting to parent service state (granted)');
+              } else {
+                  // ad_storage is not consented - clear any saved settings and set to false
+                  window.adUserDataConsent = false;
+                  window.adPersonalizationConsent = false;
+                  clearAdConsentSettings();
+                  klaroGeoLog('DEBUG: ad_storage not consented, setting sub-controls to denied');
+              }
+
+              klaroGeoLog('DEBUG: Initialized consent mode globals - adStorageService:', window.adStorageServiceName,
+                  'adServiceConsented:', adServiceConsented,
+                  'adUserDataConsent:', window.adUserDataConsent,
+                  'adPersonalizationConsent:', window.adPersonalizationConsent);
+          }
+
+          // Call consent handling functions
+          handleKlaroConsentEvents(activeManager, 'initialConsents', activeManager.consents);
+      }, 0); // Defer to next tick
   } else {
       klaroGeoWarn('DEBUG: dataLayer is not defined, cannot push initial Klaro event');
   }
@@ -496,6 +699,7 @@ function handleKlaroConsentEvents(manager, eventName, data) {
 function updateGoogleConsentMode(manager, eventType, data) {
   klaroGeoLog('DEBUG: Google consent mode update triggered by:', eventType,
     'with data:', data ? (typeof data === 'object' ? 'consent object' : data) : 'no data');
+  klaroGeoLog('DEBUG: updateGoogleConsentMode ENTRY - eventType=' + eventType + ', timestamp=' + Date.now());
 
   // Check if gtag is available
   if (typeof window.gtag !== 'function') {
@@ -525,38 +729,36 @@ function updateGoogleConsentMode(manager, eventType, data) {
       let analyticsServiceEnabled = false;
       let activeManager = manager; // Track the manager we'll use for consent state
 
-      // First try to use the provided manager
-      if (manager && manager.consents) {
-          klaroGeoLog('DEBUG: Using provided manager for consent state');
+      // ALWAYS get a fresh manager to ensure we have the latest consent state
+      // This is critical because Klaro may not have fully hydrated consent from cookies
+      // when the initial call was made (the passed manager may have stale/empty consents)
+      try {
+          if (typeof window.klaro !== 'undefined' && typeof window.klaro.getManager === 'function') {
+              const freshManager = window.klaro.getManager();
+              if (freshManager && freshManager.consents && Object.keys(freshManager.consents).length > 0) {
+                  klaroGeoLog('DEBUG: Using fresh Klaro manager for consent state');
+                  activeManager = freshManager;
+              }
+          }
+      } catch (e) {
+          klaroGeoLog('DEBUG: Error getting fresh manager, using provided manager');
+      }
+
+      // Now read consent state from activeManager
+      if (activeManager && activeManager.consents) {
+          klaroGeoLog('DEBUG: Reading consent state from manager');
           if (window.adStorageServiceName) {
-              adServiceEnabled = manager.consents[window.adStorageServiceName] === true;
+              adServiceEnabled = activeManager.consents[window.adStorageServiceName] === true;
           }
           if (window.analyticsStorageServiceName) {
-              analyticsServiceEnabled = manager.consents[window.analyticsStorageServiceName] === true;
+              analyticsServiceEnabled = activeManager.consents[window.analyticsStorageServiceName] === true;
           }
       } else {
-          // If no manager provided or it doesn't have consents, try to get one
-          try {
-              if (typeof window.klaro !== 'undefined' && typeof window.klaro.getManager === 'function') {
-                  klaroGeoLog('DEBUG: Getting fresh Klaro manager for consent state');
-                  const klaroManager = window.klaro.getManager();
-                  if (klaroManager && klaroManager.consents) {
-                      activeManager = klaroManager; // Use this manager for dynamic keys too
-                      if (window.adStorageServiceName) {
-                          adServiceEnabled = klaroManager.consents[window.adStorageServiceName] === true;
-                      }
-                      if (window.analyticsStorageServiceName) {
-                          analyticsServiceEnabled = klaroManager.consents[window.analyticsStorageServiceName] === true;
-                      }
-                  }
-              }
-          } catch (e) {
-              console.error('DEBUG: Error getting consent state from Klaro manager:', e);
-              // Try to use data as fallback if provided
-              if (data) {
-                  adServiceEnabled = data.ad_storage === 'granted'; // Fallback
-                  analyticsServiceEnabled = data.analytics_storage === 'granted'; // Fallback
-              }
+          // Fallback: try to use data if provided
+          klaroGeoLog('DEBUG: No manager consents available, using fallback');
+          if (data) {
+              adServiceEnabled = data.ad_storage === 'granted';
+              analyticsServiceEnabled = data.analytics_storage === 'granted';
           }
       }
 
@@ -621,14 +823,34 @@ function updateGoogleConsentMode(manager, eventType, data) {
           const acceptedServices = Object.keys(activeManager.consents)
               .filter(serviceName => activeManager.consents[serviceName] === true);
 
-          klaroGeoLog('DEBUG: Pushing Klaro Consent Data event to dataLayer');
-          window.dataLayer.push({
-              'event': 'Klaro Consent Data',
-              'eventSource': 'klaro-geo',
-              'consentMode': completeUpdate,
-              'acceptedServices': acceptedServices,
-              'triggerEvent': eventType
-          });
+          // In GTM mode, for initialConsents, only push if GTM service is consented
+          // This prevents stale events from being queued before GTM loads
+          // (GTM now requires consent, so initialConsents before consent would create stale events)
+          const isGtmMode = window.klaroGeo && window.klaroGeo.useGTM;
+          const gtmConsented = activeManager.consents['google-tag-manager'] === true;
+
+          // Debug logging for skip condition
+          klaroGeoLog('DEBUG: Klaro Consent Data skip check:',
+              'eventType=' + eventType,
+              'isGtmMode=' + isGtmMode,
+              'gtmConsented=' + gtmConsented,
+              'window.klaroGeo.useGTM=' + (window.klaroGeo ? window.klaroGeo.useGTM : 'undefined'),
+              'consents=' + JSON.stringify(activeManager.consents || {}));
+
+          if (eventType === 'initialConsents' && isGtmMode && !gtmConsented) {
+              klaroGeoLog('DEBUG: Skipping Klaro Consent Data push for initialConsents - GTM not yet consented');
+              // Don't push stale consent data before GTM loads
+              // saveConsents will push the correct data after user consents
+          } else {
+              klaroGeoLog('DEBUG: Pushing Klaro Consent Data event to dataLayer');
+              window.dataLayer.push({
+                  'event': 'Klaro Consent Data',
+                  'eventSource': 'klaro-geo',
+                  'consentMode': completeUpdate,
+                  'acceptedServices': acceptedServices,
+                  'triggerEvent': eventType
+              });
+          }
       }
 
       // Reset timer

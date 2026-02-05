@@ -306,9 +306,9 @@ function klaro_geo_get_default_services($defaults = null) {
         [
             "name" => "google-tag-manager",
             "title" => "Google Tag Manager",
-            "required" => true,
-            "purposes" => ["functional"],
-            "default" => true,
+            "required" => false,
+            "purposes" => ["analytics", "advertising"],
+            "default" => false,
             "cookies" => [],
             "onInit" => '',
             "onAccept" => '',

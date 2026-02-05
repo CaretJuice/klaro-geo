@@ -413,6 +413,56 @@ The dataLayer format follows Google Tag Manager conventions but can be read by o
 - `acceptedServices`: Array of service names with granted consent
 - `triggerEvent`: Either `'initialConsents'` or `'saveConsents'`
 
+#### Consent Queue (klaroGeo.push)
+
+The plugin provides a consent-aware queue that holds dataLayer events until consent state is confirmed. This solves race conditions where events fire before consent is set, and avoids the limitations of GTM Trigger Groups for repeatable events like `add_to_cart`.
+
+**Basic Usage:**
+```javascript
+// Safe to use anywhere, even before klaro-geo.js loads (stub pattern)
+window.klaroGeo = window.klaroGeo || {};
+window.klaroGeo.push = window.klaroGeo.push || function(e) {
+    (window.klaroGeo.queue = window.klaroGeo.queue || []).push(e);
+};
+
+// Queue events - held until consent is confirmed
+klaroGeo.push({
+    'event': 'view_item_list',
+    'ecommerce': {
+        'item_list_id': 'services_overview',
+        'items': [...]
+    }
+});
+```
+
+**How it works:**
+1. Events pushed via `klaroGeo.push()` are queued until the consent event fires
+2. When the consent event fires, the queue flushes all events to `dataLayer`
+3. After consent is confirmed, new events go directly to `dataLayer`
+4. GTM's consent mode determines whether tags actually fire based on consent state
+
+**Configuration:**
+
+The queue automatically detects whether you're using GTM based on whether a GTM ID is configured:
+- **GTM mode** (GTM ID set): Waits for `Klaro Consent Update` event
+- **Non-GTM mode** (no GTM ID): Waits for `Klaro Consent Data` event
+
+**Advanced options:**
+```javascript
+// Override GTM detection (for multiple tag managers)
+window.klaroGeo.useGTM = false;
+```
+
+**Queue limits:**
+- Maximum 100 events (oldest dropped when exceeded)
+- Queue resets on each page load
+
+**When to use:**
+- Page load events that need to wait for consent state to be set (`view_item_list`, `page_view`)
+- Any event that might fire before consent is confirmed
+
+**Note:** The queue ensures events reach the dataLayer after consent state is set. GTM's consent mode then determines whether tags fire based on the actual consent granted. This is a timing mechanism, not a consent enforcement mechanism.
+
 ### How It Works
 
 Klaro Geo uses Klaro's native consent management to control the loading of Google Tag Manager.

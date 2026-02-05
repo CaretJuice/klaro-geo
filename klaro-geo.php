@@ -87,6 +87,58 @@ function klaro_geo_log_once($key, $message) {
     return false;
 }
 
+/**
+ * Migrate GTM service from required/functional to optional/analytics+advertising
+ *
+ * This migration aligns with European legal interpretations that GTM itself
+ * requires consent because it enables tracking. The change ensures:
+ * - GTM only loads when user consents to analytics OR advertising
+ * - Consent queue naturally waits for consent before flushing
+ *
+ * Only migrates if the GTM service matches the old defaults exactly
+ * (required=true, purposes=["functional"]) to preserve custom configurations.
+ */
+function klaro_geo_migrate_gtm_consent_requirement() {
+    $migrated = get_option('klaro_geo_gtm_consent_migrated', false);
+    if ($migrated) {
+        return;
+    }
+
+    // Get service settings instance
+    $service_settings = Klaro_Geo_Service_Settings::get_instance();
+    $gtm = $service_settings->get_service('google-tag-manager');
+
+    if ($gtm) {
+        // Only migrate if it matches old defaults exactly
+        $is_old_config = (
+            isset($gtm['required']) && $gtm['required'] === true &&
+            isset($gtm['purposes']) && $gtm['purposes'] === ['functional']
+        );
+
+        if ($is_old_config) {
+            klaro_geo_debug_log('Migrating GTM service from required/functional to optional/analytics+advertising');
+
+            $gtm['required'] = false;
+            $gtm['default'] = false;
+            $gtm['purposes'] = ['analytics', 'advertising'];
+
+            $service_settings->set_service('google-tag-manager', $gtm);
+            $service_settings->save();
+
+            // Clear instance cache to ensure fresh data on next access
+            Klaro_Geo_Service_Settings::clear_instance_cache();
+
+            klaro_geo_debug_log('GTM service migration complete');
+        } else {
+            klaro_geo_debug_log('GTM service does not match old defaults, skipping migration');
+        }
+    } else {
+        klaro_geo_debug_log('GTM service not found, skipping migration');
+    }
+
+    update_option('klaro_geo_gtm_consent_migrated', true);
+}
+
 // Include defaults file first
 require_once plugin_dir_path(__FILE__) . 'includes/klaro-geo-defaults.php';
 
@@ -351,10 +403,10 @@ function klaro_geo_enqueue_scripts() {
 
     // Add the consent button script with a very high priority to ensure it loads after Klaro
     add_action('wp_footer', function() use ($button_settings) {
-        // First output the settings as a global variable
+        // Merge settings with any existing klaroGeo object (preserves queue, push function, etc.)
         echo '<script type="text/javascript">
             /* <![CDATA[ */
-            window.klaroGeo = ' . wp_json_encode($button_settings) . ';
+            window.klaroGeo = Object.assign(window.klaroGeo || {}, ' . wp_json_encode($button_settings) . ');
             /* ]]> */
         </script>';
 
@@ -648,6 +700,8 @@ function klaro_geo_validate_services() {
 // Add action to validate services on init
 add_action('init', 'klaro_geo_validate_services');
 
+// Run GTM consent requirement migration on init (early priority to run before validation)
+add_action('init', 'klaro_geo_migrate_gtm_consent_requirement', 5);
 
 // Function to get user location
 function klaro_geo_get_user_location() {

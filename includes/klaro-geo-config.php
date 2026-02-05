@@ -493,11 +493,15 @@ window.gtag = function(){dataLayer.push(arguments);};
         // Pre-encode consent_defaults for JavaScript output
         $consent_defaults_json = wp_json_encode($dynamic_consent_defaults);
 
+        // Get GTM ID for consent queue mode detection
+        $gtm_id = get_option('klaro_geo_gtm_id', '');
+
         // Add variables for the consent receipts script
         $klaro_config_content .= <<<JS
 // Consent Receipt Configuration
 // NOTE: Consent mode is ALWAYS enabled - no initialize_consent_mode toggle
 window.klaroConsentData = {
+    gtmId: "{$gtm_id}",
     templateName: "{$template_to_use}",
     templateSource: "{$template_source}",
     detectedCountry: "{$user_country}",

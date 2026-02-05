@@ -1,0 +1,362 @@
+# consent-queue.spec.yaml
+# Specification for Consent Queue Feature
+#
+# PURPOSE: Queue dataLayer events until consent state is confirmed
+
+file_meta:
+  purpose: "Define contract for klaroGeo.push() consent queue API"
+  dependencies:
+    - "klaro-geo.js"
+    - "klaro-geo-config.php (for GTM ID setting)"
+    - "datalayer-events.spec.yaml (Klaro Consent Update / Klaro Consent Data)"
+  stability: "new"
+  last_updated: "2026-02-04"
+
+# =============================================================================
+# PROBLEM STATEMENT
+# =============================================================================
+problem:
+  race_condition: |
+    Events fired before consent state is set may:
+    - Fire without proper consent context
+    - Get dropped by tag manager consent checks
+    - Cause compliance issues
+
+  trigger_group_limitation: |
+    GTM Trigger Groups require ALL conditions to fire EVERY time:
+    - First click: Consent Event + Add to Cart → Tag fires ✓
+    - Second click: Add to Cart only → Tag fails ✗
+
+    This makes Trigger Groups unsuitable for repeatable events (add_to_cart,
+    form submissions, etc.) - only works for one-time-per-page events.
+
+  solution: |
+    A consent-aware queue that holds events until consent state is known,
+    then flushes them (or drops them if consent is denied).
+
+# =============================================================================
+# GTM CONSENT REQUIREMENT
+# =============================================================================
+gtm_consent:
+  description: |
+    GTM is configured as an optional service that requires consent.
+    This aligns with European legal interpretations that GTM itself
+    enables tracking and therefore requires user consent.
+
+  service_configuration:
+    required: false
+    default: false
+    purposes: ["analytics", "advertising"]
+
+  behavior: |
+    - GTM only loads when user consents to analytics OR advertising
+    - 'Klaro Consent Update' only fires after GTM loads (which requires consent)
+    - Queue naturally waits for relevant consent before flushing
+    - In non-GTM mode, queue waits for 'Klaro Consent Data' instead
+
+  migration:
+    description: |
+      Existing installations with old GTM config (required=true,
+      purposes=["functional"]) are auto-migrated to the new config.
+      Custom configurations are preserved.
+    trigger: "klaro_geo_migrate_gtm_consent_requirement on init hook"
+    flag: "klaro_geo_gtm_consent_migrated option"
+
+# =============================================================================
+# API CONTRACT
+# =============================================================================
+api:
+  namespace: "window.klaroGeo"
+
+  push_method:
+    signature: "klaroGeo.push(eventData)"
+    description: "Queue an event to be pushed to dataLayer after consent is confirmed"
+
+    parameters:
+      eventData:
+        type: "object"
+        required: true
+        description: "Any valid dataLayer event object"
+        example:
+          event: "view_item_list"
+          ecommerce:
+            item_list_id: "services_overview"
+            items: []
+
+    behavior:
+      consent_already_confirmed:
+        description: "If consent event has already fired, push immediately to dataLayer"
+        action: "window.dataLayer.push(eventData)"
+
+      consent_pending:
+        description: "If consent event hasn't fired yet, queue the event"
+        action: "Add to internal queue, wait for consent event"
+
+    contract: |
+      - MUST accept any valid dataLayer event object
+      - MUST push to dataLayer immediately if consent already confirmed
+      - MUST queue event if consent pending
+      - MUST work before klaro-geo.js fully loads (stub pattern)
+      - NOTE: Queue handles TIMING only. GTM consent mode handles consent enforcement.
+
+  stub_pattern:
+    description: "Safe to call before main script loads"
+    example: |
+      // Can be placed anywhere, even before klaro-geo.js loads
+      window.klaroGeo = window.klaroGeo || {};
+      window.klaroGeo.push = window.klaroGeo.push || function(e) {
+          (window.klaroGeo.queue = window.klaroGeo.queue || []).push(e);
+      };
+
+      // Safe to call immediately
+      klaroGeo.push({ event: 'view_item_list', ... });
+
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+configuration:
+  useGTM:
+    type: "boolean"
+    default: "Auto-detected from klaro_geo_gtm_id OR google-tag-manager service"
+    description: "Determines which event to wait for"
+
+    auto_detection:
+      description: |
+        GTM mode is enabled if EITHER condition is true:
+        1. klaro_geo_gtm_id WordPress option is set (standalone GTM), OR
+        2. google-tag-manager service exists in klaroConfig.services (GTM as Klaro service)
+      gtm_detected: "GTM mode - wait for 'Klaro Consent Update'"
+      gtm_not_detected: "Non-GTM mode - wait for 'Klaro Consent Data'"
+
+    override:
+      description: "Manual override for edge cases (multiple tag managers)"
+      example: |
+        window.klaroGeo.useGTM = false; // Force non-GTM mode
+
+    contract: |
+      - MUST check klaro_geo_gtm_id from PHP settings (via klaroConsentData.gtmId)
+      - MUST check klaroConfig.services for google-tag-manager service
+      - MUST enable GTM mode if EITHER source indicates GTM is configured
+      - MUST allow JavaScript override before queue processes
+
+  # Note: queueRespectsConsent was removed in simplification.
+  # The queue now always flushes when consent event fires.
+  # GTM's consent mode handles whether tags actually fire.
+
+# =============================================================================
+# QUEUE BEHAVIOR
+# =============================================================================
+queue:
+  storage:
+    location: "window.klaroGeo.queue"
+    type: "array"
+    description: "Internal array of queued event objects"
+
+  size_limit:
+    max_events: 100
+    on_limit_exceeded:
+      action: "Drop oldest event, add new event"
+      logging: "console.warn() with message about queue limit"
+
+    contract: |
+      - MUST enforce 100 event limit
+      - MUST drop oldest events when limit exceeded (FIFO overflow)
+      - MUST log warning when limit is hit
+
+  page_load_reset:
+    behavior: "Queue resets on each page navigation"
+    rationale: "Standard WordPress behavior, fresh page = fresh state"
+
+    contract: |
+      - MUST start with empty queue on page load
+      - Queue state does NOT persist across navigations
+
+  flush_trigger:
+    gtm_mode:
+      event: "Klaro Consent Update"
+      source: "GTM template pushes this after updateConsentState()"
+      note: |
+        GTM itself requires consent (analytics/advertising purposes).
+        Therefore 'Klaro Consent Update' only fires AFTER consent is granted
+        and GTM loads. This naturally ensures events queue until consent.
+
+    non_gtm_mode:
+      event: "Klaro Consent Data"
+      source: "Plugin pushes this directly"
+
+    contract: |
+      - MUST listen for correct event based on useGTM setting
+      - MUST flush queue when trigger event fires
+      - In GTM mode, queue effectively waits for consent because GTM requires consent to load
+
+  stale_event_prevention:
+    description: |
+      In GTM mode, 'Klaro Consent Data' is NOT pushed for 'initialConsents'
+      if the google-tag-manager service has not been consented to yet.
+      This prevents stale consent data from being queued in dataLayer before
+      GTM loads - when GTM finally loads, it would process outdated events.
+
+    behavior:
+      new_user_no_consent:
+        - Page loads, no Klaro cookie
+        - initialConsents fires with all services denied
+        - Klaro Consent Data is SKIPPED (GTM not consented)
+        - User grants consent to analytics/advertising
+        - GTM loads (now has consent)
+        - saveConsents fires with updated consent state
+        - Klaro Consent Data is pushed with CURRENT state
+        - GTM template processes this and pushes Klaro Consent Update
+
+      returning_user_with_consent:
+        - Page loads, Klaro cookie present with consent
+        - initialConsents fires with saved consent state
+        - Klaro Consent Data IS pushed (GTM already consented)
+        - GTM loads immediately
+        - GTM template processes and pushes Klaro Consent Update
+
+    contract: |
+      - MUST skip 'Klaro Consent Data' for initialConsents in GTM mode when GTM not consented
+      - MUST always push 'Klaro Consent Data' for saveConsents
+      - MUST always push 'Klaro Consent Data' when GTM is already consented
+
+  consent_state_tracking:
+    variables:
+      consentConfirmed:
+        type: "boolean"
+        default: false
+        description: "Set to true when consent event fires"
+
+    contract: |
+      - MUST track whether consent event has fired
+      - MUST handle both initial page load and subsequent consent changes
+
+# =============================================================================
+# STATE MACHINE (Simplified)
+# =============================================================================
+state_machine:
+  states:
+    PENDING:
+      description: "Waiting for consent event"
+      on_push: "Queue the event"
+      on_consent_event: "Transition to CONFIRMED, flush queue"
+
+    CONFIRMED:
+      description: "Consent event has fired"
+      on_push: "Push directly to dataLayer"
+
+  transitions:
+    PENDING_to_CONFIRMED:
+      trigger: "Consent event fires (Klaro Consent Update or Klaro Consent Data)"
+      action: |
+        1. Set consentConfirmed = true
+        2. Flush all queued events to dataLayer
+        3. Clear queue
+      note: "GTM consent mode determines whether tags fire based on consent state"
+
+# =============================================================================
+# PHP INTEGRATION
+# =============================================================================
+php_integration:
+  output_configuration:
+    location: "wp_head or klaro-config.js output"
+    description: "Output useGTM setting based on klaro_geo_gtm_id"
+
+    example: |
+      <script>
+      window.klaroGeo = window.klaroGeo || {};
+      window.klaroGeo.useGTM = <?php echo !empty(get_option('klaro_geo_gtm_id')) ? 'true' : 'false'; ?>;
+      </script>
+
+    contract: |
+      - MUST output useGTM before klaro-geo.js loads
+      - MUST read from klaro_geo_gtm_id option
+      - MUST NOT add new PHP settings
+
+# =============================================================================
+# USAGE EXAMPLES
+# =============================================================================
+examples:
+  basic_usage:
+    description: "Queue a view_item_list event"
+    code: |
+      // In theme PHP or inline script
+      window.klaroGeo = window.klaroGeo || {};
+      window.klaroGeo.push = window.klaroGeo.push || function(e) {
+          (window.klaroGeo.queue = window.klaroGeo.queue || []).push(e);
+      };
+
+      klaroGeo.push({
+          'event': 'view_item_list',
+          'ecommerce': {
+              'item_list_id': 'services_overview',
+              'item_list_name': 'Services Overview',
+              'items': [...]
+          }
+      });
+
+  repeatable_event:
+    description: "Queue add_to_cart events (works on repeated clicks)"
+    code: |
+      document.querySelectorAll('.add-to-cart').forEach(btn => {
+          btn.addEventListener('click', function() {
+              klaroGeo.push({
+                  'event': 'add_to_cart',
+                  'ecommerce': {
+                      'items': [{ item_id: this.dataset.productId }]
+                  }
+              });
+          });
+      });
+
+  non_gtm_mode:
+    description: "Force non-GTM mode for other tag managers"
+    code: |
+      // Before klaro-geo.js loads
+      window.klaroGeo = window.klaroGeo || {};
+      window.klaroGeo.useGTM = false;
+
+# =============================================================================
+# TEST SCENARIOS
+# =============================================================================
+test_scenarios:
+  critical:
+    - "klaroGeo.push() works before klaro-geo.js loads (stub pattern)"
+    - "Events queue when consent not yet confirmed"
+    - "Queued events flush on Klaro Consent Update (GTM mode)"
+    - "Queued events flush on Klaro Consent Data (non-GTM mode)"
+    - "Events push immediately after consent confirmed"
+    - "Queue respects 100 event limit"
+    - "Oldest events dropped when limit exceeded"
+    - "Warning logged when limit exceeded"
+    - "Queue flushes when consent event fires (regardless of consent state)"
+    - "useGTM auto-detected from klaro_geo_gtm_id setting"
+    - "useGTM auto-detected from google-tag-manager service in klaroConfig"
+    - "useGTM can be overridden via JavaScript"
+    - "Klaro Consent Data (initialConsents) is skipped in GTM mode when GTM not consented"
+
+  edge_cases:
+    - "Empty queue on consent event (nothing to flush)"
+    - "Multiple consent events (only first should trigger flush)"
+    - "Queue starts empty on each page load"
+    - "Stub pattern preserves events added before main script"
+    - "GTM mode detected with only google-tag-manager service (no klaro_geo_gtm_id)"
+
+# =============================================================================
+# FUTURE CONSIDERATIONS
+# =============================================================================
+future:
+  event_deduplication:
+    status: "Deferred"
+    description: |
+      Add event removal tool that removes repeating events caused by
+      polling scripts. Not in initial implementation.
+
+    potential_api: |
+      klaroGeo.dedupe({ event: 'poll_event' }); // Remove duplicates
+      klaroGeo.removeByEvent('poll_event');     // Remove all of type
+
+  service_specific_queues:
+    status: "Deferred"
+    description: |
+      Events could specify which service consent they need, allowing
+      partial flushes based on granular consent.
