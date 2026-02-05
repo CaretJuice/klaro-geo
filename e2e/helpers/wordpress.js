@@ -4,6 +4,109 @@
  * Provides utilities for interacting with WordPress in E2E tests
  */
 
+const { execSync } = require('child_process');
+
+// Docker container name for E2E tests
+const DOCKER_CONTAINER = 'klaro-geo-wordpress-e2e';
+
+/**
+ * Execute a WP-CLI command inside the Docker container
+ * @param {string} command - WP-CLI command (without 'wp' prefix)
+ * @param {Object} options - Options
+ * @param {string} options.stdin - Optional stdin input
+ * @returns {string} - Command output
+ */
+function wpCli(command, options = {}) {
+  const { timeout = 10000, stdin } = options;
+  const fullCommand = `docker exec ${stdin ? '-i' : ''} ${DOCKER_CONTAINER} wp ${command} --allow-root`;
+
+  try {
+    const output = execSync(fullCommand, {
+      encoding: 'utf-8',
+      timeout,
+      input: stdin,
+      stdio: stdin ? ['pipe', 'pipe', 'pipe'] : ['pipe', 'pipe', 'pipe']
+    });
+    return output.trim();
+  } catch (error) {
+    // Return stderr or error message
+    if (error.stderr) {
+      throw new Error(`WP-CLI error: ${error.stderr}`);
+    }
+    throw error;
+  }
+}
+
+/**
+ * Update Klaro service settings via WP-CLI (fast, no browser needed)
+ * Uses wp eval to update the option directly via PHP
+ * Also regenerates the klaro-config.js file
+ * @param {string} serviceName - Service name (e.g., 'google-tag-manager')
+ * @param {Object} settings - Settings to update (e.g., { required: false, default: false })
+ * @returns {Object} - Result of the update
+ */
+function updateServiceSettingsViaCli(serviceName, settings) {
+  try {
+    // Build simple PHP code - avoid complex escaping by using base64
+    const settingsJson = JSON.stringify(settings);
+    const settingsBase64 = Buffer.from(settingsJson).toString('base64');
+
+    // PHP code that decodes base64 settings and regenerates config file
+    const phpCode = [
+      '$services = get_option("klaro_geo_services");',
+      'if (is_string($services)) $services = json_decode($services, true);',
+      'if (!is_array($services)) { echo "ERROR: not array"; exit(1); }',
+      '$found = false;',
+      'foreach ($services as &$s) {',
+      `  if ($s["name"] === "${serviceName}") {`,
+      `    $new = json_decode(base64_decode("${settingsBase64}"), true);`,
+      '    foreach ($new as $k => $v) $s[$k] = $v;',
+      '    $found = true;',
+      '  }',
+      '}',
+      'if (!$found) { echo "ERROR: not found"; exit(1); }',
+      'update_option("klaro_geo_services", $services);',
+      // Clear the service settings cache so the new values are used
+      'if (class_exists("Klaro_Geo_Service_Settings")) { Klaro_Geo_Service_Settings::clear_instance_cache(); }',
+      // Regenerate the klaro-config.js file
+      'if (function_exists("klaro_geo_generate_config_file")) { klaro_geo_generate_config_file(); }',
+      'echo "SUCCESS";'
+    ].join(' ');
+
+    const result = wpCli(`eval '${phpCode}'`);
+
+    if (result.includes('ERROR:')) {
+      return { success: false, error: result };
+    }
+
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Reset a Klaro service to default settings via WP-CLI
+ * These defaults match the plugin's klaro-geo-defaults.php
+ * @param {string} serviceName - Service name to reset
+ * @returns {Object} - Result of the reset
+ */
+function resetServiceToDefaultsViaCli(serviceName) {
+  // Plugin defaults: all services are opt-in (required:false, default:false)
+  const defaults = {
+    'google-tag-manager': { required: false, default: false },
+    'google-analytics': { required: false, default: false },
+    'google-ads': { required: false, default: false },
+  };
+
+  const settings = defaults[serviceName];
+  if (!settings) {
+    return { success: false, error: `No defaults defined for ${serviceName}` };
+  }
+
+  return updateServiceSettingsViaCli(serviceName, settings);
+}
+
 class WordPressHelper {
   constructor(page) {
     this.page = page;
@@ -186,4 +289,9 @@ class WordPressHelper {
   }
 }
 
-module.exports = { WordPressHelper };
+module.exports = {
+  WordPressHelper,
+  wpCli,
+  updateServiceSettingsViaCli,
+  resetServiceToDefaultsViaCli
+};

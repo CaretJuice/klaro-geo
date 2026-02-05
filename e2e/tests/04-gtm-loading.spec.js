@@ -9,7 +9,7 @@
 
 const { test, expect } = require('@playwright/test');
 const { KlaroHelper } = require('../helpers/klaro');
-const { WordPressHelper } = require('../helpers/wordpress');
+const { WordPressHelper, updateServiceSettingsViaCli, resetServiceToDefaultsViaCli } = require('../helpers/wordpress');
 
 // GTM Container ID for testing (set in docker-entrypoint-e2e.sh)
 const GTM_CONTAINER_ID = 'GTM-M2Z9TF4J';
@@ -84,30 +84,61 @@ async function hasGtmScriptTag(page) {
 }
 
 test.describe('Google Tag Manager Loading', () => {
+  // Run entire test suite serially to avoid race conditions when modifying service settings
+  test.describe.configure({ mode: 'serial' });
+
+  // Increase timeout for tests that modify service settings
+  test.setTimeout(60000);
+
   let klaroHelper;
   let wpHelper;
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, context }) => {
     klaroHelper = new KlaroHelper(page);
     wpHelper = new WordPressHelper(page);
 
-    // Clear all cookies and localStorage
-    await page.context().clearCookies();
-    await klaroHelper.clearConsent();
+    // Clear browser cache to ensure fresh klaro-config.js is loaded
+    await context.clearCookies();
+
+    // Clear all cookies and localStorage after navigating to a page
+    // (can only clear localStorage when on a page)
+    try {
+      await page.goto('/');
+      await klaroHelper.clearConsent();
+    } catch (e) {
+      // Ignore if page navigation fails (first load)
+    }
   });
 
-  test.describe('With GTM as required/default service (default configuration)', () => {
-    // Ensure GTM is in default state before these tests
+  test.describe('With GTM as required/default service (auto-load configuration)', () => {
+    // Run serially to avoid race conditions with other test groups modifying service settings
+    test.describe.configure({ mode: 'serial' });
+
+    // Set GTM to required:true, default:true for these tests
+    // Note: Plugin default is now required:false, default:false, so we must explicitly set this
     test.beforeEach(async ({ page }) => {
-      // Reset GTM to default settings to ensure test isolation
       try {
-        await wpHelper.login();
-        await wpHelper.resetServiceToDefaults('google-tag-manager');
-        await page.context().clearCookies();
-        await klaroHelper.clearConsent();
+        const result = updateServiceSettingsViaCli('google-tag-manager', {
+          required: true,
+          default: true
+        });
+        if (!result.success) {
+          console.log('Warning: Could not set GTM to required/default:', result.error);
+        }
       } catch (e) {
-        // If reset fails, tests will likely fail but that's expected
-        console.log('Warning: Could not reset GTM settings:', e.message);
+        console.log('Warning: Could not set GTM to required/default:', e.message);
+      }
+    });
+
+    test.afterEach(async () => {
+      // Restore GTM to plugin defaults (required:false, default:false)
+      try {
+        const result = resetServiceToDefaultsViaCli('google-tag-manager');
+        if (!result.success) {
+          console.log('Warning: Could not restore GTM defaults:', result.error);
+        }
+      } catch (e) {
+        console.log('Warning: Could not restore GTM defaults:', e.message);
       }
     });
 
@@ -165,35 +196,29 @@ test.describe('Google Tag Manager Loading', () => {
     });
   });
 
-  test.describe('With GTM as non-default service (opt-in required)', () => {
+  test.describe('With GTM as non-default service (opt-in required - plugin default)', () => {
+    // This is now the plugin's default configuration (required:false, default:false)
     // Run these tests serially to avoid race conditions with service settings
     test.describe.configure({ mode: 'serial' });
 
     test.beforeEach(async ({ page }) => {
-      // Log in to WordPress admin to change settings
-      await wpHelper.login();
+      // Ensure GTM is set to plugin defaults (required:false, default:false)
+      // This should already be the case, but reset to be safe
+      try {
+        const result = resetServiceToDefaultsViaCli('google-tag-manager');
+        if (!result.success) {
+          console.log('Warning: Could not reset GTM to defaults:', result.error);
+        }
+      } catch (e) {
+        console.log('Warning: Could not reset GTM to defaults:', e.message);
+      }
 
-      // Update GTM service to be non-required and non-default
-      const result = await wpHelper.updateServiceSettings('google-tag-manager', {
-        required: false,
-        default: false
-      });
-
-      // Log out and clear cookies to test as anonymous user
+      // Clear cookies to test as anonymous user
       await page.context().clearCookies();
       await klaroHelper.clearConsent();
     });
 
-    test.afterEach(async ({ page }) => {
-      // Restore GTM to default settings - use try/catch to avoid flaky failures
-      try {
-        await wpHelper.login();
-        await wpHelper.resetServiceToDefaults('google-tag-manager');
-      } catch (e) {
-        // If login fails, log the error but don't fail the test
-        console.log('Warning: Could not restore GTM settings in afterEach:', e.message);
-      }
-    });
+    // No afterEach needed - we're testing the default configuration
 
     test('should NOT load GTM script before consent when service is default:false', async ({ page }) => {
       // Navigate to homepage without any prior consent
