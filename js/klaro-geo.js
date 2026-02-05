@@ -356,16 +356,27 @@
           klaroGeoLog('Server-side consent logging is disabled for this template/country. Receipt stored locally only.');
       }
 
-      // Push to dataLayer
-      window.dataLayer.push({
-          'event': 'Klaro Event',
-          'eventSource': 'klaro-geo',
-          'klaroEventName': 'generateConsentReceipt',
-          'klaroGeoConsentReceipt': consentReceipt.receipt_id,
-          'klaroGeoTemplateSource': consentReceipt.template_source,
-          'klaroGeoAdminOverride': consentReceipt.admin_override,
-          'klaroGeoEnableConsentLogging': enableConsentLogging
-      });
+      // Push to dataLayer using event factory if available
+      let receiptEvent;
+      if (typeof window.KlaroGeoEvents !== 'undefined') {
+          receiptEvent = window.KlaroGeoEvents.createKlaroGeoEvent('generateConsentReceipt', {
+              'klaroGeoConsentReceipt': consentReceipt.receipt_id,
+              'klaroGeoTemplateSource': consentReceipt.template_source,
+              'klaroGeoAdminOverride': consentReceipt.admin_override,
+              'klaroGeoEnableConsentLogging': enableConsentLogging
+          });
+      } else {
+          receiptEvent = {
+              'event': 'Klaro Event',
+              'eventSource': 'klaro-geo',
+              'klaroEventName': 'generateConsentReceipt',
+              'klaroGeoConsentReceipt': consentReceipt.receipt_id,
+              'klaroGeoTemplateSource': consentReceipt.template_source,
+              'klaroGeoAdminOverride': consentReceipt.admin_override,
+              'klaroGeoEnableConsentLogging': enableConsentLogging
+          };
+      }
+      window.dataLayer.push(receiptEvent);
 }
 
 /**
@@ -552,19 +563,25 @@ function setupWatcher(manager) {
                       return;
                   }
 
-                  const pushData = {
-                      'event': 'Klaro Event',
-                      'eventSource': 'klaro',
-                      'klaroEventName': name,
-                      'klaroEventData': data,
-                      'klaroConfig': obj.config
-                  };
-
-                  // Add acceptedServices for saveConsents events
-                  if (name === 'saveConsents') {
-                      const acceptedServices = Object.keys(manager.consents)
-                          .filter(serviceName => manager.consents[serviceName] === true);
-                      pushData.acceptedServices = acceptedServices;
+                  // Use KlaroGeoEvents factory if available, otherwise fallback to inline
+                  let pushData;
+                  if (typeof window.KlaroGeoEvents !== 'undefined') {
+                      pushData = window.KlaroGeoEvents.createKlaroForwardedEvent(name, data, obj.config);
+                  } else {
+                      // Fallback for when events module hasn't loaded yet
+                      pushData = {
+                          'event': 'Klaro Event',
+                          'eventSource': 'klaro',
+                          'klaroEventName': name,
+                          'klaroEventData': data,
+                          'klaroConfig': obj.config
+                      };
+                      // Add acceptedServices for saveConsents events
+                      if (name === 'saveConsents') {
+                          const acceptedServices = Object.keys(manager.consents)
+                              .filter(serviceName => manager.consents[serviceName] === true);
+                          pushData.acceptedServices = acceptedServices;
+                      }
                   }
 
                   klaroGeoLog('DEBUG: Pushing Klaro event to dataLayer:', pushData);
@@ -610,14 +627,26 @@ function pushConsentData(manager) {
           // Deep copy consents to capture current state (not a reference that changes later)
           const consentsCopy = JSON.parse(JSON.stringify(activeManager.consents || {}));
 
-          const initialData = {
-              'event': 'Klaro Event',
-              'eventSource': 'klaro-geo',
-              'klaroEventName': 'initialConsents',
-              'klaroEventData': consentsCopy,
-              'acceptedServices': acceptedServices,
-              'klaroConfig': activeManager.config
-          };
+          // Use KlaroGeoEvents factory if available - this ensures correct eventSource ('klaro')
+          // initialConsents represents Klaro manager state, so it should use 'klaro' eventSource
+          let initialData;
+          if (typeof window.KlaroGeoEvents !== 'undefined') {
+              initialData = window.KlaroGeoEvents.createKlaroForwardedEvent(
+                  'initialConsents',
+                  consentsCopy,
+                  activeManager.config
+              );
+          } else {
+              // Fallback - note: eventSource is now 'klaro' (not 'klaro-geo')
+              initialData = {
+                  'event': 'Klaro Event',
+                  'eventSource': 'klaro',
+                  'klaroEventName': 'initialConsents',
+                  'klaroEventData': consentsCopy,
+                  'acceptedServices': acceptedServices,
+                  'klaroConfig': activeManager.config
+              };
+          }
 
           klaroGeoLog('DEBUG: Pushing initial Klaro event to dataLayer:', initialData);
           window.dataLayer.push(initialData);
@@ -843,13 +872,20 @@ function updateGoogleConsentMode(manager, eventType, data) {
               // saveConsents will push the correct data after user consents
           } else {
               klaroGeoLog('DEBUG: Pushing Klaro Consent Data event to dataLayer');
-              window.dataLayer.push({
-                  'event': 'Klaro Consent Data',
-                  'eventSource': 'klaro-geo',
-                  'consentMode': completeUpdate,
-                  'acceptedServices': acceptedServices,
-                  'triggerEvent': eventType
-              });
+              // Use KlaroGeoEvents factory if available for fresh consent state
+              let consentDataEvent;
+              if (typeof window.KlaroGeoEvents !== 'undefined') {
+                  consentDataEvent = window.KlaroGeoEvents.createConsentDataEvent(eventType);
+              } else {
+                  consentDataEvent = {
+                      'event': 'Klaro Consent Data',
+                      'eventSource': 'klaro-geo',
+                      'consentMode': completeUpdate,
+                      'acceptedServices': acceptedServices,
+                      'triggerEvent': eventType
+                  };
+              }
+              window.dataLayer.push(consentDataEvent);
           }
       }
 

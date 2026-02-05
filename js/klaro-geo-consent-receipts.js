@@ -55,11 +55,16 @@ function handleConsentChange(e) {
             consentReceipt.consent_choices[k] = consents[k] === true;
         }
 
-        // Push to dataLayer
-        window.dataLayer.push({
-            'event': 'Klaro Geo Consent Receipt',
-            'klaro_geo_consent_receipt': consentReceipt
-        });
+        // Push to dataLayer using event factory if available
+        if (typeof window.KlaroGeoEvents !== 'undefined') {
+            window.dataLayer.push(window.KlaroGeoEvents.createConsentReceiptEvent(consentReceipt, false));
+        } else {
+            window.dataLayer.push({
+                'event': 'Klaro Geo Consent Receipt',
+                'eventSource': 'klaro-geo',
+                'klaro_geo_consent_receipt': consentReceipt
+            });
+        }
 
         klaroGeoLog('Server-side consent logging is disabled for this template. Receipt stored locally only.');
 
@@ -142,13 +147,18 @@ function handleConsentChange(e) {
         klaroGeoLog('Server-side consent logging is disabled for this template. Receipt stored locally only.');
     }
 
-    // Push to dataLayer
-    window.dataLayer.push({
-        'event': 'Klaro Geo Consent Receipt',
-        'klaro_geo_consent_receipt': consentReceipt,
-        'klaro_geo_template_source': consentReceipt.template_source,
-        'klaro_geo_admin_override': consentReceipt.admin_override
-    });
+    // Push to dataLayer using event factory if available
+    if (typeof window.KlaroGeoEvents !== 'undefined') {
+        window.dataLayer.push(window.KlaroGeoEvents.createConsentReceiptEvent(consentReceipt, true));
+    } else {
+        window.dataLayer.push({
+            'event': 'Klaro Geo Consent Receipt',
+            'eventSource': 'klaro-geo',
+            'klaro_geo_consent_receipt': consentReceipt,
+            'klaro_geo_template_source': consentReceipt.template_source,
+            'klaro_geo_admin_override': consentReceipt.admin_override
+        });
+    }
 }
 
 /**

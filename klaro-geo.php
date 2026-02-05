@@ -246,7 +246,14 @@ function klaro_geo_enqueue_scripts() {
         array('strategy' => 'defer', 'in_footer' => true)
     );
 
-
+    // Enqueue event factory module (depends on klaro-geo-js for klaroGeoLog)
+    wp_enqueue_script(
+        'klaro-geo-events-js',
+        plugins_url('js/klaro-geo-events.js', __FILE__),
+        array('klaro-geo-js', 'klaro-geo-debug'),
+        KLARO_GEO_VERSION,
+        array('strategy' => 'defer', 'in_footer' => true)
+    );
 
     if ($klaro_variant === 'klaro-no-css.js') {
         wp_enqueue_style(
@@ -318,7 +325,7 @@ function klaro_geo_enqueue_scripts() {
         wp_enqueue_script(
             'klaro-consent-receipts-js',
             plugins_url('js/klaro-geo-consent-receipts.js', __FILE__),
-            array('klaro-js', 'klaro-geo-debug'),
+            array('klaro-js', 'klaro-geo-debug', 'klaro-geo-events-js'),
             KLARO_GEO_VERSION,
             true
         );
