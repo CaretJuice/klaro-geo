@@ -228,8 +228,8 @@ test.describe('Google Tag Manager Loading', () => {
       // Wait for modal to appear (proving no prior consent)
       await klaroHelper.waitForModal();
 
-      // Wait a moment for any scripts that might load
-      await page.waitForTimeout(2000);
+      // Wait for all initial script loading to complete before checking GTM state
+      await page.waitForLoadState('networkidle');
 
       // GTM script tag should exist but NOT be executed (external script not fetched)
       const hasTag = await hasGtmScriptTag(page);
@@ -245,6 +245,9 @@ test.describe('Google Tag Manager Loading', () => {
       await page.goto('/');
       await klaroHelper.waitForKlaroLoad();
       await klaroHelper.waitForModal();
+
+      // Wait for all initial script loading to complete before checking GTM state
+      await page.waitForLoadState('networkidle');
 
       // Verify GTM is not fully loaded initially (no gtm.js event)
       let gtmInitialized = await isGtmDataLayerInitialized(page);
