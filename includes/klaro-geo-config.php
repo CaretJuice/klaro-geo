@@ -240,8 +240,14 @@ function klaro_geo_generate_config_file() {
     foreach ($services as $service) {
         $service_name = $service['name'] ?? '';
         if (!empty($service_name)) {
-            // Convert service name to consent key format (e.g., 'google-analytics' -> 'google_analytics_consent')
-            $consent_key = str_replace('-', '_', $service_name) . '_consent';
+            // For consent mode services, use the consent_mode_key directly (e.g., 'analytics_storage')
+            // For regular services, use service_name + '_consent' (e.g., 'google_analytics_consent')
+            $is_consent_mode_service = isset($service['is_consent_mode_service']) && $service['is_consent_mode_service'] === true;
+            if ($is_consent_mode_service && !empty($service['consent_mode_key'])) {
+                $consent_key = $service['consent_mode_key'];
+            } else {
+                $consent_key = str_replace('-', '_', $service_name) . '_consent';
+            }
 
             // Determine the default value based on priority:
             // 1. Required services → always 'granted'
@@ -258,15 +264,6 @@ function klaro_geo_generate_config_file() {
             } else {
                 // Inherit from template default
                 $dynamic_consent_defaults[$consent_key] = $template_default_consent ? 'granted' : 'denied';
-            }
-
-            // For consent mode services, also set the standard Google Consent Mode key
-            if (isset($service['is_consent_mode_service']) && $service['is_consent_mode_service'] === true) {
-                $consent_mode_key = $service['consent_mode_key'] ?? '';
-                if (!empty($consent_mode_key) && isset($dynamic_consent_defaults[$consent_mode_key])) {
-                    // Set the standard key to match the service's default
-                    $dynamic_consent_defaults[$consent_mode_key] = $dynamic_consent_defaults[$consent_key];
-                }
             }
         }
     }
@@ -417,10 +414,9 @@ var klaroConfigLoadedData = {
     'klaroGeoEnableConsentLogging': " . ($custom_template_settings['enableConsentLogging'] ? 'true' : 'false') . "
 };
 
-// Add the consent receipt if available
+// Add the consent receipt ID if available
 if (latestReceipt) {
-    klaroConfigLoadedData.klaroGeoConsentReceipt = latestReceipt;
-    console.log('Adding latest consent receipt to klaroConfigLoaded event:', latestReceipt.receipt_id);
+    klaroConfigLoadedData.klaroGeoConsentReceiptId = latestReceipt.receipt_id;
 }
 
 // Push to dataLayer

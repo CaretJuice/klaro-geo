@@ -280,6 +280,69 @@ describe('Consent Queue', () => {
         });
     });
 
+    describe('queueFlushed Event', () => {
+        beforeEach(() => {
+            loadKlaroGeoJs();
+        });
+
+        test('should push queueFlushed event after flushing queued events', () => {
+            // Queue some events
+            window.klaroGeo.push({ event: 'queued_event_1' });
+            window.klaroGeo.push({ event: 'queued_event_2' });
+            window.klaroGeo.push({ event: 'queued_event_3' });
+
+            // Trigger consent (non-GTM mode by default)
+            window.dataLayer.push({ event: 'Klaro Consent Data' });
+
+            // Find the queueFlushed event in dataLayer
+            const queueFlushedEvents = window.dataLayer.filter(e =>
+                e.event === 'Klaro Event' && e.klaroEventName === 'queueFlushed'
+            );
+
+            expect(queueFlushedEvents.length).toBe(1);
+            expect(queueFlushedEvents[0].queueSize).toBe(3);
+            expect(queueFlushedEvents[0].eventSource).toBe('klaro-geo');
+        });
+
+        test('should NOT push queueFlushed event when queue is empty', () => {
+            // Trigger consent with no events queued
+            window.dataLayer.push({ event: 'Klaro Consent Data' });
+
+            // Should not have a queueFlushed event
+            const queueFlushedEvents = window.dataLayer.filter(e =>
+                e.event === 'Klaro Event' && e.klaroEventName === 'queueFlushed'
+            );
+
+            expect(queueFlushedEvents.length).toBe(0);
+        });
+
+        test('queueFlushed should appear after all flushed events in dataLayer', () => {
+            // Queue events
+            window.klaroGeo.push({ event: 'first_event' });
+            window.klaroGeo.push({ event: 'second_event' });
+
+            // Trigger consent
+            window.dataLayer.push({ event: 'Klaro Consent Data' });
+
+            // Find positions in dataLayer
+            let firstEventIdx = -1;
+            let secondEventIdx = -1;
+            let queueFlushedIdx = -1;
+
+            for (let i = 0; i < window.dataLayer.length; i++) {
+                if (window.dataLayer[i].event === 'first_event') firstEventIdx = i;
+                if (window.dataLayer[i].event === 'second_event') secondEventIdx = i;
+                if (window.dataLayer[i].klaroEventName === 'queueFlushed') queueFlushedIdx = i;
+            }
+
+            expect(firstEventIdx).toBeGreaterThan(-1);
+            expect(secondEventIdx).toBeGreaterThan(-1);
+            expect(queueFlushedIdx).toBeGreaterThan(-1);
+            expect(queueFlushedIdx).toBeGreaterThan(firstEventIdx);
+            expect(queueFlushedIdx).toBeGreaterThan(secondEventIdx);
+        });
+    });
+
     describe('Edge Cases', () => {
         beforeEach(() => {
             loadKlaroGeoJs();

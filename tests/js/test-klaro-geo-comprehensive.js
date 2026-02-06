@@ -351,8 +351,7 @@ describe('Klaro Geo Core Functionality - Comprehensive Tests', function() {
                 'eventSource': 'klaro',
                 'klaroEventName': name,
                 'klaroEventData': data,
-                'acceptedServices': acceptedServices,
-                'klaroConfig': obj.config
+                'acceptedServices': acceptedServices
               };
               
               window.dataLayer.push(pushData);
@@ -378,11 +377,10 @@ describe('Klaro Geo Core Functionality - Comprehensive Tests', function() {
         
         const initialData = {
           'event': 'Klaro Event',
-          'eventSource': 'klaro-geo',
+          'eventSource': 'klaro',
           'klaroEventName': 'initialConsents',
           'klaroEventData': manager.consents,
-          'acceptedServices': acceptedServices,
-          'klaroConfig': manager.config
+          'acceptedServices': acceptedServices
         };
         
         window.dataLayer.push(initialData);

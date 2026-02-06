@@ -51,10 +51,8 @@ event_source_rules:
     events:
       - name: generateConsentReceipt
         reason: Plugin generates receipt after consent change
-      - name: Klaro Consent Data
-        reason: Plugin transforms consent for GTM consumption
-      - name: Klaro Geo Consent Receipt
-        reason: Plugin event for receipt tracking
+      - name: queueFlushed
+        reason: Fired after consent queue is drained
 
 functions:
   getConsentState:
@@ -116,9 +114,6 @@ functions:
       - name: eventData
         type: any
         description: Event data from Klaro
-      - name: config
-        type: object
-        description: Klaro config object
     returns:
       type: object
       structure:
@@ -126,7 +121,6 @@ functions:
         eventSource: "klaro"
         klaroEventName: "{eventName}"
         klaroEventData: "{eventData}"
-        klaroConfig: "{config}"
         acceptedServices: "Array of accepted service names"
 
   createKlaroGeoEvent:
@@ -162,7 +156,6 @@ functions:
       type: object
       structure:
         event: "Klaro Consent Data"
-        eventSource: "klaro-geo"
         consentMode: "Google Consent Mode object"
         acceptedServices: "Array of accepted service names"
         triggerEvent: "{triggerEvent}"
@@ -182,7 +175,6 @@ functions:
       type: object
       structure:
         event: "Klaro Geo Consent Receipt"
-        eventSource: "klaro-geo"
         klaro_geo_consent_receipt: "{consentReceipt}"
         klaro_geo_template_source: "Optional - included if includeDetails=true"
         klaro_geo_admin_override: "Optional - included if includeDetails=true"
@@ -198,6 +190,17 @@ breaking_changes:
       Users filtering dataLayer on eventSource === 'klaro-geo' for initial
       consent state will need to update their GTM triggers to filter on
       eventSource === 'klaro' or klaroEventName === 'initialConsents'.
+
+  - version: "0.5.0"
+    change: "Removed klaroConfig from forwarded Klaro events; removed eventSource from non-'Klaro Event' events"
+    reason: |
+      klaroConfig (~250 lines JSON) was repeated 3x per page session in the dataLayer.
+      Config is always available via window.klaroConfig. eventSource is redundant on
+      events with unique event names ('Klaro Consent Data', 'Klaro Geo Consent Receipt').
+    migration: |
+      - If reading klaroConfig from dataLayer events, use window.klaroConfig instead.
+      - If filtering on eventSource for 'Klaro Consent Data' or 'Klaro Geo Consent Receipt'
+        events, filter on the event name directly instead.
 
 global_export:
   name: KlaroGeoEvents

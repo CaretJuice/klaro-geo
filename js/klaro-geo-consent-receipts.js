@@ -61,7 +61,6 @@ function handleConsentChange(e) {
         } else {
             window.dataLayer.push({
                 'event': 'Klaro Geo Consent Receipt',
-                'eventSource': 'klaro-geo',
                 'klaro_geo_consent_receipt': consentReceipt
             });
         }
@@ -153,7 +152,6 @@ function handleConsentChange(e) {
     } else {
         window.dataLayer.push({
             'event': 'Klaro Geo Consent Receipt',
-            'eventSource': 'klaro-geo',
             'klaro_geo_consent_receipt': consentReceipt,
             'klaro_geo_template_source': consentReceipt.template_source,
             'klaro_geo_admin_override': consentReceipt.admin_override

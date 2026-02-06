@@ -2,11 +2,23 @@
   klaroGeoLog('DEBUG: klaro-geo.js loaded (early capture attempt)');
 
   /**
-   * Generate a consent key from a service name
+   * Generate a consent key from a service name.
+   * For consent mode services (is_consent_mode_service=true), returns the consent_mode_key
+   * directly (e.g., "analytics_storage"). For regular services, appends "_consent"
+   * (e.g., "google_analytics_consent").
    * @param {string} serviceName - The service name (e.g., "google-analytics")
-   * @returns {string} - The consent key (e.g., "google_analytics_consent")
+   * @returns {string} - The consent key
    */
   function getServiceConsentKey(serviceName) {
+      // Check if this is a consent mode service with a dedicated key
+      if (typeof window.klaroConfig !== 'undefined' && window.klaroConfig.services) {
+          for (var i = 0; i < window.klaroConfig.services.length; i++) {
+              var service = window.klaroConfig.services[i];
+              if (service.name === serviceName && service.is_consent_mode_service && service.consent_mode_key) {
+                  return service.consent_mode_key;
+              }
+          }
+      }
       return serviceName.replace(/-/g, '_') + '_consent';
   }
 
@@ -113,13 +125,30 @@
           return;
       }
 
-      klaroGeoLog('DEBUG: Consent Queue - flushing', window.klaroGeo.queue.length, 'events to dataLayer');
+      const queueSize = window.klaroGeo.queue.length;
+      klaroGeoLog('DEBUG: Consent Queue - flushing', queueSize, 'events to dataLayer');
 
       while (window.klaroGeo.queue.length > 0) {
           const event = window.klaroGeo.queue.shift();
           klaroGeoLog('DEBUG: Consent Queue - pushing event:', event.event || 'no-event-name', event);
           window.dataLayer.push(event);
       }
+
+      // Push queueFlushed event for timing visibility
+      var queueFlushedEvent;
+      if (typeof window.KlaroGeoEvents !== 'undefined') {
+          queueFlushedEvent = window.KlaroGeoEvents.createKlaroGeoEvent('queueFlushed', {
+              'queueSize': queueSize
+          });
+      } else {
+          queueFlushedEvent = {
+              'event': 'Klaro Event',
+              'eventSource': 'klaro-geo',
+              'klaroEventName': 'queueFlushed',
+              'queueSize': queueSize
+          };
+      }
+      window.dataLayer.push(queueFlushedEvent);
 
       klaroGeoLog('DEBUG: Consent Queue - flush complete');
   }
@@ -511,15 +540,14 @@
                       // Use KlaroGeoEvents factory if available, otherwise fallback to inline
                       let pushData;
                       if (typeof window.KlaroGeoEvents !== 'undefined') {
-                          pushData = window.KlaroGeoEvents.createKlaroForwardedEvent(name, data, obj.config);
+                          pushData = window.KlaroGeoEvents.createKlaroForwardedEvent(name, data);
                       } else {
                           // Fallback for when events module hasn't loaded yet
                           pushData = {
                               'event': 'Klaro Event',
                               'eventSource': 'klaro',
                               'klaroEventName': name,
-                              'klaroEventData': data,
-                              'klaroConfig': obj.config
+                              'klaroEventData': data
                           };
                           // Add acceptedServices for saveConsents events
                           if (name === 'saveConsents') {
@@ -578,8 +606,7 @@
               if (typeof window.KlaroGeoEvents !== 'undefined') {
                   initialData = window.KlaroGeoEvents.createKlaroForwardedEvent(
                       'initialConsents',
-                      consentsCopy,
-                      activeManager.config
+                      consentsCopy
                   );
               } else {
                   // Fallback - note: eventSource is now 'klaro' (not 'klaro-geo')
@@ -588,8 +615,7 @@
                       'eventSource': 'klaro',
                       'klaroEventName': 'initialConsents',
                       'klaroEventData': consentsCopy,
-                      'acceptedServices': acceptedServices,
-                      'klaroConfig': activeManager.config
+                      'acceptedServices': acceptedServices
                   };
               }
 
@@ -629,8 +655,9 @@
   }
 
   /**
-   * Get consent mode service map from klaroConsentData
-   * Maps consent_mode_key (e.g., 'ad_storage') to service name (e.g., 'ad-storage')
+   * Get consent mode service map.
+   * Maps consent_mode_key (e.g., 'ad_storage') to service name (e.g., 'ad-storage').
+   * Prefers klaroConsentData, falls back to deriving from klaroConfig.services.
    * @returns {Object} Map of consent_mode_key to service_name
    */
   function getConsentModeServiceMap() {
@@ -638,11 +665,22 @@
           window.klaroConsentData.consentModeServices) {
           return window.klaroConsentData.consentModeServices;
       }
-      return {};
+      // Fallback: derive from klaroConfig.services
+      var map = {};
+      if (typeof window.klaroConfig !== 'undefined' && window.klaroConfig.services) {
+          window.klaroConfig.services.forEach(function(service) {
+              if (service.is_consent_mode_service && service.consent_mode_key) {
+                  map[service.consent_mode_key] = service.name;
+              }
+          });
+      }
+      return map;
   }
 
   /**
-   * Get parent-child service map from klaroConsentData
+   * Get parent-child service map.
+   * Maps parent service name to array of child service names.
+   * Prefers klaroConsentData, falls back to deriving from klaroConfig.services.
    * @returns {Object} Map of parent service name to array of child service names
    */
   function getParentChildMap() {
@@ -650,7 +688,19 @@
           window.klaroConsentData.parentChildMap) {
           return window.klaroConsentData.parentChildMap;
       }
-      return {};
+      // Fallback: derive from klaroConfig.services
+      var map = {};
+      if (typeof window.klaroConfig !== 'undefined' && window.klaroConfig.services) {
+          window.klaroConfig.services.forEach(function(service) {
+              if (service.parent_service) {
+                  if (!map[service.parent_service]) {
+                      map[service.parent_service] = [];
+                  }
+                  map[service.parent_service].push(service.name);
+              }
+          });
+      }
+      return map;
   }
 
   // Function to handle consent updates and trigger dataLayer events
@@ -741,28 +791,14 @@
               }
           });
 
-          // Reserved keys that dynamic service keys should not overwrite
-          const reservedKeys = ['ad_storage', 'analytics_storage', 'ad_user_data', 'ad_personalization'];
-
           // Add dynamic service consent keys for ALL services
-          console.log('[klaro-geo] activeManager exists:', !!activeManager, 'has consents:', !!(activeManager && activeManager.consents));
           if (activeManager && activeManager.consents) {
-              const consentKeys = Object.keys(activeManager.consents);
-              console.log('[klaro-geo] Processing', consentKeys.length, 'services for dynamic consent keys:', consentKeys);
+              var consentKeys = Object.keys(activeManager.consents);
               consentKeys.forEach(function(serviceName) {
-                  const dynamicKey = getServiceConsentKey(serviceName);
-                  // Only add if not conflicting with reserved keys
-                  if (!reservedKeys.includes(dynamicKey.replace('_consent', ''))) {
-                      const isGranted = activeManager.consents[serviceName] === true;
-                      completeUpdate[dynamicKey] = isGranted ? 'granted' : 'denied';
-                      console.log('[klaro-geo] Added dynamic key:', dynamicKey, '=', completeUpdate[dynamicKey]);
-                  } else {
-                      console.log('[klaro-geo] Skipped reserved key collision:', dynamicKey);
-                  }
+                  var dynamicKey = getServiceConsentKey(serviceName);
+                  var isGranted = activeManager.consents[serviceName] === true;
+                  completeUpdate[dynamicKey] = isGranted ? 'granted' : 'denied';
               });
-          } else {
-              console.log('[klaro-geo] No activeManager.consents available - dynamic keys will not be added');
-              console.log('[klaro-geo] activeManager:', activeManager);
           }
 
           // Log the complete update being sent (now includes dynamic keys)
@@ -808,7 +844,6 @@
                   } else {
                       consentDataEvent = {
                           'event': 'Klaro Consent Data',
-                          'eventSource': 'klaro-geo',
                           'consentMode': completeUpdate,
                           'acceptedServices': acceptedServices,
                           'triggerEvent': eventType

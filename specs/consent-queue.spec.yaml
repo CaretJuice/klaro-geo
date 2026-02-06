@@ -219,6 +219,21 @@ queue:
       - MUST always push 'Klaro Consent Data' for saveConsents
       - MUST always push 'Klaro Consent Data' when GTM is already consented
 
+  queue_flushed_event:
+    description: |
+      Lightweight timing visibility event pushed after the consent queue drains.
+      Only fires when the queue had events to flush (not on empty queue).
+    event_shape:
+      event: "Klaro Event"
+      eventSource: "klaro-geo"
+      klaroEventName: "queueFlushed"
+      queueSize: "Number of events that were flushed"
+    contract: |
+      - MUST fire after all queued events have been pushed to dataLayer
+      - MUST include the count of flushed events as queueSize
+      - MUST NOT fire when the queue is empty
+      - MUST use eventSource 'klaro-geo' (this is a plugin-generated event)
+
   consent_state_tracking:
     variables:
       consentConfirmed:
