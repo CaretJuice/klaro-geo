@@ -60,7 +60,35 @@
     }
 
     /**
+     * Get consent mode service map from klaroConsentData
+     * Maps consent_mode_key (e.g., 'ad_storage') to service name (e.g., 'ad-storage')
+     * @returns {Object} Map of consent_mode_key to service_name
+     */
+    function getConsentModeServiceMap() {
+        if (typeof window.klaroConsentData !== 'undefined' &&
+            window.klaroConsentData.consentModeServices) {
+            return window.klaroConsentData.consentModeServices;
+        }
+        return {};
+    }
+
+    /**
+     * Get parent-child service map from klaroConsentData
+     * @returns {Object} Map of parent service name to array of child service names
+     */
+    function getParentChildMap() {
+        if (typeof window.klaroConsentData !== 'undefined' &&
+            window.klaroConsentData.parentChildMap) {
+            return window.klaroConsentData.parentChildMap;
+        }
+        return {};
+    }
+
+    /**
      * Build Google Consent Mode object from consents
+     * Uses consent mode services (is_consent_mode_service=true) to map service consent
+     * to standard Google Consent Mode keys (ad_storage, analytics_storage, etc.)
+     *
      * @param {Object} consents - Service consents object
      * @param {Object} manager - Klaro manager (optional, for config access)
      * @returns {Object} Google Consent Mode formatted object
@@ -68,19 +96,34 @@
     function buildConsentMode(consents, manager) {
         var consentMode = {};
 
-        // Get consent mode settings from config if available
-        var adStorageService = window.adStorageServiceName;
-        var analyticsStorageService = window.analyticsStorageServiceName;
+        // Get consent mode service map from PHP-generated config
+        var consentModeServiceMap = getConsentModeServiceMap();
+        var parentChildMap = getParentChildMap();
 
-        // Check service consent status
-        var adServiceEnabled = adStorageService && consents[adStorageService] === true;
-        var analyticsServiceEnabled = analyticsStorageService && consents[analyticsStorageService] === true;
+        // Process consent mode services - map their consent state to standard Google keys
+        Object.keys(consentModeServiceMap).forEach(function(consentModeKey) {
+            var serviceName = consentModeServiceMap[consentModeKey];
+            var isGranted = consents[serviceName] === true;
+            consentMode[consentModeKey] = isGranted ? 'granted' : 'denied';
+        });
 
-        // Standard Google Consent Mode keys
-        consentMode['ad_storage'] = adServiceEnabled ? 'granted' : 'denied';
-        consentMode['analytics_storage'] = analyticsServiceEnabled ? 'granted' : 'denied';
-        consentMode['ad_user_data'] = (adServiceEnabled && window.adUserDataConsent === true) ? 'granted' : 'denied';
-        consentMode['ad_personalization'] = (adServiceEnabled && window.adPersonalizationConsent === true) ? 'granted' : 'denied';
+        // Enforce parent-child dependencies
+        // If parent is denied, children must also be denied
+        Object.keys(parentChildMap).forEach(function(parentName) {
+            var children = parentChildMap[parentName];
+            var parentConsented = consents[parentName] === true;
+            if (!parentConsented) {
+                // Parent is denied - ensure all children are also denied
+                children.forEach(function(childName) {
+                    // Find the consent mode key for this child service
+                    Object.keys(consentModeServiceMap).forEach(function(key) {
+                        if (consentModeServiceMap[key] === childName) {
+                            consentMode[key] = 'denied';
+                        }
+                    });
+                });
+            }
+        });
 
         // Reserved keys that dynamic service keys should not overwrite
         var reservedKeys = ['ad_storage', 'analytics_storage', 'ad_user_data', 'ad_personalization'];

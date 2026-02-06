@@ -46,8 +46,8 @@ class KlaroHelper {
    */
   async acceptAll() {
     await this.waitForModal();
-    // Klaro v0.7 uses .cm-btn-success for accept/OK button
-    await this.page.click('.cm-btn-success, button:has-text("OK"), button:has-text("That\'s ok")');
+    // Click the Accept All button (not the OK/Save button which preserves defaults)
+    await this.page.click('.cm-btn-accept-all');
 
     // Wait for modal to close
     await this.page.waitForSelector('.cookie-notice, .cm-modal', {

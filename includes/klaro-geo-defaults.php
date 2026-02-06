@@ -353,6 +353,85 @@ function klaro_geo_get_default_services($defaults = null) {
                     "description" => "Google Ads is an online advertising platform developed by Google, where advertisers pay to display brief advertisements, service offerings, product listings, and video content to web users."
                 ]
             ]
+        ],
+        // Consent Mode Services - these control Google Consent Mode signals
+        [
+            "name" => "analytics-storage",
+            "title" => "Analytics Storage",
+            "required" => false,
+            "purposes" => ["analytics"],
+            "default" => false,
+            "cookies" => [],
+            "is_consent_mode_service" => true,
+            "consent_mode_key" => "analytics_storage",
+            "onInit" => '',
+            "onAccept" => '',
+            "onDecline" => '',
+            "translations" => [
+                "zz" => [
+                    "title" => "Analytics Storage",
+                    "description" => "Enables storage (such as cookies) related to analytics, e.g., visit duration. This controls the analytics_storage consent signal."
+                ]
+            ]
+        ],
+        [
+            "name" => "ad-storage",
+            "title" => "Advertising Storage",
+            "required" => false,
+            "purposes" => ["advertising"],
+            "default" => false,
+            "cookies" => [],
+            "is_consent_mode_service" => true,
+            "consent_mode_key" => "ad_storage",
+            "onInit" => '',
+            "onAccept" => '',
+            "onDecline" => '',
+            "translations" => [
+                "zz" => [
+                    "title" => "Advertising Storage",
+                    "description" => "Enables storage (such as cookies) related to advertising. This controls the ad_storage consent signal."
+                ]
+            ]
+        ],
+        [
+            "name" => "ad-user-data",
+            "title" => "Ad User Data",
+            "required" => false,
+            "purposes" => ["advertising"],
+            "default" => false,
+            "cookies" => [],
+            "is_consent_mode_service" => true,
+            "consent_mode_key" => "ad_user_data",
+            "parent_service" => "ad-storage",
+            "onInit" => '',
+            "onAccept" => '',
+            "onDecline" => '',
+            "translations" => [
+                "zz" => [
+                    "title" => "Ad User Data",
+                    "description" => "Controls whether user data can be sent to Google for advertising purposes. This controls the ad_user_data consent signal."
+                ]
+            ]
+        ],
+        [
+            "name" => "ad-personalization",
+            "title" => "Ad Personalization",
+            "required" => false,
+            "purposes" => ["advertising"],
+            "default" => false,
+            "cookies" => [],
+            "is_consent_mode_service" => true,
+            "consent_mode_key" => "ad_personalization",
+            "parent_service" => "ad-storage",
+            "onInit" => '',
+            "onAccept" => '',
+            "onDecline" => '',
+            "translations" => [
+                "zz" => [
+                    "title" => "Ad Personalization",
+                    "description" => "Controls whether personalized advertising is enabled. This controls the ad_personalization consent signal."
+                ]
+            ]
         ]
     ];
 }

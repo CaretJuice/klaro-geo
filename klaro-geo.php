@@ -139,6 +139,51 @@ function klaro_geo_migrate_gtm_consent_requirement() {
     update_option('klaro_geo_gtm_consent_migrated', true);
 }
 
+/**
+ * Initialize consent mode services if they don't exist
+ *
+ * Consent mode services (analytics-storage, ad-storage, ad-user-data, ad-personalization)
+ * are now first-class Klaro services that control Google Consent Mode signals.
+ * This function adds them if they don't already exist in the database.
+ */
+function klaro_geo_init_consent_mode_services() {
+    // Get service settings instance
+    $service_settings = Klaro_Geo_Service_Settings::get_instance();
+
+    // Check if consent mode services already exist
+    $consent_mode_service_names = array(
+        'analytics-storage',
+        'ad-storage',
+        'ad-user-data',
+        'ad-personalization'
+    );
+
+    $needs_update = false;
+    $default_services = klaro_geo_get_default_services();
+
+    foreach ($consent_mode_service_names as $service_name) {
+        $existing = $service_settings->get_service($service_name);
+        if (!$existing) {
+            // Find the service in defaults
+            foreach ($default_services as $default_service) {
+                if (isset($default_service['name']) && $default_service['name'] === $service_name) {
+                    klaro_geo_debug_log('Adding consent mode service: ' . $service_name);
+                    $service_settings->set_service($service_name, $default_service);
+                    $needs_update = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    if ($needs_update) {
+        $service_settings->save();
+        // Clear instance cache to ensure fresh data on next access
+        Klaro_Geo_Service_Settings::clear_instance_cache();
+        klaro_geo_debug_log('Consent mode services initialization complete');
+    }
+}
+
 // Include defaults file first
 require_once plugin_dir_path(__FILE__) . 'includes/klaro-geo-defaults.php';
 
@@ -709,6 +754,9 @@ add_action('init', 'klaro_geo_validate_services');
 
 // Run GTM consent requirement migration on init (early priority to run before validation)
 add_action('init', 'klaro_geo_migrate_gtm_consent_requirement', 5);
+
+// Initialize consent mode services on init (after migration, before validation)
+add_action('init', 'klaro_geo_init_consent_mode_services', 6);
 
 // Function to get user location
 function klaro_geo_get_user_location() {

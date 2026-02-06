@@ -186,45 +186,53 @@ function klaro_geo_generate_config_file() {
     // Build the services configuration
     $klaro_config['services'] = array();
 
-    // Check if consent mode is enabled in the template
-    // First check if consent_mode_settings is directly in the template
-    if (isset($template_config['consent_mode_settings'])) {
-        $consent_mode_settings = $template_config['consent_mode_settings'];
-    } 
-    // Then check if it's in the config array (as set by the admin form)
-    else if (isset($template_config['config']) && isset($template_config['config']['consent_mode_settings'])) {
-        $consent_mode_settings = $template_config['config']['consent_mode_settings'];
-    } else {
-        $consent_mode_settings = [];
+    // NOTE: Consent mode is ALWAYS enabled
+    // Consent mode services are now first-class Klaro services with is_consent_mode_service=true
+    // The old template-level analytics_storage_service/ad_storage_service mappings are removed
+
+    // Build map of consent mode services for quick lookup
+    $consent_mode_services = array();
+    $parent_child_map = array(); // Maps parent service name to array of child service names
+    foreach ($services as $service) {
+        if (isset($service['is_consent_mode_service']) && $service['is_consent_mode_service'] === true) {
+            $consent_mode_key = $service['consent_mode_key'] ?? '';
+            if (!empty($consent_mode_key)) {
+                $consent_mode_services[$consent_mode_key] = $service['name'];
+            }
+            // Track parent-child relationships
+            if (isset($service['parent_service']) && !empty($service['parent_service'])) {
+                $parent = $service['parent_service'];
+                if (!isset($parent_child_map[$parent])) {
+                    $parent_child_map[$parent] = array();
+                }
+                $parent_child_map[$parent][] = $service['name'];
+            }
+        }
     }
 
-    // NOTE: Consent mode is ALWAYS enabled - no toggle check needed
-    // Remove any legacy initialize_consent_mode from settings
-    unset($consent_mode_settings['initialize_consent_mode']);
-
-    $analytics_storage_service = isset($consent_mode_settings['analytics_storage_service']) ?
-        $consent_mode_settings['analytics_storage_service'] : 'no_service';
-
-    $ad_storage_service = isset($consent_mode_settings['ad_storage_service']) ?
-        $consent_mode_settings['ad_storage_service'] : 'no_service';
-
-    // Log consent mode configuration (always enabled)
-    klaro_geo_debug_log('Consent mode enabled (always on): analytics=' . $analytics_storage_service . ', ads=' . $ad_storage_service);
+    klaro_geo_debug_log('Consent mode services detected: ' . implode(', ', array_values($consent_mode_services)));
 
     // Get template's default consent state (for inheritance)
     $template_default_consent = isset($template_config['config']['default']) && $template_config['config']['default'] ? true : false;
 
-    // Build consolidated consent mode initialization
-    // Use new structured settings if available, otherwise fall back to defaults
-    $consent_defaults = isset($consent_mode_settings['consent_defaults']) ? $consent_mode_settings['consent_defaults'] : array();
+    // Get gtag settings from template if available (ads_data_redaction, url_passthrough)
+    $consent_mode_settings = array();
+    if (isset($template_config['consent_mode_settings'])) {
+        $consent_mode_settings = $template_config['consent_mode_settings'];
+    } else if (isset($template_config['config']) && isset($template_config['config']['consent_mode_settings'])) {
+        $consent_mode_settings = $template_config['config']['consent_mode_settings'];
+    }
     $gtag_settings = isset($consent_mode_settings['gtag_settings']) ? $consent_mode_settings['gtag_settings'] : array();
+    $ads_data_redaction = isset($gtag_settings['ads_data_redaction']) ? $gtag_settings['ads_data_redaction'] : 'true';
+    $url_passthrough = isset($gtag_settings['url_passthrough']) ? $gtag_settings['url_passthrough'] : 'false';
 
-    // Standard Google Consent Mode v2 keys - use settings or default to 'denied'
+    // Build consent defaults - all start as 'denied' for Basic Consent Mode
+    // Standard Google Consent Mode v2 keys default to 'denied'
     $dynamic_consent_defaults = array(
-        'ad_storage' => isset($consent_defaults['ad_storage']) ? $consent_defaults['ad_storage'] : 'denied',
-        'analytics_storage' => isset($consent_defaults['analytics_storage']) ? $consent_defaults['analytics_storage'] : 'denied',
-        'ad_user_data' => isset($consent_defaults['ad_user_data']) ? $consent_defaults['ad_user_data'] : 'denied',
-        'ad_personalization' => isset($consent_defaults['ad_personalization']) ? $consent_defaults['ad_personalization'] : 'denied',
+        'ad_storage' => 'denied',
+        'analytics_storage' => 'denied',
+        'ad_user_data' => 'denied',
+        'ad_personalization' => 'denied',
     );
 
     // Add dynamic service consent keys for ALL services
@@ -251,12 +259,17 @@ function klaro_geo_generate_config_file() {
                 // Inherit from template default
                 $dynamic_consent_defaults[$consent_key] = $template_default_consent ? 'granted' : 'denied';
             }
+
+            // For consent mode services, also set the standard Google Consent Mode key
+            if (isset($service['is_consent_mode_service']) && $service['is_consent_mode_service'] === true) {
+                $consent_mode_key = $service['consent_mode_key'] ?? '';
+                if (!empty($consent_mode_key) && isset($dynamic_consent_defaults[$consent_mode_key])) {
+                    // Set the standard key to match the service's default
+                    $dynamic_consent_defaults[$consent_mode_key] = $dynamic_consent_defaults[$consent_key];
+                }
+            }
         }
     }
-
-    // Get gtag settings (ads_data_redaction, url_passthrough)
-    $ads_data_redaction = isset($gtag_settings['ads_data_redaction']) ? $gtag_settings['ads_data_redaction'] : 'true';
-    $url_passthrough = isset($gtag_settings['url_passthrough']) ? $gtag_settings['url_passthrough'] : 'false';
 
     klaro_geo_debug_log('Generated consolidated consent defaults for ' . count($dynamic_consent_defaults) . ' keys');
 
@@ -299,58 +312,28 @@ function klaro_geo_generate_config_file() {
             $service_config['translations'] = $service['translations'];
         }
 
-        // NOTE: Consent mode initialization has been moved to klaro-config.js (runs before GTM loads)
-        // This ensures consent defaults are set BEFORE any GTM tags can fire
-        // The GTM onInit callback is now only used for service-specific initialization if needed
+        // Add consent mode metadata for JavaScript to use
+        if (isset($service['is_consent_mode_service']) && $service['is_consent_mode_service'] === true) {
+            $service_config['is_consent_mode_service'] = true;
+            if (isset($service['consent_mode_key'])) {
+                $service_config['consent_mode_key'] = $service['consent_mode_key'];
+            }
+            if (isset($service['parent_service'])) {
+                $service_config['parent_service'] = $service['parent_service'];
+            }
+        }
 
-        // Check if this service matches the analytics storage event
-        $is_analytics_service = $analytics_storage_service !== 'no_service' && $service['name'] === $analytics_storage_service;
-
-        // Check if this service matches the ad storage event
-        $is_ad_service = $ad_storage_service !== 'no_service' && $service['name'] === $ad_storage_service;
-
-        // Our custom code to control the 'checked' attribute
-        // This code should be executed *after* the consent mode updates
-        if ($is_ad_service || $is_analytics_service) {
-            $checkbox_accept_code = "\n" .
-            "const adPersonalizationCheckbox = document.querySelector('#klaro-geo-ad-personalization');\n" .
-            "const adUserDataCheckbox = document.querySelector('#klaro-geo-ad-user-data');\n" .
-            "if (adPersonalizationCheckbox) {\n" .
-            "    adPersonalizationCheckbox.checked = true;\n" .
-            "}\n" .
-            "if (adUserDataCheckbox) {\n" .
-            "    adUserDataCheckbox.checked = true;\n" .
-            "}\n" .
-            "// Remove disabled class from controls container\n" .
-            "const controlsContainer = document.querySelector('.klaro-geo-ad-controls');\n" .
-            "if (controlsContainer) {\n" .
-            "    controlsContainer.classList.remove('klaro-geo-controls-disabled');\n" .
-            "}\n";
-
-            $service_config['onAccept'] = $service_config['onAccept'] . $checkbox_accept_code;
-            klaro_geo_debug_log('Added checkbox control code to onAccept for ' . $service['name']);
-
-            $checkbox_decline_code = "\n" .
-            "const adPersonalizationCheckbox = document.querySelector('#klaro-geo-ad-personalization');\n" .
-            "const adUserDataCheckbox = document.querySelector('#klaro-geo-ad-user-data');\n" .
-            "if (adPersonalizationCheckbox) {\n" .
-            "    adPersonalizationCheckbox.checked = false;\n" .
-            "}\n" .
-            "if (adUserDataCheckbox) {\n" .
-            "    adUserDataCheckbox.checked = false;\n" .
-            "}\n" .
-            "// Add disabled class to controls container\n" .
-            "const controlsContainer = document.querySelector('.klaro-geo-ad-controls');\n" .
-            "if (controlsContainer) {\n" .
-            "    controlsContainer.classList.add('klaro-geo-controls-disabled');\n" .
-            "}\n";
-
-            $service_config['onDecline'] = $service_config['onDecline'] . $checkbox_decline_code;
-            klaro_geo_debug_log('Added checkbox control code to onDecline for ' . $service['name']);
+        // Skip hidden services
+        if (isset($service['hidden']) && $service['hidden'] === true) {
+            klaro_geo_debug_log('Skipping hidden service: ' . ($service['name'] ?? 'unknown'));
+            continue;
         }
 
         $klaro_config['services'][] = $service_config;
     }
+
+    // Store parent-child map for JavaScript to use for dependency enforcement
+    $klaro_config['consent_mode_dependencies'] = $parent_child_map;
 
     // Transform styling settings from object to array format if needed
     if (isset($klaro_config['styling']) && isset($klaro_config['styling']['theme'])) {
@@ -496,10 +479,14 @@ window.gtag = function(){dataLayer.push(arguments);};
         // Get GTM ID for consent queue mode detection
         $gtm_id = get_option('klaro_geo_gtm_id', '');
 
+        // Pre-encode consent mode services map for JavaScript
+        $consent_mode_services_json = wp_json_encode($consent_mode_services);
+        $parent_child_map_json = wp_json_encode($parent_child_map);
+
         // Add variables for the consent receipts script
         $klaro_config_content .= <<<JS
 // Consent Receipt Configuration
-// NOTE: Consent mode is ALWAYS enabled - no initialize_consent_mode toggle
+// NOTE: Consent mode is ALWAYS enabled - consent mode services are now first-class Klaro services
 window.klaroConsentData = {
     gtmId: "{$gtm_id}",
     templateName: "{$template_to_use}",
@@ -512,6 +499,8 @@ window.klaroConsentData = {
     enableConsentLogging: {$enable_consent_logging_value},
     consentMode: {$consent_mode_js},
     suppressConsentsEvents: {$suppress_consents_events},
+    consentModeServices: {$consent_mode_services_json},
+    parentChildMap: {$parent_child_map_json},
     templateSettings: {
         consentModalTitle: "{$modal_title}",
         consentModalDescription: "{$modal_description}",
@@ -521,8 +510,6 @@ window.klaroConsentData = {
         requiredConsent: {$required_consent},
         config: {
             consent_mode_settings: {
-                analytics_storage_service: "{$analytics_storage_service}",
-                ad_storage_service: "{$ad_storage_service}",
                 consent_defaults: {$consent_defaults_json},
                 gtag_settings: {
                     ads_data_redaction: {$ads_data_redaction},

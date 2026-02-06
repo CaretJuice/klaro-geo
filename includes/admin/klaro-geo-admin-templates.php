@@ -1163,94 +1163,21 @@ function klaro_geo_templates_page() {
                     </tr>
                 </table>
                 <h3>Consent Mode Settings</h3>
-                <p class="description">Consent mode is always enabled. Configure which services control Google Consent Mode signals below. Dynamic consent keys are automatically generated for all services.</p>
-                <table class="form-table">
-                    <tr>
-                        <th><label for="consent_mode_settings_analytics_storage_service">Map analytics_storage to service:</label></th>
-                        <td>
-                            <select name="template_config[consent_mode_settings][analytics_storage_service]" id="consent_mode_settings_analytics_storage_service">
-                                <option value="no_service" <?php selected(isset($current_config['consent_mode_settings']['analytics_storage_service']) ? $current_config['consent_mode_settings']['analytics_storage_service'] : 'no_service', 'no_service'); ?>>No service</option>
-                                <?php
-                                // Get services for dropdown
-                                $service_settings = Klaro_Geo_Service_Settings::get_instance();
-                                $services = $service_settings->get();
-                                foreach ($services as $service) {
-                                    if (isset($service['name'])) {
-                                        echo '<option value="' . esc_attr($service['name']) . '" ' .
-                                            selected(isset($current_config['consent_mode_settings']['analytics_storage_service']) ? $current_config['consent_mode_settings']['analytics_storage_service'] : 'no_service', $service['name'], false) . '>' .
-                                            esc_html($service['name']) . '</option>';
-                                    }
-                                }
-                                ?>
-                            </select>
-                            <p class="description">Select the service that enables or disables analytics_storage.</p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th><label for="ad_storage_service">Map ad signals to service:</label></th>
-                        <td>
-                            <select name="template_config[consent_mode_settings][ad_storage_service]" id="ad_storage_service">
-                                <option value="no_service" <?php selected(isset($current_config['consent_mode_settings']['ad_storage_service']) ? $current_config['consent_mode_settings']['ad_storage_service'] : 'no_service', 'no_service'); ?>>No service</option>
-                                <?php
-                                // Reuse services from above
-                                foreach ($services as $service) {
-                                    if (isset($service['name'])) {
-                                        echo '<option value="' . esc_attr($service['name']) . '" ' .
-                                            selected(isset($current_config['consent_mode_settings']['ad_storage_service']) ? $current_config['consent_mode_settings']['ad_storage_service'] : 'no_service', $service['name'], false) . '>' .
-                                            esc_html($service['name']) . '</option>';
-                                    }
-                                }
-                                ?>
-                            </select>
-                            <p class="description">Select the service that enables or disables `ads_storage` and under which `ad_personalization` and `ad_user_data` controls get injected.</p>
-                        </td>
-                    </tr>
-                </table>
-
-                <h4>Google Consent Mode Defaults</h4>
-                <p class="description">Set the default consent state for Google's standard consent signals. These are set to 'denied' by default for privacy compliance.</p>
-                <table class="form-table">
-                    <tr>
-                        <th><label for="consent_default_ad_storage">ad_storage</label></th>
-                        <td>
-                            <select name="template_config[consent_mode_settings][consent_defaults][ad_storage]" id="consent_default_ad_storage">
-                                <option value="denied" <?php selected(isset($current_config['consent_mode_settings']['consent_defaults']['ad_storage']) ? $current_config['consent_mode_settings']['consent_defaults']['ad_storage'] : 'denied', 'denied'); ?>>denied</option>
-                                <option value="granted" <?php selected(isset($current_config['consent_mode_settings']['consent_defaults']['ad_storage']) ? $current_config['consent_mode_settings']['consent_defaults']['ad_storage'] : 'denied', 'granted'); ?>>granted</option>
-                            </select>
-                            <p class="description">Controls storage for advertising purposes (cookies, etc.)</p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th><label for="consent_default_analytics_storage">analytics_storage</label></th>
-                        <td>
-                            <select name="template_config[consent_mode_settings][consent_defaults][analytics_storage]" id="consent_default_analytics_storage">
-                                <option value="denied" <?php selected(isset($current_config['consent_mode_settings']['consent_defaults']['analytics_storage']) ? $current_config['consent_mode_settings']['consent_defaults']['analytics_storage'] : 'denied', 'denied'); ?>>denied</option>
-                                <option value="granted" <?php selected(isset($current_config['consent_mode_settings']['consent_defaults']['analytics_storage']) ? $current_config['consent_mode_settings']['consent_defaults']['analytics_storage'] : 'denied', 'granted'); ?>>granted</option>
-                            </select>
-                            <p class="description">Controls storage for analytics purposes</p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th><label for="consent_default_ad_user_data">ad_user_data</label></th>
-                        <td>
-                            <select name="template_config[consent_mode_settings][consent_defaults][ad_user_data]" id="consent_default_ad_user_data">
-                                <option value="denied" <?php selected(isset($current_config['consent_mode_settings']['consent_defaults']['ad_user_data']) ? $current_config['consent_mode_settings']['consent_defaults']['ad_user_data'] : 'denied', 'denied'); ?>>denied</option>
-                                <option value="granted" <?php selected(isset($current_config['consent_mode_settings']['consent_defaults']['ad_user_data']) ? $current_config['consent_mode_settings']['consent_defaults']['ad_user_data'] : 'denied', 'granted'); ?>>granted</option>
-                            </select>
-                            <p class="description">Controls sending user data to Google for advertising</p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th><label for="consent_default_ad_personalization">ad_personalization</label></th>
-                        <td>
-                            <select name="template_config[consent_mode_settings][consent_defaults][ad_personalization]" id="consent_default_ad_personalization">
-                                <option value="denied" <?php selected(isset($current_config['consent_mode_settings']['consent_defaults']['ad_personalization']) ? $current_config['consent_mode_settings']['consent_defaults']['ad_personalization'] : 'denied', 'denied'); ?>>denied</option>
-                                <option value="granted" <?php selected(isset($current_config['consent_mode_settings']['consent_defaults']['ad_personalization']) ? $current_config['consent_mode_settings']['consent_defaults']['ad_personalization'] : 'denied', 'granted'); ?>>granted</option>
-                            </select>
-                            <p class="description">Controls personalized advertising</p>
-                        </td>
-                    </tr>
-                </table>
+                <p class="description">
+                    Consent mode is always enabled. Consent mode signals (ad_storage, analytics_storage, ad_user_data, ad_personalization)
+                    are now controlled by dedicated consent mode services that appear in the consent modal.
+                    Configure these services in the <a href="<?php echo admin_url('admin.php?page=klaro-geo-services'); ?>">Services</a> section.
+                </p>
+                <div class="notice notice-info inline" style="margin: 10px 0;">
+                    <p><strong>How it works:</strong></p>
+                    <ul style="list-style-type: disc; margin-left: 20px;">
+                        <li><strong>analytics-storage</strong> service → controls <code>analytics_storage</code> consent signal</li>
+                        <li><strong>ad-storage</strong> service → controls <code>ad_storage</code> consent signal</li>
+                        <li><strong>ad-user-data</strong> service → controls <code>ad_user_data</code> consent signal (child of ad-storage)</li>
+                        <li><strong>ad-personalization</strong> service → controls <code>ad_personalization</code> consent signal (child of ad-storage)</li>
+                    </ul>
+                    <p>Child services are automatically denied when their parent service is declined.</p>
+                </div>
 
                 <h4>Additional Google Settings</h4>
                 <p class="description">Additional settings that control Google tag behavior when consent is denied.</p>

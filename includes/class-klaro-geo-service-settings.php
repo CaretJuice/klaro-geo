@@ -141,12 +141,68 @@ class Klaro_Geo_Service_Settings extends Klaro_Geo_Option {
     }
 
     /**
-     * Remove a service
+     * Check if a service is a consent mode service (protected from deletion)
      *
      * @param string $service_name The service name
+     * @return bool True if the service is a consent mode service
+     */
+    public function is_consent_mode_service($service_name) {
+        $service = $this->get_service($service_name);
+        if (!$service) {
+            return false;
+        }
+        return isset($service['is_consent_mode_service']) && $service['is_consent_mode_service'] === true;
+    }
+
+    /**
+     * Get all consent mode services
+     *
+     * @return array Array of consent mode services
+     */
+    public function get_consent_mode_services() {
+        $consent_mode_services = array();
+        foreach ($this->value as $service) {
+            if (isset($service['is_consent_mode_service']) && $service['is_consent_mode_service'] === true) {
+                $consent_mode_services[] = $service;
+            }
+        }
+        return $consent_mode_services;
+    }
+
+    /**
+     * Hide a service (sets hidden flag, does not delete)
+     *
+     * @param string $service_name The service name
+     * @param bool $hidden Whether to hide the service
      * @return $this For method chaining
      */
+    public function hide_service($service_name, $hidden = true) {
+        $service = $this->get_service($service_name);
+        if ($service) {
+            $service['hidden'] = $hidden;
+            $this->set_service($service_name, $service);
+        }
+        return $this;
+    }
+
+    /**
+     * Remove a service
+     * Protected consent mode services cannot be deleted, only hidden
+     *
+     * @param string $service_name The service name
+     * @return $this|array For method chaining, or array with error if protected
+     */
     public function remove_service($service_name) {
+        // Check if this is a protected consent mode service
+        if ($this->is_consent_mode_service($service_name)) {
+            klaro_geo_debug_log('Cannot delete consent mode service: ' . $service_name . '. Use hide_service() instead.');
+            return array(
+                'error' => true,
+                'message' => 'Consent mode services cannot be deleted. They can only be hidden.',
+                'service' => $service_name
+            );
+        }
+
         foreach ($this->value as $key => $service) {
             if (isset($service['name']) && $service['name'] === $service_name) {
                 unset($this->value[$key]);
@@ -155,7 +211,7 @@ class Klaro_Geo_Service_Settings extends Klaro_Geo_Option {
                 break;
             }
         }
-        
+
         return $this;
     }
 
