@@ -61,6 +61,17 @@ function klaro_geo_settings_page_content() {
                         <p class="description">Enter your Google Tag Manager container ID (e.g., GTM-XXXXXX). Leave empty to disable GTM integration.</p>
                     </td>
                 </tr>
+                <tr valign="top">
+                    <th scope="row"><label for="klaro_geo_consent_mode_type">Consent Mode Type</label></th>
+                    <td>
+                        <select name="klaro_geo_consent_mode_type" id="klaro_geo_consent_mode_type">
+                            <option value="basic" <?php selected(get_option('klaro_geo_consent_mode_type', 'basic'), 'basic'); ?>>Basic</option>
+                            <option value="advanced" <?php selected(get_option('klaro_geo_consent_mode_type', 'basic'), 'advanced'); ?>>Advanced</option>
+                        </select>
+                        <p class="description"><strong>Basic:</strong> GTM is blocked by Klaro until the user consents. No data is sent before consent.<br>
+                        <strong>Advanced:</strong> GTM loads immediately with all consent defaults set to "denied". GA4 sends cookieless pings before consent, enabling behavioral modeling. When the user consents, consent state updates and full tracking begins.</p>
+                    </td>
+                </tr>
             </table>
 
             <h2>Consent Management Buttons</h2>
@@ -254,6 +265,13 @@ function klaro_geo_register_main_settings() {
                 return $input;
             }
             return '';
+        }
+    ]);
+    register_setting('klaro_geo_settings_group', 'klaro_geo_consent_mode_type', [
+        'type' => 'string',
+        'default' => 'basic',
+        'sanitize_callback' => function($input) {
+            return in_array($input, ['basic', 'advanced']) ? $input : 'basic';
         }
     ]);
 

@@ -216,20 +216,20 @@
     }
 
     /**
-     * Create consent data event for GTM
-     * This event is consumed by the Klaro Geo GTM template
+     * Create consent update event
+     * Pushed directly by the plugin after gtag('consent', 'update') is called
      *
      * @param {string} triggerEvent - The event that triggered this (e.g., 'initialConsents', 'saveConsents')
      * @returns {Object} DataLayer event object
      */
-    function createConsentDataEvent(triggerEvent) {
+    function createConsentUpdateEvent(triggerEvent) {
         var state = getConsentState();
 
         return {
-            'event': 'Klaro Consent Data',
+            'event': 'Klaro Consent Update',
+            'consent_trigger': triggerEvent,
             'consentMode': state.consentMode,
-            'acceptedServices': state.acceptedServices,
-            'triggerEvent': triggerEvent
+            'acceptedServices': state.acceptedServices
         };
     }
 
@@ -266,7 +266,7 @@
         buildConsentMode: buildConsentMode,
         createKlaroForwardedEvent: createKlaroForwardedEvent,
         createKlaroGeoEvent: createKlaroGeoEvent,
-        createConsentDataEvent: createConsentDataEvent,
+        createConsentUpdateEvent: createConsentUpdateEvent,
         createConsentReceiptEvent: createConsentReceiptEvent
     };
 

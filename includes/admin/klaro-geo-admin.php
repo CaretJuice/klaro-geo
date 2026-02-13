@@ -113,6 +113,7 @@ function klaro_geo_deactivate() {
 
         // GTM settings
         delete_option('klaro_geo_gtm_id');
+        delete_option('klaro_geo_consent_mode_type');
         delete_option('klaro_geo_gtm_oninit');
         delete_option('klaro_geo_gtm_onaccept');
         delete_option('klaro_geo_gtm_ondecline');

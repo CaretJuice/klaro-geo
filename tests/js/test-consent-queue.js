@@ -109,6 +109,38 @@ describe('Consent Queue', () => {
             // Manual override should be preserved
             expect(window.klaroGeo.useGTM).toBe(false);
         });
+
+        test('should detect consentModeType from klaroConsentData', () => {
+            window.klaroConsentData = { gtmId: 'GTM-XXXXX', consentModeType: 'advanced' };
+
+            loadKlaroGeoJs();
+
+            expect(window.klaroGeo.consentModeType).toBe('advanced');
+        });
+
+        test('should default consentModeType to basic when not specified', () => {
+            window.klaroConsentData = { gtmId: 'GTM-XXXXX' };
+
+            loadKlaroGeoJs();
+
+            expect(window.klaroGeo.consentModeType).toBe('basic');
+        });
+
+        test('should default consentModeType to basic when klaroConsentData missing', () => {
+            loadKlaroGeoJs();
+
+            expect(window.klaroGeo.consentModeType).toBe('basic');
+        });
+
+        test('should allow manual override of consentModeType', () => {
+            window.klaroGeo = { consentModeType: 'advanced' };
+            window.klaroConsentData = { gtmId: 'GTM-XXXXX', consentModeType: 'basic' };
+
+            loadKlaroGeoJs();
+
+            // Manual override should be preserved
+            expect(window.klaroGeo.consentModeType).toBe('advanced');
+        });
     });
 
     describe('Queuing Behavior', () => {
@@ -241,22 +273,65 @@ describe('Consent Queue', () => {
         });
     });
 
-    describe('Consent Event Handling - Non-GTM Mode', () => {
+    describe('Consent Event Handling - GTM Advanced Mode', () => {
         beforeEach(() => {
-            window.klaroConsentData = { gtmId: '' };
+            window.klaroConsentData = { gtmId: 'GTM-XXXXX', consentModeType: 'advanced' };
             loadKlaroGeoJs();
         });
 
-        test('should flush queue on Klaro Consent Data event', () => {
+        test('should detect advanced consent mode type', () => {
+            expect(window.klaroGeo.consentModeType).toBe('advanced');
+        });
+
+        test('should flush queue on Klaro Consent Update event in advanced mode', () => {
             // Queue some events
             window.klaroGeo.push({ event: 'queued_event_1' });
             window.klaroGeo.push({ event: 'queued_event_2' });
 
             expect(window.klaroGeo.queue.length).toBe(2);
 
-            // Simulate plugin pushing Klaro Consent Data
+            // Simulate GTM template pushing Klaro Consent Update
+            window.dataLayer.push({
+                event: 'Klaro Consent Update',
+                consentMode: { analytics_storage: 'denied' }
+            });
+
+            // Queue should be flushed
+            expect(window.klaroGeo.queue.length).toBe(0);
+            expect(window.klaroGeo.consentConfirmed).toBe(true);
+        });
+
+        test('should still use Klaro Consent Update as flush trigger (not Klaro Consent Data)', () => {
+            window.klaroGeo.push({ event: 'queued_event' });
+
+            // Push Klaro Consent Data (wrong event for GTM mode, even in advanced)
             window.dataLayer.push({
                 event: 'Klaro Consent Data',
+                consentMode: { analytics_storage: 'denied' }
+            });
+
+            // Queue should NOT be flushed - still GTM mode
+            expect(window.klaroGeo.queue.length).toBe(1);
+            expect(window.klaroGeo.consentConfirmed).toBe(false);
+        });
+    });
+
+    describe('Consent Event Handling - Non-GTM Mode', () => {
+        beforeEach(() => {
+            window.klaroConsentData = { gtmId: '' };
+            loadKlaroGeoJs();
+        });
+
+        test('should flush queue on Klaro Consent Update event (unified trigger)', () => {
+            // Queue some events
+            window.klaroGeo.push({ event: 'queued_event_1' });
+            window.klaroGeo.push({ event: 'queued_event_2' });
+
+            expect(window.klaroGeo.queue.length).toBe(2);
+
+            // Simulate plugin pushing Klaro Consent Update
+            window.dataLayer.push({
+                event: 'Klaro Consent Update',
                 consentMode: { analytics_storage: 'granted' }
             });
 
@@ -265,12 +340,12 @@ describe('Consent Queue', () => {
             expect(window.klaroGeo.consentConfirmed).toBe(true);
         });
 
-        test('should NOT flush on Klaro Consent Update in non-GTM mode', () => {
+        test('should NOT flush on Klaro Consent Data (deprecated event)', () => {
             window.klaroGeo.push({ event: 'queued_event' });
 
-            // Push Klaro Consent Update (wrong event for non-GTM mode)
+            // Push Klaro Consent Data (no longer used as trigger)
             window.dataLayer.push({
-                event: 'Klaro Consent Update',
+                event: 'Klaro Consent Data',
                 consentMode: { analytics_storage: 'granted' }
             });
 
@@ -291,8 +366,8 @@ describe('Consent Queue', () => {
             window.klaroGeo.push({ event: 'queued_event_2' });
             window.klaroGeo.push({ event: 'queued_event_3' });
 
-            // Trigger consent (non-GTM mode by default)
-            window.dataLayer.push({ event: 'Klaro Consent Data' });
+            // Trigger consent (unified trigger)
+            window.dataLayer.push({ event: 'Klaro Consent Update' });
 
             // Find the queueFlushed event in dataLayer
             const queueFlushedEvents = window.dataLayer.filter(e =>
@@ -306,7 +381,7 @@ describe('Consent Queue', () => {
 
         test('should NOT push queueFlushed event when queue is empty', () => {
             // Trigger consent with no events queued
-            window.dataLayer.push({ event: 'Klaro Consent Data' });
+            window.dataLayer.push({ event: 'Klaro Consent Update' });
 
             // Should not have a queueFlushed event
             const queueFlushedEvents = window.dataLayer.filter(e =>
@@ -322,7 +397,7 @@ describe('Consent Queue', () => {
             window.klaroGeo.push({ event: 'second_event' });
 
             // Trigger consent
-            window.dataLayer.push({ event: 'Klaro Consent Data' });
+            window.dataLayer.push({ event: 'Klaro Consent Update' });
 
             // Find positions in dataLayer
             let firstEventIdx = -1;
@@ -350,7 +425,7 @@ describe('Consent Queue', () => {
 
         test('should handle empty queue on consent event', () => {
             // No events queued, just trigger consent
-            window.dataLayer.push({ event: 'Klaro Consent Data' });
+            window.dataLayer.push({ event: 'Klaro Consent Update' });
 
             expect(window.klaroGeo.consentConfirmed).toBe(true);
             expect(window.klaroGeo.queue.length).toBe(0);
