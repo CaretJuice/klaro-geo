@@ -289,9 +289,27 @@ class WordPressHelper {
   }
 }
 
+/**
+ * Update a WordPress option via WP-CLI and regenerate klaro-config.js
+ * @param {string} optionName - Option name
+ * @param {string} value - Option value
+ * @returns {Object} - Result of the update
+ */
+function updateOptionViaCli(optionName, value) {
+  try {
+    wpCli(`option update ${optionName} "${value}"`);
+    // Regenerate config file to pick up the change
+    wpCli(`eval 'if (function_exists("klaro_geo_generate_config_file")) { klaro_geo_generate_config_file(); echo "OK"; }'`);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
 module.exports = {
   WordPressHelper,
   wpCli,
   updateServiceSettingsViaCli,
-  resetServiceToDefaultsViaCli
+  resetServiceToDefaultsViaCli,
+  updateOptionViaCli
 };

@@ -1,0 +1,14 @@
+homepage: "https://github.com/CaretJuice/klaro-geo"
+documentation: "https://github.com/CaretJuice/klaro-geo/tree/master/gtm-template"
+versions:
+  - sha: HEAD
+    changeNotes: |
+      Initial release of Klaro Geo Consent Gate variable template.
+
+      Features:
+      - Gates any GTM variable value behind a consent type check
+      - Returns the original value when consent is granted
+      - Configurable redacted value when consent is denied (undefined, empty string, zero, null, or custom)
+      - Supports all Google Consent Mode v2 types (ad_user_data, ad_personalization, ad_storage, analytics_storage)
+      - Read-only consent access (no write permissions needed)
+      - Debug logging mode

@@ -9,7 +9,7 @@
 
 const { test, expect } = require('@playwright/test');
 const { KlaroHelper } = require('../helpers/klaro');
-const { WordPressHelper, updateServiceSettingsViaCli, resetServiceToDefaultsViaCli } = require('../helpers/wordpress');
+const { WordPressHelper, updateServiceSettingsViaCli, resetServiceToDefaultsViaCli, updateOptionViaCli } = require('../helpers/wordpress');
 
 // GTM Container ID for testing (set in docker-entrypoint-e2e.sh)
 const GTM_CONTAINER_ID = 'GTM-M2Z9TF4J';
@@ -340,6 +340,119 @@ test.describe('Google Tag Manager Loading', () => {
       );
 
       expect(klaroEvents.length).toBeGreaterThan(0);
+    });
+  });
+
+  test.describe('Advanced Consent Mode', () => {
+    test.describe.configure({ mode: 'serial' });
+    test.setTimeout(60000);
+
+    test.beforeEach(async ({ page, context }) => {
+      // Set advanced consent mode
+      const result = updateOptionViaCli('klaro_geo_consent_mode_type', 'advanced');
+      if (!result.success) {
+        console.log('Warning: Could not set advanced consent mode:', result.error);
+      }
+
+      // Ensure GTM is at plugin defaults (required:false, default:false)
+      try {
+        resetServiceToDefaultsViaCli('google-tag-manager');
+      } catch (e) {
+        console.log('Warning: Could not reset GTM defaults:', e.message);
+      }
+
+      // Clear browser state
+      await context.clearCookies();
+      try {
+        await page.goto('/');
+        await klaroHelper.clearConsent();
+      } catch (e) {
+        // Ignore
+      }
+    });
+
+    test.afterEach(async () => {
+      // Reset to basic consent mode
+      updateOptionViaCli('klaro_geo_consent_mode_type', 'basic');
+    });
+
+    test('should load GTM immediately in advanced mode (before consent)', async ({ page }) => {
+      await page.goto('/');
+      await klaroHelper.waitForKlaroLoad();
+
+      // Wait for GTM to load (it should load immediately in advanced mode)
+      try {
+        await waitForGtmLoad(page, 10000);
+        const gtmInitialized = await isGtmDataLayerInitialized(page);
+        expect(gtmInitialized).toBe(true);
+      } catch (e) {
+        // If GTM can't reach network, at least verify the script tag is normal (not Klaro-gated)
+        const gtmLoaded = await isGtmScriptLoaded(page);
+        expect(gtmLoaded).toBe(true);
+      }
+    });
+
+    test('should NOT have Klaro gating attributes on GTM script in advanced mode', async ({ page }) => {
+      await page.goto('/');
+      await klaroHelper.waitForKlaroLoad();
+
+      // In advanced mode, GTM script should NOT have data-name or type="text/plain"
+      const hasKlaroGatedScript = await page.evaluate(() => {
+        const scripts = document.querySelectorAll('script[data-name="google-tag-manager"]');
+        return scripts.length > 0;
+      });
+      expect(hasKlaroGatedScript).toBe(false);
+
+      // But GTM should still be present as a normal script
+      const gtmLoaded = await isGtmScriptLoaded(page);
+      expect(gtmLoaded).toBe(true);
+    });
+
+    test('should push Klaro Consent Update on initial load (not skipped)', async ({ page }) => {
+      await page.goto('/');
+      await klaroHelper.waitForKlaroLoad();
+
+      // Wait for Klaro initialization events
+      await page.waitForTimeout(2000);
+
+      // Check that Klaro Consent Update was pushed (should NOT be skipped in advanced mode)
+      const hasConsentUpdate = await page.evaluate(() => {
+        return window.dataLayer && window.dataLayer.some(event =>
+          event.event === 'Klaro Consent Update'
+        );
+      });
+      expect(hasConsentUpdate).toBe(true);
+    });
+
+    test('should still show google-tag-manager in Klaro consent dialog', async ({ page }) => {
+      await page.goto('/');
+      await klaroHelper.waitForKlaroLoad();
+      await klaroHelper.waitForModal();
+
+      // The google-tag-manager service should still appear in the consent dialog
+      const hasGtmInDialog = await page.evaluate(() => {
+        // Look for the service in Klaro config
+        return window.klaroConfig && window.klaroConfig.services &&
+          window.klaroConfig.services.some(s => s.name === 'google-tag-manager');
+      });
+      expect(hasGtmInDialog).toBe(true);
+    });
+
+    test('should fire Klaro Consent Update after consent interaction', async ({ page }) => {
+      await page.goto('/');
+      await klaroHelper.waitForKlaroLoad();
+      await klaroHelper.waitForModal();
+      await klaroHelper.acceptAll();
+
+      // Wait for consent events to propagate
+      await page.waitForTimeout(2000);
+
+      const hasConsentUpdate = await page.evaluate(() => {
+        return window.dataLayer && window.dataLayer.some(event =>
+          event.event === 'Klaro Consent Update'
+        );
+      });
+      expect(hasConsentUpdate).toBe(true);
     });
   });
 });

@@ -90,7 +90,6 @@ describe('Klaro Config', function() {
         // Simulate the Klaro Consent Update event that the plugin pushes
         window.dataLayer.push({
             'event': 'Klaro Consent Update',
-            'eventSource': 'klaro-geo',
             'consentMode': {
                 'ad_storage': 'granted',
                 'analytics_storage': 'granted',
@@ -100,7 +99,7 @@ describe('Klaro Config', function() {
                 'google_ads_consent': 'granted'
             },
             'acceptedServices': ['google-analytics', 'google-ads'],
-            'triggerEvent': 'saveConsents'
+            'consent_trigger': 'saveConsents'
         });
 
         // Find the Klaro Consent Update event
@@ -118,7 +117,6 @@ describe('Klaro Config', function() {
         // Simulate the Klaro Consent Update event that the plugin pushes
         window.dataLayer.push({
             'event': 'Klaro Consent Update',
-            'eventSource': 'klaro-geo',
             'consentMode': {
                 'ad_storage': 'denied',
                 'analytics_storage': 'granted',
@@ -127,7 +125,7 @@ describe('Klaro Config', function() {
                 'google_analytics_consent': 'granted'
             },
             'acceptedServices': ['google-analytics'],
-            'triggerEvent': 'initialConsents'
+            'consent_trigger': 'initialConsents'
         });
 
         // Find the Klaro Consent Update event

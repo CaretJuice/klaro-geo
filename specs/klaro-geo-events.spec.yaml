@@ -26,7 +26,6 @@ constants:
       are plugin-specific and not directly from Klaro.
     examples:
       - generateConsentReceipt
-      - Klaro Consent Data (GTM integration event)
       - Klaro Geo Consent Receipt
 
 event_source_rules:
@@ -143,11 +142,11 @@ functions:
         klaroEventName: "{eventName}"
         "...additionalData": "Merged properties"
 
-  createConsentDataEvent:
+  createConsentUpdateEvent:
     stability: core
     description: |
-      Creates consent data event for GTM. This event is consumed by the
-      Klaro Geo GTM template to update Google Consent Mode state.
+      Creates consent update event. Pushed directly by the plugin after
+      gtag('consent', 'update') is called.
     parameters:
       - name: triggerEvent
         type: string
@@ -155,10 +154,10 @@ functions:
     returns:
       type: object
       structure:
-        event: "Klaro Consent Data"
-        consentMode: "Google Consent Mode object"
+        event: "Klaro Consent Update"
+        consent_trigger: "{triggerEvent}"
+        consentMode: "Google Consent Mode object (all keys)"
         acceptedServices: "Array of accepted service names"
-        triggerEvent: "{triggerEvent}"
 
   createConsentReceiptEvent:
     stability: core
@@ -196,11 +195,23 @@ breaking_changes:
     reason: |
       klaroConfig (~250 lines JSON) was repeated 3x per page session in the dataLayer.
       Config is always available via window.klaroConfig. eventSource is redundant on
-      events with unique event names ('Klaro Consent Data', 'Klaro Geo Consent Receipt').
+      events with unique event names ('Klaro Consent Update', 'Klaro Geo Consent Receipt').
     migration: |
       - If reading klaroConfig from dataLayer events, use window.klaroConfig instead.
-      - If filtering on eventSource for 'Klaro Consent Data' or 'Klaro Geo Consent Receipt'
+      - If filtering on eventSource for 'Klaro Consent Update' or 'Klaro Geo Consent Receipt'
         events, filter on the event name directly instead.
+
+  - version: "0.6.0"
+    change: "Replaced 'Klaro Consent Data' with client-side gtag() + 'Klaro Consent Update'"
+    reason: |
+      The GTM community template existed solely to call updateConsentState() after
+      reading 'Klaro Consent Data'. By calling gtag('consent', 'update') directly,
+      the plugin eliminates GTM setup entirely for consent mode. Custom consent types
+      now work natively with GTM's 'Require additional consent' feature.
+    migration: |
+      - GTM triggers on 'Klaro Consent Data' must change to 'Klaro Consent Update'
+      - createConsentDataEvent() renamed to createConsentUpdateEvent()
+      - The consent queue trigger is now always 'Klaro Consent Update' (no GTM/non-GTM distinction)
 
 global_export:
   name: KlaroGeoEvents
@@ -212,5 +223,5 @@ global_export:
     - buildConsentMode
     - createKlaroForwardedEvent
     - createKlaroGeoEvent
-    - createConsentDataEvent
+    - createConsentUpdateEvent
     - createConsentReceiptEvent
