@@ -14,7 +14,7 @@ This plugin gives you a lot of control over how consent is managed and tracked a
 
 - **Geolocation-Based Consent Management**: Display different consent banners based on user location (country and region).
 - **Template System**: Create and manage multiple consent banner templates.
-- **Google Tag Manager Integration**: Built-in support for Google Tag Manager with including a custom community template.
+- **Google Tag Manager Integration**: Built-in support for Google Tag Manager with zero-config consent mode.
 - **Google Consent Mode v2**: Support for Google's basic and advanced consent mode.
 - **Simplified GTM Consent Triggers**: Custom Consent Mode consent keys allow for a cleaner triggering of consented services in Google Tag Manager.
 - **Fallback Templates**: Use strict fallback templates to prevent accidental violations of local law.
@@ -91,7 +91,7 @@ Navigate to **Klaro Geo > Klaro Geo** to configure the general plugin settings:
 
 Templates define the language, layout, and behavior of the consent banner displayed to users. Templates get assigned to countries and regions so that you can change consent features and language by jurisdiction. 
 
-Most of the template settings are derived directly from Klaro settings but Klaro Geo settings, like Google Consent Mode settings and Consent Logging, that need to be managed by country or region are also set by templates.
+Most of the template settings are derived directly from Klaro settings. Template-specific Klaro Geo settings include additional Google settings (ads_data_redaction, url_passthrough) and Consent Logging.
 
 You can not delete templates that are currently assigned to countries or regions. To remove a template, you must first unassign it on the Country Settings page.
 
@@ -129,20 +129,12 @@ Navigate to **Klaro Geo > Templates** to manage consent banner templates.
   - Additional CSS Class: Additional CSS class to add to the consent modal.
   - Default Language: Default language code (e.g., 'en', 'de'). Leave empty to use the fallback language and translation settings ('zz').
 #### Consent Mode Settings:
-  Consent mode is always enabled and generates dynamic consent keys for every service. Configure which services control the standard Google Consent Mode signals:
-  - Map analytics_storage to service: Select the service that enables or disables `analytics_storage`.
-  - Map ad signals to service: Select the service that enables or disables `ads_storage` and under which `ad_personalization` and `ad_user_data` controls get injected.
-  ![ad_personalization and ad_user_data controls injected by Klaro Geo](assets/ad_personalization-ad_user_data-controls.png)
-  - ##### Google Consent Mode Defaults
-    - ad_storage: Default `ad_storage` consent mode value
-    - analytics_storage: Default `analytics_storage` consent mode value
-    - ad_user_data: Default `ad_user_data` consent mode value
-    - ad_personalization: Default `ad_personalization` consent mode value
+  Consent mode is always enabled. The standard Google Consent Mode signals (`ad_storage`, `analytics_storage`, `ad_user_data`, `ad_personalization`) are controlled by dedicated [consent mode services](#consent-mode-services) configured in the Services section. Consent defaults for each service are determined by the service's required/default state and this template's Default State setting.
   - ##### Additional Google Settings
     - ads_data_redaction: Manage the redaction of ad click identifiers when `ad_storage` is denied
-    - url_passthrough: Manage the appending of ad click identifiers as URL parameters when `ad_storage` or `analytics_storage` is denied 
+    - url_passthrough: Manage the appending of ad click identifiers as URL parameters when `ad_storage` or `analytics_storage` is denied
   - ##### Service Consent Defaults
-    - View the custom consent key and default state of each service
+    - Read-only view of the custom consent key and default state for each service
 - **Plugin Settings**:
   - Enable Consent Logging: Log consent choices for this template in the WordPress database.
 
@@ -316,6 +308,144 @@ The plugin will automatically:
 - Add the GTM script to your site's header with the proper Klaro attributes
 - Add the GTM noscript iframe to your site's body with the proper Klaro attributes
 - Configure consent callbacks to manage GTM's consent mode
+
+### Basic vs Advanced Consent Mode
+
+Klaro Geo supports two consent mode types that control how Google Tag Manager interacts with the consent banner. Both modes use Google Consent Mode v2 and the Klaro Geo GTM community template.
+
+#### Basic Consent Mode (Default)
+
+In Basic mode, **GTM is completely blocked until the user consents** to the `google-tag-manager` service. No data is sent to Google before consent.
+
+**How it works:**
+1. The GTM script tag is rendered with `type="text/plain"` and `data-name="google-tag-manager"`, which prevents execution
+2. When the user grants consent to the `google-tag-manager` service, Klaro changes the type to `text/javascript`, which triggers GTM to load
+3. The GTM community template sets consent defaults and then updates consent state based on the user's choices
+4. Tags fire according to their consent requirements
+
+**When to use Basic mode:**
+- When you want zero data collection before explicit consent
+- For the strictest interpretation of GDPR and similar regulations
+- When you don't need Google's behavioral modeling features
+
+**WordPress settings:**
+- Go to **Klaro Geo > Klaro Geo > Google Tag Manager**
+- Set **Consent Mode Type** to **Basic**
+
+#### Advanced Consent Mode
+
+In Advanced mode, **GTM loads immediately** (without Klaro gating) but all consent signals default to `denied`. Google tags like GA4 can send cookieless pings before consent, enabling behavioral modeling and basic measurement without cookies.
+
+**How it works:**
+1. The GTM script tag is rendered as a normal `<script>` tag (no Klaro `type="text/plain"` gating)
+2. GTM loads immediately on page load, but the community template sets all consent signals to `denied`
+3. GA4 sends cookieless pings (if configured) while consent is denied, enabling behavioral modeling
+4. When the user interacts with the Klaro consent banner, consent state is updated
+5. After consent is granted, full tracking begins with cookies
+
+**When to use Advanced mode:**
+- When you want to take advantage of Google's behavioral modeling (which fills in gaps in conversion data)
+- When your legal interpretation allows cookieless data collection before consent
+- When you want GA4 to capture anonymous page view data even without consent
+
+**WordPress settings:**
+- Go to **Klaro Geo > Klaro Geo > Google Tag Manager**
+- Set **Consent Mode Type** to **Advanced**
+
+**Important notes for Advanced mode:**
+- The `google-tag-manager` service still appears in the Klaro consent dialog. Users can still toggle it off, which affects the consent state of your tags.
+- `Klaro Consent Update` events are pushed on initial page load (they are not skipped like in Basic mode where GTM hasn't loaded yet).
+- The GTM community template is optional but still recommended for advanced use cases like first-page attribution.
+
+#### Side-by-Side Comparison
+
+| Behavior | Basic | Advanced |
+|----------|-------|----------|
+| GTM loads before consent | No | Yes |
+| Data sent before consent | None | Cookieless pings only (if configured in GA4) |
+| Consent defaults | `denied` (set in `<head>` via `gtag`) | `denied` (set in `<head>` via `gtag`) |
+| Behavioral modeling | Not available | Available |
+| `Klaro Consent Update` on initial load | Skipped (GTM not loaded yet) | Pushed immediately |
+| GTM script tag | `type="text/plain"` with `data-name` | Normal `<script>` tag |
+| User can revoke GTM consent | Yes (via consent dialog) | Yes (via consent dialog) |
+
+#### Configuring Tag Triggers in GTM
+
+How you configure tag triggers differs significantly between Google tags and non-Google tags, and between Basic and Advanced consent mode. This is because Google tags have **built-in consent checks** that make them consent-aware -- they adjust their own behavior based on consent state rather than needing to be blocked or unblocked.
+
+##### Google Tags (GA4, Google Ads) -- Advanced Mode
+
+In Advanced mode, Google tags should fire on their **normal triggers** (e.g., `All Pages` for the Google Tag / GA4 Config, specific events for conversion tags). **Do not** add "Require additional consent for tag to fire" -- this would block the tag entirely and prevent cookieless pings.
+
+Google tags have built-in consent checks for `analytics_storage`, `ad_storage`, `ad_user_data`, and `ad_personalization`. When these signals are `denied`, Google tags still fire but automatically send **cookieless pings** instead of full measurement data. When consent state changes (via `gtag('consent', 'update')`), Google tags automatically adjust to full tracking -- they do not need to be re-triggered.
+
+| Phase | What happens |
+|-------|-------------|
+| Page load (before consent) | Google Tag fires on `All Pages`. Consent is `denied`. GA4 sends cookieless pings for [behavioral modeling](https://support.google.com/analytics/answer/11161109). No cookies are set. |
+| User grants consent | Plugin calls `gtag('consent', 'update')` directly. Google tags automatically switch to full tracking with cookies. |
+| Returning visitor with cookie | Plugin reads consent state on page load, calls `gtag('consent', 'update')` with `granted`. Google Tag fires on `All Pages` with full tracking from the start. |
+
+##### Google Tags (GA4, Google Ads) -- Basic Mode
+
+In Basic mode, GTM is completely blocked until the user consents to the `google-tag-manager` service. There are no cookieless pings and no behavioral modeling.
+
+Google tags can fire on `All Pages` since by the time GTM loads and `All Pages` fires, consent has already been established. Alternatively, triggering on `Klaro Consent Update` also works.
+
+| Phase | What happens |
+|-------|-------------|
+| Page load (before consent) | GTM is not loaded. Nothing happens. |
+| User grants consent | Klaro unblocks GTM. GTM loads, community template sets consent, `All Pages` fires. Tags fire with full tracking. |
+| Returning visitor with cookie | Klaro reads cookie and immediately unblocks GTM. Same as above. |
+
+##### Non-Google Tags (Facebook Pixel, LinkedIn Insight, etc.)
+
+Non-Google tags do not have built-in consent awareness. They cannot send cookieless pings and have no equivalent to behavioral modeling. **The configuration is the same in both Basic and Advanced mode.**
+
+Since the plugin now calls `gtag('consent', 'update')` directly with all consent types (including custom ones like `facebook_consent`), you can use GTM's **"Require additional consent for tag to fire"** for any consent type. This is the simplest approach:
+
+1. Open your non-Google tag (e.g., Facebook Pixel)
+2. Go to **Advanced Settings** > **Consent Settings**
+3. Check **Require additional consent for tag to fire**
+4. Add the consent type: `facebook_consent` (use the service name with hyphens replaced by underscores, plus `_consent`)
+
+**Alternative: DLV approach** (still works, captures more data with Trigger Groups):
+
+1. **Create a Data Layer Variable** for the service's consent key:
+   - **Data Layer Variable Name**: `consentMode.facebook_consent` (replace with your service name)
+2. **Create a Custom Event trigger** for `Klaro Consent Update`:
+   - Add condition: your DLV **equals** `granted`
+3. **Assign the trigger** to your non-Google tag
+
+The DLV approach works because the full `consentMode` object (including all custom consent keys) is included in the `Klaro Consent Update` dataLayer event.
+
+| Phase | What happens (both modes) |
+|-------|--------------------------|
+| Page load (before consent) | Nothing. Tag is either not loaded (Basic) or blocked by trigger condition (Advanced). |
+| User grants consent | `Klaro Consent Update` fires. DLV condition is met. Tag fires. |
+| Returning visitor with cookie | `Klaro Consent Update` fires on page load with consent already `granted`. Tag fires immediately. |
+
+##### Summary
+
+- **Google tags in Advanced mode**: Fire on normal triggers (`All Pages`, etc.). Do NOT add additional consent requirements. Built-in consent checks handle cookieless pings and automatic adjustment when consent changes.
+- **Google tags in Basic mode**: Fire on `All Pages` or `Klaro Consent Update`. Both work since GTM only loads after consent. No cookieless pings.
+- **Non-Google tags in both modes**: Use "Require additional consent for tag to fire" with the custom consent key (e.g., `facebook_consent`). Alternatively, fire on `Klaro Consent Update` with a DLV trigger condition (e.g., `consentMode.facebook_consent` equals `granted`).
+
+### Consent Mode Services
+
+Klaro Geo includes four built-in **consent mode services** that map directly to Google Consent Mode v2 signals. These appear as toggleable services in the Klaro consent dialog, giving users granular control over consent signals.
+
+| Service Name | Consent Mode Signal | Purpose | Parent |
+|-------------|-------------------|---------|--------|
+| `analytics-storage` | `analytics_storage` | analytics | - |
+| `ad-storage` | `ad_storage` | advertising | - |
+| `ad-user-data` | `ad_user_data` | advertising | `ad-storage` |
+| `ad-personalization` | `ad_personalization` | advertising | `ad-storage` |
+
+These services are automatically added to your configuration on plugin activation. They can be managed like any other service under **Klaro Geo > Services**.
+
+**Parent-child dependencies:** `ad-user-data` and `ad-personalization` are children of `ad-storage`. If a user denies `ad-storage`, the child services are automatically denied as well, regardless of their individual toggle state.
+
+**How these differ from regular services:** Consent mode services use their `consent_mode_key` directly (e.g., `analytics_storage`) rather than the `{service_name}_consent` format used by regular services. This means the consent signals they produce are natively recognized by Google tags without any mapping.
 
 ### Integrating Klaro Geo into Google Tag Manager
 
