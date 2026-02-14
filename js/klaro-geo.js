@@ -89,6 +89,13 @@
       klaroGeoLog('DEBUG: GTM mode detection - hasGtmId=' + hasGtmId + ', hasGtmService=' + hasGtmService + ', useGTM=' + window.klaroGeo.useGTM);
   }
 
+  // Detect consent mode type (basic or advanced)
+  if (typeof window.klaroGeo.consentModeType === 'undefined') {
+      window.klaroGeo.consentModeType = (typeof window.klaroConsentData !== 'undefined' &&
+                                          window.klaroConsentData.consentModeType) || 'basic';
+      klaroGeoLog('DEBUG: Consent mode type detection - consentModeType=' + window.klaroGeo.consentModeType);
+  }
+
   /**
    * Push an event to the consent queue or directly to dataLayer
    * @param {Object} eventData - The dataLayer event object
@@ -186,8 +193,8 @@
                   eventName = eventData.value.event;
               }
 
-              // Determine which event to listen for based on GTM mode
-              const triggerEvent = window.klaroGeo.useGTM ? 'Klaro Consent Update' : 'Klaro Consent Data';
+              // Always wait for 'Klaro Consent Update' (unified trigger)
+              const triggerEvent = 'Klaro Consent Update';
 
               if (eventName === triggerEvent) {
                   klaroGeoLog('DEBUG: Consent Queue - detected consent event:', eventName);
@@ -198,8 +205,7 @@
           return result;
       };
 
-      klaroGeoLog('DEBUG: Consent Queue - listener initialized, waiting for:',
-                  window.klaroGeo.useGTM ? 'Klaro Consent Update' : 'Klaro Consent Data');
+      klaroGeoLog('DEBUG: Consent Queue - listener initialized, waiting for: Klaro Consent Update');
   })();
 
   // Process any events that were queued before this script loaded (stub pattern)
@@ -807,49 +813,40 @@
           // Store last update
           window.lastConsentUpdate = completeUpdate;
 
-          // Push "Klaro Consent Data" event to dataLayer
-          // The Klaro Geo GTM template listens for this event and:
-          // 1. Calls updateConsentState() with the consent data
-          // 2. Pushes "Klaro Consent Update" event AFTER consent is set
-          // Use "Klaro Consent Update" as the trigger for GA4/other tags (consent is guaranteed to be set)
+          // Call gtag('consent', 'update') directly — no intermediary event needed
+          // This queues in dataLayer for GTM to process (or works standalone without GTM)
           if (typeof window.dataLayer !== 'undefined' && activeManager && activeManager.consents) {
               // Create acceptedServices array for the update event
               const acceptedServices = Object.keys(activeManager.consents)
                   .filter(serviceName => activeManager.consents[serviceName] === true);
 
-              // In GTM mode, for initialConsents, only push if GTM service is consented
-              // This prevents stale events from being queued before GTM loads
-              // (GTM now requires consent, so initialConsents before consent would create stale events)
+              // Always call gtag consent update
+              klaroGeoLog('DEBUG: Calling gtag consent update');
+              gtag('consent', 'update', completeUpdate);
+
+              // Determine skip condition for Klaro Consent Update event:
+              // In Basic GTM mode, for initialConsents when GTM not consented,
+              // do NOT push Klaro Consent Update (would flush consent queue prematurely)
               const isGtmMode = window.klaroGeo && window.klaroGeo.useGTM;
               const gtmConsented = activeManager.consents['google-tag-manager'] === true;
+              const isAdvancedMode = window.klaroGeo && window.klaroGeo.consentModeType === 'advanced';
 
-              // Debug logging for skip condition
-              klaroGeoLog('DEBUG: Klaro Consent Data skip check:',
+              klaroGeoLog('DEBUG: Klaro Consent Update skip check:',
                   'eventType=' + eventType,
                   'isGtmMode=' + isGtmMode,
                   'gtmConsented=' + gtmConsented,
-                  'window.klaroGeo.useGTM=' + (window.klaroGeo ? window.klaroGeo.useGTM : 'undefined'),
-                  'consents=' + JSON.stringify(activeManager.consents || {}));
+                  'isAdvancedMode=' + isAdvancedMode);
 
-              if (eventType === 'initialConsents' && isGtmMode && !gtmConsented) {
-                  klaroGeoLog('DEBUG: Skipping Klaro Consent Data push for initialConsents - GTM not yet consented');
-                  // Don't push stale consent data before GTM loads
-                  // saveConsents will push the correct data after user consents
+              if (eventType === 'initialConsents' && isGtmMode && !gtmConsented && !isAdvancedMode) {
+                  klaroGeoLog('DEBUG: Skipping Klaro Consent Update push for initialConsents - GTM not yet consented in Basic mode');
               } else {
-                  klaroGeoLog('DEBUG: Pushing Klaro Consent Data event to dataLayer');
-                  // Use KlaroGeoEvents factory if available for fresh consent state
-                  let consentDataEvent;
-                  if (typeof window.KlaroGeoEvents !== 'undefined') {
-                      consentDataEvent = window.KlaroGeoEvents.createConsentDataEvent(eventType);
-                  } else {
-                      consentDataEvent = {
-                          'event': 'Klaro Consent Data',
-                          'consentMode': completeUpdate,
-                          'acceptedServices': acceptedServices,
-                          'triggerEvent': eventType
-                      };
-                  }
-                  window.dataLayer.push(consentDataEvent);
+                  klaroGeoLog('DEBUG: Pushing Klaro Consent Update event to dataLayer');
+                  window.dataLayer.push({
+                      'event': 'Klaro Consent Update',
+                      'consent_trigger': eventType,
+                      'consentMode': completeUpdate,
+                      'acceptedServices': acceptedServices
+                  });
               }
           }
 
@@ -859,6 +856,60 @@
       }, window.consentUpdateDelay || 50); // Default delay
   }
 
+  /**
+   * Protect multi-purpose services from being disabled when only one of their purposes is toggled off.
+   * When groupByPurpose is true, Klaro's UI shows purpose-level toggles. Disabling a purpose
+   * disables ALL services in that purpose, even if a service belongs to another still-active purpose.
+   * This listener re-enables such services after Klaro processes the purpose toggle.
+   */
+  function setupMultiPurposeProtection() {
+      if (!window.klaroConfig || !window.klaroConfig.groupByPurpose) return;
+
+      var services = window.klaroConfig.services || [];
+      var multiPurposeServices = services.filter(function(s) {
+          return s.purposes && s.purposes.length > 1;
+      });
+      if (multiPurposeServices.length === 0) return;
+
+      document.addEventListener('change', function(e) {
+          if (!e.target || !e.target.matches || !e.target.matches('input[id^="purpose-item-"]')) return;
+          if (e.target.checked) return; // Only fix when disabling a purpose
+
+          var purposeName = e.target.id.replace('purpose-item-', '');
+
+          // After Klaro has processed (synchronously during bubble), fix multi-purpose services
+          setTimeout(function() {
+              var manager;
+              try { manager = window.klaro.getManager(); } catch(err) { return; }
+              if (!manager) return;
+
+              multiPurposeServices.forEach(function(service) {
+                  if (!service.purposes.includes(purposeName)) return;
+
+                  var otherPurposeActive = service.purposes.some(function(p) {
+                      if (p === purposeName) return false;
+                      var otherInput = document.getElementById('purpose-item-' + p);
+                      return otherInput && otherInput.checked;
+                  });
+
+                  if (otherPurposeActive && manager.consents[service.name] !== true) {
+                      klaroGeoLog('DEBUG: Re-enabling multi-purpose service "' + service.name +
+                          '" (purpose "' + purposeName + '" disabled, but other purpose still active)');
+                      if (typeof manager.updateConsent === 'function') {
+                          manager.updateConsent(service.name, true);
+                      } else {
+                          manager.consents[service.name] = true;
+                      }
+                  }
+              });
+          }, 0);
+      });
+
+      klaroGeoLog('DEBUG: Multi-purpose protection enabled for: ' +
+          multiPurposeServices.map(function(s) { return s.name; }).join(', '));
+  }
+
   // Initialize the watcher
   setupKlaroDataLayerWatcher();
+  setupMultiPurposeProtection();
 })();

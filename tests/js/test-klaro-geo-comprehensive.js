@@ -450,18 +450,17 @@ describe('Klaro Geo Core Functionality - Comprehensive Tests', function() {
       if (typeof window.dataLayer !== 'undefined') {
         const acceptedServices = Object.keys(manager.consents)
           .filter(serviceName => manager.consents[serviceName] === true);
-          
+
         const consentUpdateData = {
           'event': 'Klaro Consent Update',
-          'eventSource': 'klaro-geo',
           'acceptedServices': acceptedServices,
-          'triggerEvent': eventType
+          'consent_trigger': eventType
         };
-        
+
         if (consentMode) {
           consentUpdateData.consentMode = consentMode;
         }
-        
+
         window.dataLayer.push(consentUpdateData);
       }
     });
@@ -809,18 +808,17 @@ describe('Klaro Geo Core Functionality - Comprehensive Tests', function() {
         if (typeof window.dataLayer !== 'undefined') {
           const acceptedServices = Object.keys(manager.consents)
             .filter(serviceName => manager.consents[serviceName] === true);
-            
+
           const consentUpdateData = {
-            'event': 'klaroConsentUpdate',
-            'eventSource': 'klaro-geo',
+            'event': 'Klaro Consent Update',
             'acceptedServices': acceptedServices,
-            'triggerEvent': eventType
+            'consent_trigger': eventType
           };
-          
+
           if (consentMode) {
             consentUpdateData.consentMode = consentMode;
           }
-          
+
           window.dataLayer.push(consentUpdateData);
         }
       });
@@ -916,18 +914,17 @@ describe('Klaro Geo Core Functionality - Comprehensive Tests', function() {
         if (typeof window.dataLayer !== 'undefined') {
           const acceptedServices = Object.keys(manager.consents)
             .filter(serviceName => manager.consents[serviceName] === true);
-            
+
           const consentUpdateData = {
-            'event': 'klaroConsentUpdate',
-            'eventSource': 'klaro-geo',
+            'event': 'Klaro Consent Update',
             'acceptedServices': acceptedServices,
-            'triggerEvent': eventType
+            'consent_trigger': eventType
           };
-          
+
           if (consentMode) {
             consentUpdateData.consentMode = consentMode;
           }
-          
+
           window.dataLayer.push(consentUpdateData);
         }
       });
@@ -951,11 +948,10 @@ describe('Klaro Geo Core Functionality - Comprehensive Tests', function() {
       // Check if data was pushed to dataLayer
       expect(window.dataLayer.length).toBeGreaterThan(0);
       
-      // Find the klaroConsentUpdate event
-      const updateEvent = window.dataLayer.find(item => item.event === 'klaroConsentUpdate');
+      // Find the Klaro Consent Update event
+      const updateEvent = window.dataLayer.find(item => item.event === 'Klaro Consent Update');
       expect(updateEvent).toBeTruthy();
-      expect(updateEvent.eventSource).toBe('klaro-geo');
-      expect(updateEvent.triggerEvent).toBe('testEvent');
+      expect(updateEvent.consent_trigger).toBe('testEvent');
       expect(updateEvent.acceptedServices).toContain('google-analytics');
       expect(updateEvent.acceptedServices).not.toContain('google-ads');
     });
@@ -984,11 +980,10 @@ describe('Klaro Geo Core Functionality - Comprehensive Tests', function() {
       // Check if data was pushed to dataLayer
       expect(window.dataLayer.length).toBeGreaterThan(0);
       
-      // Find the klaroConsentUpdate event
-      const updateEvent = window.dataLayer.find(item => item.event === 'klaroConsentUpdate');
+      // Find the Klaro Consent Update event
+      const updateEvent = window.dataLayer.find(item => item.event === 'Klaro Consent Update');
       expect(updateEvent).toBeTruthy();
-      expect(updateEvent.eventSource).toBe('klaro-geo');
-      expect(updateEvent.triggerEvent).toBe('testEvent');
+      expect(updateEvent.consent_trigger).toBe('testEvent');
       expect(updateEvent.consentMode).toEqual(consentMode);
     });
   });

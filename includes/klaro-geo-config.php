@@ -270,6 +270,13 @@ function klaro_geo_generate_config_file() {
 
     klaro_geo_debug_log('Generated consolidated consent defaults for ' . count($dynamic_consent_defaults) . ' keys');
 
+    // Store consent defaults in globals for klaro_geo_add_gtm_head_script() to output
+    $GLOBALS['klaro_geo_consent_defaults'] = $dynamic_consent_defaults;
+    $GLOBALS['klaro_geo_gtag_settings'] = array(
+        'ads_data_redaction' => $ads_data_redaction,
+        'url_passthrough' => $url_passthrough,
+    );
+
     // Process each service
     foreach ($services as $service) {
         $service_config = array(
@@ -423,11 +430,11 @@ if (latestReceipt) {
 window.dataLayer.push(klaroConfigLoadedData);
 
 // ===== DATALAYER INITIALIZATION =====
-// Initialize dataLayer and gtag function for GTM
-// NOTE: Consent mode is handled by the Klaro Geo GTM template, not via gtag commands
-// The gtag() approach has timing issues - GTM template uses native consent APIs
+// Initialize dataLayer and gtag function
+// Consent defaults are set via gtag('consent','default') in the <head> by klaro_geo_add_gtm_head_script()
+// Consent updates are pushed via gtag('consent','update') in klaro-geo.js
 window.dataLayer = window.dataLayer || [];
-window.gtag = function(){dataLayer.push(arguments);};
+window.gtag = window.gtag || function(){dataLayer.push(arguments);};
 \n";
 
     // Log summary of config generation
@@ -475,6 +482,9 @@ window.gtag = function(){dataLayer.push(arguments);};
         // Get GTM ID for consent queue mode detection
         $gtm_id = get_option('klaro_geo_gtm_id', '');
 
+        // Get consent mode type (basic or advanced)
+        $consent_mode_type = get_option('klaro_geo_consent_mode_type', 'basic');
+
         // Pre-encode consent mode services map for JavaScript
         $consent_mode_services_json = wp_json_encode($consent_mode_services);
         $parent_child_map_json = wp_json_encode($parent_child_map);
@@ -485,6 +495,7 @@ window.gtag = function(){dataLayer.push(arguments);};
 // NOTE: Consent mode is ALWAYS enabled - consent mode services are now first-class Klaro services
 window.klaroConsentData = {
     gtmId: "{$gtm_id}",
+    consentModeType: "{$consent_mode_type}",
     templateName: "{$template_to_use}",
     templateSource: "{$template_source}",
     detectedCountry: "{$user_country}",

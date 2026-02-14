@@ -1,15 +1,15 @@
 /**
  * Klaro Geo Consent Mode Tests
  *
- * NOTE: The plugin no longer calls gtag('consent', 'default') or gtag('consent', 'update').
- * Consent mode is now handled by the GTM template using native setDefaultConsentState()
- * and updateConsentState() APIs. The plugin pushes 'Klaro Consent Update' events
- * to the dataLayer with the consentMode object.
+ * The plugin calls gtag('consent', 'default', ...) in the <head> via PHP and
+ * gtag('consent', 'update', ...) in klaro-geo.js when consent changes.
+ * It also pushes 'Klaro Consent Update' events to the dataLayer.
  *
  * These tests verify:
  * 1. The consentMode object structure is correct
  * 2. Dynamic service consent keys are generated properly
  * 3. UI controls for ad personalization/user data work correctly
+ * 4. gtag('consent', 'update') is called with correct consent data
  */
 
 describe('Klaro Geo Consent Mode', function() {
@@ -54,16 +54,15 @@ describe('Klaro Geo Consent Mode', function() {
             </div>
         `;
 
-        // Mock global objects - using dataLayer instead of gtag for consent mode
+        // Mock global objects
         mockDataLayer = [];
         window.dataLayer = mockDataLayer;
-        window.gtag = jest.fn(); // Keep gtag mock but it should NOT be called for consent
+        window.gtag = jest.fn(); // gtag is called for consent updates
         window.klaro = {
             getManager: jest.fn().mockReturnValue(mockKlaroManager)
         };
 
         // Initialize Klaro consent data object with template settings
-        // NOTE: initialize_consent_mode has been removed - consent mode is always enabled
         window.klaroConsentData = {
             templateSettings: {
                 config: {
@@ -150,15 +149,14 @@ describe('Klaro Geo Consent Mode', function() {
         return serviceName.replace(/-/g, '_') + '_consent';
     }
 
-    // Helper function to simulate the new consent mode architecture
-    // NOTE: Instead of calling gtag('consent', 'update', ...), we now push
-    // 'Klaro Consent Update' events to dataLayer with a consentMode object.
-    // The GTM template reads this event and calls updateConsentState() API.
+    // Helper function to simulate the consent mode architecture
+    // The plugin calls gtag('consent', 'update', ...) AND pushes
+    // 'Klaro Consent Update' events to dataLayer.
     function loadConsentModeScript() {
         // Create a script element
         const script = document.createElement('script');
         script.textContent = `
-            // Mock the consent mode functionality (NEW ARCHITECTURE)
+            // Mock the consent mode functionality
             window.adPersonalizationConsent = true;
             window.adUserDataConsent = true;
 
@@ -176,7 +174,7 @@ describe('Klaro Geo Consent Mode', function() {
                 return serviceName.replace(/-/g, '_') + '_consent';
             };
 
-            // Function to push consent update to dataLayer (NEW - no gtag calls)
+            // Function to push consent update via gtag + dataLayer
             window.pushConsentToDataLayer = function(consentUpdate, triggerEvent) {
                 // Skip if the update is identical to the last one
                 if (window.lastConsentUpdate &&
@@ -188,6 +186,9 @@ describe('Klaro Geo Consent Mode', function() {
                 // Store this update as the last one
                 window.lastConsentUpdate = consentUpdate;
 
+                // Call gtag consent update directly
+                window.gtag('consent', 'update', consentUpdate);
+
                 // Build the acceptedServices array
                 const manager = window.klaro && window.klaro.getManager ? window.klaro.getManager() : null;
                 const acceptedServices = manager ? Object.keys(manager.consents).filter(s => manager.consents[s]) : [];
@@ -195,14 +196,13 @@ describe('Klaro Geo Consent Mode', function() {
                 // Push the Klaro Consent Update event to dataLayer
                 window.dataLayer.push({
                     'event': 'Klaro Consent Update',
-                    'eventSource': 'klaro-geo',
                     'consentMode': consentUpdate,
                     'acceptedServices': acceptedServices,
-                    'triggerEvent': triggerEvent || 'saveConsents'
+                    'consent_trigger': triggerEvent || 'saveConsents'
                 });
             };
 
-            // Mock the updateConsentState function (pushes to dataLayer instead of gtag)
+            // Mock the updateConsentState function (calls gtag + pushes to dataLayer)
             window.updateConsentState = function(triggerEvent) {
                 // Get the current state of services from Klaro manager
                 let adServiceEnabled = false;
@@ -233,7 +233,7 @@ describe('Klaro Geo Consent Mode', function() {
                     });
                 }
 
-                // Push to dataLayer (NOT gtag)
+                // Push via gtag + dataLayer
                 window.pushConsentToDataLayer(consentUpdate, triggerEvent || 'saveConsents');
 
                 // Mark that we're done with initialization
@@ -304,8 +304,8 @@ describe('Klaro Geo Consent Mode', function() {
         expect(consentEvent.consentMode.google_ads_consent).toBe('granted');
         expect(consentEvent.consentMode.google_analytics_consent).toBe('granted');
 
-        // Verify that gtag was NOT called for consent (handled by GTM template)
-        expect(window.gtag).not.toHaveBeenCalledWith('consent', 'update', expect.anything());
+        // Verify that gtag was called for consent update
+        expect(window.gtag).toHaveBeenCalledWith('consent', 'update', expect.anything());
 
         // Verify that dataLayer has exactly one consent update event
         const consentEvents = window.dataLayer.filter(e => e.event === 'Klaro Consent Update');
@@ -329,11 +329,10 @@ describe('Klaro Geo Consent Mode', function() {
         // Verify event structure
         expect(consentEvent).toBeTruthy();
         expect(consentEvent.event).toBe('Klaro Consent Update');
-        expect(consentEvent.eventSource).toBe('klaro-geo');
         expect(consentEvent.consentMode).toBeDefined();
         expect(consentEvent.acceptedServices).toBeDefined();
         expect(Array.isArray(consentEvent.acceptedServices)).toBe(true);
-        expect(consentEvent.triggerEvent).toBe('initialConsents');
+        expect(consentEvent.consent_trigger).toBe('initialConsents');
     });
 
     test('should include acceptedServices array with services that have consent', function() {
@@ -380,8 +379,8 @@ describe('Klaro Geo Consent Mode', function() {
         expect(consentEvent.consentMode.ad_user_data).toBe('granted');
         expect(consentEvent.consentMode.ad_personalization).toBe('denied');
 
-        // Verify that gtag was NOT called for consent
-        expect(window.gtag).not.toHaveBeenCalledWith('consent', 'update', expect.anything());
+        // Verify that gtag was called for consent update
+        expect(window.gtag).toHaveBeenCalledWith('consent', 'update', expect.anything());
     });
 
     test('should update consent state when ad user data checkbox changes', function() {
@@ -413,8 +412,8 @@ describe('Klaro Geo Consent Mode', function() {
         expect(consentEvent.consentMode.ad_user_data).toBe('denied');
         expect(consentEvent.consentMode.ad_personalization).toBe('granted');
 
-        // Verify that gtag was NOT called for consent
-        expect(window.gtag).not.toHaveBeenCalledWith('consent', 'update', expect.anything());
+        // Verify that gtag was called for consent update
+        expect(window.gtag).toHaveBeenCalledWith('consent', 'update', expect.anything());
     });
 
     test('should update controls state when parent service is disabled', function() {
@@ -451,8 +450,8 @@ describe('Klaro Geo Consent Mode', function() {
         expect(consentEvent.consentMode.ad_personalization).toBe('denied');
         expect(consentEvent.consentMode.google_ads_consent).toBe('denied');
 
-        // Verify that gtag was NOT called for consent
-        expect(window.gtag).not.toHaveBeenCalledWith('consent', 'update', expect.anything());
+        // Verify that gtag was called for consent update
+        expect(window.gtag).toHaveBeenCalledWith('consent', 'update', expect.anything());
     });
 
     test('should update controls state when parent service is enabled', function() {
@@ -490,8 +489,8 @@ describe('Klaro Geo Consent Mode', function() {
         expect(consentEvent.consentMode.ad_user_data).toBe('granted');
         expect(consentEvent.consentMode.ad_personalization).toBe('granted');
 
-        // Verify that gtag was NOT called for consent
-        expect(window.gtag).not.toHaveBeenCalledWith('consent', 'update', expect.anything());
+        // Verify that gtag was called for consent update
+        expect(window.gtag).toHaveBeenCalledWith('consent', 'update', expect.anything());
     });
 
     test('should handle both checkboxes being unchecked', function() {
@@ -525,8 +524,8 @@ describe('Klaro Geo Consent Mode', function() {
         expect(consentEvent.consentMode.ad_user_data).toBe('denied');
         expect(consentEvent.consentMode.ad_personalization).toBe('denied');
 
-        // Verify that gtag was NOT called for consent
-        expect(window.gtag).not.toHaveBeenCalledWith('consent', 'update', expect.anything());
+        // Verify that gtag was called for consent update
+        expect(window.gtag).toHaveBeenCalledWith('consent', 'update', expect.anything());
     });
 
     test('should skip duplicate consent updates', function() {

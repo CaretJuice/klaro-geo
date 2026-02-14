@@ -489,27 +489,64 @@ function klaro_geo_add_gtm_head_script() {
     // Get GTM ID from settings
     $gtm_id = get_option('klaro_geo_gtm_id', '');
 
-    // If no GTM ID is set, don't output anything
+    // Always output consent defaults if available (even without GTM)
+    $consent_defaults = isset($GLOBALS['klaro_geo_consent_defaults']) ? $GLOBALS['klaro_geo_consent_defaults'] : null;
+    $gtag_settings = isset($GLOBALS['klaro_geo_gtag_settings']) ? $GLOBALS['klaro_geo_gtag_settings'] : array();
+
+    if ($consent_defaults) {
+        // Build the consent default object with wait_for_update
+        $consent_default_obj = $consent_defaults;
+        $consent_default_obj['wait_for_update'] = 500;
+        ?>
+        <!-- Klaro Geo Consent Defaults -->
+        <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('consent', 'default', <?php echo wp_json_encode($consent_default_obj, JSON_UNESCAPED_SLASHES); ?>);
+        <?php if (isset($gtag_settings['ads_data_redaction']) && $gtag_settings['ads_data_redaction'] === 'true') : ?>
+        gtag('set', 'ads_data_redaction', true);
+        <?php endif; ?>
+        <?php if (isset($gtag_settings['url_passthrough']) && $gtag_settings['url_passthrough'] === 'true') : ?>
+        gtag('set', 'url_passthrough', true);
+        <?php endif; ?>
+        </script>
+        <?php
+    }
+
+    // If no GTM ID is set, don't output GTM snippet
     if (empty($gtm_id)) {
         return;
     }
 
-    // Output the GTM script with Klaro attributes
-    ?>
-    <!-- Google Tag Manager (Klaro-compatible) -->
-    <script>
-        // Initialize the dataLayer if it doesn't exist
-        window.dataLayer = window.dataLayer || [];
-    </script>
-    <script data-type="application/javascript" type="text/plain" data-name="google-tag-manager">
-    (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-    })(window,document,'script','dataLayer','<?php echo esc_js($gtm_id); ?>');
-    </script>
-    <!-- End Google Tag Manager -->
-    <?php
+    $consent_mode_type = get_option('klaro_geo_consent_mode_type', 'basic');
+
+    if ($consent_mode_type === 'advanced') {
+        // Advanced mode: GTM loads immediately (no Klaro gating)
+        ?>
+        <!-- Google Tag Manager (Advanced Consent Mode) -->
+        <script>
+        (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+        new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+        j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+        'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+        })(window,document,'script','dataLayer','<?php echo esc_js($gtm_id); ?>');
+        </script>
+        <!-- End Google Tag Manager -->
+        <?php
+    } else {
+        // Basic mode: GTM gated by Klaro consent
+        ?>
+        <!-- Google Tag Manager (Klaro-compatible) -->
+        <script data-type="application/javascript" type="text/plain" data-name="google-tag-manager">
+        (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+        new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+        j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+        'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+        })(window,document,'script','dataLayer','<?php echo esc_js($gtm_id); ?>');
+        </script>
+        <!-- End Google Tag Manager -->
+        <?php
+    }
 }
 
 /**
@@ -529,13 +566,25 @@ function klaro_geo_add_gtm_body_script() {
         return;
     }
 
-    // Output the GTM noscript tag with Klaro attributes
-    ?>
-    <!-- Google Tag Manager (noscript) (Klaro-compatible) -->
-    <noscript><iframe data-name="google-tag-manager" data-src="https://www.googletagmanager.com/ns.html?id=<?php echo esc_attr($gtm_id); ?>"
-    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
-    <!-- End Google Tag Manager (noscript) -->
-    <?php
+    $consent_mode_type = get_option('klaro_geo_consent_mode_type', 'basic');
+
+    if ($consent_mode_type === 'advanced') {
+        // Advanced mode: Normal noscript tag (no Klaro gating)
+        ?>
+        <!-- Google Tag Manager (noscript) (Advanced Consent Mode) -->
+        <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=<?php echo esc_attr($gtm_id); ?>"
+        height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+        <!-- End Google Tag Manager (noscript) -->
+        <?php
+    } else {
+        // Basic mode: noscript tag with Klaro attributes
+        ?>
+        <!-- Google Tag Manager (noscript) (Klaro-compatible) -->
+        <noscript><iframe data-name="google-tag-manager" data-src="https://www.googletagmanager.com/ns.html?id=<?php echo esc_attr($gtm_id); ?>"
+        height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+        <!-- End Google Tag Manager (noscript) -->
+        <?php
+    }
 }
 
 // Add GTM scripts to the appropriate hooks
