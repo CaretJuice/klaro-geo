@@ -421,9 +421,22 @@ var klaroConfigLoadedData = {
     'klaroGeoEnableConsentLogging': " . ($custom_template_settings['enableConsentLogging'] ? 'true' : 'false') . "
 };
 
-// Add the consent receipt ID if available
+// Add the consent receipt ID if available and active consent data exists
+// (Receipt ID persists in localStorage even after consent data is cleared,
+// so we check for consent data to avoid including a stale receipt ID)
 if (latestReceipt) {
-    klaroConfigLoadedData.klaroGeoConsentReceiptId = latestReceipt.receipt_id;
+    var klaroStorageName = (klaroConfig && (klaroConfig.storageName || klaroConfig.cookieName)) || 'klaro';
+    var hasActiveConsent = false;
+    if (klaroConfig && klaroConfig.storageMethod === 'localStorage') {
+        hasActiveConsent = window.localStorage.getItem(klaroStorageName) !== null;
+    } else {
+        hasActiveConsent = document.cookie.split(';').some(function(c) {
+            return c.trim().indexOf(klaroStorageName + '=') === 0;
+        });
+    }
+    if (hasActiveConsent) {
+        klaroConfigLoadedData.klaroGeoConsentReceiptId = latestReceipt.receipt_id;
+    }
 }
 
 // Push to dataLayer

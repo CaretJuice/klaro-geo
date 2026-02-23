@@ -133,10 +133,18 @@ Use the custom `/commit` command which:
 - `refactor:` - Code refactoring
 - `chore:` - Maintenance tasks
 
+## Planning & To-Do Convention
+
+The file `plan/to-do.md` tracks outstanding and completed work:
+- Outstanding items are at the top of the file
+- Completed items are moved below a `---` divider at the bottom
+- Completed section headings get `(completed)` appended to the title
+- Individual items use `[x]` checkboxes
+
 ## Current Session Goals
 
 <!-- Update this section for each working session -->
-- Debugging and fixing Google Tag Manager dataLayer interaction
+- Preparing for WordPress plugin registry publication
 
 ## Working Memory
 

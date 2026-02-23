@@ -214,7 +214,7 @@ class KlaroGeoMockDB {
             'template_source' => $receipt_data['template_source'],
             'country_code' => $receipt_data['country_code'] ?? null,
             'region_code' => $receipt_data['region_code'] ?? null,
-            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? null
+            'user_agent' => klaro_geo_get_coarse_user_agent()
         );
 
         // Store the receipt in our mock storage
@@ -237,7 +237,7 @@ class KlaroGeoMockDB {
                 'template_source' => $receipt_data['template_source'],
                 'country_code' => $receipt_data['country_code'] ?? null,
                 'region_code' => $receipt_data['region_code'] ?? null,
-                'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? null
+                'user_agent' => klaro_geo_get_coarse_user_agent()
             )
         );
 

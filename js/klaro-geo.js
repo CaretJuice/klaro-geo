@@ -810,6 +810,26 @@
           // Log the complete update being sent (now includes dynamic keys)
           klaroGeoLog('DEBUG: Consent update object (with dynamic service keys):', completeUpdate);
 
+          // On initialConsents, skip if all values match the defaults set in <head>
+          // This avoids a redundant gtag update and a misleading Klaro Consent Update event
+          if (eventType === 'initialConsents' &&
+              typeof window.klaroConsentData !== 'undefined' &&
+              window.klaroConsentData.templateSettings &&
+              window.klaroConsentData.templateSettings.config &&
+              window.klaroConsentData.templateSettings.config.consent_mode_settings &&
+              window.klaroConsentData.templateSettings.config.consent_mode_settings.consent_defaults) {
+              var defaults = window.klaroConsentData.templateSettings.config.consent_mode_settings.consent_defaults;
+              var allMatch = Object.keys(completeUpdate).every(function(key) {
+                  return completeUpdate[key] === (defaults[key] || 'denied');
+              });
+              if (allMatch) {
+                  klaroGeoLog('DEBUG: Skipping redundant consent update on initialConsents - all values match defaults');
+                  window.lastConsentUpdate = completeUpdate;
+                  window.consentUpdateTimer = null;
+                  return;
+              }
+          }
+
           // Store last update
           window.lastConsentUpdate = completeUpdate;
 

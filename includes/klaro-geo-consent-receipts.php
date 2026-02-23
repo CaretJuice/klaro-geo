@@ -262,7 +262,7 @@ function klaro_geo_store_consent_receipt($receipt_data) {
             'template_source' => $template_source,
             'country_code' => $receipt_data['country_code'],
             'region_code' => $receipt_data['region_code'],
-            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? null
+            'user_agent' => klaro_geo_get_coarse_user_agent()
         );
 
         // Add klaro_config if it exists and the column exists in the table
@@ -345,6 +345,61 @@ function klaro_geo_get_anonymized_ip() {
     }
     
     return $ip;
+}
+
+// Get a coarse user agent string for privacy (avoids fingerprinting)
+// Returns format like "Chrome Mobile/Android" or "Safari/macOS"
+function klaro_geo_get_coarse_user_agent() {
+    $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
+    if (empty($ua)) {
+        return 'unknown';
+    }
+
+    // Detect browser
+    $browser = 'Other';
+    if (preg_match('/Edg(e|A|iOS)?\//', $ua)) {
+        $browser = 'Edge';
+    } elseif (preg_match('/OPR\/|Opera/', $ua)) {
+        $browser = 'Opera';
+    } elseif (preg_match('/SamsungBrowser\//', $ua)) {
+        $browser = 'Samsung Internet';
+    } elseif (preg_match('/Chrome\//', $ua) && !preg_match('/Chromium\//', $ua)) {
+        $browser = 'Chrome';
+    } elseif (preg_match('/Safari\//', $ua) && !preg_match('/Chrome\//', $ua)) {
+        $browser = 'Safari';
+    } elseif (preg_match('/Firefox\//', $ua)) {
+        $browser = 'Firefox';
+    }
+
+    // Detect device type
+    $device = 'Desktop';
+    if (preg_match('/Mobi|Android.*Mobile|iPhone|iPod/', $ua)) {
+        $device = 'Mobile';
+    } elseif (preg_match('/Tablet|iPad|Android(?!.*Mobile)/', $ua)) {
+        $device = 'Tablet';
+    }
+
+    // Detect OS family
+    $os = 'Other';
+    if (preg_match('/Windows/', $ua)) {
+        $os = 'Windows';
+    } elseif (preg_match('/Macintosh|Mac OS X/', $ua)) {
+        $os = 'macOS';
+    } elseif (preg_match('/iPhone|iPad|iPod/', $ua)) {
+        $os = 'iOS';
+    } elseif (preg_match('/Android/', $ua)) {
+        $os = 'Android';
+    } elseif (preg_match('/Linux/', $ua)) {
+        $os = 'Linux';
+    } elseif (preg_match('/CrOS/', $ua)) {
+        $os = 'ChromeOS';
+    }
+
+    // Combine device type only if not Desktop (Desktop is implied)
+    if ($device === 'Desktop') {
+        return $browser . '/' . $os;
+    }
+    return $browser . ' ' . $device . '/' . $os;
 }
 
 // AJAX handler to store consent receipt
@@ -499,8 +554,8 @@ function klaro_geo_ajax_store_consent_receipt() {
         $user_id = get_current_user_id();
         $user_id = $user_id ? $user_id : null;
 
-        // Get IP address with privacy considerations
-        $ip_address = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '';
+        // Get anonymized IP address for privacy
+        $ip_address = klaro_geo_get_anonymized_ip();
 
         // Prepare minimal data for insertion
         $data = array(

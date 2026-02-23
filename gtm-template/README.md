@@ -1,16 +1,5 @@
 # Klaro Geo - Google Tag Manager Templates
 
-## Consent Mode Tag (Removed)
-
-The Consent Mode tag template (`template.tpl`) has been removed. Klaro Geo now handles Google Consent Mode entirely via client-side `gtag()` calls:
-
-- **Consent defaults** are set via `gtag('consent', 'default', ...)` in the `<head>` before any tags load
-- **Consent updates** are called via `gtag('consent', 'update', ...)` directly when users interact with the consent banner
-
-No GTM template is needed for consent mode to work. See the [main README](../readme.md) for setup instructions.
-
----
-
 ## Consent Gate Variable (`variable-template.tpl`)
 
 ### What It Does

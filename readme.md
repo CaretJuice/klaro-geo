@@ -635,15 +635,26 @@ Please note that browser privacy safeguards, like Apple's Privacy Relay, make re
 
 Klaro Geo can store detailed records of user consent choices, which is useful for compliance with privacy regulations like GDPR and CCPA.
 
+### Privacy Considerations
+
+The consent receipt ID is a randomly generated identifier (not derived from any device or browser characteristics), but it **persists across browser sessions** via localStorage. This means it functions as a persistent unique identifier that can correlate a user's consent actions over time. While its purpose is to support GDPR accountability requirements (Art. 5(2), Art. 7(1)) by proving when and what consent was given, this persistence may conflict with privacy expectations in some jurisdictions.
+
+If persistent identifiers are a concern for your use case, you can:
+- **Disable consent receipts entirely** by unchecking **Enable Consent Receipts** in the global Klaro Geo settings
+- **Disable consent receipts for specific regions** by using templates: create a template with consent logging disabled and assign it to the countries or regions where persistent identifiers are problematic
+
+This granular control allows you to retain consent receipts where they are legally required (e.g., to demonstrate GDPR compliance) while disabling them in jurisdictions where a persistent identifier may raise concerns.
+
 ### How Consent Receipts Work
 
 1. When a user makes consent choices, a receipt is generated containing:
-   - Unique receipt ID
+   - Unique receipt ID (randomly generated, not derived from device characteristics)
    - Timestamp
    - User's consent choices for each service
-   - Template used
-   - User's detected location
-   - Other relevant metadata
+   - Template used and source (e.g., geo-match, fallback)
+   - User's detected country and region
+   - Coarse browser/OS identification (e.g., "Chrome/macOS", "Safari Mobile/iOS" — not the full User Agent string)
+   - Anonymized IP address (last octet zeroed for IPv4)
 
 2. Receipts are stored in two locations:
    - **Client-side**: In the user's browser localStorage (limited to last 10 receipts)
