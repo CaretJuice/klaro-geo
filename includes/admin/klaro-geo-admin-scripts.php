@@ -26,19 +26,14 @@ function klaro_geo_admin_scripts($hook) {
         KLARO_GEO_VERSION
     );
 
-    // Add jQuery UI styles for tabs
-    wp_enqueue_style(
-        'jquery-ui-style',
-        'https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css',
-        array(),
-        '1.12.1'
-    );
+    // Use WordPress core dialog styles (tabs are styled in klaro-geo-admin.css)
+    wp_enqueue_style('wp-jquery-ui-dialog');
 
     // Add translations CSS
     wp_enqueue_style(
         'klaro-geo-translations',
         KLARO_GEO_URL . 'css/klaro-geo-translations.css',
-        array('jquery-ui-style'),
+        array('klaro-geo-admin'),
         KLARO_GEO_VERSION
     );
 

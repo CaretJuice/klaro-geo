@@ -1,6 +1,7 @@
 <?php
 /**
  * Plugin Name: Klaro Geo
+ * Plugin URI: https://github.com/CaretJuice/klaro-geo
  * Description: Loads Klaro! with Geo overrides when installed with the Geolocation IP Detection plugin.
  * Version: 0.3.4
  * Author: Caret Juice Data Ltd., Damon Gudaitis
@@ -8,6 +9,10 @@
  * Requires at least: 6.6
  * Tested up to: 6.9
  * Requires PHP: 7.2
+ * License: GPL-2.0-or-later
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain: klaro-geo
+ * Domain Path: /languages
  */
 defined('ABSPATH') or die('No script kiddies please!');
 define('KLARO_GEO_VERSION', '0.3.4');
