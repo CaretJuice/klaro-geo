@@ -115,13 +115,6 @@ This is standard GTM behavior. Data sent to Google depends on your GTM container
 * Google Tag Manager: [https://tagmanager.google.com/](https://tagmanager.google.com/)
 * Google privacy policy: [https://policies.google.com/privacy](https://policies.google.com/privacy)
 
-== Screenshots ==
-
-1. Template configuration with consent mode settings
-2. Country and region assignment
-3. Service management with custom consent keys
-4. Consent receipt browser
-
 == Changelog ==
 
 = 0.3.4 =
