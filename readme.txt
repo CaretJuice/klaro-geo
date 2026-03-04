@@ -8,7 +8,7 @@ Stable tag: 0.3.4
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Geo-targeted consent management powered by Klaro. Show different consent banners by country and region with Google Tag Manager and Consent Mode v2 support.
+Geo-targeted consent management powered by Klaro. Show different consent banners by country and region with Google Tag Manager.
 
 == Description ==
 
