@@ -103,6 +103,22 @@ function klaro_geo_generate_config_file() {
         }
     }
 
+    // GPC settings: global + per-template
+    $gpc_global_enabled = get_option('klaro_geo_gpc_enabled', true);
+    $gpc_template_enabled = isset($template_config['plugin_settings']['gpc_enabled'])
+        ? $template_config['plugin_settings']['gpc_enabled']
+        : true;
+    $gpc_enabled = $gpc_global_enabled && $gpc_template_enabled;
+    $all_purposes = array_map('trim', explode(',', get_option('klaro_geo_purposes', 'functional,analytics,advertising')));
+    $gpc_purposes = isset($template_config['plugin_settings']['gpc_purposes'])
+        ? $template_config['plugin_settings']['gpc_purposes']
+        : $all_purposes;
+
+    klaro_geo_debug_log('GPC: global_enabled=' . ($gpc_global_enabled ? 'true' : 'false') .
+        ', template_enabled=' . ($gpc_template_enabled ? 'true' : 'false') .
+        ', effective=' . ($gpc_enabled ? 'true' : 'false') .
+        ', purposes=' . implode(',', $gpc_purposes));
+
     // Apply template configuration
     if (isset($template_config['config'])) {
         // Copy all config values
@@ -327,6 +343,20 @@ function klaro_geo_generate_config_file() {
             }
         }
 
+        // Compute GPC sensitivity: explicit per-service > template purposes > auto-detect
+        if ($gpc_enabled) {
+            $service_purposes = $service['purposes'] ?? array();
+            if (isset($service['gpc_sensitive']) && $service['gpc_sensitive'] === true) {
+                $service_config['gpc_sensitive'] = true;
+            } elseif (isset($service['gpc_sensitive']) && $service['gpc_sensitive'] === false) {
+                $service_config['gpc_sensitive'] = false;
+            } else {
+                // Auto-detect: check if any service purpose matches gpc_purposes
+                $is_sensitive = !empty(array_intersect($service_purposes, $gpc_purposes));
+                $service_config['gpc_sensitive'] = $is_sensitive;
+            }
+        }
+
         // Skip hidden services
         if (isset($service['hidden']) && $service['hidden'] === true) {
             klaro_geo_debug_log('Skipping hidden service: ' . ($service['name'] ?? 'unknown'));
@@ -385,6 +415,38 @@ function klaro_geo_generate_config_file() {
     // Add a clear separator comment to help with parsing
     $klaro_config_content .= "// ===== END OF KLARO CONFIG =====\n\n";
 
+    // GPC detection and service default override (runs before Klaro initializes)
+    $gpc_purposes_json = wp_json_encode($gpc_purposes);
+    $gpc_enabled_js = $gpc_enabled ? 'true' : 'false';
+    $klaro_config_content .= <<<JS
+// ===== GLOBAL PRIVACY CONTROL (GPC) =====
+var klaroGeoGPC = { detected: false, enabled: false, affectedServices: [] };
+(function() {
+    var gpcConfig = { enabled: {$gpc_enabled_js}, gpc_purposes: {$gpc_purposes_json} };
+    klaroGeoGPC.enabled = gpcConfig.enabled;
+
+    if (!gpcConfig.enabled) return;
+
+    klaroGeoGPC.detected = (navigator.globalPrivacyControl === true);
+    if (!klaroGeoGPC.detected) return;
+
+    // Override defaults for GPC-sensitive services
+    if (klaroConfig && klaroConfig.services) {
+        for (var i = 0; i < klaroConfig.services.length; i++) {
+            var svc = klaroConfig.services[i];
+            if (svc.gpc_sensitive && !svc.required) {
+                svc.default = false;
+                klaroGeoGPC.affectedServices.push(svc.name);
+            }
+        }
+    }
+})();
+window.klaroGeo = window.klaroGeo || {};
+window.klaroGeo.gpc = klaroGeoGPC;
+// ===== END GPC =====
+
+JS;
+
     // Add dataLayer push for debugging with JavaScript to include latest consent receipt
     $klaro_config_content .= "// Push debug information to dataLayer with latest consent receipt\n";
     $klaro_config_content .= "window.dataLayer = window.dataLayer || [];\n";
@@ -418,7 +480,10 @@ var klaroConfigLoadedData = {
     'klaroGeoDetectedCountry': " . (!empty($user_country) ? wp_json_encode($user_country) : 'null') . ",
     'klaroGeoDetectedRegion': " . (!empty($user_region) ? wp_json_encode($user_region) : 'null') . ",
     'klaroGeoAdminOverride': " . ($using_debug_geo ? 'true' : 'false') . ",
-    'klaroGeoEnableConsentLogging': " . ($custom_template_settings['enableConsentLogging'] ? 'true' : 'false') . "
+    'klaroGeoEnableConsentLogging': " . ($custom_template_settings['enableConsentLogging'] ? 'true' : 'false') . ",
+    'klaroGeoGPCDetected': klaroGeoGPC.detected,
+    'klaroGeoGPCEnabled': klaroGeoGPC.enabled,
+    'klaroGeoGPCAffectedServices': klaroGeoGPC.affectedServices
 };
 
 // Add the consent receipt ID if available and active consent data exists
@@ -448,6 +513,31 @@ window.dataLayer.push(klaroConfigLoadedData);
 // Consent updates are pushed via gtag('consent','update') in klaro-geo.js
 window.dataLayer = window.dataLayer || [];
 window.gtag = window.gtag || function(){dataLayer.push(arguments);};
+
+// GPC consent mode override: immediately update consent signals for GPC-sensitive services
+if (klaroGeoGPC.detected && klaroGeoGPC.affectedServices.length > 0 && typeof gtag === 'function') {
+    var gpcConsentOverride = {};
+    for (var i = 0; i < klaroConfig.services.length; i++) {
+        var svc = klaroConfig.services[i];
+        if (svc.gpc_sensitive) {
+            if (svc.is_consent_mode_service && svc.consent_mode_key) {
+                gpcConsentOverride[svc.consent_mode_key] = 'denied';
+            }
+            gpcConsentOverride[svc.name.replace(/-/g, '_') + '_consent'] = 'denied';
+        }
+    }
+    gtag('consent', 'update', gpcConsentOverride);
+}
+
+// Fire dedicated gpcDetected event when GPC is active
+if (klaroGeoGPC.detected) {
+    window.dataLayer.push({
+        'event': 'Klaro Event',
+        'eventSource': 'klaro-geo',
+        'klaroEventName': 'gpcDetected',
+        'klaroGeoGPCAffectedServices': klaroGeoGPC.affectedServices
+    });
+}
 \n";
 
     // Log summary of config generation

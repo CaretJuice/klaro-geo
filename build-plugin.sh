@@ -41,8 +41,19 @@ cp klaro-geo.php "$PLUGIN_DIR/"
 cp klaro.js "$PLUGIN_DIR/"
 cp klaro.css "$PLUGIN_DIR/"
 cp countries.csv "$PLUGIN_DIR/"
+cp subdivisions.csv "$PLUGIN_DIR/"
 cp index.php "$PLUGIN_DIR/"
 cp readme.md "$PLUGIN_DIR/"
+cp readme.txt "$PLUGIN_DIR/"
+cp LICENSE "$PLUGIN_DIR/"
+
+# Copy languages directory for i18n
+if [ -d "languages" ]; then
+    echo -e "${YELLOW}Copying languages/...${NC}"
+    cp -r languages "$PLUGIN_DIR/"
+else
+    mkdir -p "$PLUGIN_DIR/languages"
+fi
 
 # Copy directories (production files only)
 echo -e "${YELLOW}Copying includes/...${NC}"

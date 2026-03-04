@@ -87,6 +87,8 @@ function handleConsentChange(e) {
         country_code: window.klaroConsentData.detectedCountry || null,
         region_code: window.klaroConsentData.detectedRegion || null,
         admin_override: window.klaroConsentData.adminOverride === true,
+        gpc_detected: !!(window.klaroGeo && window.klaroGeo.gpc && window.klaroGeo.gpc.detected),
+        gpc_affected_services: (window.klaroGeo && window.klaroGeo.gpc) ? window.klaroGeo.gpc.affectedServices : [],
         template_settings: window.klaroConsentData.templateSettings || {},
         klaro_config: window.klaroConfig || null
     };

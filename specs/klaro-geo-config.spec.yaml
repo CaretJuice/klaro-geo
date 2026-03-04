@@ -28,6 +28,7 @@ architecture:
 
   generated_events:
     - "klaroConfigLoaded - pushed when config executes in browser"
+    - "gpcDetected - pushed when GPC signal is active (see gpc.spec.yaml)"
 
   event_data_source:
     template_info: "From template lookup in this file"

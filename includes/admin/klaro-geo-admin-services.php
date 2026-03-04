@@ -133,6 +133,15 @@ function klaro_geo_services_page_content() {
 
                 <h3>Advanced Settings</h3>
                 <div class="advanced-settings">
+                    <label for="service_gpc_sensitive">GPC Sensitivity:</label><br>
+                    <select id="service_gpc_sensitive" name="service_gpc_sensitive">
+                        <option value="auto" selected>Auto-detect (from purposes)</option>
+                        <option value="true">Yes (always GPC-sensitive)</option>
+                        <option value="false">No (never GPC-sensitive)</option>
+                    </select>
+                    <p class="description">Controls whether Global Privacy Control (GPC) affects this service. "Auto-detect" uses the template's GPC-sensitive purposes list (default: advertising).</p>
+                    <br>
+
                     <label for="service_optout">
                         <input type="checkbox" id="service_optout" name="service_optout" value="1">
                         Opt-Out

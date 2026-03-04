@@ -104,6 +104,18 @@ events:
         type: "boolean"
         description: "Whether consent receipts are enabled"
 
+      klaroGeoGPCDetected:
+        type: "boolean"
+        description: "Whether navigator.globalPrivacyControl was true"
+
+      klaroGeoGPCEnabled:
+        type: "boolean"
+        description: "Whether GPC processing was enabled for this config"
+
+      klaroGeoGPCAffectedServices:
+        type: "array"
+        description: "Service names whose defaults were overridden by GPC"
+
     optional_fields:
       klaroGeoConsentReceiptId:
         type: "string"
@@ -119,12 +131,44 @@ events:
       klaroGeoDetectedRegion: null
       klaroGeoAdminOverride: false
       klaroGeoEnableConsentLogging: true
+      klaroGeoGPCDetected: false
+      klaroGeoGPCEnabled: true
+      klaroGeoGPCAffectedServices: []
 
     contract: |
       - MUST fire on every page load where klaro-config.js is included
       - MUST include accurate template and geo information
       - If cookieDomain is set, that template's cookieDomain should be used
       - Can be used to verify correct template selection
+      - MUST include GPC state fields (klaroGeoGPCDetected, klaroGeoGPCEnabled, klaroGeoGPCAffectedServices)
+
+  # ---------------------------------------------------------------------------
+  # GPC DETECTED EVENT (only fires when GPC is active)
+  # ---------------------------------------------------------------------------
+  gpcDetected:
+    purpose: "Fired when Global Privacy Control signal is detected and GPC is enabled"
+    source: "klaro-geo-config.php (generated JS)"
+    trigger: "navigator.globalPrivacyControl === true AND gpc_enabled"
+    condition: "Only fires when GPC is both enabled and detected"
+
+    required_fields:
+      event:
+        type: "string"
+        value: "Klaro Event"
+      eventSource:
+        type: "string"
+        value: "klaro-geo"
+      klaroEventName:
+        type: "string"
+        value: "gpcDetected"
+      klaroGeoGPCAffectedServices:
+        type: "array"
+        description: "Service names whose defaults were overridden by GPC"
+
+    contract: |
+      - MUST only fire when navigator.globalPrivacyControl === true
+      - MUST NOT fire when GPC is disabled globally or per-template
+      - Fires after klaroConfigLoaded in the same config script
 
   # ---------------------------------------------------------------------------
   # KLARO CONSENT UPDATE EVENT (always fired - consent mode is always enabled)
@@ -163,6 +207,10 @@ events:
         description: "Array of service names that have consent granted"
         example: ["google-analytics", "piwik"]
 
+      gpcActive:
+        type: "boolean"
+        description: "Whether GPC signal was detected for this session"
+
     example:
       event: "Klaro Consent Update"
       consent_trigger: "saveConsents"
@@ -175,6 +223,7 @@ events:
         piwik_consent: "granted"
         facebook_consent: "denied"
       acceptedServices: ["google-analytics", "piwik"]
+      gpcActive: false
 
     contract: |
       - MUST always be fired on consent changes (consent mode is always enabled)

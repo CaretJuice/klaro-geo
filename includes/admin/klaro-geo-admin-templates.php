@@ -364,6 +364,12 @@ function klaro_geo_templates_page() {
             // Process enable_consent_logging setting
             $plugin_settings['enable_consent_logging'] = isset($_POST['plugin_settings']['enable_consent_logging']);
 
+            // Process GPC settings
+            $plugin_settings['gpc_enabled'] = isset($_POST['plugin_settings']['gpc_enabled']);
+            $plugin_settings['gpc_purposes'] = isset($_POST['plugin_settings']['gpc_purposes']) && is_array($_POST['plugin_settings']['gpc_purposes'])
+                ? array_map('sanitize_text_field', $_POST['plugin_settings']['gpc_purposes'])
+                : array();
+
             // Get the existing template
             $template = $template_settings->get_template($current_template);
 
@@ -378,7 +384,9 @@ function klaro_geo_templates_page() {
             $template = $template_settings->get_template($current_template);
             if ($template) {
                 $template['plugin_settings'] = array(
-                    'enable_consent_logging' => true
+                    'enable_consent_logging' => true,
+                    'gpc_enabled' => true,
+                    'gpc_purposes' => array_map('trim', explode(',', get_option('klaro_geo_purposes', 'functional,analytics,advertising'))),
                 );
                 $template_settings->set_template($current_template, $template);
                 klaro_geo_debug_log('Set default plugin_settings');
@@ -1280,6 +1288,32 @@ function klaro_geo_templates_page() {
                             <input type="checkbox" name="plugin_settings[enable_consent_logging]" id="enable_consent_logging"
                                 <?php checked(isset($templates[$current_template]['plugin_settings']['enable_consent_logging']) ? $templates[$current_template]['plugin_settings']['enable_consent_logging'] : true); ?>>
                             <p class="description">Log consent choices for this template in the WordPress database.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label for="gpc_enabled">Enable GPC for this Template:</label></th>
+                        <td>
+                            <input type="checkbox" name="plugin_settings[gpc_enabled]" id="gpc_enabled"
+                                <?php checked(isset($templates[$current_template]['plugin_settings']['gpc_enabled']) ? $templates[$current_template]['plugin_settings']['gpc_enabled'] : true); ?>>
+                            <p class="description">Enable Global Privacy Control detection for this template. Disable for strict opt-in templates where GPC is redundant (all services already default to denied).</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label>GPC-Sensitive Purposes:</label></th>
+                        <td>
+                            <?php
+                            $gpc_purposes = isset($templates[$current_template]['plugin_settings']['gpc_purposes'])
+                                ? $templates[$current_template]['plugin_settings']['gpc_purposes']
+                                : $available_purposes;
+                            $available_purposes = explode(',', get_option('klaro_geo_purposes', 'functional,analytics,advertising'));
+                            foreach ($available_purposes as $purpose) {
+                                $purpose = trim($purpose);
+                                if (empty($purpose)) continue;
+                                $checked = in_array($purpose, $gpc_purposes) ? 'checked' : '';
+                                echo '<label style="margin-right: 15px;"><input type="checkbox" name="plugin_settings[gpc_purposes][]" value="' . esc_attr($purpose) . '" ' . $checked . '> ' . esc_html(ucfirst($purpose)) . '</label>';
+                            }
+                            ?>
+                            <p class="description">Services with these purposes will have their defaults set to denied when GPC is detected (unless overridden per-service). Default: advertising only.</p>
                         </td>
                     </tr>
                 </table>
