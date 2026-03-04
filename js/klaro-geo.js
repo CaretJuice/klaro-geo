@@ -865,7 +865,8 @@
                       'event': 'Klaro Consent Update',
                       'consent_trigger': eventType,
                       'consentMode': completeUpdate,
-                      'acceptedServices': acceptedServices
+                      'acceptedServices': acceptedServices,
+                      'gpcActive': !!(window.klaroGeo && window.klaroGeo.gpc && window.klaroGeo.gpc.detected)
                   });
               }
           }

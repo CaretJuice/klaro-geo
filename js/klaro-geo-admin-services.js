@@ -318,6 +318,13 @@ if (typeof jQuery !== 'undefined') {
         }
         
         // Set advanced settings
+        if (service.gpc_sensitive === true) {
+            $('#service_gpc_sensitive').val('true');
+        } else if (service.gpc_sensitive === false) {
+            $('#service_gpc_sensitive').val('false');
+        } else {
+            $('#service_gpc_sensitive').val('auto');
+        }
         $('#service_optout').prop('checked', service.optOut === true);
         $('#service_onlyonce').prop('checked', service.onlyOnce === true);
         $('#service_contextual').prop('checked', service.contextualConsentOnly === true);
@@ -474,6 +481,7 @@ if (typeof jQuery !== 'undefined') {
         });
         
         // Get advanced settings
+        var gpcSensitiveVal = $('#service_gpc_sensitive').val();
         var optOut = $('#service_optout').prop('checked');
         var onlyOnce = $('#service_onlyonce').prop('checked');
         var contextualConsentOnly = $('#service_contextual').prop('checked');
@@ -566,7 +574,10 @@ if (typeof jQuery !== 'undefined') {
             service.translations = translations;
         }
 
-        // Add optional fields only if they're true
+        // Add optional fields only if they're set
+        if (gpcSensitiveVal === 'true') service.gpc_sensitive = true;
+        else if (gpcSensitiveVal === 'false') service.gpc_sensitive = false;
+        // 'auto' = omit the field (null/auto-detect)
         if (optOut) service.optOut = true;
         if (onlyOnce) service.onlyOnce = true;
         if (contextualConsentOnly) service.contextualConsentOnly = true;

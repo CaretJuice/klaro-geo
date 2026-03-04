@@ -20,6 +20,7 @@ This plugin gives you a lot of control over how consent is managed and tracked a
 - **Fallback Templates**: Use strict fallback templates to prevent accidental violations of local law.
 - **Granular Consent Receipts**: Automatically generates consent receipts stored in browser local storage for user reference if enabled. Optionally configure specific templates to archive these receipts in your WordPress database, allowing you to retain records only for jurisdictions that require it while blocking storage for others.
 - **Consent Buttons**: Add a floating button or integrate with WordPress menus to allow users to easily access consent settings.
+- **Global Privacy Control (GPC)**: Detects the `navigator.globalPrivacyControl` browser signal and automatically adjusts consent defaults for affected services. Configurable per-template and per-service.
 - **Bidirectional Data Layer Integration**: A full-duplex integration that listens for dataLayer events to trigger plugin actions, forwards native Klaro events to the dataLayer, and dispatches its own enhanced consent status events.
 - **Admin Debug Tools**: Test different geolocation scenarios directly from the admin bar.
 
@@ -630,6 +631,137 @@ To assign a template to a region, follow these steps:
 3. Assign the desired template to the desired region or regions.
 
 Please note that browser privacy safeguards, like Apple's Privacy Relay, make regional detection unreliable. Beyond just the issues with IP database accuracy, these safeguards deliberately change the location of visitors. Where country regulations are relaxed but regional regulations are stricter, you should consider using the stricter templates for the entire country in order to avoid inadvertently violating regional regulations.
+
+## Global Privacy Control (GPC)
+
+[Global Privacy Control](https://globalprivacycontrol.org/) (GPC) is a browser-level signal that communicates a user's intent to opt out of the sale or sharing of their personal information. It is sent via the `navigator.globalPrivacyControl` JavaScript property (and the `Sec-GPC` HTTP header, though this plugin only uses the JS property). GPC is recognized under several privacy laws, including the California Consumer Privacy Act (CCPA/CPRA) and Colorado Privacy Act.
+
+The open-source Klaro library does not natively support GPC. Klaro Geo adds GPC detection and integrates it with the existing template and geo system, giving admins fine-grained control over how GPC affects consent defaults.
+
+### How It Works
+
+When a visitor's browser has GPC enabled, the plugin:
+
+1. Detects the `navigator.globalPrivacyControl` signal on page load
+2. Sets affected services' defaults to **denied** (unchecked in the Klaro modal)
+3. Immediately updates Google Consent Mode signals for affected consent mode services
+4. Fires a `gpcDetected` dataLayer event for analytics/GTM use
+
+GPC operates in **default mode only** — it changes service defaults but does not block users from explicitly accepting services via the Klaro consent modal. This aligns with the GPC specification: the signal expresses a preference, and the user retains the ability to override it.
+
+### GPC Sensitivity Layering
+
+The plugin determines which services are affected by GPC using three levels of control, evaluated in priority order:
+
+1. **Per-service override**: Each service has a GPC sensitivity setting (Auto / Yes / No). If explicitly set to Yes or No, that takes precedence.
+2. **Per-template purpose list**: Each template has a configurable list of GPC-sensitive purposes. Services whose purposes match this list are treated as GPC-sensitive.
+3. **Auto-detect fallback**: If neither the service nor template specifies, the default is to treat all purposes as GPC-sensitive.
+
+### Configuration
+
+#### Global Settings
+
+Navigate to **Klaro Geo > Klaro Geo** and find the **Global Privacy Control (GPC)** section:
+
+- **Enable GPC Detection**: Master switch for GPC across all templates. Enabled by default.
+- **Serve `/.well-known/gpc.json`**: When enabled, the plugin serves a `/.well-known/gpc.json` endpoint that signals to browsers and crawlers that your site respects GPC. Disabled by default.
+
+#### Per-Template Settings
+
+Navigate to **Klaro Geo > Templates**, select a template, and find the **Plugin Settings** section:
+
+- **Enable GPC for this Template**: Allows disabling GPC for specific templates. For example, you might disable GPC on a strict opt-in (EU) template where all services already default to denied, making GPC redundant.
+- **GPC-Sensitive Purposes**: Select which purposes are considered GPC-sensitive for this template. By default, all configured purposes are selected. For example, a US-CA template might only need `advertising`, while a general US template might include all purposes.
+
+#### Per-Service Settings
+
+Navigate to **Klaro Geo > Services**, edit a service, and find the **Advanced Settings** section:
+
+- **GPC Sensitivity**: A tri-state control:
+  - **Auto-detect (from purposes)**: Uses the template's GPC-sensitive purposes list to determine sensitivity. This is the default.
+  - **Yes (always GPC-sensitive)**: This service is always affected by GPC, regardless of its purposes.
+  - **No (never GPC-sensitive)**: This service is never affected by GPC, even if its purposes match.
+
+### Recommended Template Configurations
+
+| Template | GPC Enabled | GPC Purposes | Rationale |
+|----------|------------|--------------|-----------|
+| EU (strict opt-in) | Disabled | N/A | Already strict opt-in; GPC adds no value |
+| US-CA (CCPA) | Enabled | advertising | Matches CCPA "do not sell" scope |
+| US default | Enabled | All | Conservative default |
+| Relaxed (opt-out) | Enabled | All | GPC is most impactful here — overrides opt-out defaults |
+
+### Effect on Consent Signals
+
+For **opt-out templates** (where services default to granted), GPC has the most impact:
+
+| Signal | Without GPC | With GPC |
+|--------|------------|----------|
+| Advertising services (e.g., `ad_storage`) | `granted` | `denied` |
+| Analytics services (e.g., `analytics_storage`) | `granted` | `denied` (if purpose is GPC-sensitive) |
+| Klaro modal | Services pre-checked | Affected services unchecked |
+| User can still accept? | Yes | Yes |
+
+For **opt-in templates** (where services default to denied), GPC is effectively a no-op — everything is already denied by default.
+
+### DataLayer Events
+
+When GPC is detected, the plugin adds the following fields to the `klaroConfigLoaded` event:
+
+```javascript
+{
+    'klaroGeoGPCDetected': true,       // Was the GPC signal present?
+    'klaroGeoGPCEnabled': true,        // Was GPC processing enabled?
+    'klaroGeoGPCAffectedServices': ['ad-storage', 'ad-user-data', 'ad-personalization']
+}
+```
+
+A dedicated `gpcDetected` event is also fired when GPC is active:
+
+```javascript
+{
+    'event': 'Klaro Event',
+    'eventSource': 'klaro-geo',
+    'klaroEventName': 'gpcDetected',
+    'klaroGeoGPCAffectedServices': ['ad-storage', 'ad-user-data', 'ad-personalization']
+}
+```
+
+The `Klaro Consent Update` event includes a `gpcActive` field indicating whether GPC was detected for the session.
+
+### Consent Receipts
+
+When GPC is active, consent receipts include:
+
+- `gpc_detected`: `true` — confirms GPC was active when the receipt was generated
+- `gpc_affected_services`: array of service names whose defaults were overridden
+
+### `.well-known/gpc.json` Endpoint
+
+When enabled in global settings, the plugin serves a JSON response at `/.well-known/gpc.json`:
+
+```json
+{
+    "gpc": true,
+    "lastUpdate": "2026-03-04"
+}
+```
+
+This endpoint signals to browsers and automated tools that your site respects GPC. The `lastUpdate` field reflects the current date. After enabling this setting, you may need to flush your permalink settings (**Settings > Permalinks > Save Changes**) for the rewrite rule to take effect.
+
+### Testing GPC
+
+To test GPC behavior:
+
+1. **Firefox**: Navigate to `about:config` and set `privacy.globalprivacycontrol.enabled` to `true`
+2. **Brave**: GPC is enabled by default
+3. **Chrome/Edge**: Install a GPC browser extension
+4. Load your site with a relaxed (opt-out) template and verify:
+   - Affected services appear unchecked in the Klaro modal
+   - The dataLayer contains a `gpcDetected` event
+   - The `klaroConfigLoaded` event shows `klaroGeoGPCDetected: true`
+5. Accept all services in the modal to verify user override still works
+6. Check `/.well-known/gpc.json` returns valid JSON (if enabled)
 
 ## Consent Receipts
 

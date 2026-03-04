@@ -159,6 +159,24 @@ function klaro_geo_settings_page_content() {
                     </td>
                 </tr>
             </table>
+            <h2>Global Privacy Control (GPC)</h2>
+            <table class="form-table">
+                <tr valign="top">
+                    <th scope="row"><label for="klaro_geo_gpc_enabled">Enable GPC Detection</label></th>
+                    <td>
+                        <input type="checkbox" name="klaro_geo_gpc_enabled" id="klaro_geo_gpc_enabled" value="1" <?php checked(get_option('klaro_geo_gpc_enabled', true)); ?> />
+                        <p class="description">When enabled, the plugin detects the <code>navigator.globalPrivacyControl</code> browser signal and adjusts consent defaults for GPC-sensitive services (e.g., advertising). Users can still explicitly accept via the Klaro modal. Can also be enabled/disabled per-template.</p>
+                    </td>
+                </tr>
+                <tr valign="top">
+                    <th scope="row"><label for="klaro_geo_gpc_well_known">Serve <code>/.well-known/gpc.json</code></label></th>
+                    <td>
+                        <input type="checkbox" name="klaro_geo_gpc_well_known" id="klaro_geo_gpc_well_known" value="1" <?php checked(get_option('klaro_geo_gpc_well_known', false)); ?> />
+                        <p class="description">Serve a <code>/.well-known/gpc.json</code> endpoint indicating that this site respects Global Privacy Control signals. Required by some GPC specifications.</p>
+                    </td>
+                </tr>
+            </table>
+
             <h2>Data Layer Settings</h2>
             <table class="form-table">
                 <tr valign="top">
@@ -303,6 +321,18 @@ function klaro_geo_register_main_settings() {
     register_setting('klaro_geo_settings_group', 'klaro_geo_enable_consent_receipts');
     register_setting('klaro_geo_settings_group', 'klaro_geo_cleanup_on_deactivate');
     register_setting('klaro_geo_settings_group', 'klaro_geo_enable_debug_logging', [
+        'type' => 'boolean',
+        'default' => false,
+        'sanitize_callback' => 'rest_sanitize_boolean',
+    ]);
+
+    // GPC settings
+    register_setting('klaro_geo_settings_group', 'klaro_geo_gpc_enabled', [
+        'type' => 'boolean',
+        'default' => true,
+        'sanitize_callback' => 'rest_sanitize_boolean',
+    ]);
+    register_setting('klaro_geo_settings_group', 'klaro_geo_gpc_well_known', [
         'type' => 'boolean',
         'default' => false,
         'sanitize_callback' => 'rest_sanitize_boolean',

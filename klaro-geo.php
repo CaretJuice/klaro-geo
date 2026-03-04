@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Klaro Geo
  * Description: Loads Klaro! with Geo overrides when installed with the Geolocation IP Detection plugin.
- * Version: 0.3.3
+ * Version: 0.3.4
  * Author: Caret Juice Data Ltd., Damon Gudaitis
  * Author URI: https://caretjuice.com
  * Requires at least: 6.6
@@ -10,7 +10,7 @@
  * Requires PHP: 7.2
  */
 defined('ABSPATH') or die('No script kiddies please!');
-define('KLARO_GEO_VERSION', '0.3.3');
+define('KLARO_GEO_VERSION', '0.3.4');
 if (!defined('KLARO_GEO_PATH')) {
     define('KLARO_GEO_PATH', plugin_dir_path(__FILE__));
 }
@@ -800,6 +800,65 @@ function klaro_geo_validate_services() {
 
 // Add action to validate services on init
 add_action('init', 'klaro_geo_validate_services');
+
+/**
+ * Register rewrite rule for /.well-known/gpc.json
+ */
+function klaro_geo_gpc_rewrite_rules() {
+    add_rewrite_rule('^\.well-known/gpc\.json$', 'index.php?klaro_geo_gpc_json=1', 'top');
+}
+add_action('init', 'klaro_geo_gpc_rewrite_rules');
+
+/**
+ * Register the gpc query var
+ */
+function klaro_geo_gpc_query_vars($vars) {
+    $vars[] = 'klaro_geo_gpc_json';
+    return $vars;
+}
+add_filter('query_vars', 'klaro_geo_gpc_query_vars');
+
+/**
+ * Serve /.well-known/gpc.json response
+ */
+function klaro_geo_gpc_template_redirect() {
+    if (get_query_var('klaro_geo_gpc_json') !== '1') {
+        return;
+    }
+
+    if (!get_option('klaro_geo_gpc_well_known', false)) {
+        status_header(404);
+        exit;
+    }
+
+    header('Content-Type: application/json');
+    header('Cache-Control: public, max-age=86400');
+    echo wp_json_encode(array(
+        'gpc' => true,
+        'lastUpdate' => gmdate('Y-m-d'),
+    ));
+    exit;
+}
+add_action('template_redirect', 'klaro_geo_gpc_template_redirect', 1);
+
+/**
+ * Flush rewrite rules when GPC well-known setting changes
+ */
+function klaro_geo_gpc_flush_rewrite_on_save($old_value, $new_value) {
+    if ($old_value !== $new_value) {
+        flush_rewrite_rules();
+    }
+}
+add_action('update_option_klaro_geo_gpc_well_known', 'klaro_geo_gpc_flush_rewrite_on_save', 10, 2);
+
+/**
+ * Flush rewrite rules on activation to register the GPC endpoint
+ */
+function klaro_geo_gpc_activation() {
+    klaro_geo_gpc_rewrite_rules();
+    flush_rewrite_rules();
+}
+register_activation_hook(__FILE__, 'klaro_geo_gpc_activation');
 
 // Run GTM consent requirement migration on init (early priority to run before validation)
 add_action('init', 'klaro_geo_migrate_gtm_consent_requirement', 5);

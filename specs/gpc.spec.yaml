@@ -1,0 +1,162 @@
+# gpc.spec.yaml
+# Specification for Global Privacy Control (GPC) Support
+#
+# GPC is a browser signal (navigator.globalPrivacyControl) that communicates
+# "do not sell or share my personal information with third parties."
+
+file_meta:
+  purpose: "Define GPC detection and consent override contracts"
+  dependencies:
+    - "klaro-geo-config.php"
+    - "klaro-geo.js"
+    - "klaro-geo-consent-receipts.js"
+    - "klaro-geo-admin-settings.php"
+    - "klaro-geo-admin-templates.php"
+    - "klaro-geo-admin-services.php"
+  stability: "core"
+  last_updated: "2026-03-04"
+
+# =============================================================================
+# ARCHITECTURE
+# =============================================================================
+architecture:
+  principle: "Default mode only — GPC changes service defaults, users can still override"
+  description: |
+    GPC detection runs client-side in the generated klaro-config.js, after klaroConfig
+    is defined but before Klaro initializes. It modifies service defaults in-place.
+
+  detection:
+    method: "navigator.globalPrivacyControl === true"
+    timing: "In klaro-config.js, after klaroConfig definition, before Klaro init"
+    scope: "Client-side only (no server-side Sec-GPC header support)"
+
+  sensitivity_layering:
+    description: "Three levels of control, evaluated in priority order"
+    levels:
+      - level: 1
+        name: "Per-service flag"
+        key: "gpc_sensitive"
+        description: "Explicit override on the service itself. If set (true/false), this wins."
+      - level: 2
+        name: "Per-template purpose list"
+        key: "plugin_settings.gpc_purposes"
+        description: "Array of purposes considered GPC-sensitive for this template/region."
+        default: "all configured purposes (from klaro_geo_purposes option)"
+      - level: 3
+        name: "Auto-detect fallback"
+        description: "Services whose purposes intersect the template's gpc_purposes (default: all purposes)."
+
+# =============================================================================
+# SETTINGS
+# =============================================================================
+settings:
+  global:
+    klaro_geo_gpc_enabled:
+      type: "boolean"
+      default: true
+      description: "Master switch for GPC detection across all templates"
+
+    klaro_geo_gpc_well_known:
+      type: "boolean"
+      default: false
+      description: "Serve /.well-known/gpc.json endpoint"
+
+  per_template:
+    gpc_enabled:
+      location: "plugin_settings.gpc_enabled"
+      type: "boolean"
+      default: true
+      description: "Enable/disable GPC for this template. Disable for strict opt-in."
+
+    gpc_purposes:
+      location: "plugin_settings.gpc_purposes"
+      type: "array"
+      default: ["advertising"]
+      description: "Purposes considered GPC-sensitive in this template"
+
+  per_service:
+    gpc_sensitive:
+      type: "boolean|null"
+      default: null
+      description: "Explicit GPC sensitivity override. null = auto-detect."
+
+# =============================================================================
+# BEHAVIOR
+# =============================================================================
+behavior:
+  gpc_detected:
+    condition: "navigator.globalPrivacyControl === true AND gpc_enabled"
+    effects:
+      - "Set service.default = false for all gpc_sensitive non-required services"
+      - "Emit gtag('consent', 'update') with denied for affected consent mode keys"
+      - "Fire 'gpcDetected' dataLayer event"
+      - "Include GPC state in klaroConfigLoaded event"
+
+  gpc_not_detected:
+    condition: "navigator.globalPrivacyControl !== true OR !gpc_enabled"
+    effects:
+      - "No service defaults modified"
+      - "klaroGeoGPC.detected = false in klaroConfigLoaded"
+
+  user_override:
+    description: "Users can still accept GPC-affected services via the Klaro modal"
+    behavior: "Normal consent flow — GPC only affects defaults, not hard blocks"
+
+# =============================================================================
+# DATALAYER EVENTS
+# =============================================================================
+events:
+  klaroConfigLoaded_gpc_fields:
+    description: "GPC fields added to existing klaroConfigLoaded event"
+    fields:
+      klaroGeoGPCDetected:
+        type: "boolean"
+        description: "Whether navigator.globalPrivacyControl was true"
+      klaroGeoGPCEnabled:
+        type: "boolean"
+        description: "Whether GPC processing was enabled for this config"
+      klaroGeoGPCAffectedServices:
+        type: "array"
+        description: "Service names whose defaults were overridden by GPC"
+
+  gpcDetected:
+    description: "Dedicated event fired only when GPC is active"
+    condition: "klaroGeoGPC.detected === true"
+    structure:
+      event: "Klaro Event"
+      eventSource: "klaro-geo"
+      klaroEventName: "gpcDetected"
+      klaroGeoGPCAffectedServices: "array of affected service names"
+
+  klaro_consent_update_gpc:
+    description: "GPC field added to existing Klaro Consent Update event"
+    field:
+      gpcActive:
+        type: "boolean"
+        description: "Whether GPC was detected for this session"
+
+# =============================================================================
+# CONSENT RECEIPTS
+# =============================================================================
+consent_receipts:
+  gpc_fields:
+    gpc_detected:
+      type: "boolean"
+      description: "Whether GPC signal was active when receipt was generated"
+    gpc_affected_services:
+      type: "array"
+      description: "Services whose defaults were affected by GPC"
+
+# =============================================================================
+# WELL-KNOWN ENDPOINT
+# =============================================================================
+well_known:
+  path: "/.well-known/gpc.json"
+  condition: "klaro_geo_gpc_well_known option is true"
+  response:
+    content_type: "application/json"
+    body:
+      gpc: true
+      lastUpdate: "YYYY-MM-DD format, current date"
+  when_disabled:
+    status: 404
