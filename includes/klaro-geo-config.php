@@ -419,35 +419,31 @@ function klaro_geo_generate_config_file() {
     // GPC detection and service default override (runs before Klaro initializes)
     $gpc_purposes_json = wp_json_encode($gpc_purposes);
     $gpc_enabled_js = $gpc_enabled ? 'true' : 'false';
-    // phpcs:ignore PluginCheck.CodeAnalysis.Heredoc.NotAllowed -- Heredoc used for readable multi-line JavaScript generation.
-    $klaro_config_content .= <<<JS
-// ===== GLOBAL PRIVACY CONTROL (GPC) =====
-var klaroGeoGPC = { detected: false, enabled: false, affectedServices: [] };
-(function() {
-    var gpcConfig = { enabled: {$gpc_enabled_js}, gpc_purposes: {$gpc_purposes_json} };
-    klaroGeoGPC.enabled = gpcConfig.enabled;
-
-    if (!gpcConfig.enabled) return;
-
-    klaroGeoGPC.detected = (navigator.globalPrivacyControl === true);
-    if (!klaroGeoGPC.detected) return;
-
-    // Override defaults for GPC-sensitive services
-    if (klaroConfig && klaroConfig.services) {
-        for (var i = 0; i < klaroConfig.services.length; i++) {
-            var svc = klaroConfig.services[i];
-            if (svc.gpc_sensitive && !svc.required) {
-                svc.default = false;
-                klaroGeoGPC.affectedServices.push(svc.name);
-            }
-        }
-    }
-})();
-window.klaroGeo = window.klaroGeo || {};
-window.klaroGeo.gpc = klaroGeoGPC;
-// ===== END GPC =====
-
-JS;
+    $klaro_config_content .= "// ===== GLOBAL PRIVACY CONTROL (GPC) =====\n";
+    $klaro_config_content .= "var klaroGeoGPC = { detected: false, enabled: false, affectedServices: [] };\n";
+    $klaro_config_content .= "(function() {\n";
+    $klaro_config_content .= "    var gpcConfig = { enabled: " . $gpc_enabled_js . ", gpc_purposes: " . $gpc_purposes_json . " };\n";
+    $klaro_config_content .= "    klaroGeoGPC.enabled = gpcConfig.enabled;\n";
+    $klaro_config_content .= "\n";
+    $klaro_config_content .= "    if (!gpcConfig.enabled) return;\n";
+    $klaro_config_content .= "\n";
+    $klaro_config_content .= "    klaroGeoGPC.detected = (navigator.globalPrivacyControl === true);\n";
+    $klaro_config_content .= "    if (!klaroGeoGPC.detected) return;\n";
+    $klaro_config_content .= "\n";
+    $klaro_config_content .= "    // Override defaults for GPC-sensitive services\n";
+    $klaro_config_content .= "    if (klaroConfig && klaroConfig.services) {\n";
+    $klaro_config_content .= "        for (var i = 0; i < klaroConfig.services.length; i++) {\n";
+    $klaro_config_content .= "            var svc = klaroConfig.services[i];\n";
+    $klaro_config_content .= "            if (svc.gpc_sensitive && !svc.required) {\n";
+    $klaro_config_content .= "                svc.default = false;\n";
+    $klaro_config_content .= "                klaroGeoGPC.affectedServices.push(svc.name);\n";
+    $klaro_config_content .= "            }\n";
+    $klaro_config_content .= "        }\n";
+    $klaro_config_content .= "    }\n";
+    $klaro_config_content .= "})();\n";
+    $klaro_config_content .= "window.klaroGeo = window.klaroGeo || {};\n";
+    $klaro_config_content .= "window.klaroGeo.gpc = klaroGeoGPC;\n";
+    $klaro_config_content .= "// ===== END GPC =====\n\n";
 
     // Add dataLayer push for debugging with JavaScript to include latest consent receipt
     $klaro_config_content .= "// Push debug information to dataLayer with latest consent receipt\n";
@@ -595,44 +591,41 @@ if (klaroGeoGPC.detected) {
         $parent_child_map_json = wp_json_encode($parent_child_map);
 
         // Add variables for the consent receipts script
-        // phpcs:ignore PluginCheck.CodeAnalysis.Heredoc.NotAllowed -- Heredoc used for readable multi-line JavaScript generation.
-        $klaro_config_content .= <<<JS
-// Consent Receipt Configuration
-// NOTE: Consent mode is ALWAYS enabled - consent mode services are now first-class Klaro services
-window.klaroConsentData = {
-    gtmId: "{$gtm_id}",
-    consentModeType: "{$consent_mode_type}",
-    templateName: "{$template_to_use}",
-    templateSource: "{$template_source}",
-    detectedCountry: "{$user_country}",
-    detectedRegion: "{$user_region}",
-    adminOverride: {$admin_override_value},
-    ajaxUrl: "{$admin_ajax_url}",
-    nonce: "{$consent_nonce}",
-    enableConsentLogging: {$enable_consent_logging_value},
-    consentMode: {$consent_mode_js},
-    suppressConsentsEvents: {$suppress_consents_events},
-    consentModeServices: {$consent_mode_services_json},
-    parentChildMap: {$parent_child_map_json},
-    templateSettings: {
-        consentModalTitle: "{$modal_title}",
-        consentModalDescription: "{$modal_description}",
-        acceptAllText: "{$accept_all_text}",
-        declineAllText: "{$decline_all_text}",
-        defaultConsent: {$default_consent},
-        requiredConsent: {$required_consent},
-        config: {
-            consent_mode_settings: {
-                consent_defaults: {$consent_defaults_json},
-                gtag_settings: {
-                    ads_data_redaction: {$ads_data_redaction},
-                    url_passthrough: {$url_passthrough}
-                }
-            }
-        }
-    }
-};
-JS;
+        $klaro_config_content .= "// Consent Receipt Configuration\n";
+        $klaro_config_content .= "// NOTE: Consent mode is ALWAYS enabled - consent mode services are now first-class Klaro services\n";
+        $klaro_config_content .= "window.klaroConsentData = {\n";
+        $klaro_config_content .= "    gtmId: " . wp_json_encode( $gtm_id ) . ",\n";
+        $klaro_config_content .= "    consentModeType: " . wp_json_encode( $consent_mode_type ) . ",\n";
+        $klaro_config_content .= "    templateName: " . wp_json_encode( $template_to_use ) . ",\n";
+        $klaro_config_content .= "    templateSource: " . wp_json_encode( $template_source ) . ",\n";
+        $klaro_config_content .= "    detectedCountry: " . wp_json_encode( $user_country ) . ",\n";
+        $klaro_config_content .= "    detectedRegion: " . wp_json_encode( $user_region ) . ",\n";
+        $klaro_config_content .= "    adminOverride: " . $admin_override_value . ",\n";
+        $klaro_config_content .= "    ajaxUrl: " . wp_json_encode( $admin_ajax_url ) . ",\n";
+        $klaro_config_content .= "    nonce: " . wp_json_encode( $consent_nonce ) . ",\n";
+        $klaro_config_content .= "    enableConsentLogging: " . $enable_consent_logging_value . ",\n";
+        $klaro_config_content .= "    consentMode: " . $consent_mode_js . ",\n";
+        $klaro_config_content .= "    suppressConsentsEvents: " . $suppress_consents_events . ",\n";
+        $klaro_config_content .= "    consentModeServices: " . $consent_mode_services_json . ",\n";
+        $klaro_config_content .= "    parentChildMap: " . $parent_child_map_json . ",\n";
+        $klaro_config_content .= "    templateSettings: {\n";
+        $klaro_config_content .= "        consentModalTitle: " . wp_json_encode( $modal_title ) . ",\n";
+        $klaro_config_content .= "        consentModalDescription: " . wp_json_encode( $modal_description ) . ",\n";
+        $klaro_config_content .= "        acceptAllText: " . wp_json_encode( $accept_all_text ) . ",\n";
+        $klaro_config_content .= "        declineAllText: " . wp_json_encode( $decline_all_text ) . ",\n";
+        $klaro_config_content .= "        defaultConsent: " . $default_consent . ",\n";
+        $klaro_config_content .= "        requiredConsent: " . $required_consent . ",\n";
+        $klaro_config_content .= "        config: {\n";
+        $klaro_config_content .= "            consent_mode_settings: {\n";
+        $klaro_config_content .= "                consent_defaults: " . $consent_defaults_json . ",\n";
+        $klaro_config_content .= "                gtag_settings: {\n";
+        $klaro_config_content .= "                    ads_data_redaction: " . $ads_data_redaction . ",\n";
+        $klaro_config_content .= "                    url_passthrough: " . $url_passthrough . "\n";
+        $klaro_config_content .= "                }\n";
+        $klaro_config_content .= "            }\n";
+        $klaro_config_content .= "        }\n";
+        $klaro_config_content .= "    }\n";
+        $klaro_config_content .= "};\n";
     }
 
     // Write the content to klaro-config.js in the plugin root directory
