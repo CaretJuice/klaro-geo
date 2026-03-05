@@ -119,7 +119,7 @@ function klaro_geo_settings_page_content() {
                     <td>
                         <p><strong>How to add a consent button to your WordPress menu:</strong></p>
                         <ol>
-                            <li>Go to <a href="<?php echo admin_url('nav-menus.php'); ?>">Appearance > Menus</a> in your WordPress admin</li>
+                            <li>Go to <a href="<?php echo esc_url( admin_url('nav-menus.php') ); ?>">Appearance > Menus</a> in your WordPress admin</li>
                             <li>Create a new menu or edit an existing one</li>
                             <li>In the "Custom Links" section, add a link with:
                                 <ul>
@@ -255,11 +255,24 @@ function klaro_geo_process_debug_countries($new_value, $old_value) {
 // Register settings for the main settings page
 function klaro_geo_register_main_settings() {
     // Template settings
-    register_setting('klaro_geo_settings_group', 'klaro_geo_templates');
+    register_setting('klaro_geo_settings_group', 'klaro_geo_templates', [
+        'sanitize_callback' => function($input) {
+            if (!is_array($input)) {
+                return [];
+            }
+            return array_map(function($template) {
+                return is_array($template) ? array_map('sanitize_text_field', $template) : sanitize_text_field($template);
+            }, $input);
+        }
+    ]);
 
     // Service and purpose settings
-    register_setting('klaro_geo_settings_group', 'klaro_geo_analytics_purposes');
-    register_setting('klaro_geo_settings_group', 'klaro_geo_ad_purposes');
+    register_setting('klaro_geo_settings_group', 'klaro_geo_analytics_purposes', [
+        'sanitize_callback' => 'sanitize_text_field',
+    ]);
+    register_setting('klaro_geo_settings_group', 'klaro_geo_ad_purposes', [
+        'sanitize_callback' => 'sanitize_text_field',
+    ]);
     register_setting('klaro_geo_settings_group', 'klaro_geo_purposes', [
         'type' => 'string',
         'default' => 'functional,analytics,advertising',
@@ -294,9 +307,18 @@ function klaro_geo_register_main_settings() {
     ]);
 
     // Other settings
-    register_setting('klaro_geo_settings_group', 'klaro_geo_js_version');
-    register_setting('klaro_geo_settings_group', 'klaro_geo_js_variant');
-    register_setting('klaro_geo_settings_group', 'klaro_geo_fallback_behavior');
+    register_setting('klaro_geo_settings_group', 'klaro_geo_js_version', [
+        'sanitize_callback' => 'sanitize_text_field',
+    ]);
+    register_setting('klaro_geo_settings_group', 'klaro_geo_js_variant', [
+        'sanitize_callback' => function($input) {
+            $valid_variants = ['klaro.js', 'klaro-no-css.js'];
+            return in_array($input, $valid_variants, true) ? $input : 'klaro.js';
+        },
+    ]);
+    register_setting('klaro_geo_settings_group', 'klaro_geo_fallback_behavior', [
+        'sanitize_callback' => 'sanitize_text_field',
+    ]);
     register_setting('klaro_geo_settings_group', 'klaro_geo_debug_countries', [
         'type' => 'array',
         'default' => ['US', 'US-CA', 'CA', 'CA-QC', 'UK', 'FR', 'AU'],
@@ -318,8 +340,16 @@ function klaro_geo_register_main_settings() {
             return ['US', 'US-CA', 'CA', 'CA-QC', 'UK', 'FR', 'AU'];
         },
     ]);
-    register_setting('klaro_geo_settings_group', 'klaro_geo_enable_consent_receipts');
-    register_setting('klaro_geo_settings_group', 'klaro_geo_cleanup_on_deactivate');
+    register_setting('klaro_geo_settings_group', 'klaro_geo_enable_consent_receipts', [
+        'type' => 'boolean',
+        'default' => false,
+        'sanitize_callback' => 'rest_sanitize_boolean',
+    ]);
+    register_setting('klaro_geo_settings_group', 'klaro_geo_cleanup_on_deactivate', [
+        'type' => 'boolean',
+        'default' => false,
+        'sanitize_callback' => 'rest_sanitize_boolean',
+    ]);
     register_setting('klaro_geo_settings_group', 'klaro_geo_enable_debug_logging', [
         'type' => 'boolean',
         'default' => false,

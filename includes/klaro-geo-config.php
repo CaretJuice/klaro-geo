@@ -1,4 +1,5 @@
 <?php
+if ( ! defined( 'ABSPATH' ) ) exit;
 
 // Function to generate klaro-config.js
 function klaro_geo_generate_config_file() {
@@ -184,7 +185,7 @@ function klaro_geo_generate_config_file() {
     if (!isset($klaro_config['cookieDomain']) || $klaro_config['cookieDomain'] === '') {
         // Get the site's domain from WordPress
         $raw_site_url = get_site_url();
-        $site_url = parse_url($raw_site_url, PHP_URL_HOST);
+        $site_url = wp_parse_url($raw_site_url, PHP_URL_HOST);
 
         if ($site_url) {
             // Add leading dot for subdomain sharing (e.g., ".example.com")
@@ -418,6 +419,7 @@ function klaro_geo_generate_config_file() {
     // GPC detection and service default override (runs before Klaro initializes)
     $gpc_purposes_json = wp_json_encode($gpc_purposes);
     $gpc_enabled_js = $gpc_enabled ? 'true' : 'false';
+    // phpcs:ignore PluginCheck.CodeAnalysis.Heredoc.NotAllowed -- Heredoc used for readable multi-line JavaScript generation.
     $klaro_config_content .= <<<JS
 // ===== GLOBAL PRIVACY CONTROL (GPC) =====
 var klaroGeoGPC = { detected: false, enabled: false, affectedServices: [] };
@@ -593,6 +595,7 @@ if (klaroGeoGPC.detected) {
         $parent_child_map_json = wp_json_encode($parent_child_map);
 
         // Add variables for the consent receipts script
+        // phpcs:ignore PluginCheck.CodeAnalysis.Heredoc.NotAllowed -- Heredoc used for readable multi-line JavaScript generation.
         $klaro_config_content .= <<<JS
 // Consent Receipt Configuration
 // NOTE: Consent mode is ALWAYS enabled - consent mode services are now first-class Klaro services

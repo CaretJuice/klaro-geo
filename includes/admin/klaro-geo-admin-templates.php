@@ -113,12 +113,13 @@ function klaro_geo_templates_page() {
         check_admin_referer('klaro_geo_template_nonce');
         klaro_geo_debug_log('Saving template changes...');
 
-        $current_template = sanitize_text_field($_POST['current_template']);
+        $current_template = isset($_POST['current_template']) ? sanitize_text_field(wp_unslash($_POST['current_template'])) : 'default';
         klaro_geo_debug_log('Current template: ' . $current_template);
 
         // Get the template configuration from POST data
+        // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- template_config is a complex nested array; individual values are sanitized below
         if (isset($_POST['template_config']) && is_array($_POST['template_config'])) {
-            $template_config = $_POST['template_config']; // Assign the whole array
+            $template_config = wp_unslash($_POST['template_config']); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized per-key below
             klaro_geo_debug_log('Received template config: ' . print_r($template_config, true));
 
             // Check if translations_json is present in the POST data
@@ -129,9 +130,6 @@ function klaro_geo_templates_page() {
 
                 // Clean the JSON string to prevent syntax errors
                 $translations_json = trim($translations_json);
-
-                // Fix escaped quotes that might be causing issues - but be careful not to strip too much
-                $translations_json = stripslashes($translations_json);
 
                 // Let's take a simpler approach to fix the JSON
                 // First, let's make sure we have valid JSON structure
@@ -299,7 +297,7 @@ function klaro_geo_templates_page() {
             unset($template_config['translations_json']);
 
             // Sanitize the rest of the config values
-            foreach ($_POST['template_config'] as $key => $value) {
+            foreach ($template_config as $key => $value) {
                 // Skip translations_json as we already processed it
                 if ($key === 'translations_json') continue;
                 // Skip translations as we already processed it
@@ -358,16 +356,17 @@ function klaro_geo_templates_page() {
         }
 
         // Get Plugin settings
-        if (isset($_POST['plugin_settings']) && is_array($_POST['plugin_settings'])) {
+        $plugin_settings_raw = isset($_POST['plugin_settings']) ? wp_unslash($_POST['plugin_settings']) : null; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized per-key below
+        if (is_array($plugin_settings_raw)) {
             $plugin_settings = array();
 
             // Process enable_consent_logging setting
-            $plugin_settings['enable_consent_logging'] = isset($_POST['plugin_settings']['enable_consent_logging']);
+            $plugin_settings['enable_consent_logging'] = isset($plugin_settings_raw['enable_consent_logging']);
 
             // Process GPC settings
-            $plugin_settings['gpc_enabled'] = isset($_POST['plugin_settings']['gpc_enabled']);
-            $plugin_settings['gpc_purposes'] = isset($_POST['plugin_settings']['gpc_purposes']) && is_array($_POST['plugin_settings']['gpc_purposes'])
-                ? array_map('sanitize_text_field', $_POST['plugin_settings']['gpc_purposes'])
+            $plugin_settings['gpc_enabled'] = isset($plugin_settings_raw['gpc_enabled']);
+            $plugin_settings['gpc_purposes'] = isset($plugin_settings_raw['gpc_purposes']) && is_array($plugin_settings_raw['gpc_purposes'])
+                ? array_map('sanitize_text_field', $plugin_settings_raw['gpc_purposes'])
                 : array();
 
             // Get the existing template
@@ -397,7 +396,7 @@ function klaro_geo_templates_page() {
         if (isset($_POST['inherit_from'])) {
             $template = $template_settings->get_template($current_template);
             if ($template) {
-                $template['inherit_from'] = sanitize_text_field($_POST['inherit_from']);
+                $template['inherit_from'] = sanitize_text_field(wp_unslash($_POST['inherit_from']));
                 $template_settings->set_template($current_template, $template);
             }
         }
@@ -414,14 +413,14 @@ function klaro_geo_templates_page() {
         );
 
         // Set the current template to the one that was just saved
-        $current_template = sanitize_text_field($_POST['current_template']);
+        $current_template = isset($_POST['current_template']) ? sanitize_text_field(wp_unslash($_POST['current_template'])) : 'default';
 
         // Ensure the template data is properly loaded after saving
         $templates = $template_settings->get();
 
         // Force a redirect to ensure the page is properly refreshed with the new data
         if (!headers_sent()) {
-            wp_redirect(add_query_arg(array(
+            wp_safe_redirect(add_query_arg(array(
                 'page' => 'klaro-geo-templates',
                 'template' => $current_template,
                 'updated' => 'true',
@@ -433,12 +432,12 @@ function klaro_geo_templates_page() {
 
     // Get current templates
     $templates = $template_settings->get();
-    $current_template = isset($_GET['template']) ? sanitize_text_field($_GET['template']) : 'default';
+    $current_template = isset($_GET['template']) ? sanitize_text_field(wp_unslash($_GET['template'])) : 'default';
 
     ?>
     <script type="text/javascript">
     // Make templates data available to JavaScript with timestamp for cache busting
-    var klaroGeoTemplates = <?php echo json_encode(array('templates' => $templates, 'timestamp' => time())); ?>;
+    var klaroGeoTemplates = <?php echo wp_json_encode(array('templates' => $templates, 'timestamp' => time())); ?>;
     </script>
 
     <div class="wrap">
@@ -448,7 +447,7 @@ function klaro_geo_templates_page() {
             <?php wp_nonce_field('klaro_geo_template_nonce'); ?>
 
             <!-- Add a hidden nonce field for AJAX requests -->
-            <input type="hidden" name="klaro_geo_nonce" id="klaro_geo_nonce" value="<?php echo wp_create_nonce('klaro_geo_template_nonce'); ?>">
+            <input type="hidden" name="klaro_geo_nonce" id="klaro_geo_nonce" value="<?php echo esc_attr(wp_create_nonce('klaro_geo_template_nonce')); ?>">
 
             <input type="hidden" name="current_template" id="current_template" value="<?php echo esc_attr($current_template); ?>">
             <input type="hidden" name="template_id" id="template_id" value="<?php echo esc_attr($current_template); ?>">
@@ -488,7 +487,7 @@ function klaro_geo_templates_page() {
                     $('#current_template').val(selectedTemplate);
 
                     // Redirect to the selected template
-                    window.location.href = '<?php echo admin_url('admin.php?page=klaro-geo-templates'); ?>&template=' + selectedTemplate;
+                    window.location.href = '<?php echo esc_url(admin_url('admin.php?page=klaro-geo-templates')); ?>&template=' + selectedTemplate;
                 });
 
                 // Handle delete template button
@@ -515,7 +514,7 @@ function klaro_geo_templates_page() {
                                 if (response.success) {
                                     alert('Template deleted successfully.');
                                     // Redirect to the templates page with the default template selected
-                                    window.location.href = '<?php echo admin_url('admin.php?page=klaro-geo-templates'); ?>';
+                                    window.location.href = '<?php echo esc_url(admin_url('admin.php?page=klaro-geo-templates')); ?>';
                                 } else {
                                     // Create a more user-friendly error message
                                     var errorMessage = 'Error deleting template: ' + response.data.message;
@@ -1174,7 +1173,7 @@ function klaro_geo_templates_page() {
                 <p class="description">
                     Consent mode is always enabled. Consent mode signals (ad_storage, analytics_storage, ad_user_data, ad_personalization)
                     are now controlled by dedicated consent mode services that appear in the consent modal.
-                    Configure these services in the <a href="<?php echo admin_url('admin.php?page=klaro-geo-services'); ?>">Services</a> section.
+                    Configure these services in the <a href="<?php echo esc_url(admin_url('admin.php?page=klaro-geo-services')); ?>">Services</a> section.
                 </p>
                 <div class="notice notice-info inline" style="margin: 10px 0;">
                     <p><strong>How it works:</strong></p>
@@ -1219,7 +1218,7 @@ function klaro_geo_templates_page() {
                     <br>2. <strong>Service-level override</strong> → if service has explicit default set
                     <br>3. <strong>Template default</strong> → inherited from this template's "Default Consent State" setting above
                     <br><br>
-                    To change a service's default, edit it in <a href="<?php echo admin_url('admin.php?page=klaro-geo-services'); ?>">Services settings</a>.
+                    To change a service's default, edit it in <a href="<?php echo esc_url(admin_url('admin.php?page=klaro-geo-services')); ?>">Services settings</a>.
                     Service-level overrides are recommended for "functional" purposes only.
                 </p>
                 <table class="widefat striped" style="max-width: 600px;">
@@ -1268,7 +1267,7 @@ function klaro_geo_templates_page() {
                                 </td>
                                 <td><code><?php echo esc_html($consent_key); ?></code></td>
                                 <td>
-                                    <span style="color: <?php echo $default_value === 'granted' ? '#006600' : '#cc0000'; ?>; font-weight: bold;">
+                                    <span style="color: <?php echo esc_attr($default_value === 'granted' ? '#006600' : '#cc0000'); ?>; font-weight: bold;">
                                         <?php echo esc_html($default_value); ?>
                                     </span>
                                 </td>
@@ -1310,7 +1309,7 @@ function klaro_geo_templates_page() {
                                 $purpose = trim($purpose);
                                 if (empty($purpose)) continue;
                                 $checked = in_array($purpose, $gpc_purposes) ? 'checked' : '';
-                                echo '<label style="margin-right: 15px;"><input type="checkbox" name="plugin_settings[gpc_purposes][]" value="' . esc_attr($purpose) . '" ' . $checked . '> ' . esc_html(ucfirst($purpose)) . '</label>';
+                                echo '<label style="margin-right: 15px;"><input type="checkbox" name="plugin_settings[gpc_purposes][]" value="' . esc_attr($purpose) . '" ' . esc_attr($checked) . '> ' . esc_html(ucfirst($purpose)) . '</label>';
                             }
                             ?>
                             <p class="description">Services with these purposes will have their defaults set to denied when GPC is detected (unless overridden per-service). Default: advertising only.</p>
@@ -1779,8 +1778,12 @@ function klaro_geo_create_templates() {
 function klaro_geo_create_template() {
     check_ajax_referer('klaro_geo_template_nonce', 'nonce');
 
-    $template_name = sanitize_text_field($_POST['template_name']);
-    $inherit_from = sanitize_text_field($_POST['inherit_from']);
+    if (!isset($_POST['template_name']) || !isset($_POST['inherit_from'])) {
+        wp_send_json_error(array('message' => 'Missing required fields.'));
+        return;
+    }
+    $template_name = sanitize_text_field(wp_unslash($_POST['template_name']));
+    $inherit_from = sanitize_text_field(wp_unslash($_POST['inherit_from']));
 
     // Initialize the template settings class
     $template_settings = new Klaro_Geo_Template_Settings();
@@ -1863,7 +1866,7 @@ function klaro_geo_save_translations_ajax() {
     }
 
     // Verify nonce
-    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'klaro_geo_template_nonce')) {
+    if (!isset($_POST['nonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['nonce'])), 'klaro_geo_template_nonce')) {
         wp_send_json_error(array('message' => 'Security check failed. Please refresh the page and try again.'));
         return;
     }
@@ -1875,7 +1878,7 @@ function klaro_geo_save_translations_ajax() {
     }
 
     // Get the template ID
-    $template_id = sanitize_text_field($_POST['template_id']);
+    $template_id = sanitize_text_field(wp_unslash($_POST['template_id']));
 
     // Initialize the template settings class
     $template_settings = new Klaro_Geo_Template_Settings();
@@ -1892,7 +1895,8 @@ function klaro_geo_save_translations_ajax() {
 
     // Process the translations JSON
     if (isset($_POST['translations_json']) && !empty($_POST['translations_json'])) {
-        $translations_json = stripslashes($_POST['translations_json']);
+        // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- JSON string cannot be sanitized with sanitize_text_field; it is validated via json_decode below
+        $translations_json = wp_unslash($_POST['translations_json']);
         klaro_geo_debug_log('Received translations JSON: ' . substr($translations_json, 0, 500) . (strlen($translations_json) > 500 ? '...' : ''));
 
         try {
@@ -1942,7 +1946,7 @@ add_action('wp_ajax_klaro_geo_save_translations', 'klaro_geo_save_translations_a
  */
 function klaro_geo_delete_template_ajax() {
     // Check nonce for security
-    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'klaro_geo_template_nonce')) {
+    if (!isset($_POST['nonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['nonce'])), 'klaro_geo_template_nonce')) {
         wp_send_json_error(array('message' => 'Security check failed.'));
         return;
     }
@@ -1959,7 +1963,7 @@ function klaro_geo_delete_template_ajax() {
         return;
     }
 
-    $template_id = sanitize_text_field($_POST['template_id']);
+    $template_id = sanitize_text_field(wp_unslash($_POST['template_id']));
 
     // Don't allow deleting the default template
     if ($template_id === 'default') {

@@ -27,10 +27,12 @@ function klaro_geo_country_settings_page_content() {
     // Load country codes from CSV file
     $csv_file = dirname(dirname(plugin_dir_path(__FILE__))) . '/countries.csv';
     $countries = array();
+    // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen -- Reading bundled CSV file
     if (($handle = fopen($csv_file, "r")) !== FALSE) {
         while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
             $countries[$data[0]] = $data[1];
         }
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
         fclose($handle);
     }
 
@@ -97,13 +99,13 @@ function klaro_geo_country_settings_page_content() {
                 <?php endforeach; ?>
             </ul>
             <p>Available templates: <strong><?php echo esc_html(implode(', ', $available_template_keys)); ?></strong></p>
-            <p>Please update these settings to use valid template keys, or <a href="<?php echo admin_url('admin.php?page=klaro_geo_templates_page'); ?>">create the missing templates</a>.</p>
+            <p>Please update these settings to use valid template keys, or <a href="<?php echo esc_url( admin_url('admin.php?page=klaro_geo_templates_page') ); ?>">create the missing templates</a>.</p>
         </div>
         <?php endif; ?>
 
         <?php if (empty($templates)) : ?>
         <div class="notice notice-warning">
-            <p><strong>No templates found.</strong> Please <a href="<?php echo admin_url('admin.php?page=klaro_geo_templates_page'); ?>">save your templates</a> first before configuring country settings.</p>
+            <p><strong>No templates found.</strong> Please <a href="<?php echo esc_url( admin_url('admin.php?page=klaro_geo_templates_page') ); ?>">save your templates</a> first before configuring country settings.</p>
         </div>
         <?php endif; ?>
 
@@ -267,9 +269,13 @@ function klaro_geo_country_settings_page_content() {
         </form>
     </div>
     <?php
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['option_page']) && $_POST['option_page'] === 'klaro_geo_country_settings_group' ) {
+    if ( isset( $_SERVER['REQUEST_METHOD'] ) && $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['option_page'] ) && sanitize_text_field( wp_unslash( $_POST['option_page'] ) ) === 'klaro_geo_country_settings_group' ) {
+        // Verify nonce - settings_fields() outputs a nonce with this action
+        check_admin_referer( 'klaro_geo_country_settings_group-options' );
+
         // Get the submitted settings
-        $submitted_settings = isset($_POST['klaro_geo_country_settings']) ? $_POST['klaro_geo_country_settings'] : array();
+        // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Recursively sanitized below via update_from_form()
+        $submitted_settings = isset( $_POST['klaro_geo_country_settings'] ) ? map_deep( wp_unslash( $_POST['klaro_geo_country_settings'] ), 'sanitize_text_field' ) : array();
 
         // Use the new country settings class
         $country_settings = Klaro_Geo_Country_Settings::get_instance();
@@ -284,7 +290,7 @@ function klaro_geo_country_settings_page_content() {
 
         // Also save visible countries if they were submitted
         if (isset($_POST['klaro_geo_visible_countries'])) {
-            $visible_countries = array_map('sanitize_text_field', $_POST['klaro_geo_visible_countries']);
+            $visible_countries = array_map( 'sanitize_text_field', wp_unslash( $_POST['klaro_geo_visible_countries'] ) );
             $country_settings->set_visible_countries($visible_countries);
             $country_settings->save_visible_countries();
             klaro_geo_debug_log('Saved visible countries from form submission');
@@ -294,8 +300,16 @@ function klaro_geo_country_settings_page_content() {
 
 // Register settings for country settings
 function klaro_geo_register_country_settings() {
-    register_setting('klaro_geo_country_settings_group', 'klaro_geo_country_settings');
-    register_setting('klaro_geo_country_settings_group', 'klaro_geo_visible_countries');
+    register_setting('klaro_geo_country_settings_group', 'klaro_geo_country_settings', array(
+        'sanitize_callback' => function( $input ) {
+            return map_deep( (array) $input, 'sanitize_text_field' );
+        },
+    ));
+    register_setting('klaro_geo_country_settings_group', 'klaro_geo_visible_countries', array(
+        'sanitize_callback' => function( $input ) {
+            return array_map( 'sanitize_text_field', (array) $input );
+        },
+    ));
 }
 add_action('admin_init', 'klaro_geo_register_country_settings');
 
@@ -308,10 +322,11 @@ function klaro_geo_save_country_settings() {
         return;
     }
 
-    parse_str($_POST['settings'], $settings);
+    $raw_settings = isset( $_POST['settings'] ) ? wp_unslash( $_POST['settings'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Sanitized after parse_str below
+    parse_str( $raw_settings, $settings );
 
     // Get the submitted settings
-    $submitted_settings = isset($settings['klaro_geo_country_settings']) ? $settings['klaro_geo_country_settings'] : array();
+    $submitted_settings = isset($settings['klaro_geo_country_settings']) ? map_deep( $settings['klaro_geo_country_settings'], 'sanitize_text_field' ) : array();
 
     // Use the new country settings class
     $country_settings = Klaro_Geo_Country_Settings::get_instance();
@@ -414,6 +429,7 @@ function klaro_geo_get_regions() {
     $regions = [];
     $languages = [];
 
+    // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen -- Reading bundled CSV file
     if (file_exists($regions_file) && ($handle = fopen($regions_file, "r")) !== FALSE) {
         // Skip the header row
         $header = fgetcsv($handle, 1000, ",");
@@ -457,6 +473,7 @@ function klaro_geo_get_regions() {
         }
 
         klaro_geo_debug_log('Processed ' . $row_count . ' rows, found ' . $match_count . ' matches for country ' . $country);
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
         fclose($handle);
     }
 
@@ -531,10 +548,7 @@ function klaro_geo_save_visible_countries() {
         return;
     }
 
-    $countries = isset($_POST['countries']) ? $_POST['countries'] : [];
-
-    // Sanitize country codes
-    $countries = array_map('sanitize_text_field', $countries);
+    $countries = isset($_POST['countries']) ? array_map( 'sanitize_text_field', wp_unslash( $_POST['countries'] ) ) : [];
 
     // Debug log
     klaro_geo_debug_log('Saving visible countries: ' . print_r($countries, true));

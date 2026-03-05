@@ -47,7 +47,8 @@ function klaro_geo_debug_log($message) {
 
         // During tests, also output to stderr for console capture
         if ($is_test) {
-            fwrite(STDERR, date('[Y-m-d H:i:s] ') . $formatted_message . PHP_EOL);
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite -- Writing to STDERR during tests only.
+            fwrite(STDERR, gmdate('[Y-m-d H:i:s] ') . $formatted_message . PHP_EOL);
         }
     }
 }
@@ -458,18 +459,20 @@ function klaro_geo_enqueue_scripts() {
         'version' => KLARO_GEO_VERSION,
     );
 
-    // Add the consent button script with a very high priority to ensure it loads after Klaro
-    add_action('wp_footer', function() use ($button_settings) {
-        // Merge settings with any existing klaroGeo object (preserves queue, push function, etc.)
-        echo '<script type="text/javascript">
-            /* <![CDATA[ */
-            window.klaroGeo = Object.assign(window.klaroGeo || {}, ' . wp_json_encode($button_settings) . ');
-            /* ]]> */
-        </script>';
-
-        // Then include the script
-        echo '<script type="text/javascript" src="' . esc_url(KLARO_GEO_URL . 'js/klaro-geo-consent-button.js?ver=' . KLARO_GEO_VERSION) . '" id="klaro-geo-consent-button-js"></script>';
-    }, 999);
+    // Enqueue the consent button script in footer with high priority to load after Klaro
+    wp_enqueue_script(
+        'klaro-geo-consent-button-js',
+        KLARO_GEO_URL . 'js/klaro-geo-consent-button.js',
+        array(),
+        KLARO_GEO_VERSION,
+        array( 'in_footer' => true, 'strategy' => 'defer' )
+    );
+    // Merge settings with any existing klaroGeo object (preserves queue, push function, etc.)
+    wp_add_inline_script(
+        'klaro-geo-consent-button-js',
+        'window.klaroGeo = Object.assign(window.klaroGeo || {}, ' . wp_json_encode($button_settings) . ');',
+        'before'
+    );
 }
 add_action('wp_enqueue_scripts', 'klaro_geo_enqueue_scripts');
 

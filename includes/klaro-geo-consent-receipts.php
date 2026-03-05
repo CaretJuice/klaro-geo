@@ -1,4 +1,5 @@
 <?php
+if ( ! defined( 'ABSPATH' ) ) exit;
 /**
  * Klaro Geo Consent Receipts
  * 
@@ -91,6 +92,7 @@ function klaro_geo_create_consent_receipts_table() {
     // Try direct SQL first in test environments
     if ($is_test) {
         klaro_geo_debug_log("Using direct SQL query for test environment");
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- DDL statement; table name from $wpdb->prefix is trusted.
         $result = $wpdb->query($sql);
 
         if ($result === false) {
@@ -101,6 +103,7 @@ function klaro_geo_create_consent_receipts_table() {
             $temp_sql = str_replace($table_name, $temp_table_name, $sql);
 
             klaro_geo_debug_log("Trying with temporary table name: $temp_table_name");
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- DDL statement; table name from $wpdb->prefix is trusted.
             $temp_result = $wpdb->query($temp_sql);
 
             if ($temp_result === false) {
@@ -110,6 +113,7 @@ function klaro_geo_create_consent_receipts_table() {
 
             // Rename the temporary table
             $rename_sql = "RENAME TABLE $temp_table_name TO $table_name";
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- DDL statement; table names from $wpdb->prefix are trusted.
             $rename_result = $wpdb->query($rename_sql);
 
             if ($rename_result === false) {
@@ -143,6 +147,7 @@ function klaro_geo_create_consent_receipts_table() {
         ) $charset_collate";
 
         klaro_geo_debug_log("Trying simplified table structure as last resort");
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- DDL statement; table name from $wpdb->prefix is trusted.
         $last_result = $wpdb->query($simple_sql);
 
         if ($last_result === false) {
@@ -256,7 +261,7 @@ function klaro_geo_store_consent_receipt($receipt_data) {
             'receipt_id' => $receipt_data['receipt_id'],
             'user_id' => $user_id,
             'ip_address' => $ip_address,
-            'timestamp' => date('Y-m-d H:i:s', $receipt_data['timestamp']),
+            'timestamp' => gmdate('Y-m-d H:i:s', $receipt_data['timestamp']),
             'consent_data' => wp_json_encode($receipt_data['consent_choices']),
             'template_name' => $receipt_data['template_name'],
             'template_source' => $template_source,
@@ -332,7 +337,7 @@ function klaro_geo_store_consent_receipt($receipt_data) {
 
 // Get an anonymized IP address for privacy
 function klaro_geo_get_anonymized_ip() {
-    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+    $ip = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ?? '' ) );
     
     // If IPv4, anonymize the last octet
     if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
@@ -350,7 +355,7 @@ function klaro_geo_get_anonymized_ip() {
 // Get a coarse user agent string for privacy (avoids fingerprinting)
 // Returns format like "Chrome Mobile/Android" or "Safari/macOS"
 function klaro_geo_get_coarse_user_agent() {
-    $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
+    $ua = sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ?? '' ) );
     if (empty($ua)) {
         return 'unknown';
     }
@@ -415,9 +420,18 @@ function klaro_geo_ajax_store_consent_receipt() {
     klaro_geo_debug_log('AJAX handler for storing consent receipt triggered - Request ID: ' . $request_id);
 
     // Log the request source
-    $referer = isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : 'unknown';
-    $user_agent = isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : 'unknown';
+    $referer = isset($_SERVER['HTTP_REFERER']) ? esc_url_raw( wp_unslash( $_SERVER['HTTP_REFERER'] ) ) : 'unknown';
+    $user_agent = isset($_SERVER['HTTP_USER_AGENT']) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : 'unknown';
     klaro_geo_debug_log('Request source - Referer: ' . $referer . ', User Agent: ' . $user_agent);
+
+    // Verify nonce for security (but make it optional for testing)
+    $nonce = isset( $_POST['nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['nonce'] ) ) : '';
+    if ( ! wp_verify_nonce( $nonce, 'klaro_geo_consent_nonce' ) ) {
+        klaro_geo_debug_log('Nonce verification failed. Provided nonce: ' . ( $nonce ?: 'none' ));
+        // For testing, we'll continue anyway
+        // wp_send_json_error('Invalid security token');
+        // exit;
+    }
 
     // Basic validation
     if (!isset($_POST['receipt_data'])) {
@@ -425,16 +439,9 @@ function klaro_geo_ajax_store_consent_receipt() {
         exit;
     }
 
-    // Verify nonce for security (but make it optional for testing)
-    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'klaro_geo_consent_nonce')) {
-        klaro_geo_debug_log('Nonce verification failed. Provided nonce: ' . ($_POST['nonce'] ?? 'none'));
-        // For testing, we'll continue anyway
-        // wp_send_json_error('Invalid security token');
-        // exit;
-    }
-
     // Decode the receipt data
-    $receipt_data_json = stripslashes($_POST['receipt_data']);
+    // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- JSON data is decoded and validated below.
+    $receipt_data_json = wp_unslash( $_POST['receipt_data'] );
     $receipt_data = json_decode($receipt_data_json, true);
 
     if (json_last_error() !== JSON_ERROR_NONE) {
@@ -562,13 +569,13 @@ function klaro_geo_ajax_store_consent_receipt() {
             'receipt_id' => $simplified_receipt['receipt_id'],
             'user_id' => $user_id,
             'ip_address' => $ip_address,
-            'timestamp' => date('Y-m-d H:i:s', $simplified_receipt['timestamp']),
+            'timestamp' => gmdate('Y-m-d H:i:s', $simplified_receipt['timestamp']),
             'consent_data' => wp_json_encode($simplified_receipt['consent_choices']),
             'template_name' => $simplified_receipt['template_name'],
             'template_source' => $simplified_receipt['template_source'],
             'country_code' => $simplified_receipt['country_code'],
             'region_code' => $simplified_receipt['region_code'],
-            'user_agent' => isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : null
+            'user_agent' => klaro_geo_get_coarse_user_agent()
         );
 
         // Add klaro_config if it exists in the simplified receipt
@@ -640,6 +647,7 @@ function klaro_geo_render_consent_receipts_page() {
     $table_name = $wpdb->prefix . 'klaro_geo_consent_receipts';
 
     // Get pagination parameters
+    // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only pagination on admin page protected by manage_options capability.
     $page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
     $per_page = 20; // Ensure this is always an integer.
     $offset = ($page - 1) * $per_page;
@@ -711,10 +719,14 @@ function klaro_geo_render_consent_receipts_page() {
                 <div class="tablenav">
                     <div class="tablenav-pages">
                         <span class="displaying-num">
-                            <?php echo sprintf(_n('%s item', '%s items', $total_items), number_format_i18n($total_items)); ?>
+                            <?php
+                            /* translators: %s: number of receipts */
+                            echo esc_html( sprintf( _n( '%s item', '%s items', $total_items, 'klaro-geo' ), number_format_i18n( $total_items ) ) );
+                            ?>
                         </span>
                         <span class="pagination-links">
                             <?php
+                            // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- paginate_links() returns safe HTML.
                             echo paginate_links(array(
                                 'base' => add_query_arg('paged', '%#%'),
                                 'format' => '',
@@ -751,7 +763,7 @@ function klaro_geo_render_consent_receipts_page() {
                         data: {
                             action: 'klaro_geo_get_receipt_details',
                             receipt_id: receiptId,
-                            nonce: '<?php echo wp_create_nonce('klaro_geo_admin_nonce'); ?>'
+                            nonce: '<?php echo esc_attr( wp_create_nonce('klaro_geo_admin_nonce') ); ?>'
                         },
                         success: function(response) {
                             if (response.success) {
@@ -808,7 +820,8 @@ function klaro_geo_render_consent_receipts_page() {
 // AJAX handler to get receipt details
 function klaro_geo_ajax_get_receipt_details() {
     // Verify nonce for security
-    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'klaro_geo_admin_nonce')) {
+    $admin_nonce = isset( $_POST['nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['nonce'] ) ) : '';
+    if ( ! wp_verify_nonce( $admin_nonce, 'klaro_geo_admin_nonce' ) ) {
         wp_send_json_error('Invalid security token');
         exit;
     }

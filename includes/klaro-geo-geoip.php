@@ -1,4 +1,5 @@
-<?php 
+<?php
+if ( ! defined( 'ABSPATH' ) ) exit;
 // Function to handle GeoIP lookups and determine template
 function klaro_geo_determine_template() {
     klaro_geo_debug_log('Starting GeoIP lookup...');

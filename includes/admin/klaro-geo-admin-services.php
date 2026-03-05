@@ -1,4 +1,5 @@
 <?php
+if ( ! defined( 'ABSPATH' ) ) exit;
 
 // Services Page Content
 
@@ -51,13 +52,13 @@ function klaro_geo_services_page_content() {
                     foreach ($services as $index => $service) {
                         klaro_geo_debug_log('Processing service in admin loop: ' . print_r($service, true));
 
-                        $name = isset($service['name']) ? esc_html($service['name']) : "N/A";
+                        $name = isset($service['name']) ? $service['name'] : "N/A";
                         $required = isset($service['required']) ? ($service['required'] ? 'Yes' : 'No') : "N/A";
                         $default = isset($service['default']) ? ($service['default'] ? 'Yes' : 'No') : "N/A";
                         
                         // Handle purposes (ensure it's an array)
                         $purposes = isset($service['purposes']) ? $service['purposes'] : array();
-                        $purposes_str = !empty($purposes) && is_array($purposes) ? esc_html(implode(', ', $purposes)) : "N/A";
+                        $purposes_str = !empty($purposes) && is_array($purposes) ? implode(', ', $purposes) : "N/A";
 
                         // Handle advanced settings
                         $advanced = array();
@@ -68,8 +69,8 @@ function klaro_geo_services_page_content() {
 
                         // Handle cookies
                         $cookies = isset($service['cookies']) ? $service['cookies'] : array();
-                        $cookies_str = !empty($cookies) && is_array($cookies) ? 
-                            esc_html(json_encode($cookies)) : "N/A";
+                        $cookies_str = !empty($cookies) && is_array($cookies) ?
+                            json_encode($cookies) : "N/A";
                         // Check for callbacks
                         $has_oninit = !empty($service['onInit']);
                         $has_onaccept = !empty($service['onAccept']);
@@ -81,16 +82,16 @@ function klaro_geo_services_page_content() {
                         $callbacks_str = !empty($callbacks) ? implode(', ', $callbacks) : 'None';
 
                         echo "<tr>";
-                        echo "<td>" . $name . "</td>"; //Corrected to $name
-                        echo "<td>" . $required . "</td>";
-                        echo "<td>" . $default . "</td>";
-                        echo "<td>" . $purposes_str . "</td>";
-                        echo "<td>" . $advanced_str . "</td>";
-                        echo "<td>" . $cookies_str . "</td>";
-                        echo "<td>" . $callbacks_str . "</td>";
+                        echo "<td>" . esc_html( $name ) . "</td>";
+                        echo "<td>" . esc_html( $required ) . "</td>";
+                        echo "<td>" . esc_html( $default ) . "</td>";
+                        echo "<td>" . esc_html( $purposes_str ) . "</td>";
+                        echo "<td>" . esc_html( $advanced_str ) . "</td>";
+                        echo "<td>" . esc_html( $cookies_str ) . "</td>";
+                        echo "<td>" . esc_html( $callbacks_str ) . "</td>";
                         echo "<td>";
-                        echo "<button class='edit-service button button-secondary' data-index='$index'>Edit</button> "; // Edit button
-                        echo "<button class='delete-service button button-danger' data-index='$index'>Delete</button>"; // Delete button
+                        echo "<button class='edit-service button button-secondary' data-index='" . esc_attr( $index ) . "'>Edit</button> ";
+                        echo "<button class='delete-service button button-danger' data-index='" . esc_attr( $index ) . "'>Delete</button>";
                         echo "</td>";
                         echo "</tr>";
                     }
@@ -235,14 +236,16 @@ function klaro_geo_services_page_content() {
 add_action('wp_ajax_save_klaro_services', 'klaro_geo_save_services');
 
 function klaro_geo_save_services(){
+    check_ajax_referer('klaro_geo_nonce', '_wpnonce');
+
     klaro_geo_debug_log('$_POST: ' . print_r($_POST, true));
 
     if (isset($_POST['services'])) {
         // Initialize the service settings class
         $service_settings = Klaro_Geo_Service_Settings::get_instance();
 
-        // Use wp_unslash() to remove escaping, only if necessary.
-        $services = json_decode(wp_unslash($_POST['services']), true);
+        // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- JSON string; individual fields sanitized after decoding.
+        $services = json_decode( wp_unslash( $_POST['services'] ), true );
 
         if (json_last_error() === JSON_ERROR_NONE && is_array($services)) {
             // Process each service to transform the name
@@ -276,6 +279,8 @@ function klaro_geo_save_services(){
 add_action('wp_ajax_delete_klaro_service', 'klaro_geo_delete_service');
 
 function klaro_geo_delete_service() {
+    check_ajax_referer('klaro_geo_nonce', '_wpnonce');
+
     $index = isset($_POST['index']) ? intval($_POST['index']) : -1;
     if ($index < 0) {
         wp_send_json_error(['message' => 'Invalid service index.']);
