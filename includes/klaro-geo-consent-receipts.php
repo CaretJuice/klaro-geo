@@ -440,7 +440,7 @@ function klaro_geo_ajax_store_consent_receipt() {
     }
 
     // Decode the receipt data
-    // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- JSON data is decoded and validated below.
+    // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- JSON string cannot be pre-sanitized; individual fields sanitized after decoding below.
     $receipt_data_json = wp_unslash( $_POST['receipt_data'] );
     $receipt_data = json_decode($receipt_data_json, true);
 
@@ -450,18 +450,18 @@ function klaro_geo_ajax_store_consent_receipt() {
         exit;
     }
 
-    // Simplify the receipt data to avoid potential issues
+    // Simplify and sanitize the receipt data
     $simplified_receipt = array(
-        'receipt_id' => $receipt_data['receipt_id'],
-        'timestamp' => $receipt_data['timestamp'],
-        'consent_choices' => $receipt_data['consent_choices'],
-        'template_name' => $receipt_data['template_name'],
-        'country_code' => $receipt_data['country_code'],
-        'region_code' => $receipt_data['region_code']
+        'receipt_id' => sanitize_text_field($receipt_data['receipt_id'] ?? ''),
+        'timestamp' => absint($receipt_data['timestamp'] ?? 0),
+        'consent_choices' => $receipt_data['consent_choices'] ?? array(), // Re-encoded via wp_json_encode before storage
+        'template_name' => sanitize_text_field($receipt_data['template_name'] ?? ''),
+        'country_code' => sanitize_text_field($receipt_data['country_code'] ?? ''),
+        'region_code' => sanitize_text_field($receipt_data['region_code'] ?? '')
     );
 
     // Process template source to ensure it has the correct format
-    $template_source = $receipt_data['template_source'];
+    $template_source = sanitize_text_field($receipt_data['template_source'] ?? '');
 
     // Check if admin override is set and convert to boolean
     $admin_override = false;

@@ -17,10 +17,9 @@ RUN apt-get update && apt-get install -y \
     curl \
     zip \
     libzip-dev \
+    nodejs \
+    npm \
     && docker-php-ext-install zip \
-    && curl -fsSL https://deb.nodesource.com/setup_14.x | bash - \
-    && apt-get install -y nodejs \
-    && apt-get install -y npm \
     && rm -rf /var/lib/apt/lists/* \
     && curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer \
     && wget -O /usr/local/bin/phpunit https://phar.phpunit.de/phpunit-9.phar \

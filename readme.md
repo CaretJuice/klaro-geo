@@ -31,6 +31,15 @@ This plugin gives you a lot of control over how consent is managed and tracked a
 - Tested on WordPress 6.3 and 6.4 (earlier versions may work but are untested)
 - [GeoIP Detection](https://wordpress.org/plugins/geoip-detect/) plugin (for geolocation features to work)
 
+## Versions
+
+Two builds are available:
+
+- **WordPress.org** (`klaro-geo-{version}.zip`) — Available from the WordPress plugin directory. Service callback fields (`onInit`, `onAccept`, `onDecline`) are removed for security. This is the recommended version for most users.
+- **Full** (`klaro-geo-{version}-full.zip`) — Available from [GitHub releases](https://github.com/CaretJuice/klaro-geo/releases). Includes service callback fields that allow custom JavaScript to run on consent events. Use this version if you need direct control over service lifecycle hooks.
+
+Both versions are functionally identical in all other respects.
+
 ## Installation
 
 1. Install the GeoIP Detection plugin from the WordPress plugins directory

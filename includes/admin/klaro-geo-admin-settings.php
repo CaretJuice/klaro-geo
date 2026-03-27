@@ -246,10 +246,17 @@ function klaro_geo_settings_page_content() {
 // Function to process the debug countries option
 function klaro_geo_process_debug_countries($new_value, $old_value) {
     if (is_string($new_value)) {
-        $debug_countries_array = array_map('trim', explode(',', $new_value));
-        return $debug_countries_array;
+        $new_value = array_map('trim', explode(',', $new_value));
     }
-    return $new_value; // Return the value as is if it's not a string
+    if (!is_array($new_value)) {
+        return $old_value;
+    }
+    // Normalize and validate ISO 3166 format
+    $new_value = array_map('strtoupper', $new_value);
+    $new_value = array_filter($new_value, function($code) {
+        return preg_match('/^[A-Z]{2}(-[A-Z0-9]{1,3})?$/', $code);
+    });
+    return !empty($new_value) ? array_values($new_value) : $old_value;
 }
 
 // Register settings for the main settings page
@@ -323,21 +330,26 @@ function klaro_geo_register_main_settings() {
         'type' => 'array',
         'default' => ['US', 'US-CA', 'CA', 'CA-QC', 'UK', 'FR', 'AU'],
         'sanitize_callback' => function($input) {
-            // If input is already an array, return it
-            if (is_array($input)) {
-                return $input;
-            }
+            $defaults = ['US', 'US-CA', 'CA', 'CA-QC', 'UK', 'FR', 'AU'];
 
-            // If input is a string, split by commas and trim whitespace
             if (is_string($input)) {
-                $countries = explode(',', $input);
-                $countries = array_map('trim', $countries);
-                $countries = array_filter($countries); // Remove empty values
-                return $countries;
+                $codes = explode(',', $input);
+            } else if (is_array($input)) {
+                $codes = $input;
+            } else {
+                return $defaults;
             }
 
-            // Default return if input is neither string nor array
-            return ['US', 'US-CA', 'CA', 'CA-QC', 'UK', 'FR', 'AU'];
+            $codes = array_map('trim', $codes);
+            $codes = array_map('strtoupper', $codes);
+            $codes = array_filter($codes);
+
+            // Validate each code matches ISO 3166 format: XX (country) or XX-XX/XX-XXX (region)
+            $codes = array_filter($codes, function($code) {
+                return preg_match('/^[A-Z]{2}(-[A-Z0-9]{1,3})?$/', $code);
+            });
+
+            return !empty($codes) ? array_values($codes) : $defaults;
         },
     ]);
     register_setting('klaro_geo_settings_group', 'klaro_geo_enable_consent_receipts', [

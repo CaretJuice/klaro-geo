@@ -215,6 +215,7 @@ class Klaro_Geo_Service_Settings extends Klaro_Geo_Option {
         return $this;
     }
 
+    // KLARO_CALLBACKS_START
     /**
      * Get a service's callback
      *
@@ -224,11 +225,11 @@ class Klaro_Geo_Service_Settings extends Klaro_Geo_Option {
      */
     public function get_service_callback($service_name, $callback_type) {
         $service = $this->get_service($service_name);
-        
+
         if (!$service || !isset($service['callback']) || !isset($service['callback'][$callback_type])) {
             return null;
         }
-        
+
         return $service['callback'][$callback_type];
     }
 
@@ -242,19 +243,20 @@ class Klaro_Geo_Service_Settings extends Klaro_Geo_Option {
      */
     public function set_service_callback($service_name, $callback_type, $callback) {
         $service = $this->get_service($service_name);
-        
+
         if (!$service) {
             return $this;
         }
-        
+
         if (!isset($service['callback'])) {
             $service['callback'] = array();
         }
-        
+
         $service['callback'][$callback_type] = $callback;
-        
+
         return $this->set_service($service_name, $service);
     }
+    // KLARO_CALLBACKS_END
 
     /**
      * Update a service from form data
@@ -279,11 +281,13 @@ class Klaro_Geo_Service_Settings extends Klaro_Geo_Option {
                 'required' => false,
                 'default' => false,
                 'cookies' => array(),
+                // KLARO_CALLBACKS_START
                 'callback' => array(
                     'onInit' => '',
                     'onAccept' => '',
                     'onDecline' => ''
-                )
+                ),
+                // KLARO_CALLBACKS_END
             );
         }
         
@@ -311,6 +315,7 @@ class Klaro_Geo_Service_Settings extends Klaro_Geo_Option {
                     $value = explode(',', $value);
                     $value = array_map('trim', $value);
                 }
+            // KLARO_CALLBACKS_START
             } elseif ($key === 'callback' && is_array($value)) {
                 // Merge callbacks
                 if (!isset($service['callback'])) {
@@ -319,6 +324,7 @@ class Klaro_Geo_Service_Settings extends Klaro_Geo_Option {
 
                 $service['callback'] = array_merge($service['callback'], $value);
                 continue; // Skip setting this key directly
+            // KLARO_CALLBACKS_END
             } elseif ($key === 'translations' && is_array($value)) {
                 // Handle translations
                 if (!isset($service['translations'])) {
@@ -444,10 +450,12 @@ class Klaro_Geo_Service_Settings extends Klaro_Geo_Option {
                 $service['cookies'] = array();
             }
 
+            // KLARO_CALLBACKS_START
             // Ensure callback is an array
             if (!isset($service['callback']) || !is_array($service['callback'])) {
                 $service['callback'] = array();
             }
+            // KLARO_CALLBACKS_END
 
             // Handle required and default settings
             // If value is null, it means "inherit from template"

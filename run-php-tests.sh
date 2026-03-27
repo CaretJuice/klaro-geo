@@ -18,17 +18,17 @@ docker compose run --user root --entrypoint bash wordpress_test -c "
   mkdir -p /tmp/wordpress-tests-lib/data
   mkdir -p /var/www/html/wp-content/plugins/klaro-geo/vendor
   mkdir -p /var/www/html/wp-content/debug
-  
+
   # Set permissions
   chown -R www-data:www-data /tmp/wordpress-tests-lib
   chown -R www-data:www-data /var/www/html/wp-content
-  
+
   # Ensure WordPress test library exists
   if [ ! -f '/tmp/wordpress-tests-lib/includes/functions.php' ]; then
     svn co --quiet https://develop.svn.wordpress.org/tags/6.4.3/tests/phpunit/includes/ /tmp/wordpress-tests-lib/includes
     svn co --quiet https://develop.svn.wordpress.org/tags/6.4.3/tests/phpunit/data/ /tmp/wordpress-tests-lib/data
   fi
-  
+
   # Create wp-tests-config.php if it doesn't exist
   if [ ! -f '/tmp/wordpress-tests-lib/wp-tests-config.php' ]; then
     cat > '/tmp/wordpress-tests-lib/wp-tests-config.php' <<EOF
@@ -51,27 +51,38 @@ define( 'WP_DEBUG_LOG', '/var/www/html/wp-content/debug.log' );
 define( 'WP_DEBUG_DISPLAY', false );
 EOF
   fi
-  
+
   # Create and set permissions for debug log
   touch /var/www/html/wp-content/debug.log
   chmod 666 /var/www/html/wp-content/debug.log
   chown www-data:www-data /var/www/html/wp-content/debug.log
-  
+
   # Ensure the tests directory is properly mounted
   mkdir -p /var/www/html/wp-content/plugins/klaro-geo/tests/phpunit
   cp -r /var/www/html/wp-content/plugins/klaro-geo/tests/phpunit/* /var/www/html/wp-content/plugins/klaro-geo/tests/phpunit/ 2>/dev/null || true
-  
+
+  # Install Composer dependencies (PHPUnit Polyfills etc.)
+  cd /var/www/html/wp-content/plugins/klaro-geo
+  composer install --no-interaction 2>&1
+  chown -R www-data:www-data /var/www/html/wp-content/plugins/klaro-geo/vendor
+
   echo 'Test environment set up successfully!'
 "
 
 # Run the PHP tests as www-data user
 echo "Running PHP tests..."
 docker compose run --user www-data --entrypoint bash wordpress_test -c "
-  cd /var/www/html/wp-content/plugins/klaro-geo && 
+  cd /var/www/html/wp-content/plugins/klaro-geo &&
   phpunit -c phpunit.xml
 "
 
 echo "PHP tests completed!"
+
+# Restore file ownership to the host user (Docker runs as www-data which changes ownership)
+echo "Restoring file ownership..."
+docker compose run --user root --entrypoint bash wordpress_test -c "
+  chown -R $(id -u):$(id -g) /var/www/html/wp-content/plugins/klaro-geo/
+" 2>/dev/null
 
 # Display the test logs
 if [ -f "$(dirname "$0")/docker/logs.sh" ]; then

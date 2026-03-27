@@ -169,13 +169,13 @@ function klaro_geo_templates_page() {
 
                     if (json_last_error() === JSON_ERROR_NONE && is_array($translations)) {
                         // Successfully parsed JSON, use it for translations
-                        $template_config['translations'] = $translations;
-                        klaro_geo_debug_log('Translations JSON parsed successfully: ' . print_r($translations, true));
+                        $template_config['translations'] = klaro_geo_sanitize_translations($translations);
+                        klaro_geo_debug_log('Translations JSON parsed successfully: ' . print_r($template_config['translations'], true));
                     } else {
                         // Try one more approach - use the built-in json_decode with ignoring errors
                         $translations = @json_decode($translations_json, true);
                         if ($translations !== null && is_array($translations)) {
-                            $template_config['translations'] = $translations;
+                            $template_config['translations'] = klaro_geo_sanitize_translations($translations);
                             klaro_geo_debug_log('Translations JSON parsed successfully with error suppression');
                         } else {
                             // JSON parsing error
@@ -214,7 +214,7 @@ function klaro_geo_templates_page() {
                             $translations = json_decode($fixed_json, true);
                             if (json_last_error() === JSON_ERROR_NONE && is_array($translations)) {
                                 // Successfully parsed fixed JSON
-                                $template_config['translations'] = $translations;
+                                $template_config['translations'] = klaro_geo_sanitize_translations($translations);
                                 klaro_geo_debug_log('Fixed JSON parsed successfully: ' . print_r($translations, true));
                             } else {
                                 // Keep existing translations if available
@@ -1506,8 +1506,9 @@ function klaro_geo_save_translations_ajax() {
             $translations = json_decode($translations_json, true);
 
             if (json_last_error() === JSON_ERROR_NONE && is_array($translations)) {
-                // Successfully parsed JSON
-                klaro_geo_debug_log('Translations JSON parsed successfully');
+                // Successfully parsed JSON — sanitize individual values before storage
+                $translations = klaro_geo_sanitize_translations($translations);
+                klaro_geo_debug_log('Translations JSON parsed and sanitized successfully');
 
                 // Get the template config
                 $config = $template_settings->get_template_config($template_id);

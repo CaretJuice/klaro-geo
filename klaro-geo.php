@@ -190,6 +190,26 @@ function klaro_geo_init_consent_mode_services() {
     }
 }
 
+/**
+ * Recursively sanitize a translations array.
+ * All string values are sanitized with sanitize_text_field().
+ */
+function klaro_geo_sanitize_translations($translations) {
+    if (!is_array($translations)) {
+        return array();
+    }
+    $sanitized = array();
+    foreach ($translations as $key => $value) {
+        $clean_key = sanitize_text_field($key);
+        if (is_array($value)) {
+            $sanitized[$clean_key] = klaro_geo_sanitize_translations($value);
+        } else {
+            $sanitized[$clean_key] = sanitize_text_field($value);
+        }
+    }
+    return $sanitized;
+}
+
 // Include defaults file first
 require_once plugin_dir_path(__FILE__) . 'includes/klaro-geo-defaults.php';
 
@@ -625,7 +645,7 @@ function klaro_geo_admin_bar_menu($wp_admin_bar) {
         // Set the title to show the current debug country
         $args = array(
             'id' => 'klaro-geo-debug',
-            'title' => 'Klaro Geo Debug Country: ' . $current_country,
+            'title' => 'Klaro Geo Debug Country: ' . esc_html($current_country),
             'href' => '#',
         );
         $wp_admin_bar->add_node($args);
@@ -666,13 +686,18 @@ function klaro_geo_admin_bar_menu($wp_admin_bar) {
         ));
 
         foreach ($debug_locations as $code) {
+            // Validate code format before use (defense in depth — also validated on save)
+            if (!preg_match('/^[A-Z]{2}(-[A-Z0-9]{1,3})?$/', $code)) {
+                continue;
+            }
+
             // Determine if this is a region code
             $is_region = strpos($code, '-') !== false;
 
             $args = array(
-                'id' => 'klaro-geo-debug-' . str_replace('-', '_', $code), // Replace - with _ for valid ID
-                'title' => $code,
-                'href' => add_query_arg('klaro_geo_debug_geo', $code, esc_url_raw(wp_unslash($_SERVER['REQUEST_URI']))),
+                'id' => 'klaro-geo-debug-' . str_replace('-', '_', $code),
+                'title' => esc_html($code),
+                'href' => add_query_arg('klaro_geo_debug_geo', rawurlencode($code), esc_url_raw(wp_unslash($_SERVER['REQUEST_URI']))),
                 'parent' => $is_region ? 'klaro-geo-debug-regions' : 'klaro-geo-debug-countries',
             );
             $wp_admin_bar->add_node($args);
