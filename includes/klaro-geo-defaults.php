@@ -41,7 +41,7 @@ function klaro_geo_get_default_templates() {
                 'hideDeclineAll' => false,
                 'hideLearnMore' => false,
                 'noticeAsModal' => true,
-                'disablePoweredBy' => false,
+                'disablePoweredBy' => true,
                 'consent_mode' => 'none',
                 'translations' => [
                     'zz' => [
@@ -133,7 +133,7 @@ function klaro_geo_get_default_templates() {
                 'hideDeclineAll' => false,
                 'hideLearnMore' => false,
                 'noticeAsModal' => true,
-                'disablePoweredBy' => false,
+                'disablePoweredBy' => true,
                 'consent_mode' => 'none',
                 'translations' => [
                     'zz' => [
@@ -225,7 +225,7 @@ function klaro_geo_get_default_templates() {
                 'hideDeclineAll' => true,
                 'hideLearnMore' => false,
                 'noticeAsModal' => false,
-                'disablePoweredBy' => false,
+                'disablePoweredBy' => true,
                 'consent_mode' => 'none',
                 'translations' => [
                     'zz' => [

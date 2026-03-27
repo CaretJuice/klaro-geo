@@ -108,7 +108,7 @@ function klaro_geo_services_page_content() {
         <?php // 5. Form for Add/Edit Service (Hidden initially) ?>
         <div id="service-form-container" style="display: none;">
             <h2>Add/Edit Service</h2>
-            <form id="service-form"> <input type="hidden" name="action" value="save_klaro_services">
+            <form id="service-form"> <input type="hidden" name="action" value="klaro_geo_save_services">
                 <input type="hidden" name="service_index" id="service_index">
                 <label for="service_name">Name:</label><br>
                 <input type="text" id="service_name" name="service_name" required><br>
@@ -233,7 +233,7 @@ function klaro_geo_services_page_content() {
 
 
 
-add_action('wp_ajax_save_klaro_services', 'klaro_geo_save_services');
+add_action('wp_ajax_klaro_geo_save_services', 'klaro_geo_save_services');
 
 function klaro_geo_save_services(){
     check_ajax_referer('klaro_geo_nonce', '_wpnonce');
@@ -276,7 +276,7 @@ function klaro_geo_save_services(){
 }
 
 
-add_action('wp_ajax_delete_klaro_service', 'klaro_geo_delete_service');
+add_action('wp_ajax_klaro_geo_delete_service', 'klaro_geo_delete_service');
 
 function klaro_geo_delete_service() {
     check_ajax_referer('klaro_geo_nonce', '_wpnonce');

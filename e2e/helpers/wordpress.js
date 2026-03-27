@@ -254,7 +254,7 @@ class WordPressHelper {
             'Content-Type': 'application/x-www-form-urlencoded',
           },
           body: new URLSearchParams({
-            action: 'save_klaro_services',
+            action: 'klaro_geo_save_services',
             services: JSON.stringify(services),
             _wpnonce: klaroGeoServices.nonce
           }),

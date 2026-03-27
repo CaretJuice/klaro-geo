@@ -172,7 +172,7 @@ function klaro_geo_generate_config_file() {
         $klaro_config['showDescriptionEmptyStore'] = true;
         $klaro_config['autoFocus'] = false;
         $klaro_config['showNoticeTitle'] = false;
-        $klaro_config['disablePoweredBy'] = false;
+        $klaro_config['disablePoweredBy'] = true;
         $klaro_config['cookiePath'] = '/';
     }
 

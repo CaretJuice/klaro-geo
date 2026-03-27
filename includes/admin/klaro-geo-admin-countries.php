@@ -341,7 +341,7 @@ function klaro_geo_save_country_settings() {
 
     wp_send_json_success();
 }
-add_action('wp_ajax_save_klaro_country_settings', 'klaro_geo_save_country_settings');
+add_action('wp_ajax_klaro_geo_save_country_settings', 'klaro_geo_save_country_settings');
 
 // AJAX handler for saving region settings
 function klaro_geo_save_region_settings_ajax() {
@@ -400,7 +400,7 @@ function klaro_geo_save_region_settings_ajax() {
         'updated_settings' => $updated_settings
     ]);
 }
-add_action('wp_ajax_save_klaro_region_settings', 'klaro_geo_save_region_settings_ajax');
+add_action('wp_ajax_klaro_geo_save_region_settings', 'klaro_geo_save_region_settings_ajax');
 
 // AJAX handler for getting regions
 function klaro_geo_get_regions() {
@@ -537,7 +537,7 @@ function klaro_geo_get_regions() {
         'settings' => $region_settings
     ]);
 }
-add_action('wp_ajax_get_klaro_regions', 'klaro_geo_get_regions');
+add_action('wp_ajax_klaro_geo_get_regions', 'klaro_geo_get_regions');
 
 // AJAX handler for saving visible countries
 function klaro_geo_save_visible_countries() {
@@ -565,4 +565,3 @@ function klaro_geo_save_visible_countries() {
     wp_send_json_success();
 }
 add_action('wp_ajax_klaro_geo_save_visible_countries', 'klaro_geo_save_visible_countries');
-add_action('wp_ajax_save_klaro_visible_countries', 'klaro_geo_save_visible_countries'); // Legacy support

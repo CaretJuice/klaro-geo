@@ -434,12 +434,18 @@ function klaro_geo_templates_page() {
     $templates = $template_settings->get();
     $current_template = isset($_GET['template']) ? sanitize_text_field(wp_unslash($_GET['template'])) : 'default';
 
-    ?>
-    <script type="text/javascript">
     // Make templates data available to JavaScript with timestamp for cache busting
-    var klaroGeoTemplates = <?php echo wp_json_encode(array('templates' => $templates, 'timestamp' => time())); ?>;
-    </script>
+    wp_add_inline_script(
+        'klaro-geo-templates-js',
+        'var klaroGeoTemplates = ' . wp_json_encode(array(
+            'templates' => $templates,
+            'timestamp' => time(),
+            'templatePageUrl' => admin_url('admin.php?page=klaro-geo-templates'),
+        )) . ';',
+        'before'
+    );
 
+    ?>
     <div class="wrap">
         <h1>Klaro Templates</h1>
         <?php settings_errors('klaro_geo_templates'); ?>
@@ -476,418 +482,14 @@ function klaro_geo_templates_page() {
             <button type="button" id="add_template" class="button">Add New Template</button>
             <button type="button" id="delete_template" class="button button-secondary" style="margin-left: 10px;">Delete Template</button>
 
-            <script type="text/javascript">
-            jQuery(document).ready(function($) {
-                // Handle template selection change
-                $('#template_selector').on('change', function() {
-                    var selectedTemplate = $(this).val();
-                    console.log('Template selected:', selectedTemplate);
-
-                    // Update the hidden input
-                    $('#current_template').val(selectedTemplate);
-
-                    // Redirect to the selected template
-                    window.location.href = '<?php echo esc_url(admin_url('admin.php?page=klaro-geo-templates')); ?>&template=' + selectedTemplate;
-                });
-
-                // Handle delete template button
-                $('#delete_template').on('click', function() {
-                    var selectedTemplate = $('#template_selector').val();
-
-                    // Don't allow deleting the default template
-                    if (selectedTemplate === 'default') {
-                        alert('The default template cannot be deleted.');
-                        return;
-                    }
-
-                    if (confirm('Are you sure you want to delete the template "' + selectedTemplate + '"? This action cannot be undone.')) {
-                        // Send AJAX request to delete the template
-                        $.ajax({
-                            url: ajaxurl,
-                            type: 'POST',
-                            data: {
-                                action: 'klaro_geo_delete_template',
-                                template_id: selectedTemplate,
-                                nonce: $('#klaro_geo_nonce').val()
-                            },
-                            success: function(response) {
-                                if (response.success) {
-                                    alert('Template deleted successfully.');
-                                    // Redirect to the templates page with the default template selected
-                                    window.location.href = '<?php echo esc_url(admin_url('admin.php?page=klaro-geo-templates')); ?>';
-                                } else {
-                                    // Create a more user-friendly error message
-                                    var errorMessage = 'Error deleting template: ' + response.data.message;
-
-                                    // Show the error in a dialog for better readability
-                                    var $dialog = $('<div></div>')
-                                        .html(errorMessage)
-                                        .dialog({
-                                            title: 'Template Deletion Error',
-                                            modal: true,
-                                            width: 500,
-                                            buttons: {
-                                                Ok: function() {
-                                                    $(this).dialog('close');
-                                                }
-                                            }
-                                        });
-                                }
-                            },
-                            error: function(xhr, status, error) {
-                                var $dialog = $('<div></div>')
-                                    .html('An error occurred while deleting the template: ' + error)
-                                    .dialog({
-                                        title: 'Template Deletion Error',
-                                        modal: true,
-                                        width: 400,
-                                        buttons: {
-                                            Ok: function() {
-                                                $(this).dialog('close');
-                                            }
-                                        }
-                                    });
-                            }
-                        });
-                    }
-                });
-
-                // Initialize tabs when the page loads
-                if ($('#translations-tabs').length) {
-                    console.log('Initializing tabs on page load');
-                    $('#translations-tabs').tabs();
-
-                    // Add a small delay to ensure the DOM is ready
-                    setTimeout(function() {
-                        // Get the current template data
-                        var currentTemplate = $('#current_template').val();
-                        console.log('Current template on page load:', currentTemplate);
-
-                        if (typeof klaroGeoTemplates !== 'undefined' &&
-                            klaroGeoTemplates.templates &&
-                            klaroGeoTemplates.templates[currentTemplate] &&
-                            klaroGeoTemplates.templates[currentTemplate].config &&
-                            klaroGeoTemplates.templates[currentTemplate].config.translations) {
-
-                            var translations = klaroGeoTemplates.templates[currentTemplate].config.translations;
-                            console.log('Found translations on page load:', translations);
-
-                            // Get the purposes from the page
-                            var purposes = [];
-                            $('#tab-zz h5').each(function() {
-                                purposes.push($(this).text().toLowerCase());
-                            });
-                            console.log('Found purposes on page:', purposes);
-
-                            // Add tabs for each language
-                            Object.keys(translations).forEach(function(langCode) {
-                                if (langCode === 'zz') return; // Skip fallback language
-
-                                // Get language name
-                                var langNames = {
-                                    'en': 'English',
-                                    'de': 'German',
-                                    'fr': 'French',
-                                    'es': 'Spanish',
-                                    'it': 'Italian',
-                                    'nl': 'Dutch',
-                                    'pt': 'Portuguese',
-                                    'sv': 'Swedish',
-                                    'no': 'Norwegian',
-                                    'da': 'Danish',
-                                    'fi': 'Finnish',
-                                    'pl': 'Polish',
-                                    'ru': 'Russian',
-                                    'ja': 'Japanese',
-                                    'zh': 'Chinese',
-                                    'ar': 'Arabic'
-                                };
-                                var langName = langNames[langCode] || 'Custom';
-
-                                // Check if tab already exists
-                                if (!$('#tab-' + langCode).length) {
-                                    console.log('Adding tab for language on page load:', langCode);
-
-                                    // Add new tab
-                                    var newTab = $('<li><a href="#tab-' + langCode + '">' + langName + ' (' + langCode + ')</a></li>');
-                                    newTab.insertBefore($(".translations-tabs-nav li:last"));
-
-                                    // Clone the fallback tab content
-                                    var newContent = $("#tab-zz").clone();
-                                    newContent.attr('id', 'tab-' + langCode);
-                                    newContent.addClass('translation-tab'); // Make sure the class is added
-
-                                    // Update heading
-                                    var heading = newContent.find('h4:first');
-                                    heading.text(langName + ' Translations (' + langCode + ')');
-                                    heading.append(' <button type="button" class="button button-small delete-language-btn" data-lang="' + langCode + '">Delete Language</button>');
-
-                                    // Update input names and IDs
-                                    newContent.find('input, textarea').each(function() {
-                                        var name = $(this).attr('name');
-                                        if (name) {
-                                            name = name.replace('[zz]', '[' + langCode + ']');
-                                            $(this).attr('name', name);
-                                        }
-
-                                        var id = $(this).attr('id');
-                                        if (id) {
-                                            id = id.replace('_zz_', '_' + langCode + '_');
-                                            $(this).attr('id', id);
-                                        }
-                                    });
-
-                                    // Add to DOM
-                                    newContent.appendTo("#translations-tabs");
-                                }
-
-                                // Fill in values from translations
-                                var langTranslations = translations[langCode];
-                                fillTranslationValues(langCode, langTranslations);
-                            });
-
-                            // Refresh tabs
-                            $('#translations-tabs').tabs('refresh');
-
-                            // Restore active tab if it was saved
-                            var savedTabIndex = localStorage.getItem('klaro_active_tab_index');
-                            if (savedTabIndex !== null) {
-                                try {
-                                    $('#translations-tabs').tabs('option', 'active', parseInt(savedTabIndex));
-                                    console.log('Restored active tab to index:', savedTabIndex);
-                                    // Clear the saved index after using it
-                                    localStorage.removeItem('klaro_active_tab_index');
-                                } catch (e) {
-                                    console.error('Error restoring active tab:', e);
-                                }
-                            }
-                        }
-                    }, 200);
-                }
-
-                // Helper function to fill in translation values
-                function fillTranslationValues(langCode, translations, prefix) {
-                    prefix = prefix || '';
-
-                    for (var key in translations) {
-                        if (translations.hasOwnProperty(key)) {
-                            var value = translations[key];
-
-                            if (typeof value === 'object' && value !== null) {
-                                // Recursively process nested objects
-                                fillTranslationValues(langCode, value, prefix ? prefix + '[' + key + ']' : key);
-                            } else {
-                                // Find and update the form field
-                                var selector = 'input[name="template_config[translations][' + langCode + ']' +
-                                              (prefix ? '[' + prefix + ']' : '') +
-                                              '[' + key + ']"], ' +
-                                              'textarea[name="template_config[translations][' + langCode + ']' +
-                                              (prefix ? '[' + prefix + ']' : '') +
-                                              '[' + key + ']"]';
-
-                                $(selector).val(value);
-                            }
-                        }
-                    }
-                }
-
-                // Handle delete language button
-                $(document).on('click', '.delete-language-btn', function(e) {
-                    e.preventDefault();
-                    var langCode = $(this).data('lang');
-
-                    if (confirm('Are you sure you want to delete the ' + langCode + ' language? This action cannot be undone.')) {
-                        // Remove the tab and its content
-                        var tabIndex = $(".translations-tabs-nav a[href='#tab-" + langCode + "']").parent().index();
-                        $("#tab-" + langCode).remove();
-                        $(".translations-tabs-nav li").eq(tabIndex).remove();
-
-                        // Refresh tabs and switch to fallback tab
-                        $("#translations-tabs").tabs("refresh");
-                        $("#translations-tabs").tabs("option", "active", 0);
-
-                        // Update the JSON textarea
-                        updateJsonFromForm();
-                    }
-                });
-
-                // Function to update JSON from form
-                function updateJsonFromForm() {
-                    var translations = {};
-
-                    // Get all language tabs
-                    $('.translation-tab').each(function() {
-                        var tabId = $(this).attr('id');
-                        if (!tabId || tabId === 'tab-add') return; // Skip the "Add Language" tab
-
-                        var langCode = tabId.replace('tab-', '');
-                        translations[langCode] = {};
-
-                        // Process all inputs and textareas in this tab
-                        $(this).find('input, textarea').each(function() {
-                            var name = $(this).attr('name');
-                            if (!name) return;
-
-                            // Extract the field path from the name attribute
-                            var matches = name.match(/\[translations\]\[([^\]]+)\]\[([^\]]+)(?:\]\[([^\]]+))?(?:\]\[([^\]]+))?/);
-                            if (!matches) return;
-
-                            var lang = matches[1];
-                            var key1 = matches[2];
-                            var key2 = matches[3];
-                            var key3 = matches[4];
-
-                            var value = $(this).val();
-
-                            // Build the nested structure
-                            if (!translations[lang]) {
-                                translations[lang] = {};
-                            }
-
-                            if (key2 && key3) {
-                                // Three levels deep (e.g., consentModal.title)
-                                if (!translations[lang][key1]) {
-                                    translations[lang][key1] = {};
-                                }
-                                if (!translations[lang][key1][key2]) {
-                                    translations[lang][key1][key2] = {};
-                                }
-                                translations[lang][key1][key2][key3] = value;
-                            } else if (key2) {
-                                // Two levels deep (e.g., privacyPolicy.name)
-                                if (!translations[lang][key1]) {
-                                    translations[lang][key1] = {};
-                                }
-                                translations[lang][key1][key2] = value;
-                            } else {
-                                // One level deep (e.g., acceptAll)
-                                translations[lang][key1] = value;
-                            }
-                        });
-                    });
-
-                    // Update the JSON textarea
-                    $('#translations_json_editor').val(JSON.stringify(translations, null, 2));
-
-                    return translations;
-                }
-
-                // Handle form submission
-                $('#template-form').on('submit', function(e) {
-                    // Update the JSON from the form before submitting
-                    updateJsonFromForm();
-
-                    // Store the current active tab index to restore it after page reload
-                    if ($('#translations-tabs').length) {
-                        var activeTabIndex = $('#translations-tabs').tabs('option', 'active');
-                        localStorage.setItem('klaro_active_tab_index', activeTabIndex);
-                    }
-
-                    // Continue with form submission
-                    return true;
-                });
-
-                // Restore active tab after page load if it was saved
-                if ($('#translations-tabs').length) {
-                    var savedTabIndex = localStorage.getItem('klaro_active_tab_index');
-                    if (savedTabIndex !== null) {
-                        // Set a timeout to ensure tabs are fully initialized
-                        setTimeout(function() {
-                            $('#translations-tabs').tabs('option', 'active', parseInt(savedTabIndex));
-                            // Clear the saved index after using it
-                            localStorage.removeItem('klaro_active_tab_index');
-                        }, 300);
-                    }
-                }
-            });
-            </script>
+            <!-- Template selector, delete, tabs, and form behavior handled by klaro-geo-admin-templates.js -->
 
             <div id="template_creation_container">
                      <?php
                     // Add nonce for AJAX
                     wp_nonce_field('klaro_geo_template_nonce', 'klaro_geo_template_nonce');
                     ?>
-                    <script type="text/javascript">
-                    jQuery(document).ready(function($) {
-                        $('#add_template').click(function() {
-                            // Hide the main template config temporarily
-                            $('#template_config').hide();
-
-                            // Show the new template form
-                            var newTemplateForm = $('<div id="new_template_form" class="template-creation-form">' +
-                                '<h3>Create New Template</h3>' +
-                                '<table class="form-table">' +
-                                '<tr>' +
-                                '<th><label for="new_template_name">Template Name:</label></th>' +
-                                '<td><input type="text" id="new_template_name" name="new_template_name" required></td>' +
-                                '</tr>' +
-                                '<tr>' +
-                                '<th><label for="inherit_from_template">Copy Settings From:</label></th>' +
-                                '<td><select id="inherit_from_template" name="inherit_from_template">' +
-                                $('#template_selector').html() + // Reuse existing templates list
-                                '</select></td>' +
-                                '</tr>' +
-                                '</table>' +
-                                '<div class="template-creation-buttons">' +
-                                '<button type="button" class="button button-primary" id="create_template">Create Template</button>' +
-                                '<button type="button" class="button" id="cancel_template">Cancel</button>' +
-                                '</div>' +
-                                '</div>');
-
-                            // Insert the form after the Add Template button
-                            $(this).after(newTemplateForm);
-                            $(this).hide();
-
-                            // Handle Cancel
-                            $('#cancel_template').click(function() {
-                                $('#new_template_form').remove();
-                                $('#add_template').show();
-                                $('#template_config').show();
-                            });
-
-                            // Handle Create
-                            $('#create_template').click(function() {
-                                var templateName = $('#new_template_name').val();
-                                var inheritFrom = $('#inherit_from_template').val();
-
-                                if (!templateName) {
-                                    alert('Please enter a template name');
-                                    return;
-                                }
-
-                                // Create new template by copying selected template's settings
-                                $.ajax({
-                                    url: ajaxurl,
-                                    type: 'POST',
-                                    data: {
-                                        action: 'create_klaro_template',
-                                        template_name: templateName,
-                                        inherit_from: inheritFrom,
-                                        nonce: $('#klaro_geo_template_nonce').val()
-                                    },
-                                    success: function(response) {
-                                        if (response.success) {
-                                            // Add new template to selector and select it
-                                            var option = new Option(templateName, response.data.template_key);
-                                            $('#template_selector').append(option);
-                                            $('#template_selector').val(response.data.template_key).trigger('change');
-
-                                            // Clean up creation form
-                                            $('#new_template_form').remove();
-                                            $('#add_template').show();
-                                            $('#template_config').show();
-                                        } else {
-                                            alert(response.data.message);
-                                        }
-                                    },
-                                    error: function() {
-                                        alert('Error creating template. Please try again.');
-                                    }
-                                });
-                            });
-                        });
-                    });
-                    </script>
+                    <!-- Template creation handled by klaro-geo-admin-templates.js -->
                     <?php
                      $current_config = $templates[$current_template]['config'];
                      ?>
@@ -1148,7 +750,7 @@ function klaro_geo_templates_page() {
                             <!-- Hidden field to ensure the value is sent even when unchecked -->
                             <input type="hidden" name="template_config[disablePoweredBy]" value="false">
                             <input type="checkbox" name="template_config[disablePoweredBy]" id="template_config_disablePoweredBy" value="true"
-                                <?php checked(isset($current_config['disablePoweredBy']) ? $current_config['disablePoweredBy'] : false); ?>>
+                                <?php checked(isset($current_config['disablePoweredBy']) ? $current_config['disablePoweredBy'] : true); ?>>
                             <p class="description">Hide the "Powered by Klaro" text.</p>
                         </td>
                     </tr>
@@ -1850,7 +1452,7 @@ function klaro_geo_create_template() {
         'message' => 'Template created successfully.'
     ));
 }
-add_action('wp_ajax_create_klaro_template', 'klaro_geo_create_template');
+add_action('wp_ajax_klaro_geo_create_template', 'klaro_geo_create_template');
 
 /**
  * AJAX handler for saving translations

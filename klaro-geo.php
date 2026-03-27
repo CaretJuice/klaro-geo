@@ -473,6 +473,47 @@ function klaro_geo_enqueue_scripts() {
         'window.klaroGeo = Object.assign(window.klaroGeo || {}, ' . wp_json_encode($button_settings) . ');',
         'before'
     );
+
+    // Enqueue consent defaults and GTM scripts via wp_add_inline_script (must be in <head>)
+    $consent_defaults = isset($GLOBALS['klaro_geo_consent_defaults']) ? $GLOBALS['klaro_geo_consent_defaults'] : null;
+    $gtag_settings = isset($GLOBALS['klaro_geo_gtag_settings']) ? $GLOBALS['klaro_geo_gtag_settings'] : array();
+
+    if ($consent_defaults) {
+        $consent_default_obj = $consent_defaults;
+        $consent_default_obj['wait_for_update'] = 500;
+
+        $inline_js = "window.dataLayer = window.dataLayer || [];\n";
+        $inline_js .= "function gtag(){dataLayer.push(arguments);}\n";
+        $inline_js .= "gtag('consent', 'default', " . wp_json_encode($consent_default_obj, JSON_UNESCAPED_SLASHES) . ");\n";
+
+        if (isset($gtag_settings['ads_data_redaction']) && $gtag_settings['ads_data_redaction'] === 'true') {
+            $inline_js .= "gtag('set', 'ads_data_redaction', true);\n";
+        }
+        if (isset($gtag_settings['url_passthrough']) && $gtag_settings['url_passthrough'] === 'true') {
+            $inline_js .= "gtag('set', 'url_passthrough', true);\n";
+        }
+
+        wp_register_script('klaro-geo-consent-defaults', false, array(), KLARO_GEO_VERSION, false);
+        wp_enqueue_script('klaro-geo-consent-defaults');
+        wp_add_inline_script('klaro-geo-consent-defaults', $inline_js);
+    }
+
+    $gtm_id = get_option('klaro_geo_gtm_id', '');
+    if (!empty($gtm_id)) {
+        $consent_mode_type = get_option('klaro_geo_consent_mode_type', 'basic');
+        if ($consent_mode_type === 'advanced') {
+            $gtm_deps = $consent_defaults ? array('klaro-geo-consent-defaults') : array();
+            $gtm_js  = "(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':\n";
+            $gtm_js .= "new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],\n";
+            $gtm_js .= "j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=\n";
+            $gtm_js .= "'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);\n";
+            $gtm_js .= "})(window,document,'script','dataLayer','" . esc_js($gtm_id) . "');";
+
+            wp_register_script('klaro-geo-gtm', false, $gtm_deps, KLARO_GEO_VERSION, false);
+            wp_enqueue_script('klaro-geo-gtm');
+            wp_add_inline_script('klaro-geo-gtm', $gtm_js);
+        }
+    }
 }
 add_action('wp_enqueue_scripts', 'klaro_geo_enqueue_scripts');
 
@@ -494,66 +535,33 @@ function klaro_geo_add_gtm_head_script() {
         return;
     }
 
-    // Get GTM ID from settings
+    // Consent defaults and GTM advanced mode are now enqueued via wp_add_inline_script
+    // in klaro_geo_enqueue_scripts(). This function only handles basic mode GTM which
+    // requires custom HTML attributes (data-type, data-name) for Klaro consent gating.
+
     $gtm_id = get_option('klaro_geo_gtm_id', '');
-
-    // Always output consent defaults if available (even without GTM)
-    $consent_defaults = isset($GLOBALS['klaro_geo_consent_defaults']) ? $GLOBALS['klaro_geo_consent_defaults'] : null;
-    $gtag_settings = isset($GLOBALS['klaro_geo_gtag_settings']) ? $GLOBALS['klaro_geo_gtag_settings'] : array();
-
-    if ($consent_defaults) {
-        // Build the consent default object with wait_for_update
-        $consent_default_obj = $consent_defaults;
-        $consent_default_obj['wait_for_update'] = 500;
-        ?>
-        <!-- Klaro Geo Consent Defaults -->
-        <script>
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('consent', 'default', <?php echo wp_json_encode($consent_default_obj, JSON_UNESCAPED_SLASHES); ?>);
-        <?php if (isset($gtag_settings['ads_data_redaction']) && $gtag_settings['ads_data_redaction'] === 'true') : ?>
-        gtag('set', 'ads_data_redaction', true);
-        <?php endif; ?>
-        <?php if (isset($gtag_settings['url_passthrough']) && $gtag_settings['url_passthrough'] === 'true') : ?>
-        gtag('set', 'url_passthrough', true);
-        <?php endif; ?>
-        </script>
-        <?php
-    }
-
-    // If no GTM ID is set, don't output GTM snippet
     if (empty($gtm_id)) {
         return;
     }
 
     $consent_mode_type = get_option('klaro_geo_consent_mode_type', 'basic');
 
-    if ($consent_mode_type === 'advanced') {
-        // Advanced mode: GTM loads immediately (no Klaro gating)
-        ?>
-        <!-- Google Tag Manager (Advanced Consent Mode) -->
-        <script>
-        (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-        new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-        j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-        'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-        })(window,document,'script','dataLayer','<?php echo esc_js($gtm_id); ?>');
-        </script>
-        <!-- End Google Tag Manager -->
-        <?php
-    } else {
+    if ($consent_mode_type !== 'advanced') {
         // Basic mode: GTM gated by Klaro consent
-        ?>
-        <!-- Google Tag Manager (Klaro-compatible) -->
-        <script data-type="application/javascript" type="text/plain" data-name="google-tag-manager">
-        (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-        new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-        j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-        'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-        })(window,document,'script','dataLayer','<?php echo esc_js($gtm_id); ?>');
-        </script>
-        <!-- End Google Tag Manager -->
-        <?php
+        // Uses data-type/data-name attributes so Klaro can intercept and gate execution.
+        // wp_print_inline_script_tag() is the WordPress-approved way to output inline
+        // scripts with custom attributes (available since WP 5.7).
+        $gtm_js  = "(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':\n";
+        $gtm_js .= "new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],\n";
+        $gtm_js .= "j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=\n";
+        $gtm_js .= "'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);\n";
+        $gtm_js .= "})(window,document,'script','dataLayer','" . esc_js($gtm_id) . "');";
+
+        wp_print_inline_script_tag($gtm_js, array(
+            'type'      => 'text/plain',
+            'data-type' => 'application/javascript',
+            'data-name' => 'google-tag-manager',
+        ));
     }
 }
 
@@ -664,7 +672,7 @@ function klaro_geo_admin_bar_menu($wp_admin_bar) {
             $args = array(
                 'id' => 'klaro-geo-debug-' . str_replace('-', '_', $code), // Replace - with _ for valid ID
                 'title' => $code,
-                'href' => add_query_arg('klaro_geo_debug_geo', $code, wp_unslash($_SERVER['REQUEST_URI'])),
+                'href' => add_query_arg('klaro_geo_debug_geo', $code, esc_url_raw(wp_unslash($_SERVER['REQUEST_URI']))),
                 'parent' => $is_region ? 'klaro-geo-debug-regions' : 'klaro-geo-debug-countries',
             );
             $wp_admin_bar->add_node($args);
@@ -713,20 +721,21 @@ function klaro_geo_embedded_shortcode($atts) {
         // Add a message that this is where Klaro will be embedded
         $output .= '<div class="klaro-placeholder">Loading consent manager...</div>';
 
-        // Add JavaScript to initialize Klaro in this container
-        $output .= '<script type="text/javascript">
-            document.addEventListener("DOMContentLoaded", function() {
-                if (typeof window.klaro !== "undefined") {
-                    // If Klaro is already loaded, show it in the container
-                    window.klaro.show("' . esc_attr($atts['id']) . '");
-                } else {
-                    // If Klaro is not loaded yet, wait for it
-                    document.addEventListener("klaro-ready", function() {
-                        window.klaro.show("' . esc_attr($atts['id']) . '");
-                    });
-                }
-            });
-        </script>';
+        // Enqueue inline script to initialize Klaro in this container
+        $container_id = esc_js($atts['id']);
+        $embedded_js  = "document.addEventListener('DOMContentLoaded', function() {\n";
+        $embedded_js .= "  if (typeof window.klaro !== 'undefined') {\n";
+        $embedded_js .= "    window.klaro.show('" . $container_id . "');\n";
+        $embedded_js .= "  } else {\n";
+        $embedded_js .= "    document.addEventListener('klaro-ready', function() {\n";
+        $embedded_js .= "      window.klaro.show('" . $container_id . "');\n";
+        $embedded_js .= "    });\n";
+        $embedded_js .= "  }\n";
+        $embedded_js .= "});\n";
+
+        wp_register_script('klaro-geo-embedded-init', false, array(), KLARO_GEO_VERSION, true);
+        wp_enqueue_script('klaro-geo-embedded-init');
+        wp_add_inline_script('klaro-geo-embedded-init', $embedded_js);
     } else {
         // Show a message that embedded mode is not enabled
         $output .= '<div class="klaro-error">

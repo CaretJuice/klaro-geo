@@ -751,67 +751,57 @@ function klaro_geo_render_consent_receipts_page() {
                 </div>
             </div>
             
-            <script>
-            jQuery(document).ready(function($) {
-                // View receipt details
-                $('.view-receipt').on('click', function() {
-                    var receiptId = $(this).data('receipt-id');
-                    
-                    $.ajax({
-                        url: ajaxurl,
-                        type: 'POST',
-                        data: {
-                            action: 'klaro_geo_get_receipt_details',
-                            receipt_id: receiptId,
-                            nonce: '<?php echo esc_attr( wp_create_nonce('klaro_geo_admin_nonce') ); ?>'
-                        },
-                        success: function(response) {
-                            if (response.success) {
-                                var receipt = response.data;
-                                var detailsHtml = '<table class="wp-list-table widefat fixed">';
-                                
-                                // Basic info
-                                detailsHtml += '<tr><th>Receipt ID:</th><td>' + receipt.receipt_id + '</td></tr>';
-                                detailsHtml += '<tr><th>Date & Time:</th><td>' + receipt.timestamp + '</td></tr>';
-                                detailsHtml += '<tr><th>Template:</th><td>' + receipt.template_name + '</td></tr>';
-                                detailsHtml += '<tr><th>Source:</th><td>' + receipt.template_source + '</td></tr>';
-                                detailsHtml += '<tr><th>Country:</th><td>' + (receipt.country_code || 'N/A') + '</td></tr>';
-                                detailsHtml += '<tr><th>Region:</th><td>' + (receipt.region_code || 'N/A') + '</td></tr>';
-                                
-                                // Consent choices
-                                detailsHtml += '<tr><th>Consent Choices:</th><td><pre>' +
-                                              JSON.stringify(JSON.parse(receipt.consent_data), null, 2) +
-                                              '</pre></td></tr>';
-
-                                // Klaro config (if available)
-                                if (receipt.klaro_config) {
-                                    detailsHtml += '<tr><th>Klaro Config:</th><td><pre>' +
-                                                  JSON.stringify(JSON.parse(receipt.klaro_config), null, 2) +
-                                                  '</pre></td></tr>';
-                                }
-                                
-                                detailsHtml += '</table>';
-                                
-                                $('#receipt-details').html(detailsHtml);
-                                $('#receipt-modal').show();
-                            }
-                        }
-                    });
-                });
-                
-                // Close modal
-                $('#close-modal').on('click', function() {
-                    $('#receipt-modal').hide();
-                });
-                
-                // Close modal when clicking outside
-                $(window).on('click', function(event) {
-                    if ($(event.target).is('#receipt-modal')) {
-                        $('#receipt-modal').hide();
+            <?php
+            // Enqueue receipt viewer behavior via wp_add_inline_script
+            $receipt_nonce = wp_create_nonce('klaro_geo_admin_nonce');
+            $receipt_js = <<<JS
+jQuery(document).ready(function($) {
+    // View receipt details
+    $('.view-receipt').on('click', function() {
+        var receiptId = $(this).data('receipt-id');
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: {
+                action: 'klaro_geo_get_receipt_details',
+                receipt_id: receiptId,
+                nonce: '{$receipt_nonce}'
+            },
+            success: function(response) {
+                if (response.success) {
+                    var receipt = response.data;
+                    var detailsHtml = '<table class="wp-list-table widefat fixed">';
+                    detailsHtml += '<tr><th>Receipt ID:</th><td>' + receipt.receipt_id + '</td></tr>';
+                    detailsHtml += '<tr><th>Date & Time:</th><td>' + receipt.timestamp + '</td></tr>';
+                    detailsHtml += '<tr><th>Template:</th><td>' + receipt.template_name + '</td></tr>';
+                    detailsHtml += '<tr><th>Source:</th><td>' + receipt.template_source + '</td></tr>';
+                    detailsHtml += '<tr><th>Country:</th><td>' + (receipt.country_code || 'N/A') + '</td></tr>';
+                    detailsHtml += '<tr><th>Region:</th><td>' + (receipt.region_code || 'N/A') + '</td></tr>';
+                    detailsHtml += '<tr><th>Consent Choices:</th><td><pre>' +
+                                  JSON.stringify(JSON.parse(receipt.consent_data), null, 2) +
+                                  '</pre></td></tr>';
+                    if (receipt.klaro_config) {
+                        detailsHtml += '<tr><th>Klaro Config:</th><td><pre>' +
+                                      JSON.stringify(JSON.parse(receipt.klaro_config), null, 2) +
+                                      '</pre></td></tr>';
                     }
-                });
-            });
-            </script>
+                    detailsHtml += '</table>';
+                    $('#receipt-details').html(detailsHtml);
+                    $('#receipt-modal').show();
+                }
+            }
+        });
+    });
+    // Close modal
+    $('#close-modal').on('click', function() { $('#receipt-modal').hide(); });
+    // Close modal when clicking outside
+    $(window).on('click', function(event) {
+        if ($(event.target).is('#receipt-modal')) { $('#receipt-modal').hide(); }
+    });
+});
+JS;
+            wp_add_inline_script('klaro-geo-admin-js', $receipt_js);
+            ?>
         <?php endif; ?>
     </div>
     <?php

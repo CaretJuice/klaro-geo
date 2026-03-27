@@ -395,7 +395,7 @@ if (typeof jQuery !== 'undefined') {
             url: ajaxurl,
             type: 'POST',
             data: {
-                action: 'delete_klaro_service',
+                action: 'klaro_geo_delete_service',
                 index: index,
                 _wpnonce: klaroGeoServices.nonce
             },
@@ -594,7 +594,7 @@ if (typeof jQuery !== 'undefined') {
             url: ajaxurl,
             type: 'POST',
             data: {
-                action: 'save_klaro_services',
+                action: 'klaro_geo_save_services',
                 services: JSON.stringify(klaroGeoServices.services),
                 _wpnonce: klaroGeoServices.nonce
             },

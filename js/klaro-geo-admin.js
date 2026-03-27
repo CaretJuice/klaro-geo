@@ -120,7 +120,7 @@ jQuery(document).ready(function($) {
             url: klaroGeoAdmin.ajaxurl,
             type: 'POST',
             data: {
-                action: 'get_klaro_regions',
+                action: 'klaro_geo_get_regions',
                 country: countryCode,
                 language: language,
                 nonce: klaroGeoAdmin.nonce
@@ -281,7 +281,7 @@ jQuery(document).ready(function($) {
             type: 'POST',
             dataType: 'json',
             data: {
-                action: 'save_klaro_region_settings',
+                action: 'klaro_geo_save_region_settings',
                 settings: JSON.stringify(regionSettings),
                 nonce: klaroGeoAdmin.nonce,
                 timestamp: new Date().getTime() // Add timestamp to prevent caching
@@ -340,7 +340,7 @@ jQuery(document).ready(function($) {
             url: klaroGeoAdmin.ajaxurl,
             type: 'POST',
             data: {
-                action: 'save_klaro_country_settings',
+                action: 'klaro_geo_save_country_settings',
                 settings: formData,
                 nonce: klaroGeoAdmin.nonce
             },
@@ -564,7 +564,7 @@ jQuery(document).ready(function($) {
             url: klaroGeoAdmin.ajaxurl,
             type: 'POST',
             data: {
-                action: 'save_klaro_country_settings',
+                action: 'klaro_geo_save_country_settings',
                 settings: formData,
                 nonce: klaroGeoAdmin.nonce
             },
