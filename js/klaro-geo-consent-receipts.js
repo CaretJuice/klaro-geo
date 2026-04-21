@@ -71,7 +71,7 @@ function handleConsentChange(e) {
     }
 
     // Generate a unique receipt ID
-    var receiptId = 'receipt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    let receiptId = 'receipt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 
     // Log the admin override value for debugging
     klaroGeoLog('Admin override value:', window.klaroConsentData.adminOverride);
@@ -98,7 +98,7 @@ function handleConsentChange(e) {
 
     // Get consents from the event or opts
     var consents = {};
-    var opts = null;
+    let opts = null;
 
     // First try to get consents from the event
     if (e && e.detail && e.detail.manager && e.detail.manager.consents) {
@@ -117,7 +117,7 @@ function handleConsentChange(e) {
         // Try to determine consent from the UI
         document.querySelectorAll('#klaro input[type="checkbox"]').forEach(function(checkbox) {
             if (checkbox.id && checkbox.id.startsWith('service-item-')) {
-                var serviceName = checkbox.id.replace('service-item-', '');
+                let serviceName = checkbox.id.replace('service-item-', '');
                 consents[serviceName] = checkbox.checked;
             }
         });
@@ -132,7 +132,7 @@ function handleConsentChange(e) {
     storeReceiptLocally(consentReceipt);
 
     // Check if server-side consent logging is enabled
-    var enableConsentLogging = typeof window.klaroConsentData !== 'undefined' &&
+    let enableConsentLogging = typeof window.klaroConsentData !== 'undefined' &&
         typeof window.klaroConsentData.enableConsentLogging !== 'undefined'
         ? (window.klaroConsentData.enableConsentLogging !== "0" &&
            window.klaroConsentData.enableConsentLogging !== false)
@@ -167,8 +167,8 @@ function handleConsentChange(e) {
 function storeReceiptLocally(receipt) {
     try {
         // Get existing receipts
-        var existingData = window.localStorage.getItem('klaro_consent_receipts');
-        var receipts = [];
+        let existingData = window.localStorage.getItem('klaro_consent_receipts');
+        let receipts = [];
 
         if (existingData) {
             try {
@@ -204,10 +204,10 @@ function storeReceiptLocally(receipt) {
  */
 function sendReceiptToServer(receipt) {
     // Get the AJAX URL
-    var ajaxUrl = window.klaroConsentData.ajaxUrl || '/wp-admin/admin-ajax.php';
+    let ajaxUrl = window.klaroConsentData.ajaxUrl || '/wp-admin/admin-ajax.php';
 
     // Create form data
-    var formData = new FormData();
+    let formData = new FormData();
     formData.append('action', 'klaro_geo_store_consent_receipt');
 
     // Add nonce if available
@@ -301,9 +301,9 @@ function sendReceiptToServer(receipt) {
 })();
 
 // Track if we've already processed a consent change to prevent duplicates
-var consentChangeProcessed = false;
-var consentChangeTimeout = null;
-var lastConsentTimestamp = 0;
+let consentChangeProcessed = false;
+let consentChangeTimeout = null;
+let lastConsentTimestamp = 0;
 
 // Function to reset the processed flag after a delay
 function resetConsentChangeProcessed() {
@@ -312,7 +312,7 @@ function resetConsentChangeProcessed() {
 
 // Function to handle Klaro consent change events
 function handleKlaroConsentEvent(e, eventName) {
-    var now = Date.now();
+    let now = Date.now();
 
     // Check if this event might have been triggered by the watcher
     // If the timestamps are very close (within 500ms), it's likely a duplicate
@@ -384,7 +384,7 @@ window.triggerKlaroConsentReceipt = function() {
 
     // Otherwise, try to get consents from Klaro manager
     if (window.klaro && window.klaro.getManager) {
-        var manager = window.klaro.getManager();
+        let manager = window.klaro.getManager();
         if (manager && manager.consents) {
             klaroGeoLog('Using klaro.getManager for manual consent receipt trigger');
             handleConsentChange({
@@ -395,12 +395,12 @@ window.triggerKlaroConsentReceipt = function() {
     }
 
     // Last resort: try to determine from UI
-    var consents = {};
-    var foundConsents = false;
+    let consents = {};
+    let foundConsents = false;
 
     document.querySelectorAll('#klaro input[type="checkbox"]').forEach(function(checkbox) {
         if (checkbox.id && checkbox.id.startsWith('service-item-')) {
-            var serviceName = checkbox.id.replace('service-item-', '');
+            let serviceName = checkbox.id.replace('service-item-', '');
             consents[serviceName] = checkbox.checked;
             foundConsents = true;
         }
@@ -421,7 +421,7 @@ window.triggerKlaroConsentReceipt = function() {
 // Add a test function to manually test the AJAX endpoint
 window.testKlaroConsentReceipt = function() {
     // Create a test receipt
-    var testReceipt = {
+    let testReceipt = {
         receipt_id: 'test_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
         timestamp: Math.floor(Date.now() / 1000),
         consent_choices: { 'test-service': true },

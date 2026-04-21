@@ -7,7 +7,9 @@ jQuery(document).ready(function($) {
             // Remove any existing klaro_geo_debug_geo parameter and add the new one
             let url = new URL(window.location.href);
             url.searchParams.delete('klaro_geo_debug_geo');
+            url.searchParams.delete('_wpnonce');
             url.searchParams.append('klaro_geo_debug_geo', selectedLocation);
+            url.searchParams.append('_wpnonce', klaroGeoAdminBar.nonce);
             window.location.href = url.toString();
         }
     });

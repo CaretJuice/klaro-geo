@@ -9,7 +9,7 @@
     'use strict';
 
     // Define default settings
-    var defaultSettings = {
+    let defaultSettings = {
         enableFloatingButton: false,
         floatingButtonText: 'Manage Consent',
         floatingButtonTheme: 'light',
@@ -23,13 +23,13 @@
             target = {};
         }
 
-        for (var i = 1; i < arguments.length; i++) {
-            var source = arguments[i];
+        for (let i = 1; i < arguments.length; i++) {
+            let source = arguments[i];
             if (source === undefined || source === null) {
                 continue;
             }
 
-            for (var key in source) {
+            for (let key in source) {
                 if (source.hasOwnProperty(key)) {
                     target[key] = source[key];
                 }
@@ -39,8 +39,8 @@
         return target;
     }
 
-    var isInitialized = false;
-    var settings;
+    let isInitialized = false;
+    let settings;
     // Get settings from global object or use defaults
     function getSettings() {
         if (settings) { // Check if settings are already cached
@@ -51,7 +51,7 @@
         }
 
         // Try to get settings from different possible locations
-        var rawSettings = typeof window.klaroGeo !== 'undefined' ? window.klaroGeo : null;
+        let rawSettings = typeof window.klaroGeo !== 'undefined' ? window.klaroGeo : null;
 
         // Debug: log what we found
         if (rawSettings && rawSettings.debug) {
@@ -60,7 +60,7 @@
 
         // If settings are found, merge with defaults
         if (rawSettings) {
-            var mergedSettings = (typeof $.extend === 'function')
+            let mergedSettings = (typeof $.extend === 'function')
                 ? $.extend({}, defaultSettings, rawSettings)
                 : mergeObjects({}, defaultSettings, rawSettings);
 
@@ -123,7 +123,7 @@
     // Initialize with Klaro check
     function initWithKlaroCheck() {
         klaroGeoLog('initWithKlaroCheck() called');
-        var settingsForCheck = typeof window.klaroGeo !== 'undefined' ? window.klaroGeo : null; // Only get raw settings for the debug log here
+        let settingsForCheck = typeof window.klaroGeo !== 'undefined' ? window.klaroGeo : null; // Only get raw settings for the debug log here
 
         if (settingsForCheck && settingsForCheck.debug) {
             klaroGeoLog('Checking if Klaro is loaded:', isKlaroLoaded());
@@ -165,13 +165,13 @@
      */
     function createFloatingButton(settings) {
         // Get settings
-        var buttonText = settings.floatingButtonText;
-        var buttonTheme = settings.floatingButtonTheme;
-        var buttonPosition = settings.floatingButtonPosition;
+        let buttonText = settings.floatingButtonText;
+        let buttonTheme = settings.floatingButtonTheme;
+        let buttonPosition = settings.floatingButtonPosition;
 
         try {
             // Create button with jQuery
-            var $button = $('<button>', {
+            let $button = $('<button>', {
                 'class': 'klaro-floating-button open-klaro-modal klaro-theme-' + buttonTheme + ' klaro-position-' + buttonPosition,
                 'text': buttonText,
                 'aria-label': buttonText
@@ -181,7 +181,7 @@
             $('body').append($button);
 
             // Add button styles if not already added
-            var hasStyles = false;
+            let hasStyles = false;
             try {
                 hasStyles = $('#klaro-floating-button-styles').length > 0;
             } catch (e) {
@@ -271,7 +271,7 @@
             klaroGeoWarn('jQuery methods failed, falling back to native JS:', e);
 
             // Create button with native JS
-            var button = document.createElement('button');
+            let button = document.createElement('button');
             button.className = 'klaro-floating-button open-klaro-modal klaro-theme-' + buttonTheme + ' klaro-position-' + buttonPosition;
             button.textContent = buttonText;
             button.setAttribute('aria-label', buttonText);

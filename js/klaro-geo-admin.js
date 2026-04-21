@@ -6,12 +6,12 @@ jQuery(document).ready(function($) {
     if ($.fn.tabs && $('.tabs-container').length) {
         $('.tabs-container').tabs();
     }
-    
+
     // Common form validation
     $('.klaro-geo-form').on('submit', function(e) {
-        var requiredFields = $(this).find('[required]');
-        var valid = true;
-        
+        let requiredFields = $(this).find('[required]');
+        let valid = true;
+
         requiredFields.each(function() {
             if (!$(this).val()) {
                 valid = false;
@@ -20,20 +20,20 @@ jQuery(document).ready(function($) {
                 $(this).removeClass('error');
             }
         });
-        
+
         if (!valid) {
             e.preventDefault();
             alert('Please fill in all required fields.');
         }
     });
-    
+
     // Toggle advanced sections
     $('.toggle-advanced').on('click', function(e) {
         e.preventDefault();
-        var target = $(this).data('target');
+        let target = $(this).data('target');
         $('#' + target).slideToggle();
         $(this).toggleClass('open');
-        
+
         if ($(this).hasClass('open')) {
             $(this).text($(this).data('hide-text') || 'Hide Advanced Options');
         } else {
@@ -52,8 +52,8 @@ jQuery(document).ready(function($) {
 
     // EU country codes
     const euCountries = [
-        'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 
-        'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 
+        'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR',
+        'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL',
         'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE'
     ];
 
@@ -71,15 +71,15 @@ jQuery(document).ready(function($) {
 
     // Handle hiding countries
     $('.hide-country').click(function() {
-        var countryCode = $(this).data('country');
-        var checkbox = $('input[name="klaro_geo_visible_countries[]"][value="' + countryCode + '"]');
+        let countryCode = $(this).data('country');
+        let checkbox = $('input[name="klaro_geo_visible_countries[]"][value="' + countryCode + '"]');
         checkbox.prop('checked', false);
         $(this).closest('tr').hide();
     });
 
     // Handle saving country visibility
     $('.save-countries').click(function() {
-        var selectedCountries = $('input[name="klaro_geo_visible_countries[]"]:checked').map(function() {
+        let selectedCountries = $('input[name="klaro_geo_visible_countries[]"]:checked').map(function() {
             return $(this).val();
         }).get();
 
@@ -114,7 +114,7 @@ jQuery(document).ready(function($) {
 
     // Function to load regions
     function loadRegions(countryCode, language) {
-        var modal = $('#region-modal-' + countryCode);
+        let modal = $('#region-modal-' + countryCode);
 
         $.ajax({
             url: klaroGeoAdmin.ajaxurl,
@@ -133,11 +133,11 @@ jQuery(document).ready(function($) {
                     regionList.attr('data-country', countryCode);
 
                     // Add or update language selector if multiple languages are available
-                    var languages = response.data.languages || [];
+                    let languages = response.data.languages || [];
                     klaroGeoLog('Languages:', languages);
 
                     if (languages.length > 1) {
-                        var existingSelector = modal.find('.language-selector-container');
+                        let existingSelector = modal.find('.language-selector-container');
                         if (existingSelector.length === 0) {
                             var langSelect = $('<select class="language-selector"></select>');
                             languages.forEach(function(lang) {
@@ -155,10 +155,10 @@ jQuery(document).ready(function($) {
                         }
                     }
 
-                    var regions = response.data.regions || {};
+                    let regions = response.data.regions || {};
                     klaroGeoLog('Regions:', regions);
 
-                    var html = '<table class="wp-list-table widefat fixed striped">';
+                    let html = '<table class="wp-list-table widefat fixed striped">';
                     html += '<thead><tr><th>Region Code</th><th>Name</th><th>Template</th></tr></thead><tbody>';
 
                     if (Object.keys(regions).length === 0) {
@@ -166,8 +166,8 @@ jQuery(document).ready(function($) {
                     } else {
                         // Iterate through the object using Object.entries
                         Object.entries(regions).forEach(function([code, name]) {
-                            var fullCode = countryCode + '-' + code;
-                            var templateValue = response.data.settings && response.data.settings[code] ? response.data.settings[code] : 'inherit';
+                            let fullCode = countryCode + '-' + code;
+                            let templateValue = response.data.settings && response.data.settings[code] ? response.data.settings[code] : 'inherit';
 
                             html += '<tr>';
                             html += '<td class="region-code">' + fullCode + '</td>';
@@ -175,13 +175,13 @@ jQuery(document).ready(function($) {
                             html += '<td><select name="klaro_geo_region_settings[' + countryCode + '][' + code + '][template]" data-country="' + countryCode + '" data-region="' + code + '">';
                             html += '<option value="inherit">Use country template</option>';
                             // Use klaroGeoAdmin.templates if available, otherwise try window.klaroTemplates
-                            var templates = klaroGeoAdmin.templates || window.klaroTemplates || {};
+                            let templates = klaroGeoAdmin.templates || window.klaroTemplates || {};
                             klaroGeoLog('Available templates:', templates);
 
                             Object.keys(templates).forEach(function(key) {
-                                var template = templates[key];
-                                var templateName = template.name || key;
-                                var selected = templateValue === key ? ' selected' : '';
+                                let template = templates[key];
+                                let templateName = template.name || key;
+                                let selected = templateValue === key ? ' selected' : '';
                                 html += '<option value="' + key + '"' + selected + '>' + templateName + '</option>';
                             });
                             html += '</select></td>';
@@ -203,7 +203,7 @@ jQuery(document).ready(function($) {
                 console.error('Response text:', xhr.responseText);
 
                 // Show error message in the region list
-                var regionList = modal.find('.region-list');
+                let regionList = modal.find('.region-list');
                 regionList.html('<div class="error">Error loading regions: ' + status + ' - ' + error + '<br>Please check the browser console for more details.</div>');
             }
         });
@@ -211,8 +211,8 @@ jQuery(document).ready(function($) {
 
     // Function to save region settings
     function saveRegions(countryCode) {
-        var modal = $('#region-modal-' + countryCode);
-        var regionSettings = {};
+        let modal = $('#region-modal-' + countryCode);
+        let regionSettings = {};
 
         // Initialize the regionSettings object with the country
         regionSettings[countryCode] = {};
@@ -222,7 +222,7 @@ jQuery(document).ready(function($) {
         klaroGeoLog('Found form:', form.length ? 'yes' : 'no');
 
         // Collect all region settings
-        var selectElements = form.find('.region-template-select');
+        let selectElements = form.find('.region-template-select');
         klaroGeoLog('Found ' + selectElements.length + ' select elements in form');
 
         if (selectElements.length === 0) {
@@ -238,10 +238,10 @@ jQuery(document).ready(function($) {
         }
 
         selectElements.each(function() {
-            var $select = $(this);
-            var country = $select.data('country');
-            var region = $select.data('region');
-            var value = $select.val();
+            let $select = $(this);
+            let country = $select.data('country');
+            let region = $select.data('region');
+            let value = $select.val();
 
             klaroGeoLog('Processing select - country:', country, 'region:', region, 'value:', value);
 
@@ -261,8 +261,8 @@ jQuery(document).ready(function($) {
         klaroGeoLog('Collected region settings:', regionSettings);
 
         // Check if we have any regions
-        if (Object.keys(regionSettings[countryCode]).length === 0 || 
-            !regionSettings[countryCode].regions || 
+        if (Object.keys(regionSettings[countryCode]).length === 0 ||
+            !regionSettings[countryCode].regions ||
             Object.keys(regionSettings[countryCode].regions || {}).length === 0) {
             klaroGeoWarn('No regions found for country:', countryCode);
             // Still proceed with the save to clear any existing settings
@@ -313,7 +313,7 @@ jQuery(document).ready(function($) {
                 // Show detailed error message
                 console.error('AJAX error:', status, error);
                 console.error('Response:', xhr.responseText);
-                var form = modal.find('.region-form');
+                let form = modal.find('.region-form');
                 form.find('.saving').removeClass('saving').addClass('error')
                     .html('Error saving region settings: ' + status + ' - ' + error + '<br>Please check the browser console for more details.');
             }
@@ -322,18 +322,18 @@ jQuery(document).ready(function($) {
 
     // Handle language selection change
     $(document).on('change', '.language-selector', function() {
-        var countryCode = $(this).closest('.klaro-modal').find('.region-list').data('country');
-        var selectedLanguage = $(this).val();
+        let countryCode = $(this).closest('.klaro-modal').find('.region-list').data('country');
+        let selectedLanguage = $(this).val();
         loadRegions(countryCode, selectedLanguage);
     });
 
     // Handle region management
     $('.manage-regions').click(function() {
-        var countryCode = $(this).data('country');
-        var modal = $('#region-modal-' + countryCode);
+        let countryCode = $(this).data('country');
+        let modal = $('#region-modal-' + countryCode);
 
         // Save the current form state before opening the modal
-        var formData = $('#klaro-country-settings-form').serialize();
+        let formData = $('#klaro-country-settings-form').serialize();
 
         // Save country settings via AJAX
         $.ajax({
@@ -384,7 +384,7 @@ jQuery(document).ready(function($) {
     // Handle saving regions
     $(document).on('click', '.save-regions', function(e) {
         e.preventDefault(); // Prevent any default action
-        var countryCode = $(this).data('country');
+        let countryCode = $(this).data('country');
         klaroGeoLog('Save regions button clicked for country:', countryCode);
         saveRegions(countryCode);
     });
@@ -395,7 +395,7 @@ jQuery(document).ready(function($) {
     $('#bulk_edit_templates').click(function() {
         $('#bulk_edit_modal').show();
     });
-    
+
     // Close modal
     $('#close_bulk_modal').click(function() {
         $('#bulk_edit_modal').hide();
@@ -407,7 +407,7 @@ jQuery(document).ready(function($) {
             $('#bulk_edit_modal').hide();
         }
     });
-    
+
     // Select all countries
     $('#select_all_countries').change(function() {
         $('.country-checkbox').prop('checked', $(this).prop('checked'));
@@ -421,26 +421,26 @@ jQuery(document).ready(function($) {
 
     // Apply bulk template
     $('#apply_bulk_template').click(function() {
-        var selectedTemplate = $('#bulk_template').val();
-        var selectedCountries = $('.country-checkbox:checked').map(function() {
+        let selectedTemplate = $('#bulk_template').val();
+        let selectedCountries = $('.country-checkbox:checked').map(function() {
             return $(this).val();
         }).get();
-        
+
         if (selectedCountries.length === 0) {
             alert('Please select at least one country.');
             return;
         }
-        
-        var formData = {
+
+        let formData = {
             countries: {}
         };
-        
+
         selectedCountries.forEach(function(code) {
             formData.countries[code] = {
                 template: selectedTemplate
             };
         });
-        
+
         // Save changes via AJAX
         $.ajax({
             url: klaroGeoAdmin.ajaxurl,
@@ -459,7 +459,7 @@ jQuery(document).ready(function($) {
                     // Show success message
                     $('<div class="notice notice-success is-dismissible"><p>Settings saved successfully.</p></div>')
                         .insertAfter('.wp-header-end').delay(3000).fadeOut();
-                    
+
                     // Update the UI
                     selectedCountries.forEach(function(code) {
                         $('select[name="klaro_geo_settings[countries][' + code + '][template]"]').val(selectedTemplate);
@@ -523,15 +523,15 @@ jQuery(document).ready(function($) {
         .appendTo('head');
 
     // Autosave timer reference
-    var autosaveTimer = null;
-    var autosaveDelay = 1000; // 1 second debounce
+    let autosaveTimer = null;
+    let autosaveDelay = 1000; // 1 second debounce
 
     // Function to show autosave indicator
     function showAutosaveIndicator(type, message) {
         // Remove any existing indicators
         $('.klaro-autosave-indicator').remove();
 
-        var indicator = $('<div class="klaro-autosave-indicator klaro-autosave-' + type + '">' + message + '</div>');
+        let indicator = $('<div class="klaro-autosave-indicator klaro-autosave-' + type + '">' + message + '</div>');
         $('body').append(indicator);
 
         // Auto-remove success/error indicators after delay
@@ -549,7 +549,7 @@ jQuery(document).ready(function($) {
     // Function to autosave country settings
     function autosaveCountrySettings(changedElement) {
         // Show saving indicator
-        var savingIndicator = showAutosaveIndicator('saving', 'Saving...');
+        let savingIndicator = showAutosaveIndicator('saving', 'Saving...');
 
         // Add saving class to the changed element
         if (changedElement) {
@@ -557,7 +557,7 @@ jQuery(document).ready(function($) {
         }
 
         // Serialize the form data
-        var formData = $('#klaro-country-settings-form').serialize();
+        let formData = $('#klaro-country-settings-form').serialize();
 
         // Make AJAX request
         $.ajax({
@@ -604,7 +604,7 @@ jQuery(document).ready(function($) {
 
     // Autosave on country/fallback template dropdown change
     $(document).on('change', '#klaro-country-settings-form select', function() {
-        var changedElement = this;
+        let changedElement = this;
 
         // Clear any pending autosave
         if (autosaveTimer) {

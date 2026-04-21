@@ -98,7 +98,7 @@ if (typeof jQuery !== 'undefined') {
 
     // Function to get language name from code
     function getLanguageName(langCode) {
-        var langName;
+        let langName;
         switch(langCode) {
             case 'en': langName = 'English'; break;
             case 'de': langName = 'German'; break;
@@ -119,21 +119,21 @@ if (typeof jQuery !== 'undefined') {
             return; // Tab already exists
         }
 
-        var langName = getLanguageName(langCode);
+        let langName = getLanguageName(langCode);
 
         // Add new tab
-        var newTab = $('<li><a href="#service-tab-' + langCode + '">' + langName + ' (' + langCode + ')</a></li>');
+        let newTab = $('<li><a href="#service-tab-' + langCode + '">' + langName + ' (' + langCode + ')</a></li>');
         newTab.appendTo($(".translations-tabs-nav"));
 
         // Clone the fallback tab content as a starting point
-        var newContent = $("#service-tab-zz").clone();
+        let newContent = $("#service-tab-zz").clone();
         newContent.attr('id', 'service-tab-' + langCode);
         newContent.find('h4').text(langName + ' Translations (' + langCode + ')');
 
         // Update all input names and IDs to use the new language code
         newContent.find('input, textarea').each(function() {
-            var name = $(this).attr('name');
-            var id = $(this).attr('id');
+            let name = $(this).attr('name');
+            let id = $(this).attr('id');
 
             name = name.replace('[zz]', '[' + langCode + ']');
             id = id.replace('_zz_', '_' + langCode + '_');
@@ -162,7 +162,7 @@ if (typeof jQuery !== 'undefined') {
         }
 
         // Extract all language codes from templates
-        var languageCodes = new Set(['zz']); // Always include fallback
+        let languageCodes = new Set(['zz']); // Always include fallback
 
         Object.values(window.klaroTemplates).forEach(function(template) {
             if (template.config && template.config.translations) {
@@ -192,13 +192,13 @@ if (typeof jQuery !== 'undefined') {
 
     // Populate purposes checkboxes
     function populatePurposes() {
-        var container = $('#service_purposes_container');
+        let container = $('#service_purposes_container');
         container.empty();
 
         if (klaroGeoServices.purposes && klaroGeoServices.purposes.length > 0) {
             klaroGeoServices.purposes.forEach(function(purpose) {
-                var checkbox = $('<input type="checkbox" name="service_purposes[]" value="' + purpose + '">');
-                var label = $('<label></label>').append(checkbox).append(' ' + purpose);
+                let checkbox = $('<input type="checkbox" name="service_purposes[]" value="' + purpose + '">');
+                let label = $('<label></label>').append(checkbox).append(' ' + purpose);
                 container.append(label).append('<br>');
             });
         } else {
@@ -218,23 +218,23 @@ if (typeof jQuery !== 'undefined') {
 
     // Function to update translation title based on service name
     function updateTranslationTitle() {
-        var serviceName = $('#service_name').val();
+        let serviceName = $('#service_name').val();
         if (serviceName) {
             // Convert service name to title case for the translation title
-            var titleCaseName = toTitleCase(serviceName);
+            let titleCaseName = toTitleCase(serviceName);
             $('#service_translations_zz_title').val(titleCaseName);
         }
     }
 
     // Function to update translation description based on selected purposes
     function updateTranslationDescription() {
-        var purposes = [];
+        let purposes = [];
         $('#service_purposes_container input:checked').each(function() {
             purposes.push($(this).val());
         });
 
         if (purposes.length > 0) {
-            var description = 'This service is used for ' + purposes.join(', ') + '.';
+            let description = 'This service is used for ' + purposes.join(', ') + '.';
             $('#service_translations_zz_description').val(description);
         }
     }
@@ -282,33 +282,33 @@ if (typeof jQuery !== 'undefined') {
 
     // Edit Service button click
     $(document).on('click', '.edit-service', function() {
-        var index = $(this).data('index');
-        var service = klaroGeoServices.services[index];
-        
+        let index = $(this).data('index');
+        let service = klaroGeoServices.services[index];
+
         $('#service_index').val(index);
         $('#service_name').val(service.name || '');
         $('#service_required').val(service.required === true ? 'true' : (service.required === false ? 'false' : 'global'));
         $('#service_default').val(service.default === true ? 'true' : (service.default === false ? 'false' : 'global'));
-        
+
         // Clear and repopulate purposes
         populatePurposes();
-        
+
         // Check the appropriate purposes
         if (service.purposes && service.purposes.length > 0) {
             service.purposes.forEach(function(purpose) {
                 $('#service_purposes_container input[value="' + purpose + '"]').prop('checked', true);
             });
         }
-        
+
         // Clear and repopulate cookies
         $('.cookie-group').remove();
-        
+
         if (service.cookies && service.cookies.length > 0) {
             service.cookies.forEach(function(cookie, i) {
                 if (i > 0) {
                     $('.add-cookie-group').click();
                 }
-                
+
                 if (typeof cookie === 'object') {
                     $('#cookie_name' + i).val(cookie.name || '');
                     $('#cookie_domain' + i).val(cookie.domain || '');
@@ -318,7 +318,7 @@ if (typeof jQuery !== 'undefined') {
                 }
             });
         }
-        
+
         // Set advanced settings
         if (service.gpc_sensitive === true) {
             $('#service_gpc_sensitive').val('true');
@@ -345,7 +345,7 @@ if (typeof jQuery !== 'undefined') {
         if (service.translations) {
             // Handle existing languages
             Object.keys(service.translations).forEach(function(langCode) {
-                var langTranslation = service.translations[langCode];
+                let langTranslation = service.translations[langCode];
 
                 // No need to skip any language - we want to allow all languages from templates
 
@@ -392,9 +392,9 @@ if (typeof jQuery !== 'undefined') {
         if (!confirm('Are you sure you want to delete this service?')) {
             return;
         }
-        
-        var index = $(this).data('index');
-        
+
+        let index = $(this).data('index');
+
         $.ajax({
             url: ajaxurl,
             type: 'POST',
@@ -418,10 +418,10 @@ if (typeof jQuery !== 'undefined') {
 
     // Add Cookie Group button click
     $(document).on('click', '.add-cookie-group', function() {
-        var index = parseInt($(this).data('index')) + 1;
+        let index = parseInt($(this).data('index')) + 1;
         $(this).data('index', index);
-        
-        var cookieGroup = $('<div class="cookie-group" data-index="' + index + '"></div>');
+
+        let cookieGroup = $('<div class="cookie-group" data-index="' + index + '"></div>');
         cookieGroup.append('<label for="cookie_name' + index + '">Cookie Name:</label><br>');
         cookieGroup.append('<input type="text" id="cookie_name' + index + '" name="cookie_name[]"><br>');
         cookieGroup.append('<label for="cookie_domain' + index + '">Cookie Domain:</label><br>');
@@ -429,7 +429,7 @@ if (typeof jQuery !== 'undefined') {
         cookieGroup.append('<label for="cookie_path' + index + '">Cookie Path:</label><br>');
         cookieGroup.append('<input type="text" id="cookie_path' + index + '" name="cookie_path[]"><br>');
         cookieGroup.append('<button type="button" class="button remove-cookie-group">Remove</button><br><br>');
-        
+
         $('#service_cookies_container' + (index - 1)).after(cookieGroup);
         cookieGroup.attr('id', 'service_cookies_container' + index);
     });
@@ -443,10 +443,10 @@ if (typeof jQuery !== 'undefined') {
     $('#service-form').submit(function(e) {
         e.preventDefault();
 
-        var index = $('#service_index').val();
-        var name = $('#service_name').val();
-        var required = $('#service_required').val();
-        var defaultValue = $('#service_default').val();
+        let index = $('#service_index').val();
+        let name = $('#service_name').val();
+        let required = $('#service_required').val();
+        let defaultValue = $('#service_default').val();
 
         // Ensure translation title is set based on service name if empty
         if (!$('#service_translations_zz_title').val()) {
@@ -457,20 +457,20 @@ if (typeof jQuery !== 'undefined') {
         if (!$('#service_translations_zz_description').val()) {
             updateTranslationDescription();
         }
-        
+
         // Get selected purposes
-        var purposes = [];
+        let purposes = [];
         $('#service_purposes_container input:checked').each(function() {
             purposes.push($(this).val());
         });
-        
+
         // Get cookies
-        var cookies = [];
+        let cookies = [];
         $('.cookie-group').each(function(i) {
-            var cookieName = $('#cookie_name' + i).val();
-            var cookieDomain = $('#cookie_domain' + i).val();
-            var cookiePath = $('#cookie_path' + i).val();
-            
+            let cookieName = $('#cookie_name' + i).val();
+            let cookieDomain = $('#cookie_domain' + i).val();
+            let cookiePath = $('#cookie_path' + i).val();
+
             if (cookieName) {
                 if (cookieDomain || cookiePath) {
                     cookies.push({
@@ -483,35 +483,35 @@ if (typeof jQuery !== 'undefined') {
                 }
             }
         });
-        
+
         // Get advanced settings
-        var gpcSensitiveVal = $('#service_gpc_sensitive').val();
-        var optOut = $('#service_optout').prop('checked');
-        var onlyOnce = $('#service_onlyonce').prop('checked');
-        var contextualConsentOnly = $('#service_contextual').prop('checked');
+        let gpcSensitiveVal = $('#service_gpc_sensitive').val();
+        let optOut = $('#service_optout').prop('checked');
+        let onlyOnce = $('#service_onlyonce').prop('checked');
+        let contextualConsentOnly = $('#service_contextual').prop('checked');
 
         // KLARO_CALLBACKS_START
         // Get callback scripts
-        var onInit = $('#service_oninit').val();
-        var onAccept = $('#service_onaccept').val();
-        var onDecline = $('#service_ondecline').val();
+        let onInit = $('#service_oninit').val();
+        let onAccept = $('#service_onaccept').val();
+        let onDecline = $('#service_ondecline').val();
         // KLARO_CALLBACKS_END
 
         // Collect translations
-        var translations = {};
-        var hasTranslations = false;
+        let translations = {};
+        let hasTranslations = false;
 
         // Get all language tabs
         $("#service-translations-tabs .translation-tab").each(function() {
-            var tabId = $(this).attr('id');
+            let tabId = $(this).attr('id');
             if (!tabId || tabId === 'service-tab-add') return; // Skip the "Add Language" tab
 
-            var langCode = tabId.replace('service-tab-', '');
-            var langTranslation = {};
+            let langCode = tabId.replace('service-tab-', '');
+            let langTranslation = {};
 
             // Get basic fields
-            var title = $('#service_translations_' + langCode + '_title').val();
-            var description = $('#service_translations_' + langCode + '_description').val();
+            let title = $('#service_translations_' + langCode + '_title').val();
+            let description = $('#service_translations_' + langCode + '_description').val();
 
             if (title || description) {
                 langTranslation.title = title;
@@ -520,8 +520,8 @@ if (typeof jQuery !== 'undefined') {
             }
 
             // Get opt-out fields
-            var optOutTitle = $('#service_translations_' + langCode + '_optOut_title').val();
-            var optOutDescription = $('#service_translations_' + langCode + '_optOut_description').val();
+            let optOutTitle = $('#service_translations_' + langCode + '_optOut_title').val();
+            let optOutDescription = $('#service_translations_' + langCode + '_optOut_description').val();
 
             if (optOutTitle || optOutDescription) {
                 langTranslation.optOut = {
@@ -532,8 +532,8 @@ if (typeof jQuery !== 'undefined') {
             }
 
             // Get required fields
-            var requiredTitle = $('#service_translations_' + langCode + '_required_title').val();
-            var requiredDescription = $('#service_translations_' + langCode + '_required_description').val();
+            let requiredTitle = $('#service_translations_' + langCode + '_required_title').val();
+            let requiredDescription = $('#service_translations_' + langCode + '_required_description').val();
 
             if (requiredTitle || requiredDescription) {
                 langTranslation.required = {
@@ -544,8 +544,8 @@ if (typeof jQuery !== 'undefined') {
             }
 
             // Get purpose fields
-            var purpose = $('#service_translations_' + langCode + '_purpose').val();
-            var purposes = $('#service_translations_' + langCode + '_purposes').val();
+            let purpose = $('#service_translations_' + langCode + '_purpose').val();
+            let purposes = $('#service_translations_' + langCode + '_purposes').val();
 
             if (purpose) {
                 langTranslation.purpose = purpose;
@@ -564,7 +564,7 @@ if (typeof jQuery !== 'undefined') {
         });
 
         // Create service object
-        var service = {
+        let service = {
             name: name,
             required: required === 'true' ? true : (required === 'false' ? false : null),
             default: defaultValue === 'true' ? true : (defaultValue === 'false' ? false : null),
@@ -589,14 +589,14 @@ if (typeof jQuery !== 'undefined') {
         if (optOut) service.optOut = true;
         if (onlyOnce) service.onlyOnce = true;
         if (contextualConsentOnly) service.contextualConsentOnly = true;
-        
+
         // Update or add service
         if (index !== '') {
             klaroGeoServices.services[index] = service;
         } else {
             klaroGeoServices.services.push(service);
         }
-        
+
         // Save services
         $.ajax({
             url: ajaxurl,
