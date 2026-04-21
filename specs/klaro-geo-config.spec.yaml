@@ -69,22 +69,19 @@ business_rules:
 # =============================================================================
 functions:
   klaro_geo_generate_config_file:
-    purpose: "Generate the klaro-config.js file with geo-aware template settings"
-    signature: "klaro_geo_generate_config_file(): int|false"
+    purpose: "Generate the klaro-config.js content string with geo-aware template settings"
+    signature: "klaro_geo_generate_config_file(): string"
     stability: "stable"
 
     returns:
-      success:
-        type: "int"
-        description: "Number of bytes written to file"
-      failure:
-        type: "false"
-        description: "File write failed"
+      type: "string"
+      description: "JavaScript config content. Consumed by wp_add_inline_script — never written to disk."
+      rationale: "Writing to the plugin directory was removed in 0.3.5 per WordPress.org plugin review (plugin dirs are public and wiped on update)."
 
     side_effects:
-      - "Writes klaro-config.js to plugin root directory"
       - "Logs debug information about template selection"
       - "Logs warnings when fallbacks are used"
+      - "NO filesystem writes — content is returned only"
 
     # CRITICAL: This is the data flow that must be preserved
     data_flow:

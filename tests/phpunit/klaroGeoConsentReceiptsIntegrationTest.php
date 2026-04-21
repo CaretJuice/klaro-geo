@@ -74,15 +74,13 @@ class ConsentReceiptsIntegrationTest extends IgnoreDeprecatedTestCase {
         // Check if the klaroConsentData object is added
         $this->assertStringContainsString('klaroConsentData', $head_output . $footer_output, 'klaroConsentData object should be added');
 
-        // Generate the config file to check its content
-        klaro_geo_generate_config_file();
+        // Generate the config content (returned as string since 0.3.5; no longer written to disk)
+        $config_content = klaro_geo_generate_config_file();
         $plugin_dir = plugin_dir_path(dirname(dirname(__FILE__)));
-        $klaro_config_file = $plugin_dir . 'klaro-config.js';
-        $config_content = file_get_contents($klaro_config_file);
-        
-        // Check that the config file contains the klaroConsentData object
+
+        // Check that the config content contains the klaroConsentData object
         $this->assertStringContainsString('window.klaroConsentData', $config_content, 'Config should include klaroConsentData object');
-        
+
         // Now check the klaro-geo.js file for the moved functionality
         $klaro_geo_js_file = $plugin_dir . 'js/klaro-geo.js';
         $this->assertFileExists($klaro_geo_js_file, 'klaro-geo.js file should exist');
@@ -98,20 +96,15 @@ class ConsentReceiptsIntegrationTest extends IgnoreDeprecatedTestCase {
      */
     public function test_config_file_contains_receipt_code() {
         update_option('klaro_geo_enable_consent_receipts', true);
-        // Generate the config file
-        klaro_geo_generate_config_file();
 
-        // Get the file path - need to go up one more directory to reach the plugin root
+        // Generate the config content (returned as string since 0.3.5; no longer written to disk)
+        $config_content = klaro_geo_generate_config_file();
+        $this->assertIsString($config_content, 'Config generation failed');
+
+        // klaro-geo.js is still a static file shipped with the plugin
         $plugin_dir = plugin_dir_path(dirname(dirname(__FILE__)));
-        $klaro_config_file = $plugin_dir . 'klaro-config.js';
         $klaro_geo_js_file = $plugin_dir . 'js/klaro-geo.js';
-
-        // Check if the files exist
-        $this->assertFileExists($klaro_config_file, 'klaro-config.js file should exist');
         $this->assertFileExists($klaro_geo_js_file, 'klaro-geo.js file should exist');
-
-        // Get the file contents
-        $config_content = file_get_contents($klaro_config_file);
         $geo_js_content = file_get_contents($klaro_geo_js_file);
 
         // Check that the config file contains the klaroConsentData object
@@ -246,15 +239,9 @@ class ConsentReceiptsIntegrationTest extends IgnoreDeprecatedTestCase {
         // Disable consent receipts
         update_option('klaro_geo_enable_consent_receipts', false);
 
-        // Generate the config file
-        klaro_geo_generate_config_file();
-
-        // Get the file path - need to go up one more directory to reach the plugin root
-        $plugin_dir = plugin_dir_path(dirname(dirname(__FILE__)));
-        $klaro_config_file = $plugin_dir . 'klaro-config.js';
-
-        // Get the file contents
-        $config_content = file_get_contents($klaro_config_file);
+        // Generate the config content (returned as string since 0.3.5; no longer written to disk)
+        $config_content = klaro_geo_generate_config_file();
+        $this->assertIsString($config_content, 'Config generation failed');
 
         // Check that consent receipt code is not included
         // When consent receipts are disabled, the klaroConsentData object should not be present

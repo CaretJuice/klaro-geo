@@ -22,14 +22,14 @@ class ServicesTest extends WP_UnitTestCase {
         // Make sure we have access to default services
         require_once(plugin_dir_path(dirname(dirname(__FILE__))) . 'klaro-geo.php');
 
-        // Verify the default services are defined in GLOBALS
-        $this->assertArrayHasKey('default_services', $GLOBALS);
-        $this->assertIsArray($GLOBALS['default_services']);
-        $this->assertCount(7, $GLOBALS['default_services']); // 3 standard + 4 consent mode services
+        // Verify the default services are defined in GLOBALS (renamed to klaro_geo_default_services in 0.3.5 for global prefixing)
+        $this->assertArrayHasKey('klaro_geo_default_services', $GLOBALS);
+        $this->assertIsArray($GLOBALS['klaro_geo_default_services']);
+        $this->assertCount(7, $GLOBALS['klaro_geo_default_services']); // 3 standard + 4 consent mode services
 
         // Check for Google Tag Manager
         $gtm_found = false;
-        foreach ($GLOBALS['default_services'] as $service) {
+        foreach ($GLOBALS['klaro_geo_default_services'] as $service) {
             if ($service['name'] === 'google-tag-manager') {
                 $gtm_found = true;
                 $this->assertEquals(['analytics', 'advertising'], $service['purposes']);

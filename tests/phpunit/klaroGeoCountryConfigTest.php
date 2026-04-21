@@ -95,12 +95,9 @@ class CountryConfigTest extends WP_UnitTestCase {
         $wp_query->query_vars['klaro_geo_debug_geo'] = 'US';
         klaro_geo_debug_log("Set debug country to US in query vars");
 
-        // Generate config
-        klaro_geo_generate_config_file();
-
-        // Read the generated config file
-        $config_file = plugin_dir_path(dirname(dirname(__FILE__))) . 'klaro-config.js';
-        $config_content = file_get_contents($config_file);
+        // Generate config content (returned as string since 0.3.5; no longer written to disk)
+        $config_content = klaro_geo_generate_config_file();
+        $this->assertIsString($config_content, 'Config generation failed');
 
         // Parse the config content to get the service settings using a more robust method
         if (preg_match('/var\s+klaroConfig\s*=\s*(\{[\s\S]*?\}\s*);/m', $config_content, $matches)) {
@@ -199,27 +196,16 @@ class CountryConfigTest extends WP_UnitTestCase {
             klaro_geo_debug_log("Template keys available: " . implode(", ", array_keys($templates)));
         }
 
-        // Generate config
-        klaro_geo_debug_log("Generating config file...");
-        klaro_geo_generate_config_file();
-        klaro_geo_debug_log("Config file generated");
+        // Generate config content (returned as string since 0.3.5; no longer written to disk)
+        klaro_geo_debug_log("Generating config content...");
+        $config_content = klaro_geo_generate_config_file();
+        $this->assertIsString($config_content, 'Config generation failed');
+        $this->assertNotEmpty($config_content, 'Config content is empty');
+        klaro_geo_debug_log("Config content length: " . strlen($config_content));
 
-        // Read the generated config file
-        $config_file = plugin_dir_path(dirname(dirname(__FILE__))) . 'klaro-config.js';
-        klaro_geo_debug_log("Reading config file from: " . $config_file);
-
-        if (file_exists($config_file)) {
-            $config_content = file_get_contents($config_file);
-            klaro_geo_debug_log("Config file content length: " . strlen($config_content));
-
-            // Log a snippet of the config file for debugging
-            $snippet = substr($config_content, 0, 500) . "...";
-            klaro_geo_debug_log("Config file snippet: " . $snippet);
-        } else {
-            klaro_geo_debug_log("ERROR: Config file does not exist!");
-            $this->fail('Config file does not exist at: ' . $config_file);
-            return;
-        }
+        // Log a snippet of the config content for debugging
+        $snippet = substr($config_content, 0, 500) . "...";
+        klaro_geo_debug_log("Config content snippet: " . $snippet);
 
         // Parse the config content to get the service settings using a more robust method
         if (preg_match('/var\s+klaroConfig\s*=\s*(\{[\s\S]*?\}\s*);/m', $config_content, $matches)) {
