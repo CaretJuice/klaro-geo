@@ -6,6 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // Include admin files
 require_once plugin_dir_path( __FILE__ ) . 'klaro-geo-admin-settings.php';
+require_once plugin_dir_path( __FILE__ ) . 'klaro-geo-admin-geoip-warning.php';
 require_once plugin_dir_path( __FILE__ ) . 'klaro-geo-admin-templates.php';
 require_once plugin_dir_path( __FILE__ ) . 'klaro-geo-admin-countries.php';
 require_once plugin_dir_path( __FILE__ ) . 'klaro-geo-admin-services.php';

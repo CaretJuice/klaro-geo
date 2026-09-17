@@ -54,6 +54,35 @@ function klaro_geo_settings_page_content() {
 				</tr>
 			</table>
 
+			<h2>Geo Resolution</h2>
+			<table class="form-table">
+				<tr valign="top">
+					<th scope="row"><label for="klaro_geo_geo_resolution_mode">Geo Resolution Mode</label></th>
+					<td>
+						<select name="klaro_geo_geo_resolution_mode" id="klaro_geo_geo_resolution_mode">
+							<option value="server" <?php selected( get_option( 'klaro_geo_geo_resolution_mode', 'server' ), 'server' ); ?>>Server-side (default)</option>
+							<option value="client" <?php selected( get_option( 'klaro_geo_geo_resolution_mode', 'server' ), 'client' ); ?>>Client-side (cache-safe)</option>
+						</select>
+						<p class="description"><strong>Server-side:</strong> the consent template is chosen during page rendering. Incompatible with full-page caching (WP Engine, Kinsta, LiteSpeed, Cloudflare APO, …): cached pages serve one visitor's geo and template to everyone.<br>
+						<strong>Client-side:</strong> the page ships all candidate templates and the visitor's browser resolves geo via the GeoIP Detection plugin's AJAX endpoint, then selects the template before Klaro initializes. Recommended on any host with full-page caching. Requires the "Enable AJAX endpoint" setting in the GeoIP Detection plugin.</p>
+					</td>
+				</tr>
+				<tr valign="top">
+					<th scope="row"><label for="klaro_geo_client_geo_timeout_ms">Client Geo Lookup Timeout (ms)</label></th>
+					<td>
+						<input type="number" name="klaro_geo_client_geo_timeout_ms" id="klaro_geo_client_geo_timeout_ms" min="500" max="30000" step="100" value="<?php echo esc_attr( get_option( 'klaro_geo_client_geo_timeout_ms', 2500 ) ); ?>" />
+						<p class="description">Maximum time to wait for the client-side geo lookup before falling back (timezone inference, then the fallback template). Only used in client-side mode.</p>
+					</td>
+				</tr>
+				<tr valign="top">
+					<th scope="row"><label for="klaro_geo_client_geo_timezone_fallback">Timezone Fallback</label></th>
+					<td>
+						<input type="checkbox" name="klaro_geo_client_geo_timezone_fallback" id="klaro_geo_client_geo_timezone_fallback" value="1" <?php checked( get_option( 'klaro_geo_client_geo_timezone_fallback', true ) ); ?> />
+						<p class="description">When the geo lookup fails or times out, infer the country from the browser timezone (no network request; region stays empty). Only used in client-side mode.</p>
+					</td>
+				</tr>
+			</table>
+
 			<h2>Google Tag Manager</h2>
 			<table class="form-table">
 				<tr valign="top">
@@ -314,6 +343,45 @@ function klaro_geo_register_main_settings() {
 				$purposes = array_map( 'trim', explode( ',', $input ) );
 				$purposes = array_map( 'sanitize_text_field', $purposes );
 				return implode( ',', $purposes );
+			},
+		]
+	);
+
+	// Geo resolution settings (cache-safe client mode)
+	register_setting(
+		'klaro_geo_settings_group',
+		'klaro_geo_geo_resolution_mode',
+		[
+			'type'              => 'string',
+			'default'           => 'server',
+			'sanitize_callback' => function ( $input ) {
+				return in_array( $input, [ 'server', 'client' ], true ) ? $input : 'server';
+			},
+		]
+	);
+	register_setting(
+		'klaro_geo_settings_group',
+		'klaro_geo_client_geo_timeout_ms',
+		[
+			'type'              => 'integer',
+			'default'           => 2500,
+			'sanitize_callback' => function ( $input ) {
+				$value = absint( $input );
+				if ( 0 === $value ) {
+					return 2500;
+				}
+				return min( max( $value, 500 ), 30000 );
+			},
+		]
+	);
+	register_setting(
+		'klaro_geo_settings_group',
+		'klaro_geo_client_geo_timezone_fallback',
+		[
+			'type'              => 'boolean',
+			'default'           => true,
+			'sanitize_callback' => function ( $input ) {
+				return empty( $input ) ? 0 : 1;
 			},
 		]
 	);

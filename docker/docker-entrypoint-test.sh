@@ -1,6 +1,37 @@
 #!/bin/bash
 set -e  # Exit on error
 
+# Align the container's www-data user with the owner of the bind-mounted plugin
+# source.
+#
+# Tests run as www-data (see the `su` near the end of this script), and this
+# script chowns paths under /var/www/html/wp-content. That path is a bind mount,
+# so those chowns reach out of the container and take ownership of the host
+# working tree -- including .git, which then makes git refuse to operate on the
+# repository. Rather than chowning the developer's checkout to www-data, make
+# www-data *be* the developer: every file the test run writes then lands with
+# host-correct ownership and nothing needs taking away.
+#
+# The UID/GID are read from the mount itself so this needs no compose or .env
+# changes. Export HOST_UID/HOST_GID to override. A root-owned or missing mount
+# leaves www-data alone, preserving the previous behaviour.
+#
+# A tree that an older build already chowned to www-data reads back as 33 and
+# cannot self-heal. Repair it once with:
+#   docker compose run --rm --entrypoint chown wordpress_test \
+#     -R "$(id -u):$(id -g)" /var/www/html/wp-content/plugins/klaro-geo
+PLUGIN_DIR="/var/www/html/wp-content/plugins/klaro-geo"
+HOST_UID="${HOST_UID:-$(stat -c '%u' "$PLUGIN_DIR" 2>/dev/null || echo 0)}"
+HOST_GID="${HOST_GID:-$(stat -c '%g' "$PLUGIN_DIR" 2>/dev/null || echo 0)}"
+
+if [ "$HOST_UID" -gt 0 ] && [ "$HOST_GID" -gt 0 ] && [ "$(id -u www-data)" != "$HOST_UID" ]; then
+    echo "Remapping www-data to host UID/GID ${HOST_UID}:${HOST_GID}"
+    groupmod -o -g "$HOST_GID" www-data
+    usermod -o -u "$HOST_UID" -g "$HOST_GID" www-data
+else
+    echo "Leaving www-data as $(id -u www-data):$(id -g www-data)"
+fi
+
 # Create test directories with proper permissions
 dirs=(
     "/tmp/wordpress-tests-lib"
@@ -34,7 +65,7 @@ chown -R www-data:www-data /tmp/wordpress-tests-lib
 
 # Function to wait for MySQL to be ready
 wait_for_mysql() {
-    until mysql -h"$WORDPRESS_DB_HOST" -u"$WORDPRESS_DB_USER" -p"$WORDPRESS_DB_PASSWORD" -e "SELECT 1" >/dev/null 2>&1; do
+    until mysql --skip-ssl -h"$WORDPRESS_DB_HOST" -u"$WORDPRESS_DB_USER" -p"$WORDPRESS_DB_PASSWORD" -e "SELECT 1" >/dev/null 2>&1; do
         echo "Waiting for MySQL to be ready..."
         sleep 2
     done
@@ -46,7 +77,7 @@ wait_for_mysql
 
 # Function to reset the database
 reset_database() {
-  mysql -h"$WORDPRESS_DB_HOST" -u"$WORDPRESS_DB_USER" -p"$WORDPRESS_DB_PASSWORD" -e "DROP DATABASE IF EXISTS \`$WORDPRESS_DB_NAME\`; CREATE DATABASE \`$WORDPRESS_DB_NAME\`;"
+  mysql --skip-ssl -h"$WORDPRESS_DB_HOST" -u"$WORDPRESS_DB_USER" -p"$WORDPRESS_DB_PASSWORD" -e "DROP DATABASE IF EXISTS \`$WORDPRESS_DB_NAME\`; CREATE DATABASE \`$WORDPRESS_DB_NAME\`;"
 }
 
 # Reset the database before running tests

@@ -303,6 +303,28 @@ function klaro_geo_enqueue_scripts() {
 	$klaro_version        = get_option( 'klaro_geo_js_version', '0.7' );
 	$klaro_variant        = get_option( 'klaro_geo_js_variant', 'klaro.js' );
 
+	// Cache-safe client-side geo resolution mode (admin debug override stays server-side)
+	$geo_location      = klaro_geo_get_user_location();
+	$client_geo_active = klaro_geo_is_client_geo_active( $geo_location['is_admin_override'] );
+	$klaro_js_deps     = array();
+
+	if ( $client_geo_active ) {
+		// The resolver must run before klaro.js: it selects the template and sets
+		// window.klaroConfig, which klaro.js auto-initializes from (or, if klaro.js
+		// loaded first, the resolver calls klaro.setup() itself).
+		wp_enqueue_script(
+			'klaro-geo-client-geo-js',
+			plugins_url( 'js/klaro-geo-client-geo.js', __FILE__ ),
+			array( 'klaro-geo-debug' ),
+			KLARO_GEO_VERSION,
+			array(
+				'strategy'  => 'defer',
+				'in_footer' => true,
+			)
+		);
+		$klaro_js_deps[] = 'klaro-geo-client-geo-js';
+	}
+
 	// Check if local Klaro file exists (for E2E testing)
 	$local_klaro_path = plugin_dir_path( __FILE__ ) . 'e2e/klaro.js';
 	$use_local_klaro  = file_exists( $local_klaro_path );
@@ -312,7 +334,7 @@ function klaro_geo_enqueue_scripts() {
 		wp_enqueue_script(
 			'klaro-js',
 			plugins_url( 'e2e/klaro.js', __FILE__ ),
-			array(),
+			$klaro_js_deps,
 			filemtime( $local_klaro_path ), // Use file modification time as version
 			array(
 				'strategy'  => 'defer',
@@ -324,7 +346,7 @@ function klaro_geo_enqueue_scripts() {
 		wp_enqueue_script(
 			'klaro-js',
 			'https://cdn.kiprotect.com/klaro/v' . $klaro_version . '/' . $klaro_variant,
-			array(),
+			$klaro_js_deps,
 			$klaro_version,
 			array(
 				'strategy'  => 'defer',
@@ -454,64 +476,70 @@ function klaro_geo_enqueue_scripts() {
 			true
 		);
 
-		// Get user location for the script
-		$location        = klaro_geo_get_user_location();
-		$user_country    = $location['country'];
-		$user_region     = $location['region'];
-		$using_debug_geo = $location['is_admin_override'];
+		// Client mode: window.klaroConsentData is emitted cache-safely by the
+		// generated config content and filled by the client resolver — baking
+		// per-visitor values here would defeat cache safety (and this localized
+		// object would overwrite the resolver's assignments).
+		if ( ! $client_geo_active ) {
+			// Get user location for the script
+			$location        = klaro_geo_get_user_location();
+			$user_country    = $location['country'];
+			$user_region     = $location['region'];
+			$using_debug_geo = $location['is_admin_override'];
 
-		// Get template information, passing the admin override flag
-		$effective_settings = klaro_geo_get_effective_settings(
-			$user_country . ( $user_region ? '-' . $user_region : '' ),
-			$using_debug_geo
-		);
-		$template_to_use    = $effective_settings['template'] ?? 'default';
+			// Get template information, passing the admin override flag
+			$effective_settings = klaro_geo_get_effective_settings(
+				$user_country . ( $user_region ? '-' . $user_region : '' ),
+				$using_debug_geo
+			);
+			$template_to_use    = $effective_settings['template'] ?? 'default';
 
-		// Determine template source
-		$template_source = 'fallback';
+			// Determine template source
+			$template_source = 'fallback';
 
-		// Use the source from effective settings
-		if ( isset( $effective_settings['source'] ) ) {
-			$template_source = $effective_settings['source'];
-		}
+			// Use the source from effective settings
+			if ( isset( $effective_settings['source'] ) ) {
+				$template_source = $effective_settings['source'];
+			}
 
-		// Get template settings from the database
-		$template_settings = Klaro_Geo_Template_Settings::get_instance();
-		$templates         = $template_settings->get();
-		$template_config   = $templates[ $template_to_use ] ?? $templates['default'] ?? klaro_geo_get_default_templates()['default'];
+			// Get template settings from the database
+			$template_settings = Klaro_Geo_Template_Settings::get_instance();
+			$templates         = $template_settings->get();
+			$template_config   = $templates[ $template_to_use ] ?? $templates['default'] ?? klaro_geo_get_default_templates()['default'];
 
-		// Debug log the admin override value
-		klaro_geo_debug_log( 'Admin override value being passed to JavaScript: ' . ( $using_debug_geo ? 'true' : 'false' ) );
+			// Debug log the admin override value
+			klaro_geo_debug_log( 'Admin override value being passed to JavaScript: ' . ( $using_debug_geo ? 'true' : 'false' ) );
 
-		// Get plugin settings from the template
-		$plugin_settings = isset( $templates[ $template_to_use ]['plugin_settings'] ) ?
-			$templates[ $template_to_use ]['plugin_settings'] :
-			array( 'enable_consent_logging' => true );
+			// Get plugin settings from the template
+			$plugin_settings = isset( $templates[ $template_to_use ]['plugin_settings'] ) ?
+				$templates[ $template_to_use ]['plugin_settings'] :
+				array( 'enable_consent_logging' => true );
 
-		// Get enableConsentLogging setting
-		$enable_consent_logging = isset( $plugin_settings['enable_consent_logging'] ) ?
-			(bool) $plugin_settings['enable_consent_logging'] : true;
+			// Get enableConsentLogging setting
+			$enable_consent_logging = isset( $plugin_settings['enable_consent_logging'] ) ?
+				(bool) $plugin_settings['enable_consent_logging'] : true;
 
-		// Debug log the settings
-		klaro_geo_debug_log( 'Plugin settings for template ' . $template_to_use . ': ' . wp_json_encode( $plugin_settings ) );
-		klaro_geo_debug_log( 'enableConsentLogging: ' . ( $enable_consent_logging ? 'true' : 'false' ) );
+			// Debug log the settings
+			klaro_geo_debug_log( 'Plugin settings for template ' . $template_to_use . ': ' . wp_json_encode( $plugin_settings ) );
+			klaro_geo_debug_log( 'enableConsentLogging: ' . ( $enable_consent_logging ? 'true' : 'false' ) );
 
-		// Add variables for the consent receipts script
-		wp_localize_script(
-			'klaro-consent-receipts-js',
-			'klaroConsentData',
-			array(
-				'ajaxUrl'              => admin_url( 'admin-ajax.php' ),
-				'nonce'                => wp_create_nonce( 'klaro_geo_consent_nonce' ),
-				'enableConsentLogging' => $enable_consent_logging,
-				'templateName'         => $template_to_use,
-				'templateSource'       => $template_source,
-				'detectedCountry'      => $user_country,
-				'detectedRegion'       => $user_region,
-				'adminOverride'        => $using_debug_geo ? true : false,
-				'templateSettings'     => $template_config,
-			)
-		);
+			// Add variables for the consent receipts script
+			wp_localize_script(
+				'klaro-consent-receipts-js',
+				'klaroConsentData',
+				array(
+					'ajaxUrl'              => admin_url( 'admin-ajax.php' ),
+					'nonce'                => wp_create_nonce( 'klaro_geo_consent_nonce' ),
+					'enableConsentLogging' => $enable_consent_logging,
+					'templateName'         => $template_to_use,
+					'templateSource'       => $template_source,
+					'detectedCountry'      => $user_country,
+					'detectedRegion'       => $user_region,
+					'adminOverride'        => $using_debug_geo ? true : false,
+					'templateSettings'     => $template_config,
+				)
+			);
+		} // end if ( ! $client_geo_active )
 	}
 
 	// Get settings for the consent button
