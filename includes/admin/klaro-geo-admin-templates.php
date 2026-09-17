@@ -72,6 +72,12 @@ function klaro_geo_templates_page() {
 	// Get templates for JavaScript
 	$templates = $template_settings->get();
 
+	// Resolve the selected template before it is handed to JavaScript below. The
+	// POST branches reassign this; without it a plain GET load leaves the
+	// variable undefined and passes an empty template ID to the admin scripts.
+    // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only template tab selection within manage_options-gated admin page; no data is modified.
+	$current_template = isset( $_GET['template'] ) ? sanitize_text_field( wp_unslash( $_GET['template'] ) ) : 'default';
+
 	// Pass templates to JavaScript
 	wp_localize_script(
 		'klaro-geo-template-translations',
@@ -566,9 +572,9 @@ function klaro_geo_templates_page() {
 							<!-- Hidden field to ensure the value is sent even when unchecked -->
 							<input type="hidden" name="template_config[required]" value="false">
 							<input type="checkbox" name="template_config[required]" id="template_config_required" value="true"
-								<?php checked( isset( $current_config['required'] ) ? $current_config['required'] : true ); ?>>
+								<?php checked( isset( $current_config['required'] ) ? $current_config['required'] : false ); ?>>
 							<p class="description">
-							When enabled, users cannot decline services. Only use for essential services that are required for your website to function. This setting can also be overridden per-service.</p>
+							When enabled, users cannot decline services &mdash; Klaro grants every service even when the visitor clicks Decline. Only use for essential services that are required for your website to function. This setting can also be overridden per-service.</p>
 						</td>
 					</tr>
 					<tr>
@@ -824,6 +830,14 @@ function klaro_geo_templates_page() {
 						// Get template default setting
 						$template_default = isset( $current_config['default'] ) && $current_config['default'] ? true : false;
 
+						// Load the services this preview table describes. Without this the
+						// variable is undefined and the table always renders empty.
+						$service_settings = Klaro_Geo_Service_Settings::get_instance();
+						$services         = $service_settings->get();
+						if ( ! is_array( $services ) ) {
+							$services = array();
+						}
+
 						foreach ( $services as $service ) {
 							if ( ! isset( $service['name'] ) ) {
 								continue;
@@ -892,10 +906,11 @@ function klaro_geo_templates_page() {
 						<th><label>GPC-Sensitive Purposes:</label></th>
 						<td>
 							<?php
+							// Must be defined before $gpc_purposes, which falls back to it.
+							$available_purposes = explode( ',', get_option( 'klaro_geo_purposes', 'functional,analytics,advertising' ) );
 							$gpc_purposes       = isset( $templates[ $current_template ]['plugin_settings']['gpc_purposes'] )
 								? $templates[ $current_template ]['plugin_settings']['gpc_purposes']
 								: $available_purposes;
-							$available_purposes = explode( ',', get_option( 'klaro_geo_purposes', 'functional,analytics,advertising' ) );
 							foreach ( $available_purposes as $purpose ) {
 								$purpose = trim( $purpose );
 								if ( empty( $purpose ) ) {
