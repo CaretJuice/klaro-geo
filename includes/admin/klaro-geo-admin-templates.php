@@ -911,6 +911,11 @@ function klaro_geo_templates_page() {
 							$gpc_purposes       = isset( $templates[ $current_template ]['plugin_settings']['gpc_purposes'] )
 								? $templates[ $current_template ]['plugin_settings']['gpc_purposes']
 								: $available_purposes;
+							// in_array() below throws a TypeError on a non-array,
+							// which aborts the render before the submit button.
+							if ( ! is_array( $gpc_purposes ) ) {
+								$gpc_purposes = array();
+							}
 							foreach ( $available_purposes as $purpose ) {
 								$purpose = trim( $purpose );
 								if ( empty( $purpose ) ) {

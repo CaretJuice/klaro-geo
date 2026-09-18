@@ -304,12 +304,11 @@ function klaro_geo_register_main_settings() {
 				if ( ! is_array( $input ) ) {
 					return [];
 				}
-				return array_map(
-					function ( $template ) {
-						return is_array( $template ) ? array_map( 'sanitize_text_field', $template ) : sanitize_text_field( $template );
-					},
-					$input
-				);
+				// Each template holds nested 'config' and 'plugin_settings'
+				// arrays. Mapping sanitize_text_field() over a template flattens
+				// those to empty strings, silently wiping every setting the
+				// template carries, so recurse instead.
+				return klaro_geo_sanitize_array( $input );
 			},
 		]
 	);

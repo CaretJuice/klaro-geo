@@ -4,7 +4,7 @@ Tags: consent, gdpr, ccpa, geolocation, privacy
 Requires at least: 6.6
 Tested up to: 6.9
 Requires PHP: 7.2
-Stable tag: 0.3.5
+Stable tag: 0.3.6
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -117,6 +117,14 @@ This is standard GTM behavior. Data sent to Google depends on your GTM container
 
 == Changelog ==
 
+= 0.3.6 =
+* Fixed: saving the main settings page wiped every template's config and plugin settings (nested arrays were flattened to empty strings by the sanitize callback)
+* Fixed: the template Required checkbox defaulted to checked, which made Klaro grant every service when a visitor clicked Decline
+* Fixed: the templates admin page aborted mid-render after saving, hiding the Save button
+* Fixed: the consent key preview table on the templates page never rendered any rows
+* Added: a warning naming any template whose stored config is not an array, instead of silently dropping its settings
+* Changed: country settings sanitization no longer flattens boolean values
+
 = 0.3.5 =
 * Improved input sanitization and output escaping throughout
 * Converted all inline scripts to use WordPress enqueue API
@@ -163,6 +171,9 @@ This is standard GTM behavior. Data sent to Google depends on your GTM container
 * Admin debug tools
 
 == Upgrade Notice ==
+
+= 0.3.6 =
+Fixes a bug where saving the settings page erased all template configuration. If your templates have lost their settings, re-save each template after updating.
 
 = 0.3.5 =
 Security and compliance improvements for WordPress plugin directory submission.

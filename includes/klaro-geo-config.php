@@ -130,6 +130,21 @@ function klaro_geo_build_template_payload( $template_key, $templates, $services 
 
 	$klaro_config = array();
 
+	// A template whose config is not an array cannot be copied. Production has
+	// been seen storing a string here, and foreach() over a string copies
+	// nothing while still skipping the defaults branch below -- leaving
+	// klaroConfig with no 'default' or 'required' at all. Drop the bad value so
+	// the hardcoded defaults apply, and say loudly which template is corrupt.
+	if ( isset( $template_config['config'] ) && ! is_array( $template_config['config'] ) ) {
+		klaro_geo_debug_log(
+			'WARNING: Template "' . $template_to_use . '" has a config that is not an array (type: ' .
+			gettype( $template_config['config'] ) . '), falling back to hardcoded defaults. ' .
+			'Re-save this template in Klaro Geo > Templates to rebuild it. Value starts: ' .
+			substr( (string) wp_json_encode( $template_config['config'] ), 0, 200 )
+		);
+		unset( $template_config['config'] );
+	}
+
 	// Apply template configuration
 	if ( isset( $template_config['config'] ) ) {
 		// Copy all config values

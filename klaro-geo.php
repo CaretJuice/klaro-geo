@@ -3,7 +3,7 @@
  * Plugin Name: Klaro Geo
  * Plugin URI: https://github.com/CaretJuice/klaro-geo
  * Description: Loads Klaro! with Geo overrides when installed with the Geolocation IP Detection plugin.
- * Version: 0.3.5
+ * Version: 0.3.6
  * Author: Caret Juice Data Ltd., Damon Gudaitis
  * Author URI: https://caretjuice.com
  * Requires at least: 6.6
@@ -15,7 +15,7 @@
  * Domain Path: /languages
  */
 defined( 'ABSPATH' ) || die( 'No script kiddies please!' );
-define( 'KLARO_GEO_VERSION', '0.3.5' );
+define( 'KLARO_GEO_VERSION', '0.3.6' );
 if ( ! defined( 'KLARO_GEO_PATH' ) ) {
 	define( 'KLARO_GEO_PATH', plugin_dir_path( __FILE__ ) );
 }
@@ -97,7 +97,47 @@ function klaro_geo_log_once( $key, $message ) {
 }
 
 /**
- * Recursively sanitize an array of values.
+ * Recursively sanitize a nested value.
+ *
+ * One traversal shared by the sanitizers below. The only thing that varies is
+ * how scalars are treated, and that difference is deliberate -- see
+ * $coerce_booleans.
+ *
+ * @param mixed $value           The value to sanitize. Non-arrays yield array().
+ * @param bool  $coerce_booleans When true, the form strings 'true', 'false' and
+ *                               'on' become real booleans and native
+ *                               bool/int/float pass through untouched. Config
+ *                               posted by checkboxes needs this. Human-readable
+ *                               text does not: a translation whose value is
+ *                               literally "on" must stay the string "on".
+ * @return array The sanitized array.
+ */
+function klaro_geo_sanitize_deep( $value, $coerce_booleans = false ) {
+	if ( ! is_array( $value ) ) {
+		return array();
+	}
+	$sanitized = array();
+	foreach ( $value as $key => $item ) {
+		$key = sanitize_text_field( $key );
+		if ( is_array( $item ) ) {
+			$sanitized[ $key ] = klaro_geo_sanitize_deep( $item, $coerce_booleans );
+		} elseif ( ! $coerce_booleans ) {
+			$sanitized[ $key ] = sanitize_text_field( $item );
+		} elseif ( $item === 'true' || $item === 'on' ) {
+			$sanitized[ $key ] = true;
+		} elseif ( $item === 'false' ) {
+			$sanitized[ $key ] = false;
+		} elseif ( is_bool( $item ) || is_int( $item ) || is_float( $item ) ) {
+			$sanitized[ $key ] = $item;
+		} else {
+			$sanitized[ $key ] = sanitize_text_field( $item );
+		}
+	}
+	return $sanitized;
+}
+
+/**
+ * Recursively sanitize an array of config values.
  * Handles boolean string conversion and applies sanitize_text_field to strings.
  * Use immediately after json_decode() to sanitize decoded data.
  *
@@ -105,27 +145,7 @@ function klaro_geo_log_once( $key, $message ) {
  * @return array The sanitized array.
  */
 function klaro_geo_sanitize_array( $array ) {
-	if ( ! is_array( $array ) ) {
-		return array();
-	}
-	$sanitized = array();
-	foreach ( $array as $key => $value ) {
-		$key = sanitize_text_field( $key );
-		if ( is_array( $value ) ) {
-			$sanitized[ $key ] = klaro_geo_sanitize_array( $value );
-		} elseif ( $value === 'true' ) {
-			$sanitized[ $key ] = true;
-		} elseif ( $value === 'false' ) {
-			$sanitized[ $key ] = false;
-		} elseif ( $value === 'on' ) {
-			$sanitized[ $key ] = true;
-		} elseif ( is_bool( $value ) || is_int( $value ) || is_float( $value ) ) {
-			$sanitized[ $key ] = $value;
-		} else {
-			$sanitized[ $key ] = sanitize_text_field( $value );
-		}
-	}
-	return $sanitized;
+	return klaro_geo_sanitize_deep( $array, true );
 }
 
 /**
@@ -230,19 +250,7 @@ function klaro_geo_init_consent_mode_services() {
  * All string values are sanitized with sanitize_text_field().
  */
 function klaro_geo_sanitize_translations( $translations ) {
-	if ( ! is_array( $translations ) ) {
-		return array();
-	}
-	$sanitized = array();
-	foreach ( $translations as $key => $value ) {
-		$clean_key = sanitize_text_field( $key );
-		if ( is_array( $value ) ) {
-			$sanitized[ $clean_key ] = klaro_geo_sanitize_translations( $value );
-		} else {
-			$sanitized[ $clean_key ] = sanitize_text_field( $value );
-		}
-	}
-	return $sanitized;
+	return klaro_geo_sanitize_deep( $translations, false );
 }
 
 // Include defaults file first

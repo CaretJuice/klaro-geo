@@ -322,7 +322,7 @@ function klaro_geo_country_settings_page_content() {
 
 		// Get the submitted settings
         // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Recursively sanitized below via update_from_form()
-		$submitted_settings = isset( $_POST['klaro_geo_country_settings'] ) ? map_deep( wp_unslash( $_POST['klaro_geo_country_settings'] ), 'sanitize_text_field' ) : array();
+		$submitted_settings = isset( $_POST['klaro_geo_country_settings'] ) ? klaro_geo_sanitize_array( wp_unslash( $_POST['klaro_geo_country_settings'] ) ) : array();
 
 		// Use the new country settings class
 		$country_settings = Klaro_Geo_Country_Settings::get_instance();
@@ -352,7 +352,11 @@ function klaro_geo_register_country_settings() {
 		'klaro_geo_country_settings',
 		array(
 			'sanitize_callback' => function ( $input ) {
-				return map_deep( (array) $input, 'sanitize_text_field' );
+				// Not map_deep(): that runs sanitize_text_field() over scalars of
+				// every type, so a boolean would be flattened to '1' or ''. The
+				// current structure is all strings, but this keeps a future
+				// boolean field from being silently corrupted.
+				return klaro_geo_sanitize_array( (array) $input );
 			},
 		)
 	);
@@ -381,7 +385,7 @@ function klaro_geo_save_country_settings() {
 	parse_str( $raw_settings, $settings );
 
 	// Get the submitted settings
-	$submitted_settings = isset( $settings['klaro_geo_country_settings'] ) ? map_deep( $settings['klaro_geo_country_settings'], 'sanitize_text_field' ) : array();
+	$submitted_settings = isset( $settings['klaro_geo_country_settings'] ) ? klaro_geo_sanitize_array( $settings['klaro_geo_country_settings'] ) : array();
 
 	// Use the new country settings class
 	$country_settings = Klaro_Geo_Country_Settings::get_instance();
