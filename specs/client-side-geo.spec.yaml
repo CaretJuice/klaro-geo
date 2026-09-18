@@ -1,0 +1,322 @@
+# client-side-geo.spec.yaml
+# Specification for Cache-Safe Client-Side Geo Resolution
+#
+# Problem: in server mode, klaro_geo_get_user_location() runs at page-render
+# time and its result — detected country/region AND the chosen consent
+# template — is baked into cacheable HTML. On full-page-cache hosting
+# (WP Engine, Kinsta, LiteSpeed, Cloudflare APO...) every anonymous visitor
+# receives the geo/template of whoever primed the cache entry. Observed in
+# production 2026-07-31: server geo CL served cmp_country FR, VN served UZ,
+# IE served US — wrong consent template cross-served between jurisdictions.
+#
+# Fix: the 'client' resolution mode. The rendered config is visitor-independent
+# (cache-safe); the browser resolves geo via the GeoIP Detection plugin's AJAX
+# endpoint (admin-ajax.php is excluded from page caches) and selects the
+# template before Klaro initializes.
+
+file_meta:
+  purpose: "Define cache-safe client-side geo lookup and template resolution contracts"
+  dependencies:
+    - "klaro-geo.php"                                    # enqueue flow, klaro-js deps, receipts localize guard
+    - "includes/klaro-geo-config.php"                    # klaro_geo_build_template_payload(), klaro_geo_generate_client_config_content(), klaro_geo_is_client_geo_active()
+    - "includes/class-klaro-geo-country-settings.php"    # get_effective_settings() — mirrored client-side
+    - "includes/admin/klaro-geo-admin-settings.php"      # settings registration + UI
+    - "includes/admin/klaro-geo-admin-geoip-warning.php" # AJAX endpoint detection + admin notice
+    - "js/klaro-geo-client-geo.js"                       # client-side resolver
+    - "js/klaro-geo-consent-receipts.js"                 # consumes detectedCountry/Region via klaroConsentData
+  external_dependencies:
+    geoip_detect:
+      plugin: "geoip-detect (Geolocation IP Detection, yellowtree)"
+      server_function: "geoip_detect2_get_info_from_current_ip()"
+      ajax_endpoint: "admin-ajax.php?action=geoip_detect2_get_info_from_current_ip"
+      ajax_option_key: "geoip-detect-ajax_enabled"
+      # NOTE: option key and action name are best-known values, not guaranteed
+      # API — verify against the installed geoip-detect version on upgrades.
+      # A failing/absent endpoint falls through the resolver's fallback chain,
+      # and the admin warning's detection fails open (see admin_warnings).
+  stability: "core"
+  last_updated: "2026-07-31"
+
+# =============================================================================
+# ARCHITECTURE
+# =============================================================================
+architecture:
+  principle: >
+    In client mode, NO visitor-specific geo value (country, region, template
+    choice, template source) may appear in cacheable page output. Geo is
+    resolved in the browser per visitor; template selection is replicated
+    client-side from a rules map shipped with the config.
+
+  modes:
+    server:
+      description: "Legacy/current behavior. Geo resolved in PHP at render time; template baked into config."
+      default: true
+      cache_safety: "UNSAFE on full-page-cache hosting — documented limitation."
+    client:
+      description: "Cache-safe. PHP ships rules + all candidate templates; browser resolves geo and selects template before Klaro init."
+      cache_safety: "Safe: rendered config is identical for all anonymous visitors."
+
+  client_mode_flow:
+    - step: 1
+      actor: "klaro_geo_generate_client_config_content()"
+      contract: |
+        Emit window.klaroGeoClientGeo — a visitor-independent payload:
+          - geoAjax: { url, action } for the geoip-detect AJAX endpoint
+          - timeoutMs, timezoneFallback (from settings)
+          - rules: { defaultTemplate, fallbackBehavior, visibleCountries,
+                     countries: { CC: { template, regions: { RC: template } } } }
+          - templates: { key: { config, consentDefaults, gtagSettings,
+                                enableConsentLogging, gpcEnabled, templateSettings } }
+            for every candidate template (default template + all referenced by
+            country/region rules that exist in the database, + 'default')
+          - consentReceipts flag; when on, a window.klaroConsentData base with
+            EMPTY template/geo fields (the resolver fills them)
+        MUST NOT emit detected geo values or a pre-selected template. Empty-string
+        template references are kept in the rules (PHP treats '' as set → the
+        validation fallback path; the JS mirror must see the same input).
+        Per-template configs are built by klaro_geo_build_template_payload() —
+        the same builder server mode uses, so the two modes cannot diverge.
+    - step: 2
+      actor: "js/klaro-geo-client-geo.js"
+      contract: |
+        Request geo from the AJAX endpoint (same-origin fetch, GET
+        action=geoip_detect2_get_info_from_current_ip), racing timeoutMs
+        (setting, default 2500).
+    - step: 3
+      actor: "js/klaro-geo-client-geo.js (parseGeoRecord)"
+      contract: |
+        Read country = record.country.iso_code, region = the most specific
+        subdivision (LAST element of record.subdivisions). is_empty === true or
+        a missing/empty country is a lookup failure that triggers the fallback
+        chain — never an exception.
+    - step: 4
+      actor: "js/klaro-geo-client-geo.js (resolveEffectiveTemplate)"
+      contract: |
+        Resolve the effective template CLIENT-SIDE with precedence identical to
+        Klaro_Geo_Country_Settings::get_effective_settings():
+          region override > country setting > 'inherit' -> fallback > fallback,
+        then validate the result against the shipped candidate templates.
+        The shared parity fixture (tests/fixtures/geo-resolution-parity.json)
+        MUST pass against both implementations (see testing.parity).
+    - step: 5
+      actor: "js/klaro-geo-client-geo.js (applyResolution)"
+      contract: |
+        In order: apply GPC to the selected config (mirrors the server-mode
+        inline GPC block); push gtag('consent','update') with the selected
+        template's defaults when it differs from the fallback template or GPC
+        applies; fill window.klaroConsentData BEFORE Klaro can initialize; set
+        window.klaroConfig; push klaroConfigLoaded (and gpcDetected when
+        applicable); initialize Klaro.
+
+  klaro_initialization:
+    contract: |
+      In client mode window.klaroConfig is undefined until resolution completes,
+      so klaro.js (which auto-initializes from window.klaroConfig at load) does
+      nothing on load. The resolver sets window.klaroConfig and, if klaro.js
+      already loaded, calls klaro.setup(config); otherwise klaro.js auto-inits
+      from the now-present config when it loads. Either way Klaro CANNOT
+      initialize before resolution completes or times out.
+      js/klaro-geo-client-geo.js is enqueued as a dependency of the klaro-js
+      handle so the payload and resolver are in place first.
+
+  consent_mode_defaults:
+    contract: |
+      In client mode the gtag('consent','default') call in <head> is part of the
+      cached page and therefore MUST NOT vary by visitor geo. It uses the
+      fallback (default) template's consent defaults
+      ($GLOBALS['klaro_geo_consent_defaults'] is populated from the default
+      template's payload). After client-side resolution selects a different
+      template, differences are applied via gtag('consent','update').
+
+  consent_receipts:
+    contract: |
+      In client mode the wp_localize_script klaroConsentData emission in
+      klaro_geo_enqueue_scripts() is SKIPPED (it would bake per-visitor values
+      and overwrite the resolver's assignments). The cache-safe base object is
+      emitted by the config content; the resolver fills templateName,
+      templateSource, detectedCountry, detectedRegion, enableConsentLogging and
+      templateSettings before Klaro initializes, so no receipt can carry
+      unresolved values.
+
+  admin_debug_override:
+    contract: |
+      klaro_geo_is_client_geo_active( $is_admin_override ) returns false when
+      the klaro_geo_debug_geo override is active: logged-in requests bypass page
+      caches, so the debug workflow stays fully server-side (klaroGeoGeoSource
+      = 'debug', klaroGeoResolutionMode = 'server').
+
+# =============================================================================
+# SETTINGS
+# =============================================================================
+settings:
+  global:
+    klaro_geo_geo_resolution_mode:
+      type: "string"
+      values: ["server", "client"]
+      default: "server"
+      description: >
+        Resolution mode. Default stays 'server' for backward compatibility;
+        admin UI copy recommends 'client' on cached hosting.
+
+    klaro_geo_client_geo_timeout_ms:
+      type: "integer"
+      default: 2500
+      range: [500, 30000]
+      description: "Max wait for the AJAX geo lookup before falling through the fallback chain."
+
+    klaro_geo_client_geo_timezone_fallback:
+      type: "boolean"
+      default: true
+      description: >
+        When the AJAX lookup fails or times out, infer country from
+        Intl.DateTimeFormat().resolvedOptions().timeZone via the bundled
+        TZ_COUNTRY map (no network, region always empty). Applies only as a
+        fallback, never overrides a successful lookup.
+
+# =============================================================================
+# BEHAVIOR
+# =============================================================================
+behavior:
+  resolution_fallback_chain:
+    description: "Ordered; first success wins. NEVER silently fail (log + record source)."
+    chain:
+      - source: "debug"
+        condition: "Admin debug override active (server-resolved; client mode inactive)"
+      - source: "geoip-ajax"
+        condition: "AJAX lookup returned a non-empty country within timeout"
+      - source: "timezone"
+        condition: "klaro_geo_client_geo_timezone_fallback AND timezone maps to a country"
+      - source: "fallback"
+        condition: "Always matches. country='', region='', fallback template used."
+    logging: >
+      Each fallback transition emits a klaroGeoLog debug line and the outcome is
+      exposed via klaroGeoGeoSource. Matches the project rule: never silently
+      fail — always log when fallbacks are used.
+
+  server_mode:
+    contract: >
+      Unchanged behavior. The refactor extracted the per-template config build
+      into klaro_geo_build_template_payload(); server mode calls it once for
+      the resolved template and emits the same JS as before, plus the new
+      klaroConfigLoaded fields (see events).
+
+  geoip_ajax_response_shape:
+    description: "The AJAX endpoint returns the same record shape as the PHP API (JSON)."
+    reads:
+      country: "record.country.iso_code (string, may be absent/empty)"
+      region: "record.subdivisions[last].iso_code (string, may be absent/empty)"
+      failure: "record.is_empty === true OR missing/empty country => lookup failure"
+
+# =============================================================================
+# ADMIN WARNINGS  (geoip-detect AJAX endpoint detection)
+# =============================================================================
+admin_warnings:
+  ajax_endpoint_disabled:
+    requirement: >
+      Klaro Geo MUST attempt to detect whether the GeoIP Detection plugin's
+      "Enable AJAX endpoint" setting is off and, if so, warn the admin to turn
+      it on — client mode cannot do per-visitor lookups without it.
+    implementation: "includes/admin/klaro-geo-admin-geoip-warning.php"
+    when_checked:
+      - "Rendering any Klaro Geo admin page (screen id contains 'klaro-geo') while mode = 'client'"
+      - "The probe transient is invalidated when klaro_geo_geo_resolution_mode changes, so saving 'client' re-checks immediately"
+    detection_strategy:
+      description: "Layered, best-effort (klaro_geo_geoip_ajax_endpoint_status()). First conclusive result wins."
+      layers:
+        - layer: 1
+          check: "function_exists('geoip_detect2_get_info_from_current_ip')"
+          if_false: "'plugin-missing' -> install/activate guidance notice"
+        - layer: 2
+          check: "get_option('geoip-detect-ajax_enabled', sentinel)"
+          interpretation:
+            row_exists_falsy: "'disabled' (conclusive) -> warn"
+            row_exists_truthy: "'ok' -> no warning"
+            row_missing: "inconclusive -> layer 3"
+        - layer: 3
+          check: >
+            Functional probe: wp_remote_post to
+            admin-ajax.php?action=geoip_detect2_get_info_from_current_ip
+            (5s timeout, result cached in transient
+            'klaro_geo_geoip_ajax_probe' for 1 hour).
+          interpretation:
+            http_200_with_record_json: "'ok' -> no warning"
+            http_400_or_error_body: "'disabled' -> warn"
+            transport_failure_wp_error: "'unknown' -> fail open (no warning)"
+    fail_open: >
+      If no layer is conclusive (e.g., future geoip-detect renames the option
+      and the loopback probe cannot run), show NO warning. A false 'all good' is
+      preferable to nagging users whose endpoint works; runtime behavior is
+      still protected by the fallback chain.
+    notice_contract:
+      type: "admin_notice, warning level, dismissible per-user (user meta via nonce-protected link)"
+      scope: "Klaro Geo admin pages only (not site-wide); manage_options only"
+      text_must_include:
+        - "That client-side geo mode requires the AJAX endpoint"
+        - "Where to enable it: Settings -> Geolocation IP Detection -> 'Enable AJAX endpoint'"
+        - "Current runtime consequence: lookups fall back (timezone/fallback template) until enabled"
+      must_not:
+        - "Block saving the mode setting"
+        - "Auto-change geoip-detect's own options"
+
+# =============================================================================
+# DATALAYER EVENTS
+# =============================================================================
+events:
+  klaroConfigLoaded_client_geo_fields:
+    description: >
+      klaroConfigLoaded gains fields in BOTH modes; in client mode it fires
+      AFTER resolution (later than in server mode, still exactly once per page
+      load). Also specified in datalayer-events.spec.yaml.
+    fields:
+      klaroGeoResolutionMode:
+        type: "string"
+        values: ["server", "client"]
+      klaroGeoGeoSource:
+        type: "string"
+        values: ["server", "debug", "geoip-ajax", "timezone", "fallback"]
+        description: "Which link of the fallback chain produced the geo. 'server'/'debug' in server mode."
+      klaroGeoGeoLatencyMs:
+        type: "integer|null"
+        description: "ms from resolver start to geo resolution. null in server mode."
+    unchanged_fields: >
+      klaroGeoDetectedCountry / klaroGeoDetectedRegion / klaroGeoConsentTemplate /
+      klaroGeoTemplateSource keep their existing semantics — in client mode they
+      carry the client-resolved values. Downstream consumers (GTM, consent
+      receipts, traffic-diagnostics beacon) need no changes.
+
+# =============================================================================
+# TESTING
+# =============================================================================
+testing:
+  parity:
+    fixture: "tests/fixtures/geo-resolution-parity.json"
+    requirement: >
+      A shared JSON fixture of (country settings, location) -> expected
+      (template, source) cases MUST be executed against BOTH the PHP
+      klaro_geo_get_effective_settings() (tests/phpunit/klaroGeoClientGeoTest.php)
+      and the JS resolveEffectiveTemplate() (tests/js/test-client-geo.js), so
+      the two implementations cannot drift.
+  cache_safety:
+    location: "tests/phpunit/klaroGeoClientGeoTest.php"
+    requirement: >
+      In client mode, generating the config with different mocked geoip-detect
+      results MUST produce byte-identical output, proving no visitor data leaks
+      into cacheable HTML.
+  fallback_chain:
+    location: "tests/js/test-client-geo.js"
+    cases:
+      - "AJAX success -> geoip-ajax source, correct template"
+      - "AJAX timeout/failure + timezone on -> timezone source, country from tz map, region empty"
+      - "AJAX failure + timezone off -> fallback source, fallback template"
+      - "AJAX returns empty/is_empty record -> falls through, not treated as success"
+      - "GPC detected -> service defaults overridden, consent denied, gpcDetected event"
+      - "Unknown template reference -> terminal fallback still initializes Klaro"
+  admin_warning:
+    location: "tests/phpunit/klaroGeoClientGeoTest.php"
+    cases:
+      - "option present and falsy -> 'disabled' (warning shown)"
+      - "option present and truthy -> 'ok' (no warning)"
+      - "option missing + probe 200/record -> 'ok'"
+      - "option missing + probe error body -> 'disabled'"
+      - "option missing + probe transport failure -> 'unknown' (fail open)"
+      - "probe result is transient-cached"

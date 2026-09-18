@@ -1,0 +1,29 @@
+{
+    "description": "Shared parity fixture for template resolution. Run against BOTH Klaro_Geo_Country_Settings::get_effective_settings() (PHP) and resolveEffectiveTemplate() in js/klaro-geo-client-geo.js so the two implementations cannot drift. Spec: specs/client-side-geo.spec.yaml (testing.parity).",
+    "visibleCountries": ["US", "CA", "FR", "DE", "GB", "BR", "JP"],
+    "defaultTemplate": "default",
+    "availableTemplates": ["default", "strict", "relaxed"],
+    "countrySettings": {
+        "US": { "template": "relaxed", "regions": { "CA": "strict", "VA": "inherit" } },
+        "CA": { "template": "strict", "regions": { "QC": "strict" } },
+        "FR": { "template": "strict" },
+        "DE": { "template": "inherit" },
+        "GB": {},
+        "BR": { "template": "no-such-template" }
+    },
+    "cases": [
+        { "name": "empty location -> default template",           "location": "",      "expected": { "template": "default", "source": "default" } },
+        { "name": "country-level match",                          "location": "US",    "expected": { "template": "relaxed", "source": "country" } },
+        { "name": "region override wins over country",            "location": "US-CA", "expected": { "template": "strict",  "source": "region" } },
+        { "name": "region 'inherit' keeps country template",      "location": "US-VA", "expected": { "template": "relaxed", "source": "country" } },
+        { "name": "unconfigured region falls back to country",    "location": "US-TX", "expected": { "template": "relaxed", "source": "country" } },
+        { "name": "region matching country template",             "location": "CA-QC", "expected": { "template": "strict",  "source": "region" } },
+        { "name": "country without regions",                      "location": "FR",    "expected": { "template": "strict",  "source": "country" } },
+        { "name": "country 'inherit' -> default, source fallback","location": "DE",    "expected": { "template": "default", "source": "fallback" } },
+        { "name": "country entry without template key",           "location": "GB",    "expected": { "template": "default", "source": "country" } },
+        { "name": "reference to missing template -> validation fallback", "location": "BR", "expected": { "template": "default", "source": "fallback" } },
+        { "name": "visible country without settings entry",       "location": "JP",    "expected": { "template": "default", "source": "default" } },
+        { "name": "country not in visible list",                  "location": "XX",    "expected": { "template": "default", "source": "default" } },
+        { "name": "region for country not in visible list",       "location": "XX-YY", "expected": { "template": "default", "source": "default" } }
+    ]
+}

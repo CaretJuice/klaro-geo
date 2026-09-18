@@ -30,7 +30,7 @@
      */
     function klaroGeoDebugLog(level) {
         // Convert arguments to array, excluding the first argument (level)
-        var args = Array.prototype.slice.call(arguments, 1);
+        let args = Array.prototype.slice.call(arguments, 1);
 
         // Always show errors, regardless of debug setting
         if (level === 'error') {
@@ -44,7 +44,7 @@
         }
 
         // Prepend prefix to all messages
-        var prefix = '[Klaro Geo]';
+        let prefix = '[Klaro Geo]';
 
         // Log based on level
         switch(level) {
@@ -66,22 +66,22 @@
 
     // Convenience functions for each log level
     window.klaroGeoLog = function() {
-        var args = Array.prototype.slice.call(arguments);
+        let args = Array.prototype.slice.call(arguments);
         klaroGeoDebugLog.apply(null, ['log'].concat(args));
     };
 
     window.klaroGeoWarn = function() {
-        var args = Array.prototype.slice.call(arguments);
+        let args = Array.prototype.slice.call(arguments);
         klaroGeoDebugLog.apply(null, ['warn'].concat(args));
     };
 
     window.klaroGeoInfo = function() {
-        var args = Array.prototype.slice.call(arguments);
+        let args = Array.prototype.slice.call(arguments);
         klaroGeoDebugLog.apply(null, ['info'].concat(args));
     };
 
     window.klaroGeoError = function() {
-        var args = Array.prototype.slice.call(arguments);
+        let args = Array.prototype.slice.call(arguments);
         klaroGeoDebugLog.apply(null, ['error'].concat(args));
     };
 

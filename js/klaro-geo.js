@@ -12,8 +12,8 @@
   function getServiceConsentKey(serviceName) {
       // Check if this is a consent mode service with a dedicated key
       if (typeof window.klaroConfig !== 'undefined' && window.klaroConfig.services) {
-          for (var i = 0; i < window.klaroConfig.services.length; i++) {
-              var service = window.klaroConfig.services[i];
+          for (let i = 0; i < window.klaroConfig.services.length; i++) {
+              let service = window.klaroConfig.services[i];
               if (service.name === serviceName && service.is_consent_mode_service && service.consent_mode_key) {
                   return service.consent_mode_key;
               }
@@ -142,7 +142,7 @@
       }
 
       // Push queueFlushed event for timing visibility
-      var queueFlushedEvent;
+      let queueFlushedEvent;
       if (typeof window.KlaroGeoEvents !== 'undefined') {
           queueFlushedEvent = window.KlaroGeoEvents.createKlaroGeoEvent('queueFlushed', {
               'queueSize': queueSize
@@ -276,10 +276,10 @@
       }
 
       // Generate a unique receipt ID
-      var receiptId = 'receipt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      let receiptId = 'receipt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 
       // Create the consent receipt
-      var consentReceipt = {
+      let consentReceipt = {
           receipt_id: receiptId,
           timestamp: Math.floor(Date.now() / 1000), // Unix timestamp
           consent_choices: {},
@@ -293,10 +293,10 @@
       };
 
       // Get consents from the manager
-      var consents = manager.consents;
+      let consents = manager.consents;
 
       // Add consent choices to the receipt
-      for (var k of Object.keys(consents || {})) {
+      for (let k of Object.keys(consents || {})) {
           consentReceipt.consent_choices[k] = consents[k] === true;
       }
 
@@ -365,8 +365,8 @@
   function storeReceiptLocally(receipt) {
       try {
           // Get existing receipts
-          var existingData = window.localStorage.getItem('klaro_consent_receipts');
-          var receipts = [];
+          let existingData = window.localStorage.getItem('klaro_consent_receipts');
+          let receipts = [];
 
           if (existingData) {
               try {
@@ -404,11 +404,11 @@
   function getLatestConsentReceipt() {
       try {
           // Get existing receipts
-          var existingData = window.localStorage.getItem('klaro_consent_receipts');
+          let existingData = window.localStorage.getItem('klaro_consent_receipts');
 
           if (existingData) {
               try {
-                  var receipts = JSON.parse(existingData);
+                  let receipts = JSON.parse(existingData);
 
                   // Ensure receipts is an array
                   if (Array.isArray(receipts) && receipts.length > 0) {
@@ -433,10 +433,10 @@
    */
   function sendReceiptToServer(receipt) {
       // Get the AJAX URL
-      var ajaxUrl = window.klaroConsentData.ajaxUrl || '/wp-admin/admin-ajax.php';
+      let ajaxUrl = window.klaroConsentData.ajaxUrl || '/wp-admin/admin-ajax.php';
 
       // Create form data
-      var formData = new FormData();
+      let formData = new FormData();
       formData.append('action', 'klaro_geo_store_consent_receipt');
 
       // Add nonce if available
@@ -672,7 +672,7 @@
           return window.klaroConsentData.consentModeServices;
       }
       // Fallback: derive from klaroConfig.services
-      var map = {};
+      let map = {};
       if (typeof window.klaroConfig !== 'undefined' && window.klaroConfig.services) {
           window.klaroConfig.services.forEach(function(service) {
               if (service.is_consent_mode_service && service.consent_mode_key) {
@@ -695,7 +695,7 @@
           return window.klaroConsentData.parentChildMap;
       }
       // Fallback: derive from klaroConfig.services
-      var map = {};
+      let map = {};
       if (typeof window.klaroConfig !== 'undefined' && window.klaroConfig.services) {
           window.klaroConfig.services.forEach(function(service) {
               if (service.parent_service) {
@@ -799,10 +799,10 @@
 
           // Add dynamic service consent keys for ALL services
           if (activeManager && activeManager.consents) {
-              var consentKeys = Object.keys(activeManager.consents);
+              let consentKeys = Object.keys(activeManager.consents);
               consentKeys.forEach(function(serviceName) {
-                  var dynamicKey = getServiceConsentKey(serviceName);
-                  var isGranted = activeManager.consents[serviceName] === true;
+                  let dynamicKey = getServiceConsentKey(serviceName);
+                  let isGranted = activeManager.consents[serviceName] === true;
                   completeUpdate[dynamicKey] = isGranted ? 'granted' : 'denied';
               });
           }
@@ -818,8 +818,8 @@
               window.klaroConsentData.templateSettings.config &&
               window.klaroConsentData.templateSettings.config.consent_mode_settings &&
               window.klaroConsentData.templateSettings.config.consent_mode_settings.consent_defaults) {
-              var defaults = window.klaroConsentData.templateSettings.config.consent_mode_settings.consent_defaults;
-              var allMatch = Object.keys(completeUpdate).every(function(key) {
+              let defaults = window.klaroConsentData.templateSettings.config.consent_mode_settings.consent_defaults;
+              let allMatch = Object.keys(completeUpdate).every(function(key) {
                   return completeUpdate[key] === (defaults[key] || 'denied');
               });
               if (allMatch) {
@@ -886,8 +886,8 @@
   function setupMultiPurposeProtection() {
       if (!window.klaroConfig || !window.klaroConfig.groupByPurpose) return;
 
-      var services = window.klaroConfig.services || [];
-      var multiPurposeServices = services.filter(function(s) {
+      let services = window.klaroConfig.services || [];
+      let multiPurposeServices = services.filter(function(s) {
           return s.purposes && s.purposes.length > 1;
       });
       if (multiPurposeServices.length === 0) return;
@@ -896,20 +896,20 @@
           if (!e.target || !e.target.matches || !e.target.matches('input[id^="purpose-item-"]')) return;
           if (e.target.checked) return; // Only fix when disabling a purpose
 
-          var purposeName = e.target.id.replace('purpose-item-', '');
+          let purposeName = e.target.id.replace('purpose-item-', '');
 
           // After Klaro has processed (synchronously during bubble), fix multi-purpose services
           setTimeout(function() {
-              var manager;
+              let manager;
               try { manager = window.klaro.getManager(); } catch(err) { return; }
               if (!manager) return;
 
               multiPurposeServices.forEach(function(service) {
                   if (!service.purposes.includes(purposeName)) return;
 
-                  var otherPurposeActive = service.purposes.some(function(p) {
+                  let otherPurposeActive = service.purposes.some(function(p) {
                       if (p === purposeName) return false;
-                      var otherInput = document.getElementById('purpose-item-' + p);
+                      let otherInput = document.getElementById('purpose-item-' + p);
                       return otherInput && otherInput.checked;
                   });
 

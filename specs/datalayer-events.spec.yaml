@@ -100,6 +100,20 @@ events:
         type: "boolean"
         description: "Whether admin debug override is active"
 
+      klaroGeoResolutionMode:
+        type: "string"
+        enum: ["server", "client"]
+        description: "Which geo resolution mode produced this config (client = cache-safe browser resolution)"
+
+      klaroGeoGeoSource:
+        type: "string"
+        enum: ["server", "debug", "geoip-ajax", "timezone", "fallback"]
+        description: "Which link of the resolution fallback chain produced the geo. 'server'/'debug' in server mode; the rest are client-mode chain links"
+
+      klaroGeoGeoLatencyMs:
+        type: "integer|null"
+        description: "ms from client resolver start to geo resolution. null in server mode"
+
       klaroGeoEnableConsentLogging:
         type: "boolean"
         description: "Whether consent receipts are enabled"
@@ -130,6 +144,9 @@ events:
       klaroGeoDetectedCountry: "US"
       klaroGeoDetectedRegion: null
       klaroGeoAdminOverride: false
+      klaroGeoResolutionMode: "server"
+      klaroGeoGeoSource: "server"
+      klaroGeoGeoLatencyMs: null
       klaroGeoEnableConsentLogging: true
       klaroGeoGPCDetected: false
       klaroGeoGPCEnabled: true
@@ -141,6 +158,9 @@ events:
       - If cookieDomain is set, that template's cookieDomain should be used
       - Can be used to verify correct template selection
       - MUST include GPC state fields (klaroGeoGPCDetected, klaroGeoGPCEnabled, klaroGeoGPCAffectedServices)
+      - In client resolution mode, fires AFTER the browser resolves geo and selects
+        the template (later than in server mode, still exactly once per page load),
+        with klaroGeoResolutionMode/klaroGeoGeoSource/klaroGeoGeoLatencyMs populated
 
   # ---------------------------------------------------------------------------
   # GPC DETECTED EVENT (only fires when GPC is active)

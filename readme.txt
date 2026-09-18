@@ -4,7 +4,7 @@ Tags: consent, gdpr, ccpa, geolocation, privacy
 Requires at least: 6.6
 Tested up to: 6.9
 Requires PHP: 7.2
-Stable tag: 0.3.4
+Stable tag: 0.3.6
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -117,6 +117,23 @@ This is standard GTM behavior. Data sent to Google depends on your GTM container
 
 == Changelog ==
 
+= 0.3.6 =
+* Fixed: saving the main settings page wiped every template's config and plugin settings (nested arrays were flattened to empty strings by the sanitize callback)
+* Fixed: the template Required checkbox defaulted to checked, which made Klaro grant every service when a visitor clicked Decline
+* Fixed: the templates admin page aborted mid-render after saving, hiding the Save button
+* Fixed: the consent key preview table on the templates page never rendered any rows
+* Added: a warning naming any template whose stored config is not an array, instead of silently dropping its settings
+* Changed: country settings sanitization no longer flattens boolean values
+
+= 0.3.5 =
+* Improved input sanitization and output escaping throughout
+* Converted all inline scripts to use WordPress enqueue API
+* Added ISO 3166 validation for debug country/region codes
+* Removed service callback fields from WordPress.org build (available in GitHub full version)
+* Renamed AJAX actions to use klaro_geo_ prefix
+* Changed disablePoweredBy default to true (Guideline 10 compliance)
+* Deleted backup file and fixed Docker test environment
+
 = 0.3.4 =
 * Added Global Privacy Control (GPC) detection and integration
 * Configurable GPC sensitivity per-template and per-service
@@ -154,6 +171,12 @@ This is standard GTM behavior. Data sent to Google depends on your GTM container
 * Admin debug tools
 
 == Upgrade Notice ==
+
+= 0.3.6 =
+Fixes a bug where saving the settings page erased all template configuration. If your templates have lost their settings, re-save each template after updating.
+
+= 0.3.5 =
+Security and compliance improvements for WordPress plugin directory submission.
 
 = 0.3.4 =
 Adds Global Privacy Control (GPC) support. GPC detection is enabled by default — review your template settings if you want to customize which services are affected.

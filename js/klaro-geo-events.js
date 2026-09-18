@@ -14,8 +14,8 @@
     'use strict';
 
     // Event source constants
-    var SOURCE_KLARO = 'klaro';
-    var SOURCE_KLARO_GEO = 'klaro-geo';
+    let SOURCE_KLARO = 'klaro';
+    let SOURCE_KLARO_GEO = 'klaro-geo';
 
     /**
      * Get the service consent key from a service name.
@@ -28,8 +28,8 @@
     function getServiceConsentKey(serviceName) {
         // Check if this is a consent mode service with a dedicated key
         if (typeof window.klaroConfig !== 'undefined' && window.klaroConfig.services) {
-            for (var i = 0; i < window.klaroConfig.services.length; i++) {
-                var service = window.klaroConfig.services[i];
+            for (let i = 0; i < window.klaroConfig.services.length; i++) {
+                let service = window.klaroConfig.services[i];
                 if (service.name === serviceName && service.is_consent_mode_service && service.consent_mode_key) {
                     return service.consent_mode_key;
                 }
@@ -44,8 +44,8 @@
      * @returns {Object} Current consent state with manager, consents, acceptedServices, and consentMode
      */
     function getConsentState() {
-        var manager = null;
-        var consents = {};
+        let manager = null;
+        let consents = {};
 
         try {
             if (typeof window.klaro !== 'undefined' && typeof window.klaro.getManager === 'function') {
@@ -59,7 +59,7 @@
             klaroGeoLog('DEBUG: KlaroGeoEvents.getConsentState error:', e);
         }
 
-        var acceptedServices = Object.keys(consents).filter(function(k) {
+        let acceptedServices = Object.keys(consents).filter(function(k) {
             return consents[k] === true;
         });
 
@@ -83,7 +83,7 @@
             return window.klaroConsentData.consentModeServices;
         }
         // Fallback: derive from klaroConfig.services
-        var map = {};
+        let map = {};
         if (typeof window.klaroConfig !== 'undefined' && window.klaroConfig.services) {
             window.klaroConfig.services.forEach(function(service) {
                 if (service.is_consent_mode_service && service.consent_mode_key) {
@@ -106,7 +106,7 @@
             return window.klaroConsentData.parentChildMap;
         }
         // Fallback: derive from klaroConfig.services
-        var map = {};
+        let map = {};
         if (typeof window.klaroConfig !== 'undefined' && window.klaroConfig.services) {
             window.klaroConfig.services.forEach(function(service) {
                 if (service.parent_service) {
@@ -130,24 +130,24 @@
      * @returns {Object} Google Consent Mode formatted object
      */
     function buildConsentMode(consents, manager) {
-        var consentMode = {};
+        let consentMode = {};
 
         // Get consent mode service map from PHP-generated config
-        var consentModeServiceMap = getConsentModeServiceMap();
-        var parentChildMap = getParentChildMap();
+        let consentModeServiceMap = getConsentModeServiceMap();
+        let parentChildMap = getParentChildMap();
 
         // Process consent mode services - map their consent state to standard Google keys
         Object.keys(consentModeServiceMap).forEach(function(consentModeKey) {
-            var serviceName = consentModeServiceMap[consentModeKey];
-            var isGranted = consents[serviceName] === true;
+            let serviceName = consentModeServiceMap[consentModeKey];
+            let isGranted = consents[serviceName] === true;
             consentMode[consentModeKey] = isGranted ? 'granted' : 'denied';
         });
 
         // Enforce parent-child dependencies
         // If parent is denied, children must also be denied
         Object.keys(parentChildMap).forEach(function(parentName) {
-            var children = parentChildMap[parentName];
-            var parentConsented = consents[parentName] === true;
+            let children = parentChildMap[parentName];
+            let parentConsented = consents[parentName] === true;
             if (!parentConsented) {
                 // Parent is denied - ensure all children are also denied
                 children.forEach(function(childName) {
@@ -163,7 +163,7 @@
 
         // Add dynamic service consent keys for ALL services
         Object.keys(consents).forEach(function(serviceName) {
-            var dynamicKey = getServiceConsentKey(serviceName);
+            let dynamicKey = getServiceConsentKey(serviceName);
             consentMode[dynamicKey] = consents[serviceName] === true ? 'granted' : 'denied';
         });
 
@@ -179,7 +179,7 @@
      * @returns {Object} DataLayer event object
      */
     function createKlaroForwardedEvent(eventName, eventData) {
-        var state = getConsentState();
+        let state = getConsentState();
 
         return {
             'event': 'Klaro Event',
@@ -199,7 +199,7 @@
      * @returns {Object} DataLayer event object
      */
     function createKlaroGeoEvent(eventName, additionalData) {
-        var event = {
+        let event = {
             'event': 'Klaro Event',
             'eventSource': SOURCE_KLARO_GEO,
             'klaroEventName': eventName
@@ -223,7 +223,7 @@
      * @returns {Object} DataLayer event object
      */
     function createConsentUpdateEvent(triggerEvent) {
-        var state = getConsentState();
+        let state = getConsentState();
 
         return {
             'event': 'Klaro Consent Update',
@@ -241,7 +241,7 @@
      * @returns {Object} DataLayer event object
      */
     function createConsentReceiptEvent(consentReceipt, includeDetails) {
-        var event = {
+        let event = {
             'event': 'Klaro Geo Consent Receipt',
             'klaro_geo_consent_receipt': consentReceipt
         };

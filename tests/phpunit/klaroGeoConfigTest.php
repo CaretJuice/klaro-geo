@@ -165,15 +165,10 @@ class KlaroConfigTest extends WP_UnitTestCase {
         // Set up analytics purposes
         update_option('klaro_geo_analytics_purposes', json_encode(['analytics', 'functional']));
 
-        // Generate the config file
-        $result = klaro_geo_generate_config_file();
-        $this->assertNotFalse($result, 'Config file generation failed');
-
-        // Read the generated config file
-        $plugin_dir = plugin_dir_path(dirname(__DIR__));
-        $klaro_config_file = $plugin_dir . 'klaro-config.js';
-        $this->assertFileExists($klaro_config_file, 'Config file was not created');
-        $config_content = file_get_contents($klaro_config_file);
+        // Generate the config content (returned as string since 0.3.5; no longer written to disk)
+        $config_content = klaro_geo_generate_config_file();
+        $this->assertIsString($config_content, 'Config generation failed');
+        $this->assertNotEmpty($config_content, 'Config content is empty');
 
         // Add debug logging
         klaro_geo_debug_log('Analytics test - Config content length: ' . strlen($config_content));
@@ -221,15 +216,10 @@ class KlaroConfigTest extends WP_UnitTestCase {
         // Set up advertising purposes
         update_option('klaro_geo_ad_purposes', json_encode(['advertising', 'personalization']));
 
-        // Generate the config file
-        $result = klaro_geo_generate_config_file();
-        $this->assertNotFalse($result, 'Config file generation failed');
-
-        // Read the generated config file
-        $plugin_dir = plugin_dir_path(dirname(__DIR__));
-        $klaro_config_file = $plugin_dir . 'klaro-config.js';
-        $this->assertFileExists($klaro_config_file, 'Config file was not created');
-        $config_content = file_get_contents($klaro_config_file);
+        // Generate the config content (returned as string since 0.3.5; no longer written to disk)
+        $config_content = klaro_geo_generate_config_file();
+        $this->assertIsString($config_content, 'Config generation failed');
+        $this->assertNotEmpty($config_content, 'Config content is empty');
 
         // Add debug logging
         klaro_geo_debug_log('Advertising test - Config content length: ' . strlen($config_content));

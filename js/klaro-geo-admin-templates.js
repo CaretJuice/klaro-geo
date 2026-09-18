@@ -9,18 +9,18 @@
         klaroGeoLog('Klaro Geo Template Translations Tabs loaded');
 
         // Check if the page was just updated (after form submission)
-        var urlParams = new URLSearchParams(window.location.search);
-        var wasUpdated = urlParams.get('updated') === 'true';
-        var needsReload = urlParams.get('needs_reload') === 'true';
+        let urlParams = new URLSearchParams(window.location.search);
+        let wasUpdated = urlParams.get('updated') === 'true';
+        let needsReload = urlParams.get('needs_reload') === 'true';
 
         if (wasUpdated) {
             klaroGeoLog('Page was just updated, ensuring tabs are properly initialized');
 
             // Check if we have deleted languages stored in localStorage
-            var deletedLanguagesJson = localStorage.getItem('klaro_deleted_languages');
+            let deletedLanguagesJson = localStorage.getItem('klaro_deleted_languages');
             if (deletedLanguagesJson) {
                 try {
-                    var deletedLanguages = JSON.parse(deletedLanguagesJson);
+                    let deletedLanguages = JSON.parse(deletedLanguagesJson);
                     klaroGeoLog('Found deleted languages in localStorage:', deletedLanguages);
 
                     // If we have deleted languages and this is the first load after saving,
@@ -30,7 +30,7 @@
                         // Clear the localStorage item to prevent infinite reloads
                         localStorage.removeItem('klaro_deleted_languages');
                         // Remove the needs_reload parameter to prevent infinite reloads
-                        var newUrl = window.location.href.replace(/[?&]needs_reload=true/, '');
+                        let newUrl = window.location.href.replace(/[?&]needs_reload=true/, '');
                         window.location.href = newUrl;
                         return; // Stop execution to allow the reload
                     }
@@ -42,9 +42,9 @@
 
                         try {
                             // Get the current JSON from the editor
-                            var jsonText = $('#translations_json_editor').val();
+                            let jsonText = $('#translations_json_editor').val();
                             if (jsonText && jsonText.trim() !== '') {
-                                var translations = JSON.parse(jsonText);
+                                let translations = JSON.parse(jsonText);
 
                                 // Remove each deleted language
                                 deletedLanguages.forEach(function(langCode) {
@@ -81,29 +81,29 @@
                 klaroGeoLog('Page was updated, explicitly loading translations from JSON');
                 setTimeout(function() {
                     // Force update from JSON to ensure deleted languages are removed from tabs
-                    var result = updateFormFromJson();
+                    let result = updateFormFromJson();
                     klaroGeoLog('Form updated from JSON:', result);
 
                     // If we have a JSON editor, make sure the form matches the JSON
                     if ($('#translations_json_editor').length) {
-                        var jsonText = $('#translations_json_editor').val();
+                        let jsonText = $('#translations_json_editor').val();
                         try {
                             if (jsonText && jsonText.trim() !== '') {
-                                var translations = JSON.parse(jsonText);
+                                let translations = JSON.parse(jsonText);
                                 klaroGeoLog('Ensuring tabs match JSON data');
 
                                 // Check if any tabs exist for languages not in the JSON
                                 $('.translation-tab').each(function() {
-                                    var tabId = $(this).attr('id');
+                                    let tabId = $(this).attr('id');
                                     if (tabId && tabId !== 'tab-zz' && tabId !== 'tab-add') {
-                                        var langCode = tabId.replace('tab-', '');
+                                        let langCode = tabId.replace('tab-', '');
 
                                         // If this language is not in the JSON, remove the tab
                                         if (!translations[langCode]) {
                                             klaroGeoLog('Removing tab for language not in JSON:', langCode);
 
                                             // Remove the tab and its content
-                                            var tabIndex = $(".translations-tabs-nav a[href='#tab-" + langCode + "']").parent().index();
+                                            let tabIndex = $(".translations-tabs-nav a[href='#tab-" + langCode + "']").parent().index();
                                             $("#tab-" + langCode).remove();
                                             $(".translations-tabs-nav li").eq(tabIndex).remove();
                                         }
@@ -151,7 +151,7 @@
                 console.error('Translations tabs container not found');
             }
         }
-        
+
         // Function to add existing translations as tabs
         function addExistingTranslationTabs() {
             klaroGeoLog('Adding existing translation tabs');
@@ -163,7 +163,7 @@
             }
 
             // Check if we have templates data (try both variable names)
-            var templatesData = null;
+            let templatesData = null;
             if (typeof klaroGeoTemplates !== 'undefined' && klaroGeoTemplates.templates) {
                 templatesData = klaroGeoTemplates.templates;
                 klaroGeoLog('Using klaroGeoTemplates for template data');
@@ -176,13 +176,13 @@
             }
 
             // Get current template
-            var currentTemplate = $('#template_selector').val() || $('#current_template').val();
+            let currentTemplate = $('#template_selector').val() || $('#current_template').val();
             klaroGeoLog('Current template:', currentTemplate);
 
             if (!currentTemplate) {
                 console.error('Current template selector not found');
                 // Try to get the first template key as a fallback
-                var templateKeys = Object.keys(templatesData);
+                let templateKeys = Object.keys(templatesData);
                 if (templateKeys.length > 0) {
                     currentTemplate = templateKeys[0];
                     klaroGeoLog('Using first template as fallback:', currentTemplate);
@@ -197,7 +197,7 @@
                 return;
             }
 
-            var template = templatesData[currentTemplate];
+            let template = templatesData[currentTemplate];
             klaroGeoLog('Template data:', template);
 
             // Check if template has translations
@@ -206,7 +206,7 @@
                 return;
             }
 
-            var translations = template.config.translations;
+            let translations = template.config.translations;
             klaroGeoLog('Found translations:', translations);
 
             // Add tabs for each language
@@ -220,7 +220,7 @@
                 klaroGeoLog('Processing language:', langCode);
 
                 // Get language name
-                var langName = getLanguageName(langCode);
+                let langName = getLanguageName(langCode);
                 klaroGeoLog('Language name:', langName);
 
                 // Add language tab if it doesn't already exist
@@ -240,7 +240,7 @@
                 klaroGeoLog("Ensuring Add Language tab is present after processing all tabs");
 
                 // Check if we need to add the "Add Language" tab
-                var addTabExists = false;
+                let addTabExists = false;
                 $(".translations-tabs-nav li a").each(function() {
                     if ($(this).attr('href') === '#tab-add') {
                         addTabExists = true;
@@ -251,21 +251,21 @@
                 if (!addTabExists) {
                     klaroGeoLog("Re-adding the Add Language tab navigation");
                     // Add the "Add Language" tab navigation
-                    var addTabNav = $('<li><a href="#tab-add">Add Language</a></li>');
+                    let addTabNav = $('<li><a href="#tab-add">Add Language</a></li>');
                     $(".translations-tabs-nav").append(addTabNav);
 
                     // Check if the content exists
                     if (!$("#tab-add").length) {
                         klaroGeoLog("Re-adding the Add Language tab content");
                         // Create a basic structure for the "Add Language" tab
-                        var addTabContent = $('<div id="tab-add" class="tab-content"></div>');
-                        var addTabHtml = '<h4>Add New Language Translation</h4>' +
+                        let addTabContent = $('<div id="tab-add" class="tab-content"></div>');
+                        let addTabHtml = '<h4>Add New Language Translation</h4>' +
                                         '<p>Select a language code and click "Add Language Translation" to add a new language.</p>' +
                                         '<select id="new_language_code">' +
                                         '<option value="">Select Language...</option>';
 
                         // Add options for common languages
-                        var langNames = {
+                        let langNames = {
                             'en': 'English',
                             'de': 'German',
                             'fr': 'French',
@@ -284,7 +284,7 @@
                             'ar': 'Arabic'
                         };
 
-                        for (var code in langNames) {
+                        for (let code in langNames) {
                             addTabHtml += '<option value="' + code + '">' + langNames[code] + ' (' + code + ')</option>';
                         }
 
@@ -296,10 +296,10 @@
 
                         // Add options for existing languages
                         $('.translation-tab').each(function() {
-                            var tabId = $(this).attr('id');
+                            let tabId = $(this).attr('id');
                             if (tabId && tabId !== 'tab-zz' && tabId !== 'tab-add') {
-                                var langCode = tabId.replace('tab-', '');
-                                var langName = getLanguageName(langCode);
+                                let langCode = tabId.replace('tab-', '');
+                                let langName = getLanguageName(langCode);
                                 addTabHtml += '<option value="' + langCode + '">' + langName + ' (' + langCode + ')</option>';
                             }
                         });
@@ -316,10 +316,10 @@
                 }
             }
         }
-        
+
         // Function to get language name from code
         function getLanguageName(langCode) {
-            var langNames = {
+            let langNames = {
                 'en': 'English',
                 'de': 'German',
                 'fr': 'French',
@@ -337,10 +337,10 @@
                 'zh': 'Chinese',
                 'ar': 'Arabic'
             };
-            
+
             return langNames[langCode] || 'Custom';
         }
-        
+
         // Function to add a language tab
         function addLanguageTab(langCode, langName) {
             // Check if this language already exists
@@ -352,21 +352,21 @@
             klaroGeoLog('Adding language tab:', langCode, langName);
 
             // Add new tab
-            var newTab = $('<li><a href="#tab-' + langCode + '">' + langName + ' (' + langCode + ')</a></li>');
+            let newTab = $('<li><a href="#tab-' + langCode + '">' + langName + ' (' + langCode + ')</a></li>');
             newTab.insertBefore($(".translations-tabs-nav li:last"));
 
             // Clone the fallback tab content as a starting point
-            var newContent = $("#tab-zz").clone();
+            let newContent = $("#tab-zz").clone();
             newContent.attr('id', 'tab-' + langCode);
             newContent.addClass('translation-tab'); // Make sure the class is added
 
             // Add delete button to the heading
-            var heading = newContent.find('h4:first');
+            let heading = newContent.find('h4:first');
             heading.text(langName + ' Translations (' + langCode + ')');
             heading.append(' <button type="button" class="button button-small delete-language-btn" data-lang="' + langCode + '">Delete Language</button>');
 
             // Get the purposes from the page
-            var purposes = [];
+            let purposes = [];
             $('#tab-zz h5').each(function() {
                 purposes.push($(this).text().toLowerCase());
             });
@@ -374,13 +374,13 @@
 
             // Update all input names and IDs to use the new language code
             newContent.find('input, textarea').each(function() {
-                var name = $(this).attr('name');
+                let name = $(this).attr('name');
                 if (name) {
                     name = name.replace('[zz]', '[' + langCode + ']');
                     $(this).attr('name', name);
                 }
 
-                var id = $(this).attr('id');
+                let id = $(this).attr('id');
                 if (id) {
                     id = id.replace('_zz_', '_' + langCode + '_');
                     $(this).attr('id', id);
@@ -397,7 +397,7 @@
             $("#translations-tabs").tabs("refresh");
 
             // Get the translations data for this language
-            var templatesData = null;
+            let templatesData = null;
             if (typeof klaroGeoTemplates !== 'undefined' && klaroGeoTemplates.templates) {
                 templatesData = klaroGeoTemplates.templates;
             } else if (typeof window.klaroTemplates !== 'undefined') {
@@ -407,13 +407,13 @@
                 return;
             }
 
-            var currentTemplate = $('#template_selector').val() || $('#current_template').val();
+            let currentTemplate = $('#template_selector').val() || $('#current_template').val();
             if (!currentTemplate || !templatesData[currentTemplate]) {
                 console.error('Current template not found');
                 return;
             }
 
-            var template = templatesData[currentTemplate];
+            let template = templatesData[currentTemplate];
             if (!template.config || !template.config.translations) {
                 klaroGeoWarn('No translations found in template');
                 return;
@@ -422,7 +422,7 @@
             // If we have translations for this language, use them
             if (template.config.translations[langCode]) {
                 // Fill in the form fields with the translation values
-                var translations = template.config.translations[langCode];
+                let translations = template.config.translations[langCode];
                 klaroGeoLog('Setting translation values for language:', langCode, translations);
 
                 // Process each property in the translations
@@ -440,15 +440,15 @@
         // Helper function to process translation objects and update form fields
         function processTranslationObject(obj, langCode, prefix) {
             Object.keys(obj).forEach(function(key) {
-                var value = obj[key];
-                var fieldName = prefix ? prefix + '[' + key + ']' : key;
+                let value = obj[key];
+                let fieldName = prefix ? prefix + '[' + key + ']' : key;
 
                 if (typeof value === 'object' && value !== null) {
                     // Recursively process nested objects
                     processTranslationObject(value, langCode, fieldName);
                 } else {
                     // Find and update the form field
-                    var selector = 'input[name="template_config[translations][' + langCode + ']' +
+                    let selector = 'input[name="template_config[translations][' + langCode + ']' +
                                   (prefix ? '[' + prefix + ']' : '') +
                                   '[' + key + ']"], ' +
                                   'textarea[name="template_config[translations][' + langCode + ']' +
@@ -460,35 +460,35 @@
                 }
             });
         }
-        
+
         // Function to collect form data and update JSON
         function updateJsonFromForm() {
-            var translations = {};
+            let translations = {};
 
             // Get all language tabs
             $('.translation-tab').each(function() {
-                var tabId = $(this).attr('id');
+                let tabId = $(this).attr('id');
                 if (!tabId || tabId === 'tab-add') return; // Skip the "Add Language" tab
 
-                var langCode = tabId.replace('tab-', '');
+                let langCode = tabId.replace('tab-', '');
                 translations[langCode] = {};
 
                 // Process all inputs and textareas in this tab
                 $(this).find('input, textarea').each(function() {
-                    var name = $(this).attr('name');
+                    let name = $(this).attr('name');
                     if (!name) return;
 
                     // Extract the field path from the name attribute
                     // Example: template_config[translations][zz][acceptAll] -> acceptAll
-                    var matches = name.match(/\[translations\]\[([^\]]+)\]\[([^\]]+)(?:\]\[([^\]]+))?(?:\]\[([^\]]+))?/);
+                    let matches = name.match(/\[translations\]\[([^\]]+)\]\[([^\]]+)(?:\]\[([^\]]+))?(?:\]\[([^\]]+))?/);
                     if (!matches) return;
 
-                    var lang = matches[1];
-                    var key1 = matches[2];
-                    var key2 = matches[3];
-                    var key3 = matches[4];
+                    let lang = matches[1];
+                    let key1 = matches[2];
+                    let key2 = matches[3];
+                    let key3 = matches[4];
 
-                    var value = $(this).val();
+                    let value = $(this).val();
 
                     // Build the nested structure
                     if (!translations[lang]) {
@@ -539,7 +539,7 @@
 
             // Update the JSON textarea with proper formatting options
             // Use a simpler approach - just stringify with nice formatting
-            var jsonString = JSON.stringify(translations, null, 2);
+            let jsonString = JSON.stringify(translations, null, 2);
 
             // Don't try to fix escaping issues here - it's safer to let the browser handle it
             $('#translations_json_editor').val(jsonString);
@@ -547,12 +547,12 @@
             klaroGeoLog('Updated JSON from form:', translations);
             return translations;
         }
-        
+
         // Function to parse JSON and update form fields
         function updateFormFromJson() {
             try {
-                var jsonText = $('#translations_json_editor').val();
-                var translations = JSON.parse(jsonText);
+                let jsonText = $('#translations_json_editor').val();
+                let translations = JSON.parse(jsonText);
 
                 if (typeof translations !== 'object') {
                     throw new Error('Invalid JSON: not an object');
@@ -561,16 +561,16 @@
                 // First, check if there are any tabs that need to be removed
                 // (languages that are in the tabs but not in the JSON)
                 $('.translation-tab').each(function() {
-                    var tabId = $(this).attr('id');
+                    let tabId = $(this).attr('id');
                     if (tabId && tabId !== 'tab-zz' && tabId !== 'tab-add') {
-                        var langCode = tabId.replace('tab-', '');
+                        let langCode = tabId.replace('tab-', '');
 
                         // If this language is not in the JSON, remove the tab
                         if (!translations[langCode]) {
                             klaroGeoLog('Removing tab for language not in JSON:', langCode);
 
                             // Remove the tab and its content
-                            var tabIndex = $(".translations-tabs-nav a[href='#tab-" + langCode + "']").parent().index();
+                            let tabIndex = $(".translations-tabs-nav a[href='#tab-" + langCode + "']").parent().index();
                             $("#tab-" + langCode).remove();
                             $(".translations-tabs-nav li").eq(tabIndex).remove();
                         }
@@ -584,14 +584,14 @@
 
                     // Add tab if it doesn't exist
                     if (!$("#tab-" + langCode).length) {
-                        var langName = getLanguageName(langCode);
+                        let langName = getLanguageName(langCode);
                         addLanguageTab(langCode, langName);
                     }
                 });
 
                 // Update form fields with values from JSON
                 Object.keys(translations).forEach(function(langCode) {
-                    var langData = translations[langCode];
+                    let langData = translations[langCode];
 
                     // Process each property in the language data
                     processJsonObject(langData, langCode, '');
@@ -602,7 +602,7 @@
                     klaroGeoLog("Ensuring Add Language tab is present after updating from JSON");
 
                     // Check if we need to add the "Add Language" tab
-                    var addTabExists = false;
+                    let addTabExists = false;
                     $(".translations-tabs-nav li a").each(function() {
                         if ($(this).attr('href') === '#tab-add') {
                             addTabExists = true;
@@ -613,21 +613,21 @@
                     if (!addTabExists) {
                         klaroGeoLog("Re-adding the Add Language tab navigation");
                         // Add the "Add Language" tab navigation
-                        var addTabNav = $('<li><a href="#tab-add">Add Language</a></li>');
+                        let addTabNav = $('<li><a href="#tab-add">Add Language</a></li>');
                         $(".translations-tabs-nav").append(addTabNav);
 
                         // Check if the content exists
                         if (!$("#tab-add").length) {
                             klaroGeoLog("Re-adding the Add Language tab content");
                             // Create a basic structure for the "Add Language" tab
-                            var addTabContent = $('<div id="tab-add" class="tab-content"></div>');
-                            var addTabHtml = '<h4>Add New Language Translation</h4>' +
+                            let addTabContent = $('<div id="tab-add" class="tab-content"></div>');
+                            let addTabHtml = '<h4>Add New Language Translation</h4>' +
                                             '<p>Select a language code and click "Add Language Translation" to add a new language.</p>' +
                                             '<select id="new_language_code">' +
                                             '<option value="">Select Language...</option>';
 
                             // Add options for common languages
-                            var langNames = {
+                            let langNames = {
                                 'en': 'English',
                                 'de': 'German',
                                 'fr': 'French',
@@ -646,7 +646,7 @@
                                 'ar': 'Arabic'
                             };
 
-                            for (var code in langNames) {
+                            for (let code in langNames) {
                                 addTabHtml += '<option value="' + code + '">' + langNames[code] + ' (' + code + ')</option>';
                             }
 
@@ -658,10 +658,10 @@
 
                             // Add options for existing languages
                             $('.translation-tab').each(function() {
-                                var tabId = $(this).attr('id');
+                                let tabId = $(this).attr('id');
                                 if (tabId && tabId !== 'tab-zz' && tabId !== 'tab-add') {
-                                    var langCode = tabId.replace('tab-', '');
-                                    var langName = getLanguageName(langCode);
+                                    let langCode = tabId.replace('tab-', '');
+                                    let langName = getLanguageName(langCode);
                                     addTabHtml += '<option value="' + langCode + '">' + langName + ' (' + langCode + ')</option>';
                                 }
                             });
@@ -685,45 +685,45 @@
                 return false;
             }
         }
-        
+
         // Helper function to process nested JSON objects and update form fields
         function processJsonObject(obj, langCode, prefix) {
             Object.keys(obj).forEach(function(key) {
-                var value = obj[key];
-                var fieldName = prefix ? prefix + '[' + key + ']' : key;
-                
+                let value = obj[key];
+                let fieldName = prefix ? prefix + '[' + key + ']' : key;
+
                 if (typeof value === 'object' && value !== null) {
                     // Recursively process nested objects
                     processJsonObject(value, langCode, fieldName);
                 } else {
                     // Find and update the form field
-                    var selector = 'input[name="template_config[translations][' + langCode + ']' +
+                    let selector = 'input[name="template_config[translations][' + langCode + ']' +
                                   (prefix ? '[' + prefix + ']' : '') +
                                   '[' + key + ']"], ' +
                                   'textarea[name="template_config[translations][' + langCode + ']' +
                                   (prefix ? '[' + prefix + ']' : '') +
                                   '[' + key + ']"]';
-                    
+
                     $(selector).val(value);
                 }
             });
         }
-        
+
         // Handle deleting a language - use .off() first to prevent multiple bindings
         $(document).off('click', '.delete-language-btn').on('click', '.delete-language-btn', function(e) {
             e.preventDefault();
-            var langCode = $(this).data('lang');
+            let langCode = $(this).data('lang');
 
             if (confirm('Are you sure you want to delete the ' + langCode + ' language?')) {
                 klaroGeoLog('Deleting language:', langCode);
 
                 // Make sure we're not removing the "Add Language" tab
                 // First, store a reference to the "Add Language" tab if it exists
-                var addLanguageTab = $("#tab-add");
-                var addLanguageTabNav = $(".translations-tabs-nav a[href='#tab-add']").parent();
+                let addLanguageTab = $("#tab-add");
+                let addLanguageTabNav = $(".translations-tabs-nav a[href='#tab-add']").parent();
 
                 // Remove the tab and its content
-                var tabIndex = $(".translations-tabs-nav a[href='#tab-" + langCode + "']").parent().index();
+                let tabIndex = $(".translations-tabs-nav a[href='#tab-" + langCode + "']").parent().index();
                 $("#tab-" + langCode).remove();
                 $(".translations-tabs-nav li").eq(tabIndex).remove();
 
@@ -743,8 +743,8 @@
 
                 // Delete the language from the JSON data
                 try {
-                    var jsonText = $('#translations_json_editor').val();
-                    var translations = JSON.parse(jsonText);
+                    let jsonText = $('#translations_json_editor').val();
+                    let translations = JSON.parse(jsonText);
 
                     if (translations[langCode]) {
                         klaroGeoLog('Removing language from JSON:', langCode);
@@ -765,11 +765,11 @@
                 }
             }
         });
-        
+
         // Handle "Add Language Translation" button click
         $('#add_language_translation').click(function() {
-            var langCode = $('#new_language_code').val();
-            var copyFrom = $('#copy_from_language').val();
+            let langCode = $('#new_language_code').val();
+            let copyFrom = $('#copy_from_language').val();
 
             if (!langCode) {
                 alert('Please select a language code.');
@@ -783,7 +783,7 @@
             }
 
             // Get language name
-            var langName = getLanguageName(langCode);
+            let langName = getLanguageName(langCode);
 
             // Add the new language tab
             addLanguageTab(langCode, langName);
@@ -791,9 +791,9 @@
             // Copy content from the selected language
             if (copyFrom && copyFrom !== langCode) {
                 // Get the JSON
-                var jsonText = $('#translations_json_editor').val();
+                let jsonText = $('#translations_json_editor').val();
                 try {
-                    var translations = JSON.parse(jsonText);
+                    let translations = JSON.parse(jsonText);
 
                     if (translations[copyFrom]) {
                         // Copy the translations
@@ -811,7 +811,7 @@
             }
 
             // Switch to the new tab immediately
-            var tabIndex = $(".translations-tabs-nav a[href='#tab-" + langCode + "']").parent().index();
+            let tabIndex = $(".translations-tabs-nav a[href='#tab-" + langCode + "']").parent().index();
             $("#translations-tabs").tabs("option", "active", tabIndex);
 
             // Store the current tab index in case the user submits the form
@@ -829,7 +829,7 @@
             // Auto-save the changes after switching to the new tab
             autoSaveTranslations('Language "' + langName + ' (' + langCode + ')" added successfully');
         });
-        
+
         // Handle JSON buttons
         $('#format_json').click(function() {
             try {
@@ -865,11 +865,11 @@
                 jsonText = jsonText.replace(/You"re in charge/g, 'You\'re in charge');
                 jsonText = jsonText.replace(/That"s ok/g, 'That\'s ok');
 
-                var translations = JSON.parse(jsonText);
+                let translations = JSON.parse(jsonText);
 
                 // Format with proper options
                 // Use a simpler approach - just stringify with nice formatting
-                var jsonString = JSON.stringify(translations, null, 2);
+                let jsonString = JSON.stringify(translations, null, 2);
 
                 // Don't try to fix escaping issues here - it's safer to let the browser handle it
 
@@ -882,7 +882,7 @@
                 klaroGeoLog('Problematic JSON:', jsonText);
             }
         });
-        
+
         $('#validate_json').click(function() {
             try {
                 var jsonText = $('#translations_json_editor').val();
@@ -896,7 +896,7 @@
                 alert('JSON is valid! You can save your changes now.');
             } catch (e) {
                 // Provide more helpful error message
-                var errorMsg = 'Invalid JSON: ' + e.message + '\n\n';
+                let errorMsg = 'Invalid JSON: ' + e.message + '\n\n';
                 errorMsg += 'Common issues to check:\n';
                 errorMsg += '- Missing quotes around property names\n';
                 errorMsg += '- Trailing commas at the end of lists or objects\n';
@@ -909,12 +909,12 @@
                 klaroGeoLog('Problematic JSON:', jsonText);
             }
         });
-        
+
         $('#update_form_from_json').click(function() {
-            var result = updateFormFromJson();
+            let result = updateFormFromJson();
             if (result) {
                 // Show a success message
-                var successIndicator = $('<div class="klaro-success-indicator">Form updated from JSON successfully</div>');
+                let successIndicator = $('<div class="klaro-success-indicator">Form updated from JSON successfully</div>');
                 $('body').append(successIndicator);
 
                 // Remove the success indicator after 2 seconds
@@ -927,10 +927,10 @@
         });
 
         $('#update_json_from_form').click(function() {
-            var translations = updateJsonFromForm();
+            let translations = updateJsonFromForm();
 
             // Show a success message
-            var successIndicator = $('<div class="klaro-success-indicator">JSON updated from form successfully</div>');
+            let successIndicator = $('<div class="klaro-success-indicator">JSON updated from form successfully</div>');
             $('body').append(successIndicator);
 
             // Remove the success indicator after 2 seconds
@@ -970,7 +970,7 @@
 
             // Log form data
             klaroGeoLog('Form data:');
-            var formData = {};
+            let formData = {};
             $('form').serializeArray().forEach(function(item) {
                 formData[item.name] = item.value;
             });
@@ -978,16 +978,16 @@
 
             // Log translations from form
             klaroGeoLog('Translations from form:');
-            var translations = updateJsonFromForm();
+            let translations = updateJsonFromForm();
             klaroGeoLog(translations);
 
             // Log JSON editor content
             klaroGeoLog('JSON editor content:');
-            var jsonText = $('#translations_json_editor').val();
+            let jsonText = $('#translations_json_editor').val();
             klaroGeoLog(jsonText);
 
             try {
-                var parsedJson = JSON.parse(jsonText);
+                let parsedJson = JSON.parse(jsonText);
                 klaroGeoLog('Parsed JSON:', parsedJson);
             } catch (e) {
                 console.error('Error parsing JSON:', e);
@@ -1004,7 +1004,7 @@
 
             // Log current template
             klaroGeoLog('Current template:');
-            var currentTemplate = $('#template_selector').val() || $('#current_template').val();
+            let currentTemplate = $('#template_selector').val() || $('#current_template').val();
             klaroGeoLog(currentTemplate);
 
             console.groupEnd();
@@ -1020,8 +1020,8 @@
                 // First, check if we have a JSON editor
                 if ($('#translations_json_editor').length) {
                     // Get the current JSON from the editor
-                    var jsonText = $('#translations_json_editor').val();
-                    var currentTranslations = {};
+                    let jsonText = $('#translations_json_editor').val();
+                    let currentTranslations = {};
 
                     try {
                         // Parse the current JSON
@@ -1035,7 +1035,7 @@
 
                     // Now update the JSON from the form
                     // This will ensure any deleted languages are properly removed
-                    var translations = updateJsonFromForm();
+                    let translations = updateJsonFromForm();
 
                     // Debug log the translations being submitted
                     klaroGeoLog('Translations being submitted:', translations);
@@ -1074,7 +1074,7 @@
 
                 // Store information about deleted languages in localStorage
                 // This will be used after the page reloads to ensure deleted languages stay deleted
-                var deletedLanguages = [];
+                let deletedLanguages = [];
                 $('.delete-language-btn').each(function() {
                     if ($(this).data('deleted') === true) {
                         deletedLanguages.push($(this).data('lang'));
@@ -1087,7 +1087,7 @@
 
                     // Add a parameter to the form action URL to indicate we need to reload
                     // This will help us detect if we need to force a second reload
-                    var formAction = $(this).attr('action');
+                    let formAction = $(this).attr('action');
                     if (formAction.indexOf('?') > -1) {
                         formAction += '&needs_reload=true';
                     } else {
@@ -1125,25 +1125,25 @@
             updateJsonFromForm();
 
             // Get the form data
-            var formData = new FormData($('form')[0]);
+            let formData = new FormData($('form')[0]);
 
             // Add action for WordPress AJAX
             formData.append('action', 'klaro_geo_save_translations');
 
             // Get the current template ID
-            var templateId = $('#template_id').val() || $('#current_template').val();
+            let templateId = $('#template_id').val() || $('#current_template').val();
             if (templateId) {
                 formData.append('template_id', templateId);
             }
 
             // Get the JSON data
-            var jsonText = $('#translations_json_editor').val();
+            let jsonText = $('#translations_json_editor').val();
             if (jsonText) {
                 formData.append('translations_json', jsonText);
             }
 
             // Add a nonce for security - try multiple sources
-            var nonce = $('#klaro_geo_nonce').val();
+            let nonce = $('#klaro_geo_nonce').val();
             if (!nonce && typeof klaroGeoTemplates !== 'undefined' && klaroGeoTemplates.nonce) {
                 nonce = klaroGeoTemplates.nonce;
             }
@@ -1201,7 +1201,7 @@
         // Function to auto-save translations with visual feedback
         function autoSaveTranslations(message, callback, quietMode) {
             // If in quiet mode, don't show the saving indicator
-            var savingIndicator;
+            let savingIndicator;
             if (!quietMode) {
                 // Show a saving indicator
                 savingIndicator = $('<div class="klaro-saving-indicator">Saving translations...</div>');
@@ -1218,7 +1218,7 @@
                 if (success) {
                     if (!quietMode) {
                         // Show a success message
-                        var successIndicator = $('<div class="klaro-success-indicator">' + (message || 'Translations saved successfully') + '</div>');
+                        let successIndicator = $('<div class="klaro-success-indicator">' + (message || 'Translations saved successfully') + '</div>');
                         $('body').append(successIndicator);
 
                         // Remove the success indicator after 2 seconds
@@ -1239,9 +1239,9 @@
                         }
 
                         // Show a small indicator in the admin bar
-                        var adminBar = $('#wpadminbar');
+                        let adminBar = $('#wpadminbar');
                         if (adminBar.length) {
-                            var miniIndicator = $('<div class="klaro-mini-indicator">✓</div>');
+                            let miniIndicator = $('<div class="klaro-mini-indicator">✓</div>');
                             adminBar.append(miniIndicator);
                             setTimeout(function() {
                                 miniIndicator.fadeOut(300, function() {
@@ -1252,8 +1252,8 @@
                     }
                 } else {
                     // Always show errors, even in quiet mode
-                    var errorMessage = response.data && response.data.message ? response.data.message : 'Error saving translations';
-                    var errorIndicator = $('<div class="klaro-error-indicator">Error: ' + errorMessage + '</div>');
+                    let errorMessage = response.data && response.data.message ? response.data.message : 'Error saving translations';
+                    let errorIndicator = $('<div class="klaro-error-indicator">Error: ' + errorMessage + '</div>');
                     $('body').append(errorIndicator);
 
                     // Remove the error indicator after 3 seconds
@@ -1332,13 +1332,13 @@
 (function($) {
     $(document).ready(function() {
         // Template page URL from PHP (passed via klaroGeoTemplates)
-        var templatePageUrl = (typeof klaroGeoTemplates !== 'undefined' && klaroGeoTemplates.templatePageUrl)
+        let templatePageUrl = (typeof klaroGeoTemplates !== 'undefined' && klaroGeoTemplates.templatePageUrl)
             ? klaroGeoTemplates.templatePageUrl
             : '';
 
         // Handle template selection change
         $('#template_selector').on('change', function() {
-            var selectedTemplate = $(this).val();
+            let selectedTemplate = $(this).val();
             console.log('Template selected:', selectedTemplate);
 
             // Update the hidden input
@@ -1350,7 +1350,7 @@
 
         // Handle delete template button
         $('#delete_template').on('click', function() {
-            var selectedTemplate = $('#template_selector').val();
+            let selectedTemplate = $('#template_selector').val();
 
             // Don't allow deleting the default template
             if (selectedTemplate === 'default') {
@@ -1375,7 +1375,7 @@
                             window.location.href = templatePageUrl;
                         } else {
                             // Create a more user-friendly error message
-                            var errorMessage = 'Error deleting template: ' + response.data.message;
+                            let errorMessage = 'Error deleting template: ' + response.data.message;
 
                             // Show the error in a dialog for better readability
                             $('<div></div>')
@@ -1418,7 +1418,7 @@
             // Add a small delay to ensure the DOM is ready
             setTimeout(function() {
                 // Get the current template data
-                var currentTemplate = $('#current_template').val();
+                let currentTemplate = $('#current_template').val();
                 console.log('Current template on page load:', currentTemplate);
 
                 if (typeof klaroGeoTemplates !== 'undefined' &&
@@ -1427,11 +1427,11 @@
                     klaroGeoTemplates.templates[currentTemplate].config &&
                     klaroGeoTemplates.templates[currentTemplate].config.translations) {
 
-                    var translations = klaroGeoTemplates.templates[currentTemplate].config.translations;
+                    let translations = klaroGeoTemplates.templates[currentTemplate].config.translations;
                     console.log('Found translations on page load:', translations);
 
                     // Get the purposes from the page
-                    var purposes = [];
+                    let purposes = [];
                     $('#tab-zz h5').each(function() {
                         purposes.push($(this).text().toLowerCase());
                     });
@@ -1442,7 +1442,7 @@
                         if (langCode === 'zz') return; // Skip fallback language
 
                         // Get language name
-                        var langNames = {
+                        let langNames = {
                             'en': 'English',
                             'de': 'German',
                             'fr': 'French',
@@ -1460,35 +1460,35 @@
                             'zh': 'Chinese',
                             'ar': 'Arabic'
                         };
-                        var langName = langNames[langCode] || 'Custom';
+                        let langName = langNames[langCode] || 'Custom';
 
                         // Check if tab already exists
                         if (!$('#tab-' + langCode).length) {
                             console.log('Adding tab for language on page load:', langCode);
 
                             // Add new tab
-                            var newTab = $('<li><a href="#tab-' + langCode + '">' + langName + ' (' + langCode + ')</a></li>');
+                            let newTab = $('<li><a href="#tab-' + langCode + '">' + langName + ' (' + langCode + ')</a></li>');
                             newTab.insertBefore($(".translations-tabs-nav li:last"));
 
                             // Clone the fallback tab content
-                            var newContent = $("#tab-zz").clone();
+                            let newContent = $("#tab-zz").clone();
                             newContent.attr('id', 'tab-' + langCode);
                             newContent.addClass('translation-tab'); // Make sure the class is added
 
                             // Update heading
-                            var heading = newContent.find('h4:first');
+                            let heading = newContent.find('h4:first');
                             heading.text(langName + ' Translations (' + langCode + ')');
                             heading.append(' <button type="button" class="button button-small delete-language-btn" data-lang="' + langCode + '">Delete Language</button>');
 
                             // Update input names and IDs
                             newContent.find('input, textarea').each(function() {
-                                var name = $(this).attr('name');
+                                let name = $(this).attr('name');
                                 if (name) {
                                     name = name.replace('[zz]', '[' + langCode + ']');
                                     $(this).attr('name', name);
                                 }
 
-                                var id = $(this).attr('id');
+                                let id = $(this).attr('id');
                                 if (id) {
                                     id = id.replace('_zz_', '_' + langCode + '_');
                                     $(this).attr('id', id);
@@ -1500,7 +1500,7 @@
                         }
 
                         // Fill in values from translations
-                        var langTranslations = translations[langCode];
+                        let langTranslations = translations[langCode];
                         fillTranslationValues(langCode, langTranslations);
                     });
 
@@ -1508,7 +1508,7 @@
                     $('#translations-tabs').tabs('refresh');
 
                     // Restore active tab if it was saved
-                    var savedTabIndex = localStorage.getItem('klaro_active_tab_index');
+                    let savedTabIndex = localStorage.getItem('klaro_active_tab_index');
                     if (savedTabIndex !== null) {
                         try {
                             $('#translations-tabs').tabs('option', 'active', parseInt(savedTabIndex));
@@ -1527,16 +1527,16 @@
         function fillTranslationValues(langCode, translations, prefix) {
             prefix = prefix || '';
 
-            for (var key in translations) {
+            for (let key in translations) {
                 if (translations.hasOwnProperty(key)) {
-                    var value = translations[key];
+                    let value = translations[key];
 
                     if (typeof value === 'object' && value !== null) {
                         // Recursively process nested objects
                         fillTranslationValues(langCode, value, prefix ? prefix + '[' + key + ']' : key);
                     } else {
                         // Find and update the form field
-                        var selector = 'input[name="template_config[translations][' + langCode + ']' +
+                        let selector = 'input[name="template_config[translations][' + langCode + ']' +
                                       (prefix ? '[' + prefix + ']' : '') +
                                       '[' + key + ']"], ' +
                                       'textarea[name="template_config[translations][' + langCode + ']' +
@@ -1552,11 +1552,11 @@
         // Handle delete language button
         $(document).on('click', '.delete-language-btn', function(e) {
             e.preventDefault();
-            var langCode = $(this).data('lang');
+            let langCode = $(this).data('lang');
 
             if (confirm('Are you sure you want to delete the ' + langCode + ' language? This action cannot be undone.')) {
                 // Remove the tab and its content
-                var tabIndex = $(".translations-tabs-nav a[href='#tab-" + langCode + "']").parent().index();
+                let tabIndex = $(".translations-tabs-nav a[href='#tab-" + langCode + "']").parent().index();
                 $("#tab-" + langCode).remove();
                 $(".translations-tabs-nav li").eq(tabIndex).remove();
 
@@ -1571,31 +1571,31 @@
 
         // Function to update JSON from form
         function updateJsonFromForm() {
-            var translations = {};
+            let translations = {};
 
             // Get all language tabs
             $('.translation-tab').each(function() {
-                var tabId = $(this).attr('id');
+                let tabId = $(this).attr('id');
                 if (!tabId || tabId === 'tab-add') return; // Skip the "Add Language" tab
 
-                var langCode = tabId.replace('tab-', '');
+                let langCode = tabId.replace('tab-', '');
                 translations[langCode] = {};
 
                 // Process all inputs and textareas in this tab
                 $(this).find('input, textarea').each(function() {
-                    var name = $(this).attr('name');
+                    let name = $(this).attr('name');
                     if (!name) return;
 
                     // Extract the field path from the name attribute
-                    var matches = name.match(/\[translations\]\[([^\]]+)\]\[([^\]]+)(?:\]\[([^\]]+))?(?:\]\[([^\]]+))?/);
+                    let matches = name.match(/\[translations\]\[([^\]]+)\]\[([^\]]+)(?:\]\[([^\]]+))?(?:\]\[([^\]]+))?/);
                     if (!matches) return;
 
-                    var lang = matches[1];
-                    var key1 = matches[2];
-                    var key2 = matches[3];
-                    var key3 = matches[4];
+                    let lang = matches[1];
+                    let key1 = matches[2];
+                    let key2 = matches[3];
+                    let key3 = matches[4];
 
-                    var value = $(this).val();
+                    let value = $(this).val();
 
                     // Build the nested structure
                     if (!translations[lang]) {
@@ -1637,7 +1637,7 @@
 
             // Store the current active tab index to restore it after page reload
             if ($('#translations-tabs').length) {
-                var activeTabIndex = $('#translations-tabs').tabs('option', 'active');
+                let activeTabIndex = $('#translations-tabs').tabs('option', 'active');
                 localStorage.setItem('klaro_active_tab_index', activeTabIndex);
             }
 
@@ -1647,7 +1647,7 @@
 
         // Restore active tab after page load if it was saved
         if ($('#translations-tabs').length) {
-            var savedTabIndex = localStorage.getItem('klaro_active_tab_index');
+            let savedTabIndex = localStorage.getItem('klaro_active_tab_index');
             if (savedTabIndex !== null) {
                 // Set a timeout to ensure tabs are fully initialized
                 setTimeout(function() {
@@ -1664,7 +1664,7 @@
             $('#template_config').hide();
 
             // Show the new template form
-            var newTemplateForm = $('<div id="new_template_form" class="template-creation-form">' +
+            let newTemplateForm = $('<div id="new_template_form" class="template-creation-form">' +
                 '<h3>Create New Template</h3>' +
                 '<table class="form-table">' +
                 '<tr>' +
@@ -1697,8 +1697,8 @@
 
             // Handle Create
             $('#create_template').click(function() {
-                var templateName = $('#new_template_name').val();
-                var inheritFrom = $('#inherit_from_template').val();
+                let templateName = $('#new_template_name').val();
+                let inheritFrom = $('#inherit_from_template').val();
 
                 if (!templateName) {
                     alert('Please enter a template name');
@@ -1718,7 +1718,7 @@
                     success: function(response) {
                         if (response.success) {
                             // Add new template to selector and select it
-                            var option = new Option(templateName, response.data.template_key);
+                            let option = new Option(templateName, response.data.template_key);
                             $('#template_selector').append(option);
                             $('#template_selector').val(response.data.template_key).trigger('change');
 
