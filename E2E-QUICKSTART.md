@@ -240,7 +240,7 @@ Uncomment webkit in `playwright.config.js` to test Safari.
 - **Full suite**: 2-3 minutes
 - **With Docker setup**: 3-4 minutes total
 
-Tests run in parallel across browsers by default.
+Tests run one at a time (`workers: 1` in `playwright.config.js`), first in Chromium and then in Firefox. They share one WordPress site and several of them change site-wide options, so they cannot run in parallel.
 
 ## Need Help?
 

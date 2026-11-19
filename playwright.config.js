@@ -17,8 +17,14 @@ module.exports = defineConfig({
     timeout: 5000
   },
 
-  // Run tests in files in parallel
-  fullyParallel: true,
+  // One worker, no parallelism. Every test talks to the same WordPress site, and
+  // several tests change site-wide options through WP-CLI (consent mode type,
+  // the google-tag-manager service settings). With parallel workers, or with
+  // the chromium and firefox projects running side by side, one test's page load
+  // could see another test's settings, which produced failures that moved from
+  // test to test between runs.
+  fullyParallel: false,
+  workers: 1,
 
   // Fail the build on CI if you accidentally left test.only in the source code
   forbidOnly: !!process.env.CI,
