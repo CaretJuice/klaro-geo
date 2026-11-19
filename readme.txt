@@ -4,7 +4,7 @@ Tags: consent, gdpr, ccpa, geolocation, privacy
 Requires at least: 6.6
 Tested up to: 6.9
 Requires PHP: 7.2
-Stable tag: 0.3.6
+Stable tag: 0.3.7
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -120,6 +120,13 @@ This is standard GTM behavior. Data sent to Google depends on your GTM container
 * Google privacy policy: [https://policies.google.com/privacy](https://policies.google.com/privacy)
 
 == Changelog ==
+
+= 0.3.7 =
+* Fixed: the consent notice's "That's ok" button declined every service when a template's config was missing acceptAll (including templates wiped by the 0.3.5 settings bug); missing admin defaults are now filled in
+* Fixed: the initial Klaro Consent Update was never pushed for first-time visitors, so the consent queue never flushed and single-trigger tags never fired until they chose
+* Fixed: Google Tag Manager belonged to both the Analytics and Advertising purposes, so enabling one purpose made the other look enabled and a click on it switched it off; GTM now has its own Site Infrastructure purpose (existing installs are migrated)
+* Fixed: a template's Required setting made Decline accept every service; it now applies per service to services set to "Use Global Setting", so Google Tag Manager can be required in some templates and consent-gated in others
+* Changed: the default Google Tag Manager service inherits Required from each template
 
 = 0.3.6 =
 * Fixed: saving the main settings page wiped every template's config and plugin settings (nested arrays were flattened to empty strings by the sanitize callback)
