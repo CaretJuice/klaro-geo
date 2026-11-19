@@ -160,7 +160,7 @@ function klaro_geo_sanitize_array( $array ) {
  * (required=true, purposes=["functional"]) to preserve custom configurations.
  *
  * klaro_geo_migrate_gtm_purpose() then moves analytics+advertising to the
- * single 'tag-management' purpose.
+ * single 'performance' purpose.
  */
 function klaro_geo_migrate_gtm_consent_requirement() {
 	$migrated = get_option( 'klaro_geo_gtm_consent_migrated', false );
@@ -204,7 +204,7 @@ function klaro_geo_migrate_gtm_consent_requirement() {
 }
 
 /**
- * Move the GTM service from analytics+advertising to its own 'tag-management'
+ * Move the GTM service from analytics+advertising to its own 'performance'
  * purpose, and add that purpose to a stored klaro_geo_purposes list.
  *
  * Klaro draws a purpose as checked when any of its services is on. With GTM in
@@ -222,16 +222,16 @@ function klaro_geo_migrate_gtm_purpose() {
 		return;
 	}
 
-	// A stored purpose list predates 'tag-management'; add it after 'functional'.
+	// A stored purpose list predates 'performance'; add it after 'functional'.
 	$stored_purposes = get_option( 'klaro_geo_purposes', false );
 	if ( false !== $stored_purposes ) {
 		$purposes = array_values( array_filter( array_map( 'trim', explode( ',', (string) $stored_purposes ) ), 'strlen' ) );
-		if ( ! in_array( 'tag-management', $purposes, true ) ) {
+		if ( ! in_array( 'performance', $purposes, true ) ) {
 			$functional_at = array_search( 'functional', $purposes, true );
 			$insert_at     = ( false === $functional_at ) ? 0 : $functional_at + 1;
-			array_splice( $purposes, $insert_at, 0, array( 'tag-management' ) );
+			array_splice( $purposes, $insert_at, 0, array( 'performance' ) );
 			update_option( 'klaro_geo_purposes', implode( ',', $purposes ) );
-			klaro_geo_debug_log( 'Added tag-management to klaro_geo_purposes: ' . implode( ',', $purposes ) );
+			klaro_geo_debug_log( 'Added performance to klaro_geo_purposes: ' . implode( ',', $purposes ) );
 		}
 	}
 
@@ -242,12 +242,12 @@ function klaro_geo_migrate_gtm_purpose() {
 		$current = $gtm['purposes'];
 		sort( $current );
 		if ( array( 'advertising', 'analytics' ) === $current ) {
-			$gtm['purposes'] = array( 'tag-management' );
+			$gtm['purposes'] = array( 'performance' );
 			$service_settings->set_service( 'google-tag-manager', $gtm );
 			$service_settings->save();
 			Klaro_Geo_Service_Settings::clear_instance_cache();
-			klaro_geo_debug_log( 'Migrated GTM service purposes from analytics+advertising to tag-management' );
-		} elseif ( array( 'tag-management' ) !== $current ) {
+			klaro_geo_debug_log( 'Migrated GTM service purposes from analytics+advertising to performance' );
+		} elseif ( array( 'performance' ) !== $current ) {
 			klaro_geo_debug_log( 'GTM service purposes are customized (' . implode( ',', $gtm['purposes'] ) . '), skipping purpose migration' );
 		}
 	}
@@ -1069,7 +1069,7 @@ register_activation_hook( __FILE__, 'klaro_geo_gpc_activation' );
 // Run GTM consent requirement migration on init (early priority to run before validation)
 add_action( 'init', 'klaro_geo_migrate_gtm_consent_requirement', 5 );
 
-// Move GTM to its own tag-management purpose (same priority, registered after, so it runs second)
+// Move GTM to its own performance purpose (same priority, registered after, so it runs second)
 add_action( 'init', 'klaro_geo_migrate_gtm_purpose', 5 );
 
 // Initialize consent mode services on init (after migration, before validation)

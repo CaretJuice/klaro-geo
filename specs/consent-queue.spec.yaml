@@ -46,11 +46,11 @@ gtm_consent:
   service_configuration:
     required: false
     default: false
-    purposes: ["tag-management"]
+    purposes: ["performance"]
 
   behavior: |
     - GTM only loads when the visitor consents to the google-tag-manager service:
-      by enabling the Tag Management purpose or the service itself, or via Accept all
+      by enabling the Performance purpose or the service itself, or via Accept all
     - Consent to analytics or advertising services does NOT imply consent to GTM
       (product decision); in Basic mode those services' tags cannot run until GTM is consented
     - In Basic mode, 'Klaro Consent Update' is skipped for initialConsents when GTM not consented
@@ -72,8 +72,8 @@ gtm_consent:
       flag: "klaro_geo_gtm_consent_migrated option"
     - description: |
         GTM with purposes exactly analytics+advertising (any order) moves to
-        ["tag-management"]; other custom purposes are preserved. A stored
-        klaro_geo_purposes list gains 'tag-management' after 'functional'.
+        ["performance"]; other custom purposes are preserved. A stored
+        klaro_geo_purposes list gains 'performance' after 'functional'.
       trigger: "klaro_geo_migrate_gtm_purpose on init hook (priority 5, runs after the above)"
       flag: "klaro_geo_gtm_purpose_migrated option"
 

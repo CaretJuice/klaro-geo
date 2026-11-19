@@ -2,7 +2,7 @@
 /**
  * Class GtmPurposeTest
  *
- * Google Tag Manager lives in its own 'tag-management' purpose.
+ * Google Tag Manager lives in its own 'performance' purpose.
  *
  * Klaro draws a purpose as checked when any of its services is on. With GTM in
  * both 'analytics' and 'advertising', enabling one purpose made the other look
@@ -51,7 +51,7 @@ class GtmPurposeTest extends WP_UnitTestCase {
 		return $gtm['purposes'];
 	}
 
-	public function test_default_gtm_service_has_only_the_tag_management_purpose() {
+	public function test_default_gtm_service_has_only_the_performance_purpose() {
 		$defaults = klaro_geo_get_default_services();
 		$gtm      = null;
 		foreach ( $defaults as $service ) {
@@ -61,7 +61,7 @@ class GtmPurposeTest extends WP_UnitTestCase {
 		}
 
 		$this->assertNotNull( $gtm );
-		$this->assertSame( array( 'tag-management' ), $gtm['purposes'] );
+		$this->assertSame( array( 'performance' ), $gtm['purposes'] );
 		$this->assertFalse( $gtm['required'], 'GTM must stay consent-gated' );
 	}
 
@@ -75,8 +75,8 @@ class GtmPurposeTest extends WP_UnitTestCase {
 		}
 	}
 
-	public function test_default_purposes_include_tag_management_with_translations() {
-		$this->assertContains( 'tag-management', klaro_geo_get_purposes() );
+	public function test_default_purposes_include_performance_with_translations() {
+		$this->assertContains( 'performance', klaro_geo_get_purposes() );
 
 		$translations = klaro_geo_get_default_purpose_translations();
 		foreach ( klaro_geo_get_default_purposes() as $purpose ) {
@@ -90,7 +90,7 @@ class GtmPurposeTest extends WP_UnitTestCase {
 
 		klaro_geo_migrate_gtm_purpose();
 
-		$this->assertSame( array( 'tag-management' ), $this->stored_gtm_purposes() );
+		$this->assertSame( array( 'performance' ), $this->stored_gtm_purposes() );
 		$this->assertTrue( (bool) get_option( 'klaro_geo_gtm_purpose_migrated' ) );
 	}
 
@@ -102,12 +102,12 @@ class GtmPurposeTest extends WP_UnitTestCase {
 		$this->assertSame( array( 'analytics' ), $this->stored_gtm_purposes() );
 	}
 
-	public function test_migration_adds_tag_management_to_a_stored_purpose_list() {
+	public function test_migration_adds_performance_to_a_stored_purpose_list() {
 		update_option( 'klaro_geo_purposes', 'functional,analytics,advertising,personalization' );
 
 		klaro_geo_migrate_gtm_purpose();
 
-		$this->assertSame( 'functional,tag-management,analytics,advertising,personalization', get_option( 'klaro_geo_purposes' ) );
+		$this->assertSame( 'functional,performance,analytics,advertising,personalization', get_option( 'klaro_geo_purposes' ) );
 	}
 
 	public function test_migration_runs_once() {
@@ -120,7 +120,7 @@ class GtmPurposeTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A template saved before 'tag-management' existed has no translation for
+	 * A template saved before 'performance' existed has no translation for
 	 * it; Klaro must still get a title and description.
 	 */
 	public function test_config_fills_missing_purpose_translation_and_keeps_custom_ones() {
@@ -147,7 +147,7 @@ class GtmPurposeTest extends WP_UnitTestCase {
 		$klaro    = klaro_geo_build_template_payload( 'default', $templates, $services )['config'];
 		$purposes = $klaro['translations']['zz']['purposes'];
 
-		$this->assertSame( 'Tag Management', $purposes['tag-management']['title'] );
+		$this->assertSame( 'Performance', $purposes['performance']['title'] );
 		$this->assertSame( 'My Analytics', $purposes['analytics']['title'], 'A template translation must not be overwritten' );
 		$this->assertSame( klaro_geo_get_purposes(), $klaro['purposeOrder'] );
 	}

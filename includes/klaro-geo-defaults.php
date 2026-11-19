@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Default purpose keys, in display order.
  *
- * 'tag-management' holds the Google Tag Manager container. GTM used to sit in
+ * 'performance' holds the Google Tag Manager container. GTM used to sit in
  * both 'analytics' and 'advertising', but Klaro draws a purpose as checked
  * whenever any of its services is on, so a service shared by two purposes
  * made enabling one purpose show the other as on. A visitor's click on that
@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @return string[]
  */
 function klaro_geo_get_default_purposes() {
-	return array( 'functional', 'tag-management', 'analytics', 'advertising' );
+	return array( 'functional', 'performance', 'analytics', 'advertising' );
 }
 
 /**
@@ -56,19 +56,19 @@ function klaro_geo_get_purposes() {
  */
 function klaro_geo_get_default_purpose_translations() {
 	return array(
-		'functional'     => array(
+		'functional'  => array(
 			'title'       => 'Functional',
 			'description' => 'These services are essential for the correct functioning of this website. You cannot disable them as the website would not work properly.',
 		),
-		'tag-management' => array(
-			'title'       => 'Tag Management',
-			'description' => 'These services load the other tools on this website. They do not track you themselves, but nothing they manage can run without them.',
+		'performance' => array(
+			'title'       => 'Performance',
+			'description' => 'These services load and run the other tools on this website, such as a tag manager. They do not track you themselves, but the analytics and advertising tools they load cannot run without them.',
 		),
-		'analytics'      => array(
+		'analytics'   => array(
 			'title'       => 'Analytics',
 			'description' => 'These services allow us to analyze website usage to evaluate and improve its performance.',
 		),
-		'advertising'    => array(
+		'advertising' => array(
 			'title'       => 'Advertising',
 			'description' => 'These services process personal information to show you personalized advertisements.',
 		),
@@ -332,7 +332,7 @@ function klaro_geo_get_default_services( $defaults = null ) {
 			'name'         => 'google-tag-manager',
 			'title'        => 'Google Tag Manager',
 			'required'     => false,
-			'purposes'     => [ 'tag-management' ],
+			'purposes'     => [ 'performance' ],
 			'default'      => false,
 			'cookies'      => [],
 			// KLARO_CALLBACKS_START
