@@ -1379,7 +1379,7 @@
 
                             // Show the error in a dialog for better readability
                             $('<div></div>')
-                                .html(errorMessage)
+                                .text(errorMessage)
                                 .dialog({
                                     title: 'Template Deletion Error',
                                     modal: true,
@@ -1394,7 +1394,7 @@
                     },
                     error: function(xhr, status, error) {
                         $('<div></div>')
-                            .html('An error occurred while deleting the template: ' + error)
+                            .text('An error occurred while deleting the template: ' + error)
                             .dialog({
                                 title: 'Template Deletion Error',
                                 modal: true,

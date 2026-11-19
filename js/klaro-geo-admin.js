@@ -158,6 +158,13 @@ jQuery(document).ready(function($) {
                     let regions = response.data.regions || {};
                     klaroGeoLog('Regions:', regions);
 
+                    // Escape every value interpolated into the markup below
+                    const esc = function(value) {
+                        return String(value).replace(/[&<>"']/g, function(c) {
+                            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+                        });
+                    };
+
                     let html = '<table class="wp-list-table widefat fixed striped">';
                     html += '<thead><tr><th>Region Code</th><th>Name</th><th>Template</th></tr></thead><tbody>';
 
@@ -170,9 +177,9 @@ jQuery(document).ready(function($) {
                             let templateValue = response.data.settings && response.data.settings[code] ? response.data.settings[code] : 'inherit';
 
                             html += '<tr>';
-                            html += '<td class="region-code">' + fullCode + '</td>';
-                            html += '<td>' + name + '</td>';
-                            html += '<td><select name="klaro_geo_region_settings[' + countryCode + '][' + code + '][template]" data-country="' + countryCode + '" data-region="' + code + '">';
+                            html += '<td class="region-code">' + esc(fullCode) + '</td>';
+                            html += '<td>' + esc(name) + '</td>';
+                            html += '<td><select name="klaro_geo_region_settings[' + esc(countryCode) + '][' + esc(code) + '][template]" data-country="' + esc(countryCode) + '" data-region="' + esc(code) + '">';
                             html += '<option value="inherit">Use country template</option>';
                             // Use klaroGeoAdmin.templates if available, otherwise try window.klaroTemplates
                             let templates = klaroGeoAdmin.templates || window.klaroTemplates || {};
@@ -182,7 +189,7 @@ jQuery(document).ready(function($) {
                                 let template = templates[key];
                                 let templateName = template.name || key;
                                 let selected = templateValue === key ? ' selected' : '';
-                                html += '<option value="' + key + '"' + selected + '>' + templateName + '</option>';
+                                html += '<option value="' + esc(key) + '"' + selected + '>' + esc(templateName) + '</option>';
                             });
                             html += '</select></td>';
                             html += '</tr>';
@@ -195,7 +202,7 @@ jQuery(document).ready(function($) {
                     console.error('Failed to load regions:', response);
 
                     // Show error message in the region list
-                    regionList.html('<div class="error">Failed to load regions: ' + (response.data ? response.data.message : 'Unknown error') + '</div>');
+                    regionList.empty().append($('<div class="error"></div>').text('Failed to load regions: ' + (response.data ? response.data.message : 'Unknown error')));
                 }
             },
             error: function(xhr, status, error) {
@@ -204,7 +211,7 @@ jQuery(document).ready(function($) {
 
                 // Show error message in the region list
                 let regionList = modal.find('.region-list');
-                regionList.html('<div class="error">Error loading regions: ' + status + ' - ' + error + '<br>Please check the browser console for more details.</div>');
+                regionList.empty().append($('<div class="error"></div>').text('Error loading regions: ' + status + ' - ' + error + '. Please check the browser console for more details.'));
             }
         });
     }
@@ -315,7 +322,7 @@ jQuery(document).ready(function($) {
                 console.error('Response:', xhr.responseText);
                 let form = modal.find('.region-form');
                 form.find('.saving').removeClass('saving').addClass('error')
-                    .html('Error saving region settings: ' + status + ' - ' + error + '<br>Please check the browser console for more details.');
+                    .text('Error saving region settings: ' + status + ' - ' + error + '. Please check the browser console for more details.');
             }
         });
     }

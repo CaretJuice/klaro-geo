@@ -417,7 +417,12 @@ function klaro_geo_register_main_settings() {
 		'klaro_geo_settings_group',
 		'klaro_geo_js_version',
 		[
-			'sanitize_callback' => 'sanitize_text_field',
+			// The version becomes part of the script URL, so only a version
+			// number is accepted (for example 0.7 or 0.7.22).
+			'sanitize_callback' => function ( $input ) {
+				$input = is_string( $input ) ? trim( $input ) : '';
+				return preg_match( '/^\d+(\.\d+){1,3}$/', $input ) ? $input : '0.7';
+			},
 		]
 	);
 	register_setting(

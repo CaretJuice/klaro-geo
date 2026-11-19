@@ -146,6 +146,26 @@ function klaro_geo_deactivate() {
 	}
 }
 
+/**
+ * Authorize an admin AJAX request, or end it with a 403.
+ *
+ * A valid nonce only proves the request came from a page WordPress served to
+ * this user; it says nothing about what the user may do. Every admin AJAX
+ * handler therefore needs both checks, and calls this first.
+ *
+ * @param string $nonce_action The nonce action.
+ * @param string $nonce_field  The request field holding the nonce.
+ */
+function klaro_geo_verify_admin_ajax( $nonce_action, $nonce_field = 'nonce' ) {
+	if ( ! check_ajax_referer( $nonce_action, $nonce_field, false ) ) {
+		wp_send_json_error( array( 'message' => 'Security check failed. Please refresh the page and try again.' ), 403 );
+	}
+
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_send_json_error( array( 'message' => 'You do not have permission to perform this action.' ), 403 );
+	}
+}
+
 // Helper function to get default geo settings
 function klaro_geo_get_default_geo_settings() {
 	// Get templates

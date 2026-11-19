@@ -500,6 +500,62 @@ function klaro_geo_get_coarse_user_agent() {
 }
 
 /**
+ * Largest receipt request body accepted, in bytes. A receipt with a full
+ * klaro_config snapshot is far smaller; anything bigger is not a receipt.
+ */
+define( 'KLARO_GEO_RECEIPT_MAX_BYTES', 200000 );
+
+/**
+ * Count this request against the receipt rate limit and say whether the limit
+ * is exceeded.
+ *
+ * The endpoint is public, so without a limit a script could fill the receipts
+ * table. Requests are counted per anonymized IP (the same /24 or /48 the
+ * receipt records) in a transient. A visitor saves consent a handful of times
+ * at most; the default of 30 per 5 minutes leaves room for many visitors
+ * behind one address.
+ *
+ * @return bool True when this request is over the limit and must be refused.
+ */
+function klaro_geo_receipt_rate_limit_exceeded() {
+	/**
+	 * Filters how many receipts one anonymized IP may submit per window.
+	 * Return 0 to disable the limit.
+	 *
+	 * @param int $limit Receipts per window. Default 30.
+	 */
+	$limit = (int) apply_filters( 'klaro_geo_receipt_rate_limit', 30 );
+	if ( $limit <= 0 ) {
+		return false;
+	}
+
+	/**
+	 * Filters the length of the rate limit window, in seconds.
+	 *
+	 * @param int $window Default 300 (5 minutes).
+	 */
+	$window = max( 1, (int) apply_filters( 'klaro_geo_receipt_rate_limit_window', 5 * MINUTE_IN_SECONDS ) );
+
+	$key   = 'klaro_geo_rl_' . md5( klaro_geo_get_anonymized_ip() );
+	$count = (int) get_transient( $key );
+
+	if ( $count >= $limit ) {
+		return true;
+	}
+
+	// The window starts at the first request and is not extended by later ones.
+	if ( 0 === $count ) {
+		set_transient( $key, 1, $window );
+	} else {
+		$timeout = (int) get_option( '_transient_timeout_' . $key );
+		$left    = $timeout > time() ? $timeout - time() : $window;
+		set_transient( $key, $count + 1, $left );
+	}
+
+	return false;
+}
+
+/**
  * AJAX handler to store a consent receipt. Public (logged-out visitors submit
  * receipts), so it only authenticates the request and decodes it; validation
  * and storage are in klaro_geo_store_consent_receipt().
@@ -512,6 +568,14 @@ function klaro_geo_ajax_store_consent_receipt() {
 
 	if ( ! isset( $_POST['receipt_data'] ) || ! is_string( $_POST['receipt_data'] ) ) {
 		wp_send_json_error( 'No receipt data provided' );
+	}
+
+	if ( strlen( $_POST['receipt_data'] ) > KLARO_GEO_RECEIPT_MAX_BYTES ) { // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- length check only.
+		wp_send_json_error( 'Receipt data too large', 413 );
+	}
+
+	if ( klaro_geo_receipt_rate_limit_exceeded() ) {
+		wp_send_json_error( 'Too many requests', 429 );
 	}
 
 	// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- JSON string; every field is validated in klaro_geo_sanitize_receipt().

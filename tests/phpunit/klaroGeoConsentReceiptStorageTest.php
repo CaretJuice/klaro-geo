@@ -311,4 +311,38 @@ class KlaroGeoConsentReceiptStorageTest extends WP_UnitTestCase {
 
 		$this->assertNull( $this->stored( $receipt['receipt_id'] )->klaro_config );
 	}
+
+	public function test_rate_limit_refuses_requests_over_the_limit() {
+		$_SERVER['REMOTE_ADDR'] = '198.51.100.23';
+		$limit                  = function () {
+			return 3;
+		};
+		add_filter( 'klaro_geo_receipt_rate_limit', $limit );
+
+		$this->assertFalse( klaro_geo_receipt_rate_limit_exceeded() );
+		$this->assertFalse( klaro_geo_receipt_rate_limit_exceeded() );
+		$this->assertFalse( klaro_geo_receipt_rate_limit_exceeded() );
+		$this->assertTrue( klaro_geo_receipt_rate_limit_exceeded(), 'The fourth request in the window is refused' );
+
+		// Another network is counted separately
+		$_SERVER['REMOTE_ADDR'] = '203.0.113.9';
+		$this->assertFalse( klaro_geo_receipt_rate_limit_exceeded() );
+
+		// The same /24 shares one counter (IPs are anonymized before counting)
+		$_SERVER['REMOTE_ADDR'] = '198.51.100.200';
+		$this->assertTrue( klaro_geo_receipt_rate_limit_exceeded() );
+
+		remove_filter( 'klaro_geo_receipt_rate_limit', $limit );
+	}
+
+	public function test_rate_limit_can_be_disabled() {
+		$_SERVER['REMOTE_ADDR'] = '198.51.100.24';
+		add_filter( 'klaro_geo_receipt_rate_limit', '__return_zero' );
+
+		for ( $i = 0; $i < 50; $i++ ) {
+			$this->assertFalse( klaro_geo_receipt_rate_limit_exceeded() );
+		}
+
+		remove_filter( 'klaro_geo_receipt_rate_limit', '__return_zero' );
+	}
 }

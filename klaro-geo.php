@@ -474,8 +474,6 @@ function klaro_geo_enqueue_scripts() {
 		'floatingButtonText'     => $button_text,
 		'floatingButtonTheme'    => $button_theme,
 		'floatingButtonPosition' => $button_position,
-		'ajaxUrl'                => admin_url( 'admin-ajax.php' ),
-		'nonce'                  => wp_create_nonce( 'klaro_geo_nonce' ),
 		'debug'                  => defined( 'WP_DEBUG' ) && WP_DEBUG, // Kept for backward compatibility
 		'debugEnabled'           => (bool) $debug_enabled, // New debug logging control
 		'version'                => KLARO_GEO_VERSION,

@@ -1393,7 +1393,7 @@ function klaro_geo_create_templates() {
 
 // AJAX handler for template creation
 function klaro_geo_create_template() {
-	check_ajax_referer( 'klaro_geo_template_nonce', 'nonce' );
+	klaro_geo_verify_admin_ajax( 'klaro_geo_template_nonce', 'nonce' );
 
 	if ( ! isset( $_POST['template_name'] ) || ! isset( $_POST['inherit_from'] ) ) {
 		wp_send_json_error( array( 'message' => 'Missing required fields.' ) );
