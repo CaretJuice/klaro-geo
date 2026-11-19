@@ -71,6 +71,30 @@ klaro-geo/
 └── contract-driven-templates/ # CDD framework
 ```
 
+## Local Environments (Docker)
+
+All WordPress environments for this plugin live in this repo; there are no shared containers elsewhere on the machine. Use Docker Compose v2 (`docker compose`, not `docker-compose`). In every stack the repo is bind-mounted at `/var/www/html/wp-content/plugins/klaro-geo`, so code edits are live without a restart.
+
+| Stack | Compose file | Run from | URL / container | Use for |
+|-------|--------------|----------|-----------------|---------|
+| PHPUnit runner | `docker/docker-compose.yml`, service `wordpress_test` (+ `db_test`) | `docker/` | one-off container | PHP test suite |
+| E2E site | `docker-compose.e2e.yml` | repo root | http://localhost:8080, container `klaro-geo-wordpress-e2e` | Playwright tests, reproducing frontend bugs in a real browser |
+| Dev site | `docker/docker-compose.yml`, service `wordpress` (+ `db`) | `docker/` | http://localhost:8000 | Manual testing; avoid (see warning) |
+
+**Tests:**
+- PHP: `cd docker && docker compose run --rm wordpress_test vendor/bin/phpunit` (add `--filter ClassName` for one test class). Debug output lands in `docker/logs/debug_test.log`.
+- JS: `npx jest` from the repo root, on the host (no container needed).
+- E2E: `npm run e2e:setup` (starts the E2E stack and waits), `npm run e2e:test`, then `npm run e2e:docker:down`.
+
+**E2E site** (preferred for anything that needs a running WordPress):
+- Start with `docker compose -f docker-compose.e2e.yml up -d`; ready when `docker logs klaro-geo-wordpress-e2e` prints `E2E Environment Ready!`.
+- The entrypoint installs WordPress unattended, activates klaro-geo and geoip-detect, and sets GTM ID `GTM-M2Z9TF4J`. Admin login: `admin` / `password`.
+- WP-CLI: `docker exec klaro-geo-wordpress-e2e wp --allow-root --path=/var/www/html <command>`, e.g. `option get klaro_geo_services` or `eval 'echo json_encode(get_option("klaro_geo_templates"));'`.
+- Playwright and its browsers are already installed (`node_modules/playwright`, `~/.cache/ms-playwright`). Ad-hoc scripts can `require()` the absolute path to `node_modules/playwright`.
+- Plugin JS debug logging is off by default; in a Playwright context, `addInitScript(() => { window.klaroGeo = { debugEnabled: true }; })` turns it on.
+
+**Warning, dev site:** `docker/docker-entrypoint-wordpress.sh` runs `chown -R www-data` and `chmod -R a+w` on the bind-mounted plugin directory, which changes ownership and permissions of the host checkout. Use the E2E site instead unless the user asks for the dev site. (The test runner's entrypoint was fixed for this in 591ebfc.)
+
 ## Before Any Code Change
 
 1. Read the corresponding `.spec.yaml`
