@@ -23,7 +23,7 @@ file_meta:
     - "includes/admin/klaro-geo-admin-settings.php"      # settings registration + UI
     - "includes/admin/klaro-geo-admin-geoip-warning.php" # AJAX endpoint detection + admin notice
     - "js/klaro-geo-client-geo.js"                       # client-side resolver
-    - "js/klaro-geo-consent-receipts.js"                 # consumes detectedCountry/Region via klaroConsentData
+    - "js/klaro-geo.js"                                  # consumes detectedCountry/Region via klaroConsentData for receipts
   external_dependencies:
     geoip_detect:
       plugin: "geoip-detect (Geolocation IP Detection, yellowtree)"

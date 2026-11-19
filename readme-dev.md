@@ -175,7 +175,7 @@ The JavaScript tests use Jest and are located in the `/tests/js/` directory.
 ./run-tests.sh js
 
 # Run a specific JavaScript test file
-./run-tests.sh js test-consent-receipts.js
+./run-tests.sh js test-klaro-geo.js
 ```
 
 ##### Method 2: Manually Using npm

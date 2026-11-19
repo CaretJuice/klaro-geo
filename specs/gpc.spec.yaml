@@ -9,7 +9,6 @@ file_meta:
   dependencies:
     - "klaro-geo-config.php"
     - "klaro-geo.js"
-    - "klaro-geo-consent-receipts.js"
     - "klaro-geo-admin-settings.php"
     - "klaro-geo-admin-templates.php"
     - "klaro-geo-admin-services.php"

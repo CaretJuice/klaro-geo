@@ -1,33 +1,14 @@
 (function() {
   klaroGeoLog('DEBUG: klaro-geo.js loaded (early capture attempt)');
 
-  /**
-   * Generate a consent key from a service name.
-   * For consent mode services (is_consent_mode_service=true), returns the consent_mode_key
-   * directly (e.g., "analytics_storage"). For regular services, appends "_consent"
-   * (e.g., "google_analytics_consent").
-   * @param {string} serviceName - The service name (e.g., "google-analytics")
-   * @returns {string} - The consent key
-   */
-  function getServiceConsentKey(serviceName) {
-      // Check if this is a consent mode service with a dedicated key
-      if (typeof window.klaroConfig !== 'undefined' && window.klaroConfig.services) {
-          for (let i = 0; i < window.klaroConfig.services.length; i++) {
-              let service = window.klaroConfig.services[i];
-              if (service.name === serviceName && service.is_consent_mode_service && service.consent_mode_key) {
-                  return service.consent_mode_key;
-              }
-          }
-      }
-      return serviceName.replace(/-/g, '_') + '_consent';
-  }
+  // Event creation and consent-mode mapping live in klaro-geo-events.js, which
+  // is enqueued as a dependency of this script.
+  const KlaroGeoEvents = window.KlaroGeoEvents;
 
   // Global variables for consent mode
   window.lastConsentUpdate = null;
   window.consentUpdateTimer = null;
   window.consentUpdateDelay = 50; // Default delay
-  window.currentKlaroOpts = null;
-  window.lastWatcherConsentTimestamp = null;
 
   // Make sure window.dataLayer exists
   if (typeof window.dataLayer === 'undefined') {
@@ -142,20 +123,9 @@
       }
 
       // Push queueFlushed event for timing visibility
-      let queueFlushedEvent;
-      if (typeof window.KlaroGeoEvents !== 'undefined') {
-          queueFlushedEvent = window.KlaroGeoEvents.createKlaroGeoEvent('queueFlushed', {
-              'queueSize': queueSize
-          });
-      } else {
-          queueFlushedEvent = {
-              'event': 'Klaro Event',
-              'eventSource': 'klaro-geo',
-              'klaroEventName': 'queueFlushed',
-              'queueSize': queueSize
-          };
-      }
-      window.dataLayer.push(queueFlushedEvent);
+      window.dataLayer.push(KlaroGeoEvents.createKlaroGeoEvent('queueFlushed', {
+          'queueSize': queueSize
+      }));
 
       klaroGeoLog('DEBUG: Consent Queue - flush complete');
   }
@@ -285,27 +255,12 @@
               console.error('Error from server when sending receipt:', error);
           });
 
-      // Push to dataLayer using event factory if available
-      let receiptEvent;
-      if (typeof window.KlaroGeoEvents !== 'undefined') {
-          receiptEvent = window.KlaroGeoEvents.createKlaroGeoEvent('generateConsentReceipt', {
-              'klaroGeoConsentReceipt': consentReceipt.receipt_id,
-              'klaroGeoTemplateSource': consentReceipt.template_source,
-              'klaroGeoAdminOverride': consentReceipt.admin_override,
-              'klaroGeoEnableConsentLogging': enableConsentLogging
-          });
-      } else {
-          receiptEvent = {
-              'event': 'Klaro Event',
-              'eventSource': 'klaro-geo',
-              'klaroEventName': 'generateConsentReceipt',
-              'klaroGeoConsentReceipt': consentReceipt.receipt_id,
-              'klaroGeoTemplateSource': consentReceipt.template_source,
-              'klaroGeoAdminOverride': consentReceipt.admin_override,
-              'klaroGeoEnableConsentLogging': enableConsentLogging
-          };
-      }
-      window.dataLayer.push(receiptEvent);
+      window.dataLayer.push(KlaroGeoEvents.createKlaroGeoEvent('generateConsentReceipt', {
+          'klaroGeoConsentReceipt': consentReceipt.receipt_id,
+          'klaroGeoTemplateSource': consentReceipt.template_source,
+          'klaroGeoAdminOverride': consentReceipt.admin_override,
+          'klaroGeoEnableConsentLogging': enableConsentLogging
+      }));
   }
 
   /**
@@ -492,25 +447,7 @@
                           return;
                       }
 
-                      // Use KlaroGeoEvents factory if available, otherwise fallback to inline
-                      let pushData;
-                      if (typeof window.KlaroGeoEvents !== 'undefined') {
-                          pushData = window.KlaroGeoEvents.createKlaroForwardedEvent(name, data);
-                      } else {
-                          // Fallback for when events module hasn't loaded yet
-                          pushData = {
-                              'event': 'Klaro Event',
-                              'eventSource': 'klaro',
-                              'klaroEventName': name,
-                              'klaroEventData': data
-                          };
-                          // Add acceptedServices for saveConsents events
-                          if (name === 'saveConsents') {
-                              const acceptedServices = Object.keys(manager.consents)
-                                  .filter(serviceName => manager.consents[serviceName] === true);
-                              pushData.acceptedServices = acceptedServices;
-                          }
-                      }
+                      const pushData = KlaroGeoEvents.createKlaroForwardedEvent(name, data);
 
                       klaroGeoLog('DEBUG: Pushing Klaro event to dataLayer:', pushData);
                       window.dataLayer.push(pushData);
@@ -548,31 +485,11 @@
                   klaroGeoLog('DEBUG: Error getting fresh manager in pushConsentData');
               }
 
-              // Create acceptedServices array from fresh consent state
-              const acceptedServices = Object.keys(activeManager.consents || {})
-                  .filter(serviceName => activeManager.consents[serviceName] === true);
-
               // Deep copy consents to capture current state (not a reference that changes later)
               const consentsCopy = JSON.parse(JSON.stringify(activeManager.consents || {}));
 
-              // Use KlaroGeoEvents factory if available - this ensures correct eventSource ('klaro')
-              // initialConsents represents Klaro manager state, so it should use 'klaro' eventSource
-              let initialData;
-              if (typeof window.KlaroGeoEvents !== 'undefined') {
-                  initialData = window.KlaroGeoEvents.createKlaroForwardedEvent(
-                      'initialConsents',
-                      consentsCopy
-                  );
-              } else {
-                  // Fallback - note: eventSource is now 'klaro' (not 'klaro-geo')
-                  initialData = {
-                      'event': 'Klaro Event',
-                      'eventSource': 'klaro',
-                      'klaroEventName': 'initialConsents',
-                      'klaroEventData': consentsCopy,
-                      'acceptedServices': acceptedServices
-                  };
-              }
+              // initialConsents represents Klaro manager state, so it uses the 'klaro' eventSource
+              const initialData = KlaroGeoEvents.createKlaroForwardedEvent('initialConsents', consentsCopy);
 
               klaroGeoLog('DEBUG: Pushing initial Klaro event to dataLayer:', initialData);
               window.dataLayer.push(initialData);
@@ -609,57 +526,6 @@
       }
   }
 
-  /**
-   * Get consent mode service map.
-   * Maps consent_mode_key (e.g., 'ad_storage') to service name (e.g., 'ad-storage').
-   * Prefers klaroConsentData, falls back to deriving from klaroConfig.services.
-   * @returns {Object} Map of consent_mode_key to service_name
-   */
-  function getConsentModeServiceMap() {
-      if (typeof window.klaroConsentData !== 'undefined' &&
-          window.klaroConsentData.consentModeServices) {
-          return window.klaroConsentData.consentModeServices;
-      }
-      // Fallback: derive from klaroConfig.services
-      let map = {};
-      if (typeof window.klaroConfig !== 'undefined' && window.klaroConfig.services) {
-          window.klaroConfig.services.forEach(function(service) {
-              if (service.is_consent_mode_service && service.consent_mode_key) {
-                  map[service.consent_mode_key] = service.name;
-              }
-          });
-      }
-      return map;
-  }
-
-  /**
-   * Get parent-child service map.
-   * Maps parent service name to array of child service names.
-   * Prefers klaroConsentData, falls back to deriving from klaroConfig.services.
-   * @returns {Object} Map of parent service name to array of child service names
-   */
-  function getParentChildMap() {
-      if (typeof window.klaroConsentData !== 'undefined' &&
-          window.klaroConsentData.parentChildMap) {
-          return window.klaroConsentData.parentChildMap;
-      }
-      // Fallback: derive from klaroConfig.services
-      let map = {};
-      if (typeof window.klaroConfig !== 'undefined' && window.klaroConfig.services) {
-          window.klaroConfig.services.forEach(function(service) {
-              if (service.parent_service) {
-                  if (!map[service.parent_service]) {
-                      map[service.parent_service] = [];
-                  }
-                  map[service.parent_service].push(service.name);
-              }
-          });
-      }
-      return map;
-  }
-
-  // Function to handle consent updates and trigger dataLayer events
-  // NOTE: Consent mode is ALWAYS enabled - consent mode services are now first-class Klaro services
   function updateGoogleConsentMode(manager, eventType, data) {
       klaroGeoLog('DEBUG: Google consent mode update triggered by:', eventType,
           'with data:', data ? (typeof data === 'object' ? 'consent object' : data) : 'no data');
@@ -706,55 +572,11 @@
               klaroGeoLog('DEBUG: Error getting fresh manager, using provided manager');
           }
 
-          // Get consent mode service map
-          const consentModeServiceMap = getConsentModeServiceMap();
-          const parentChildMap = getParentChildMap();
-
-          // Build consent mode update from consent mode services
-          const completeUpdate = {};
-
-          // Process consent mode services - map their consent state to standard Google keys
-          Object.keys(consentModeServiceMap).forEach(function(consentModeKey) {
-              const serviceName = consentModeServiceMap[consentModeKey];
-              if (activeManager && activeManager.consents) {
-                  const isGranted = activeManager.consents[serviceName] === true;
-                  completeUpdate[consentModeKey] = isGranted ? 'granted' : 'denied';
-                  klaroGeoLog('DEBUG: Consent mode key', consentModeKey, '=', completeUpdate[consentModeKey],
-                      '(from service:', serviceName, ')');
-              }
-          });
-
-          // Enforce parent-child dependencies
-          // If parent is denied, children must also be denied
-          Object.keys(parentChildMap).forEach(function(parentName) {
-              const children = parentChildMap[parentName];
-              if (activeManager && activeManager.consents) {
-                  const parentConsented = activeManager.consents[parentName] === true;
-                  if (!parentConsented) {
-                      // Parent is denied - ensure all children are also denied
-                      children.forEach(function(childName) {
-                          // Find the consent mode key for this child service
-                          Object.keys(consentModeServiceMap).forEach(function(key) {
-                              if (consentModeServiceMap[key] === childName) {
-                                  completeUpdate[key] = 'denied';
-                                  klaroGeoLog('DEBUG: Enforcing parent-child: child', childName,
-                                      '(' + key + ') denied because parent', parentName, 'is denied');
-                              }
-                          });
-                      });
-                  }
-              }
-          });
-
-          // Add dynamic service consent keys for ALL services
-          if (activeManager && activeManager.consents) {
-              let consentKeys = Object.keys(activeManager.consents);
-              consentKeys.forEach(function(serviceName) {
-                  let dynamicKey = getServiceConsentKey(serviceName);
-                  let isGranted = activeManager.consents[serviceName] === true;
-                  completeUpdate[dynamicKey] = isGranted ? 'granted' : 'denied';
-              });
-          }
+          // Standard Google keys from consent mode services (with parent-child
+          // dependencies enforced) plus a dynamic key for every service
+          const completeUpdate = KlaroGeoEvents.buildConsentMode(
+              (activeManager && activeManager.consents) || {}
+          );
 
           // Log the complete update being sent (now includes dynamic keys)
           klaroGeoLog('DEBUG: Consent update object (with dynamic service keys):', completeUpdate);

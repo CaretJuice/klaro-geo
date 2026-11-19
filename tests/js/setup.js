@@ -71,3 +71,8 @@ if (typeof window !== 'undefined') {
     window.klaroGeoError = global.klaroGeoError;
     window.klaroGeoDebugLog = global.klaroGeoDebugLog;
 }
+
+// klaro-geo.js depends on the events module (it is a script dependency in
+// production), so load it for every test file. It only reads window state when
+// its functions are called, so tests can still set up their own globals.
+jest.requireActual('../../js/klaro-geo-events.js');

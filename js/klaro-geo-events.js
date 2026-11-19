@@ -233,27 +233,6 @@
         };
     }
 
-    /**
-     * Create consent receipt event
-     *
-     * @param {Object} consentReceipt - The consent receipt object
-     * @param {boolean} includeDetails - Whether to include additional details
-     * @returns {Object} DataLayer event object
-     */
-    function createConsentReceiptEvent(consentReceipt, includeDetails) {
-        let event = {
-            'event': 'Klaro Geo Consent Receipt',
-            'klaro_geo_consent_receipt': consentReceipt
-        };
-
-        if (includeDetails) {
-            event['klaro_geo_template_source'] = consentReceipt.template_source;
-            event['klaro_geo_admin_override'] = consentReceipt.admin_override;
-        }
-
-        return event;
-    }
-
     // Export to global namespace
     window.KlaroGeoEvents = {
         // Constants
@@ -266,8 +245,7 @@
         buildConsentMode: buildConsentMode,
         createKlaroForwardedEvent: createKlaroForwardedEvent,
         createKlaroGeoEvent: createKlaroGeoEvent,
-        createConsentUpdateEvent: createConsentUpdateEvent,
-        createConsentReceiptEvent: createConsentReceiptEvent
+        createConsentUpdateEvent: createConsentUpdateEvent
     };
 
     klaroGeoLog('DEBUG: KlaroGeoEvents module loaded');
