@@ -95,6 +95,15 @@ All WordPress environments for this plugin live in this repo; there are no share
 
 **Warning, dev site:** `docker/docker-entrypoint-wordpress.sh` runs `chown -R www-data` and `chmod -R a+w` on the bind-mounted plugin directory, which changes ownership and permissions of the host checkout. Use the E2E site instead unless the user asks for the dev site. (The test runner's entrypoint was fixed for this in 591ebfc.)
 
+## Production Debugging: caretjuice.com + traffic-diagnostics
+
+caretjuice.com is the only live install of this plugin. It also runs the traffic-diagnostics instrumentation from `/home/damon/dev/ca/research/traffic-diagnostics/`, which records consent behavior **outside** Klaro, so it can confirm what the plugin actually did for real visitors. Use it as a debugging source for consent problems, after reproducing locally on the E2E site.
+
+- **What it records per page load:** the `cmp` phase (which Klaro Geo template was applied and the geo detected) and the `consent` phase (what the visitor granted, and whether they acted on this page or a stored choice or the defaults applied: `cmp_event` = `set` / `load` / `default`). caretjuice.com also records the `gtag('consent', ...)` commands the plugin sends, including the custom `*_consent` keys.
+- **Where the data is:** BigQuery. The project, dataset and site config are in that repo's `deployment.yaml` (gitignored, the source of truth). Field meanings are in its `docs/FIELDS.md`, and the Klaro Geo adapter is `client/presets/klaro-geo.js`. Read that repo's `CLAUDE.md` before changing anything there.
+- **Low traffic:** caretjuice.com gets single-digit visits per day. After deploying a fix, wait several days before drawing conclusions, and compare windows before and after the deploy date. A day or two of data is anecdote, not evidence.
+- If a plugin change alters the dataLayer events, consent keys or template data the adapter reads, check `client/presets/klaro-geo.js` in that repo still parses them.
+
 ## Before Any Code Change
 
 1. Read the corresponding `.spec.yaml`
