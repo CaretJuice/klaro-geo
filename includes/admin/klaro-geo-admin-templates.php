@@ -368,7 +368,7 @@ function klaro_geo_templates_page() {
 				$template['plugin_settings'] = array(
 					'enable_consent_logging' => true,
 					'gpc_enabled'            => true,
-					'gpc_purposes'           => array_map( 'trim', explode( ',', get_option( 'klaro_geo_purposes', 'functional,analytics,advertising' ) ) ),
+					'gpc_purposes'           => array_map( 'trim', explode( ',', get_option( 'klaro_geo_purposes', klaro_geo_get_default_purposes_string() ) ) ),
 				);
 				$template_settings->set_template( $current_template, $template );
 				klaro_geo_debug_log( 'Set default plugin_settings' );
@@ -907,7 +907,7 @@ function klaro_geo_templates_page() {
 						<td>
 							<?php
 							// Must be defined before $gpc_purposes, which falls back to it.
-							$available_purposes = explode( ',', get_option( 'klaro_geo_purposes', 'functional,analytics,advertising' ) );
+							$available_purposes = explode( ',', get_option( 'klaro_geo_purposes', klaro_geo_get_default_purposes_string() ) );
 							$gpc_purposes       = isset( $templates[ $current_template ]['plugin_settings']['gpc_purposes'] )
 								? $templates[ $current_template ]['plugin_settings']['gpc_purposes']
 								: $available_purposes;
@@ -1075,23 +1075,23 @@ function klaro_geo_templates_page() {
 
 							<?php
 							// Get all defined purposes from the option
-							$purposes_string = get_option( 'klaro_geo_purposes', 'functional,analytics,advertising' );
-							$purposes        = array_map( 'trim', explode( ',', $purposes_string ) );
+							$purposes = klaro_geo_get_purposes();
 
-							// Default descriptions for standard purposes
-							$default_descriptions = array(
-								'functional'  => 'These services are essential for the correct functioning of this website. You cannot disable them here as the service would not work correctly otherwise.',
-								'analytics'   => 'These services process personal information to help us understand how visitors interact with the website.',
-								'advertising' => 'These services process personal information to show you personalized or interest-based advertisements.',
-							);
+							// Default title and description for built-in purposes (shared with
+							// the hardcoded templates and the config-time backfill)
+							$default_purpose_translations = klaro_geo_get_default_purpose_translations();
 
 							// Loop through each purpose and create form fields
 							foreach ( $purposes as $purpose ) {
 								$purpose_key   = sanitize_key( $purpose ); // Sanitize for use in HTML IDs
-								$purpose_title = ucfirst( $purpose ); // Capitalize the first letter for default title
+								$purpose_title = isset( $default_purpose_translations[ $purpose_key ] )
+									? $default_purpose_translations[ $purpose_key ]['title']
+									: ucfirst( $purpose );
 
 								// Get default description if it exists, otherwise use empty string
-								$default_description = isset( $default_descriptions[ $purpose_key ] ) ? $default_descriptions[ $purpose_key ] : '';
+								$default_description = isset( $default_purpose_translations[ $purpose_key ] )
+									? $default_purpose_translations[ $purpose_key ]['description']
+									: '';
 
 								// Get saved values if they exist
 								$saved_title = isset( $current_config['translations']['zz']['purposes'][ $purpose_key ]['title'] )

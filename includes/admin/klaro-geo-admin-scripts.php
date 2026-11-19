@@ -85,7 +85,7 @@ function klaro_geo_admin_scripts( $hook ) {
 	// Services page
 	if ( strpos( $hook, 'klaro-geo-services' ) !== false ) {
 		// Get available purposes from settings
-		$purposes = explode( ',', get_option( 'klaro_geo_purposes', 'functional,analytics,advertising' ) );
+		$purposes = explode( ',', get_option( 'klaro_geo_purposes', klaro_geo_get_default_purposes_string() ) );
 		$services = klaro_geo_validate_services();
 
 		// Register and enqueue the service translations script

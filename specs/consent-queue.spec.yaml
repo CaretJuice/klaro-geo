@@ -46,21 +46,44 @@ gtm_consent:
   service_configuration:
     required: false
     default: false
-    purposes: ["analytics", "advertising"]
+    purposes: ["tag-management"]
 
   behavior: |
-    - GTM only loads when user consents to analytics OR advertising
+    - GTM only loads when the visitor consents to the google-tag-manager service:
+      by enabling the Tag Management purpose or the service itself, or via Accept all
+    - Consent to analytics or advertising services does NOT imply consent to GTM
+      (product decision); in Basic mode those services' tags cannot run until GTM is consented
     - In Basic mode, 'Klaro Consent Update' is skipped for initialConsents when GTM not consented
     - Queue naturally waits for relevant consent before flushing
     - gtag('consent', 'update') is always called (queues for when GTM loads)
 
+  single_purpose_rationale: |
+    Klaro draws a purpose as checked when any of its services is on. With GTM in
+    both analytics and advertising, enabling one purpose made the other look
+    enabled, and a click on it switched it off instead of on. No default service
+    may belong to more than one purpose.
+
   migration:
-    description: |
-      Existing installations with old GTM config (required=true,
-      purposes=["functional"]) are auto-migrated to the new config.
-      Custom configurations are preserved.
-    trigger: "klaro_geo_migrate_gtm_consent_requirement on init hook"
-    flag: "klaro_geo_gtm_consent_migrated option"
+    - description: |
+        Existing installations with old GTM config (required=true,
+        purposes=["functional"]) are auto-migrated to optional GTM.
+        Custom configurations are preserved.
+      trigger: "klaro_geo_migrate_gtm_consent_requirement on init hook (priority 5)"
+      flag: "klaro_geo_gtm_consent_migrated option"
+    - description: |
+        GTM with purposes exactly analytics+advertising (any order) moves to
+        ["tag-management"]; other custom purposes are preserved. A stored
+        klaro_geo_purposes list gains 'tag-management' after 'functional'.
+      trigger: "klaro_geo_migrate_gtm_purpose on init hook (priority 5, runs after the above)"
+      flag: "klaro_geo_gtm_purpose_migrated option"
+
+  purpose_translations:
+    contract: |
+      - Built-in purposes (klaro_geo_get_default_purposes()) MUST reach Klaro with a
+        title and description even if the stored template lacks a translation for them;
+        missing 'zz' entries are filled from klaro_geo_get_default_purpose_translations()
+      - Template-provided purpose translations MUST NOT be overwritten
+      - klaroConfig.purposeOrder follows the klaro_geo_purposes setting unless the template sets it
 
 # =============================================================================
 # API CONTRACT

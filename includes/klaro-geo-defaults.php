@@ -11,6 +11,71 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
+ * Default purpose keys, in display order.
+ *
+ * 'tag-management' holds the Google Tag Manager container. GTM used to sit in
+ * both 'analytics' and 'advertising', but Klaro draws a purpose as checked
+ * whenever any of its services is on, so a service shared by two purposes
+ * made enabling one purpose show the other as on. A visitor's click on that
+ * falsely-checked purpose then switched it off instead of on.
+ *
+ * @return string[]
+ */
+function klaro_geo_get_default_purposes() {
+	return array( 'functional', 'tag-management', 'analytics', 'advertising' );
+}
+
+/**
+ * The klaro_geo_purposes option's default value (comma-separated).
+ *
+ * @return string
+ */
+function klaro_geo_get_default_purposes_string() {
+	return implode( ',', klaro_geo_get_default_purposes() );
+}
+
+/**
+ * The configured purpose keys (klaro_geo_purposes option), trimmed, empty
+ * entries dropped.
+ *
+ * @return string[]
+ */
+function klaro_geo_get_purposes() {
+	$purposes = array_map( 'trim', explode( ',', (string) get_option( 'klaro_geo_purposes', klaro_geo_get_default_purposes_string() ) ) );
+	return array_values( array_filter( $purposes, 'strlen' ) );
+}
+
+/**
+ * Default Klaro translations (title, description) for the built-in purposes.
+ *
+ * Used by the hardcoded templates, as the templates admin page's defaults,
+ * and by config generation to fill in a built-in purpose that a stored
+ * template has no translation for.
+ *
+ * @return array<string, array{title: string, description: string}>
+ */
+function klaro_geo_get_default_purpose_translations() {
+	return array(
+		'functional'     => array(
+			'title'       => 'Functional',
+			'description' => 'These services are essential for the correct functioning of this website. You cannot disable them as the website would not work properly.',
+		),
+		'tag-management' => array(
+			'title'       => 'Tag Management',
+			'description' => 'These services load the other tools on this website. They do not track you themselves, but nothing they manage can run without them.',
+		),
+		'analytics'      => array(
+			'title'       => 'Analytics',
+			'description' => 'These services allow us to analyze website usage to evaluate and improve its performance.',
+		),
+		'advertising'    => array(
+			'title'       => 'Advertising',
+			'description' => 'These services process personal information to show you personalized advertisements.',
+		),
+	);
+}
+
+/**
  * Get default templates for Klaro Geo
  *
  * @return array The default templates
@@ -62,20 +127,7 @@ function klaro_geo_get_default_templates() {
 						'acceptSelected'   => 'Accept selected',
 						'decline'          => 'I decline',
 						'close'            => 'Close',
-						'purposes'         => [
-							'functional'  => [
-								'title'       => 'Functional',
-								'description' => 'These services are essential for the correct functioning of this website. You cannot disable them as the website would not work properly.',
-							],
-							'analytics'   => [
-								'title'       => 'Analytics',
-								'description' => 'These services allow us to analyze website usage to evaluate and improve its performance.',
-							],
-							'advertising' => [
-								'title'       => 'Advertising',
-								'description' => 'These services process personal information to show you personalized advertisements.',
-							],
-						],
+						'purposes'         => klaro_geo_get_default_purpose_translations(),
 						'purposeItem'      => [
 							'service'  => 'service',
 							'services' => 'services',
@@ -153,20 +205,7 @@ function klaro_geo_get_default_templates() {
 						'acceptSelected'   => 'Accept selected',
 						'decline'          => 'I decline',
 						'close'            => 'Close',
-						'purposes'         => [
-							'functional'  => [
-								'title'       => 'Functional',
-								'description' => 'These services are essential for the correct functioning of this website. You cannot disable them as the website would not work properly.',
-							],
-							'analytics'   => [
-								'title'       => 'Analytics',
-								'description' => 'These services allow us to analyze website usage to evaluate and improve its performance.',
-							],
-							'advertising' => [
-								'title'       => 'Advertising',
-								'description' => 'These services process personal information to show you personalized advertisements.',
-							],
-						],
+						'purposes'         => klaro_geo_get_default_purpose_translations(),
 						'purposeItem'      => [
 							'service'  => 'service',
 							'services' => 'services',
@@ -244,20 +283,7 @@ function klaro_geo_get_default_templates() {
 						'acceptSelected'   => 'Accept selected',
 						'decline'          => 'I decline',
 						'close'            => 'Close',
-						'purposes'         => [
-							'functional'  => [
-								'title'       => 'Functional',
-								'description' => 'These services are essential for the correct functioning of this website. You cannot disable them as the website would not work properly.',
-							],
-							'analytics'   => [
-								'title'       => 'Analytics',
-								'description' => 'These services allow us to analyze website usage to evaluate and improve its performance.',
-							],
-							'advertising' => [
-								'title'       => 'Advertising',
-								'description' => 'These services process personal information to show you personalized advertisements.',
-							],
-						],
+						'purposes'         => klaro_geo_get_default_purpose_translations(),
 						'purposeItem'      => [
 							'service'  => 'service',
 							'services' => 'services',
@@ -306,7 +332,7 @@ function klaro_geo_get_default_services( $defaults = null ) {
 			'name'         => 'google-tag-manager',
 			'title'        => 'Google Tag Manager',
 			'required'     => false,
-			'purposes'     => [ 'analytics', 'advertising' ],
+			'purposes'     => [ 'tag-management' ],
 			'default'      => false,
 			'cookies'      => [],
 			// KLARO_CALLBACKS_START

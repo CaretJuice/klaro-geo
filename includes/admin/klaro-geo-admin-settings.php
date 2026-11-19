@@ -185,7 +185,7 @@ function klaro_geo_settings_page_content() {
 				<tr valign="top">
 					<th scope="row"><label for="klaro_geo_purposes">Purposes (comma-separated):</label></th>
 					<td>
-						<input type="text" name="klaro_geo_purposes" id="klaro_geo_purposes" value="<?php echo esc_attr( get_option( 'klaro_geo_purposes', 'functional,analytics,advertising' ) ); ?>" class="regular-text" />
+						<input type="text" name="klaro_geo_purposes" id="klaro_geo_purposes" value="<?php echo esc_attr( get_option( 'klaro_geo_purposes', klaro_geo_get_default_purposes_string() ) ); ?>" class="regular-text" />
 						<p class="description">Enter the purposes for which you use cookies, separated by commas.  These will be available for selection when configuring services.</p>
 					</td>
 				</tr>
@@ -333,10 +333,10 @@ function klaro_geo_register_main_settings() {
 		'klaro_geo_purposes',
 		[
 			'type'              => 'string',
-			'default'           => 'functional,analytics,advertising',
+			'default'           => klaro_geo_get_default_purposes_string(),
 			'sanitize_callback' => function ( $input ) {
 				if ( empty( $input ) ) {
-					return 'functional,analytics,advertising';
+					return klaro_geo_get_default_purposes_string();
 				}
 				// Sanitize the comma-separated list
 				$purposes = array_map( 'trim', explode( ',', $input ) );

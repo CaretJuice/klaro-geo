@@ -85,8 +85,7 @@ class KlaroGeoServiceSettingsClassTest extends WP_UnitTestCase {
                 
                 // Check service properties
                 $this->assertEquals('Google Tag Manager', $service['title']);
-                $this->assertContains('analytics', $service['purposes']);
-                $this->assertContains('advertising', $service['purposes']);
+                $this->assertEquals(array('tag-management'), $service['purposes']);
                 $this->assertFalse($service['required']);
                 $this->assertFalse($service['default']);
                 
@@ -304,17 +303,20 @@ class KlaroGeoServiceSettingsClassTest extends WP_UnitTestCase {
         ));
         
         // Test getting services by purpose
-        // Default services: GTM (analytics,advertising), google-analytics (analytics),
+        // Default services: GTM (tag-management), google-analytics (analytics),
         // google-ads (advertising), analytics-storage (analytics), ad-storage (advertising),
         // ad-user-data (advertising), ad-personalization (advertising)
         $functional_services = $settings->get_services_by_purpose('functional');
         $this->assertCount(2, $functional_services); // test-service-1, test-service-3
 
+        $tag_management_services = $settings->get_services_by_purpose('tag-management');
+        $this->assertCount(1, $tag_management_services); // GTM only
+
         $analytics_services = $settings->get_services_by_purpose('analytics');
-        $this->assertCount(5, $analytics_services); // GTM, google-analytics, analytics-storage + 2 test services
+        $this->assertCount(4, $analytics_services); // google-analytics, analytics-storage + 2 test services
 
         $advertising_services = $settings->get_services_by_purpose('advertising');
-        $this->assertCount(6, $advertising_services); // GTM, google-ads, ad-storage, ad-user-data, ad-personalization + test-service-2
+        $this->assertCount(5, $advertising_services); // google-ads, ad-storage, ad-user-data, ad-personalization + test-service-2
         
         $non_existent_services = $settings->get_services_by_purpose('non_existent');
         $this->assertEmpty($non_existent_services);

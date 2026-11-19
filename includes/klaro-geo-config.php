@@ -57,6 +57,52 @@ function klaro_geo_get_admin_true_by_default_keys() {
 }
 
 /**
+ * Give Klaro a title and description for every configured built-in purpose,
+ * and a purpose display order.
+ *
+ * Purpose translations live in each stored template, so a purpose added after
+ * a template was saved (such as 'tag-management') would otherwise reach Klaro
+ * without a title. Only missing 'zz' entries for built-in purposes are filled;
+ * anything the template sets is left alone. purposeOrder follows the
+ * klaro_geo_purposes setting unless the template sets its own.
+ *
+ * @param array  $klaro_config    The Klaro config being built (modified in place).
+ * @param string $template_to_use Template key, for logging.
+ */
+function klaro_geo_apply_purpose_defaults( array &$klaro_config, $template_to_use ) {
+	$purposes = klaro_geo_get_purposes();
+	$defaults = klaro_geo_get_default_purpose_translations();
+
+	if ( ! isset( $klaro_config['translations'] ) || ! is_array( $klaro_config['translations'] ) ) {
+		$klaro_config['translations'] = array();
+	}
+	if ( ! isset( $klaro_config['translations']['zz'] ) || ! is_array( $klaro_config['translations']['zz'] ) ) {
+		$klaro_config['translations']['zz'] = array();
+	}
+	if ( ! isset( $klaro_config['translations']['zz']['purposes'] ) || ! is_array( $klaro_config['translations']['zz']['purposes'] ) ) {
+		$klaro_config['translations']['zz']['purposes'] = array();
+	}
+
+	$filled = array();
+	foreach ( $purposes as $purpose ) {
+		if ( isset( $defaults[ $purpose ] ) && empty( $klaro_config['translations']['zz']['purposes'][ $purpose ] ) ) {
+			$klaro_config['translations']['zz']['purposes'][ $purpose ] = $defaults[ $purpose ];
+			$filled[] = $purpose;
+		}
+	}
+	if ( ! empty( $filled ) ) {
+		klaro_geo_debug_log(
+			'Template "' . $template_to_use . '" has no translation for purpose(s) ' . implode( ', ', $filled ) .
+			'; using the built-in defaults. Re-save the template to customize them.'
+		);
+	}
+
+	if ( empty( $klaro_config['purposeOrder'] ) ) {
+		$klaro_config['purposeOrder'] = $purposes;
+	}
+}
+
+/**
  * Build the full Klaro config payload for a single template.
  *
  * Contains no visitor-specific data: given the same template/services/options,
@@ -136,7 +182,7 @@ function klaro_geo_build_template_payload( $template_key, $templates, $services 
 		? $template_config['plugin_settings']['gpc_enabled']
 		: true;
 	$gpc_enabled          = $gpc_global_enabled && $gpc_template_enabled;
-	$all_purposes         = array_map( 'trim', explode( ',', get_option( 'klaro_geo_purposes', 'functional,analytics,advertising' ) ) );
+	$all_purposes         = array_map( 'trim', explode( ',', get_option( 'klaro_geo_purposes', klaro_geo_get_default_purposes_string() ) ) );
 	$gpc_purposes         = isset( $template_config['plugin_settings']['gpc_purposes'] )
 		? $template_config['plugin_settings']['gpc_purposes']
 		: $all_purposes;
@@ -251,6 +297,8 @@ function klaro_geo_build_template_payload( $template_key, $templates, $services 
 
 		klaro_geo_debug_log( 'Template "' . $template_to_use . '" has no usable config; using hardcoded default template config' );
 	}
+
+	klaro_geo_apply_purpose_defaults( $klaro_config, $template_to_use );
 
 	// Set default cookiePath if not configured
 	if ( ! isset( $klaro_config['cookiePath'] ) || empty( $klaro_config['cookiePath'] ) ) {
