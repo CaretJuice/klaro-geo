@@ -10,7 +10,6 @@ This directory contains all Docker-related files for the Klaro Geo plugin develo
 - `test-logging.sh` - Script to test logging functionality
 - `copy-debug-log.sh` - Script to copy debug logs from the container
 - `debug-database.sh` - Script to debug database issues
-- `run-mock-tests.sh` - Script to run tests with mock database
 - `fix-npm-permissions.sh` - Script to fix npm permissions issues
 - `make-scripts-executable.sh` - Script to make all scripts executable
 - `logs/` - Directory for storing debug logs
@@ -81,17 +80,6 @@ To run a specific JavaScript test file:
 ```bash
 ./run-tests.sh js test-file-name.js
 ```
-
-### Tests with Mock Database
-
-If you're having issues with database permissions or configuration, you can use the mock database implementation:
-
-```bash
-chmod +x docker/run-mock-tests.sh
-./docker/run-mock-tests.sh
-```
-
-This will run the tests with a mock database implementation that doesn't require actual database tables.
 
 ## Debugging
 
@@ -189,23 +177,9 @@ If logging is not working:
    docker compose exec wordpress_test cat /tmp/wordpress-tests-lib/wp-tests-config.php | grep WP_DEBUG
    ```
 
-## Mock Database for Tests
+## Database
 
-The mock database implementation is useful when you want to run tests without a real database connection.
-
-### How It Works
-
-The mock database implementation:
-
-1. Overrides the database functions used by the plugin
-2. Stores data in memory instead of in a database
-3. Simulates database operations like CREATE TABLE, INSERT, SELECT, etc.
-
-### Files
-
-- `tests/phpunit/mock-db.php`: The main mock database implementation
-- `tests/phpunit/bootstrap-mock.php`: A bootstrap file that sets up the mock database
-- `tests/phpunit/test-helpers.php`: Helper functions for tests
+PHPUnit tests use the real test database provided by the `db_test` service. Tests that need the consent receipts table create it once per test class with `klaro_geo_create_consent_receipts_table()`.
 
 ### Debugging Database Issues
 

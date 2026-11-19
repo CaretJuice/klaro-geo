@@ -1,0 +1,82 @@
+# frontend-data.spec.yaml
+#
+# CONTRACT BETWEEN PHP AND JAVASCRIPT, and the consent keys GTM sees.
+#
+# PHP generates data; separately written JavaScript reads it. The two sides are
+# implemented in different files and languages, so the shape between them is
+# written down here. The consent keys are also read by GTM containers outside
+# this repo.
+#
+# Verified against the code on 2026-11-19 (plugin 0.3.7 + unreleased changes).
+
+klaro_consent_data:
+  global: "window.klaroConsentData"
+  built_by: "klaro_geo_build_consent_data() in includes/klaro-geo-config.php"
+  read_by: "js/klaro-geo.js, js/klaro-geo-events.js, js/klaro-geo-client-geo.js"
+  rules:
+    - "MUST be emitted on every frontend page, in both geo modes, whether or not consent receipts are enabled"
+    - "MUST be defined exactly once per page, as one JSON assignment in the config content attached to klaro-js. Nothing else may assign it server-side (no wp_localize_script copy)"
+    - "All flags MUST be real booleans, never '1' / '0' / '' strings"
+    - "enableConsentLogging is the EFFECTIVE value: the global consent receipts setting AND the template's enable_consent_logging"
+    - "ajaxUrl and nonce are present ONLY when consent receipts are enabled globally"
+    - "In client geo mode the template and geo fields are emitted empty and filled by the resolver before Klaro initializes"
+    - "Frontend scripts read settings from this object, not from dataLayer events"
+  fields:
+    gtmId: "string"
+    consentModeType: "string - 'basic' | 'advanced'"
+    templateName: "string"
+    templateSource: "string"
+    detectedCountry: "string"
+    detectedRegion: "string"
+    adminOverride: "bool"
+    consentReceipts: "bool - global consent receipts setting"
+    enableConsentLogging: "bool - effective value, see rules"
+    consentMode: "string - always 'v2'"
+    suppressConsentsEvents: "bool"
+    consentModeServices: "object - consent_mode_key => service name"
+    parentChildMap: "object - parent service name => array of child service names"
+    templateSettings: "object - consentModalTitle, consentModalDescription, acceptAllText, declineAllText, defaultConsent, requiredConsent, and config.consent_mode_settings.{consent_defaults, gtag_settings}"
+    ajaxUrl: "string - only when receipts are enabled"
+    nonce: "string - only when receipts are enabled"
+
+klaro_config_extensions:
+  global: "window.klaroConfig"
+  description: |
+    klaroConfig is Klaro's own config object. The plugin adds these fields, which
+    Klaro ignores and the plugin's scripts read.
+  per_service:
+    is_consent_mode_service: "bool - the service stands for a Google Consent Mode key"
+    consent_mode_key: "string - e.g. 'analytics_storage'; only with is_consent_mode_service"
+    parent_service: "string - a consent mode service that must be granted for this one to be granted"
+    gpc_sensitive: "bool - present when GPC is enabled for the template; the service's default is set to false when GPC is detected"
+    required: "bool - always present; resolved per service from the service's own setting or the template's Required setting"
+  top_level:
+    consent_mode_dependencies: "object - same as parentChildMap"
+    required: "always false. Klaro's global required flag makes Decline accept everything, so Required is applied per service"
+
+consent_keys:
+  description: |
+    The keys used in gtag('consent', 'default'), gtag('consent', 'update') and
+    the consentMode object of the 'Klaro Consent Update' event. GTM tags reference
+    them by name, so they are part of the external contract.
+  google_keys:
+    - ad_storage
+    - analytics_storage
+    - ad_user_data
+    - ad_personalization
+  rules:
+    - "A consent mode service (is_consent_mode_service with a consent_mode_key) is reported under its consent_mode_key, and does NOT also get a *_consent key"
+    - "Every other service is reported as <service name with hyphens replaced by underscores>_consent, e.g. google-analytics => google_analytics_consent"
+    - "A child consent mode service is 'denied' whenever its parent_service is not granted"
+    - "Values are 'granted' or 'denied'; a key is never omitted"
+  defaults:
+    - "The four Google keys default to 'denied' unless a consent mode service says otherwise"
+    - "A required service defaults to 'granted'"
+    - "A service with an explicit default uses it"
+    - "Any other service inherits the template's default"
+  implementations:
+    php: "klaro_geo_build_template_payload() (defaults)"
+    js: "KlaroGeoEvents.buildConsentMode() and getServiceConsentKey() in js/klaro-geo-events.js (updates) - the only JS implementation"
+  tests:
+    - "tests/phpunit/klaroGeoConsentModeTest.php"
+    - "tests/js/test-consent-mode.js"

@@ -215,24 +215,6 @@
         return event;
     }
 
-    /**
-     * Create consent update event
-     * Pushed directly by the plugin after gtag('consent', 'update') is called
-     *
-     * @param {string} triggerEvent - The event that triggered this (e.g., 'initialConsents', 'saveConsents')
-     * @returns {Object} DataLayer event object
-     */
-    function createConsentUpdateEvent(triggerEvent) {
-        let state = getConsentState();
-
-        return {
-            'event': 'Klaro Consent Update',
-            'consent_trigger': triggerEvent,
-            'consentMode': state.consentMode,
-            'acceptedServices': state.acceptedServices
-        };
-    }
-
     // Export to global namespace
     window.KlaroGeoEvents = {
         // Constants
@@ -244,8 +226,7 @@
         getServiceConsentKey: getServiceConsentKey,
         buildConsentMode: buildConsentMode,
         createKlaroForwardedEvent: createKlaroForwardedEvent,
-        createKlaroGeoEvent: createKlaroGeoEvent,
-        createConsentUpdateEvent: createConsentUpdateEvent
+        createKlaroGeoEvent: createKlaroGeoEvent
     };
 
     klaroGeoLog('DEBUG: KlaroGeoEvents module loaded');

@@ -1,6 +1,11 @@
 # client-side-geo.spec.yaml
 # Specification for Cache-Safe Client-Side Geo Resolution
 #
+# CONTRACT BETWEEN PHP AND JAVASCRIPT: template resolution is implemented twice
+# (Klaro_Geo_Country_Settings::get_effective_settings() in PHP and
+# resolveEffectiveTemplate() in js/klaro-geo-client-geo.js) and the two must
+# agree. tests/fixtures/geo-resolution-parity.json is run against both.
+#
 # Problem: in server mode, klaro_geo_get_user_location() runs at page-render
 # time and its result — detected country/region AND the chosen consent
 # template — is baked into cacheable HTML. On full-page-cache hosting

@@ -1,13 +1,16 @@
 # consent-queue.spec.yaml
-# Specification for Consent Queue Feature
 #
-# PURPOSE: Queue dataLayer events until consent state is confirmed
+# EXTERNAL CONTRACT: the window.klaroGeo.push() consent queue.
+#
+# Theme code, other plugins and GTM custom HTML call this API, and it may be
+# called before klaro-geo.js has loaded. Its behaviour cannot change without
+# breaking those callers.
 
 file_meta:
   purpose: "Define contract for klaroGeo.push() consent queue API"
   dependencies:
     - "klaro-geo.js"
-    - "klaro-geo-config.php (for GTM ID setting)"
+    - "frontend-data.spec.yaml (klaroConsentData.gtmId, consentModeType)"
     - "datalayer-events.spec.yaml (Klaro Consent Update)"
   stability: "new"
   last_updated: "2026-02-04"
@@ -344,20 +347,11 @@ state_machine:
 # PHP INTEGRATION
 # =============================================================================
 php_integration:
-  output_configuration:
-    location: "wp_head or klaro-config.js output"
-    description: "Output useGTM setting based on klaro_geo_gtm_id"
-
-    example: |
-      <script>
-      window.klaroGeo = window.klaroGeo || {};
-      window.klaroGeo.useGTM = <?php echo !empty(get_option('klaro_geo_gtm_id')) ? 'true' : 'false'; ?>;
-      </script>
-
-    contract: |
-      - MUST output useGTM before klaro-geo.js loads
-      - MUST read from klaro_geo_gtm_id option
-      - MUST NOT add new PHP settings
+  description: |
+    PHP does not output useGTM or consentModeType directly. klaro-geo.js derives
+    them at load from window.klaroConsentData.gtmId and .consentModeType (see
+    frontend-data.spec.yaml), unless window.klaroGeo.useGTM or
+    window.klaroGeo.consentModeType was already set by the page.
 
 # =============================================================================
 # USAGE EXAMPLES
