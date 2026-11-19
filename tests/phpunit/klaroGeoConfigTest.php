@@ -175,21 +175,8 @@ class KlaroConfigTest extends WP_UnitTestCase {
         klaro_geo_debug_log('Analytics test - Config content first 100 chars: ' . substr($config_content, 0, 100));
         klaro_geo_debug_log('Analytics test - Full config content: ' . $config_content);
 
-        // Try to get the config directly from the function
-        $config = null;
-
-        // First try to get it directly from the function
-        ob_start();
-        $direct_config = klaro_geo_get_config();
-        ob_end_clean();
-
-        if (is_array($direct_config) && !empty($direct_config)) {
-            klaro_geo_debug_log('Got config directly from function');
-            $config = $direct_config;
-        } else {
-            // If that fails, extract from the file content
-            $config = $this->extractConfigFromOutput($config_content);
-        }
+        // Extract the config from the generated content
+        $config = $this->extractConfigFromOutput($config_content);
 
         // Verify we got a valid config
         $this->assertNotNull($config, 'Failed to extract config from output');
@@ -226,21 +213,8 @@ class KlaroConfigTest extends WP_UnitTestCase {
         klaro_geo_debug_log('Advertising test - Config content first 100 chars: ' . substr($config_content, 0, 100));
         klaro_geo_debug_log('Advertising test - Full config content: ' . $config_content);
 
-        // Try to get the config directly from the function
-        $config = null;
-
-        // First try to get it directly from the function
-        ob_start();
-        $direct_config = klaro_geo_get_config();
-        ob_end_clean();
-
-        if (is_array($direct_config) && !empty($direct_config)) {
-            klaro_geo_debug_log('Got config directly from function');
-            $config = $direct_config;
-        } else {
-            // If that fails, extract from the file content
-            $config = $this->extractConfigFromOutput($config_content);
-        }
+        // Extract the config from the generated content
+        $config = $this->extractConfigFromOutput($config_content);
 
         // Verify we got a valid config
         $this->assertNotNull($config, 'Failed to extract config from output');

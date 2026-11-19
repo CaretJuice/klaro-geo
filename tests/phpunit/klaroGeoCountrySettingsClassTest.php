@@ -350,47 +350,6 @@ class KlaroGeoCountrySettingsClassTest extends WP_UnitTestCase {
         $settings->update_regions_from_ajax('not_an_array');
     }
 
-    /**
-     * Test optimization
-     */
-    public function test_optimize() {
-        // Create settings with our test option name
-        $settings = new Klaro_Geo_Country_Settings($this->option_name);
-
-        // Set default template
-        $settings->set_default_template('default');
-
-        // Set up test countries
-        $settings->set_country('US', array(
-            'template' => 'default', // Should be optimized out (default template, no regions)
-            'regions' => array()
-        ));
-
-        $settings->set_country('CA', array(
-            'template' => 'strict', // Should be kept (non-default template)
-            'regions' => array()
-        ));
-
-        $settings->set_country('UK', array(
-            'template' => 'default', // Should be kept (has regions)
-            'regions' => array(
-                'SCT' => 'strict'
-            )
-        ));
-
-        // Optimize
-        $settings->optimize();
-
-        // Check that US was optimized out
-        $this->assertNull($settings->get_country('US'));
-
-        // Check that CA was kept
-        $this->assertNotNull($settings->get_country('CA'));
-
-        // Check that UK was kept
-        $this->assertNotNull($settings->get_country('UK'));
-    }
-
     // NOTE: test_get_effective_settings and test_fallback_template_inheritance
     // were removed as they are now covered by ContractVerificationTest:
     // - test_contract_effective_settings_returns_template_key

@@ -569,62 +569,6 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
 		$updated_settings = $this->get();
 		klaro_geo_debug_log( 'Settings after updating all regions: ' . wp_json_encode( $updated_settings ) );
 
-		// Skip optimization to ensure we don't lose any region settings
-		// $this->optimize();
-
-		return $this;
-	}
-
-	/**
-	 * Optimize the settings by removing countries that use the default template and have no region overrides
-	 *
-	 * @return $this For method chaining
-	 */
-	public function optimize() {
-		$default_template = $this->get_default_template();
-		$optimized        = array(
-			'default_template' => $default_template,
-		);
-
-		// Debug log before optimization
-		klaro_geo_debug_log( 'Before optimization: ' . wp_json_encode( $this->value ) );
-
-		foreach ( $this->value as $code => $config ) {
-			// Skip the default_template key
-			if ( $code === 'default_template' ) {
-				continue;
-			}
-
-			// Ensure regions key exists
-			if ( ! isset( $config['regions'] ) ) {
-				$config['regions'] = array();
-			}
-
-			// Check for region settings
-			$has_regions = ! empty( $config['regions'] );
-
-			// If the country uses the default template or inherits from fallback and has no regions, skip it
-			if ( isset( $config['template'] ) &&
-				( $config['template'] === $default_template || $config['template'] === 'inherit' ) &&
-				! $has_regions ) {
-				klaro_geo_debug_log( 'Optimizing: Removing country ' . $code . ' (uses default template or inherits from fallback with no region overrides)' );
-				continue;
-			}
-
-			// Always preserve countries with region settings
-			if ( $has_regions ) {
-				klaro_geo_debug_log( 'Optimizing: Preserving country ' . $code . ' because it has region settings: ' . wp_json_encode( $config['regions'] ) );
-			}
-
-			// Add the country to the optimized settings
-			$optimized[ $code ] = $config;
-		}
-
-		// Debug log after optimization
-		klaro_geo_debug_log( 'After optimization: ' . wp_json_encode( $optimized ) );
-
-		$this->set( $optimized );
-
 		return $this;
 	}
 

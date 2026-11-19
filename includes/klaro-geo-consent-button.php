@@ -14,59 +14,11 @@ class Klaro_Consent_Menu_Button {
 	 * Initialize the class
 	 */
 	public static function init() {
-		// Register settings for the floating button
-		add_action( 'admin_init', array( __CLASS__, 'register_settings' ) );
-
 		// Add admin notice about how to add the consent button to menus
 		add_action( 'admin_notices', array( __CLASS__, 'admin_notice' ) );
 
 		// Register shortcode for adding consent button anywhere
 		add_shortcode( 'klaro_consent_button', array( __CLASS__, 'consent_button_shortcode' ) );
-	}
-
-	/**
-	 * Register settings
-	 */
-	public static function register_settings() {
-		register_setting(
-			'klaro_geo_settings_group',
-			'klaro_geo_enable_floating_button',
-			array(
-				'type'              => 'boolean',
-				'default'           => true,
-				'sanitize_callback' => 'rest_sanitize_boolean',
-			)
-		);
-
-		register_setting(
-			'klaro_geo_settings_group',
-			'klaro_geo_floating_button_text',
-			array(
-				'type'              => 'string',
-				'default'           => 'Manage Consent Settings',
-				'sanitize_callback' => 'sanitize_text_field',
-			)
-		);
-
-		register_setting(
-			'klaro_geo_settings_group',
-			'klaro_geo_floating_button_theme',
-			array(
-				'type'              => 'string',
-				'default'           => 'light',
-				'sanitize_callback' => 'sanitize_text_field',
-			)
-		);
-
-		register_setting(
-			'klaro_geo_settings_group',
-			'klaro_geo_floating_button_position',
-			array(
-				'type'              => 'string',
-				'default'           => 'bottom-right',
-				'sanitize_callback' => 'sanitize_text_field',
-			)
-		);
 	}
 
 	// Script enqueuing is now handled in the main plugin file
