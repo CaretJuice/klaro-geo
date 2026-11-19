@@ -32,7 +32,7 @@ class ServicesTest extends WP_UnitTestCase {
         foreach ($GLOBALS['klaro_geo_default_services'] as $service) {
             if ($service['name'] === 'google-tag-manager') {
                 $gtm_found = true;
-                $this->assertEquals(['performance'], $service['purposes']);
+                $this->assertEquals(['infrastructure'], $service['purposes']);
                 break;
             }
         }

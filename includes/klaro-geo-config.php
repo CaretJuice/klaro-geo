@@ -61,7 +61,7 @@ function klaro_geo_get_admin_true_by_default_keys() {
  * and a purpose display order.
  *
  * Purpose translations live in each stored template, so a purpose added after
- * a template was saved (such as 'performance') would otherwise reach Klaro
+ * a template was saved (such as 'infrastructure') would otherwise reach Klaro
  * without a title. Only missing 'zz' entries for built-in purposes are filled;
  * anything the template sets is left alone. purposeOrder follows the
  * klaro_geo_purposes setting unless the template sets its own.

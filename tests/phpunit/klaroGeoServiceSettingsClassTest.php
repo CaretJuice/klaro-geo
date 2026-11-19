@@ -85,7 +85,7 @@ class KlaroGeoServiceSettingsClassTest extends WP_UnitTestCase {
                 
                 // Check service properties
                 $this->assertEquals('Google Tag Manager', $service['title']);
-                $this->assertEquals(array('performance'), $service['purposes']);
+                $this->assertEquals(array('infrastructure'), $service['purposes']);
                 $this->assertFalse($service['required']);
                 $this->assertFalse($service['default']);
                 
@@ -303,14 +303,14 @@ class KlaroGeoServiceSettingsClassTest extends WP_UnitTestCase {
         ));
         
         // Test getting services by purpose
-        // Default services: GTM (performance), google-analytics (analytics),
+        // Default services: GTM (infrastructure), google-analytics (analytics),
         // google-ads (advertising), analytics-storage (analytics), ad-storage (advertising),
         // ad-user-data (advertising), ad-personalization (advertising)
         $functional_services = $settings->get_services_by_purpose('functional');
         $this->assertCount(2, $functional_services); // test-service-1, test-service-3
 
-        $performance_services = $settings->get_services_by_purpose('performance');
-        $this->assertCount(1, $performance_services); // GTM only
+        $infrastructure_services = $settings->get_services_by_purpose('infrastructure');
+        $this->assertCount(1, $infrastructure_services); // GTM only
 
         $analytics_services = $settings->get_services_by_purpose('analytics');
         $this->assertCount(4, $analytics_services); // google-analytics, analytics-storage + 2 test services

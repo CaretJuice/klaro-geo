@@ -333,7 +333,7 @@ In Basic mode, **GTM is completely blocked until the user consents** to the `goo
 3. The GTM community template sets consent defaults and then updates consent state based on the user's choices
 4. Tags fire according to their consent requirements
 
-**The Performance purpose:** the `google-tag-manager` service sits in its own **Performance** purpose. A visitor who enables Analytics or Advertising but not Performance has consented to those services but not to GTM, so in Basic mode none of the tags GTM would load can run. **Accept all** covers Performance. GTM deliberately has a single purpose: Klaro shows a purpose as on whenever any of its services is on, so a service shared between two purposes makes the other purpose look enabled and a click on it turns it off instead of on. Keep each service in one purpose when Group by Purpose is enabled.
+**The Site Infrastructure purpose:** the `google-tag-manager` service sits in its own **Site Infrastructure** purpose. A visitor who enables Analytics or Advertising but not Site Infrastructure has consented to those services but not to GTM, so in Basic mode none of the tags GTM would load can run. **Accept all** covers Site Infrastructure. GTM deliberately has a single purpose: Klaro shows a purpose as on whenever any of its services is on, so a service shared between two purposes makes the other purpose look enabled and a click on it turns it off instead of on. Keep each service in one purpose when Group by Purpose is enabled.
 
 **When to use Basic mode:**
 - When you want zero data collection before explicit consent
