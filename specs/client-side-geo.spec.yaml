@@ -69,8 +69,10 @@ architecture:
                                 enableConsentLogging, gpcEnabled, templateSettings } }
             for every candidate template (default template + all referenced by
             country/region rules that exist in the database, + 'default')
-          - consentReceipts flag; when on, a window.klaroConsentData base with
-            EMPTY template/geo fields (the resolver fills them)
+          - consentReceipts flag (the global consent receipts setting)
+        Also emit, ALWAYS, a window.klaroConsentData base with EMPTY
+        template/geo fields (the resolver fills them). It is built by
+        klaro_geo_build_consent_data(), the same builder server mode uses.
         MUST NOT emit detected geo values or a pre-selected template. Empty-string
         template references are kept in the rules (PHP treats '' as set → the
         validation fallback path; the JS mirror must see the same input).
@@ -130,13 +132,14 @@ architecture:
 
   consent_receipts:
     contract: |
-      In client mode the wp_localize_script klaroConsentData emission in
-      klaro_geo_enqueue_scripts() is SKIPPED (it would bake per-visitor values
-      and overwrite the resolver's assignments). The cache-safe base object is
-      emitted by the config content; the resolver fills templateName,
+      window.klaroConsentData is defined once, by the config content, in both
+      modes. klaro_geo_enqueue_scripts() MUST NOT localize a second copy onto
+      any script (it would bake per-visitor values and overwrite the
+      resolver's assignments). The resolver fills templateName,
       templateSource, detectedCountry, detectedRegion, enableConsentLogging and
       templateSettings before Klaro initializes, so no receipt can carry
-      unresolved values.
+      unresolved values. enableConsentLogging is set to the effective value:
+      payload.consentReceipts AND the selected template's enableConsentLogging.
 
   admin_debug_override:
     contract: |

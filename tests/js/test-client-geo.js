@@ -249,6 +249,24 @@ describe('Resolution fallback chain', function() {
         expect(window.klaroConsentData.templateSource).toBe('country');
     });
 
+    test('enableConsentLogging is the effective value: global receipts setting AND template setting', async function() {
+        mockFetchSuccess({ country: { iso_code: 'CA' } });
+
+        // Template has logging on, but receipts are disabled globally
+        await clientGeo.resolveAndApply(makePayload({ consentReceipts: false }));
+        expect(window.klaroConsentData.enableConsentLogging).toBe(false);
+
+        // Both on
+        await clientGeo.resolveAndApply(makePayload({ consentReceipts: true }));
+        expect(window.klaroConsentData.enableConsentLogging).toBe(true);
+
+        // Receipts enabled globally, but the selected template has logging off
+        const payload = makePayload({ consentReceipts: true });
+        payload.templates.strict.enableConsentLogging = false;
+        await clientGeo.resolveAndApply(payload);
+        expect(window.klaroConsentData.enableConsentLogging).toBe(false);
+    });
+
     test('AJAX failure + timezone fallback on → timezone source (region empty)', async function() {
         mockFetchFailure();
         mockTimezone('America/Vancouver');

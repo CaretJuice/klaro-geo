@@ -575,6 +575,66 @@ function klaro_geo_build_template_payload( $template_key, $templates, $services 
 }
 
 /**
+ * Build window.klaroConsentData, the one object the frontend scripts read
+ * plugin settings and the resolved template from.
+ *
+ * Emitted on every page in both geo modes. It is the only definition: nothing
+ * else may assign window.klaroConsentData server-side.
+ *
+ * enableConsentLogging is the effective value: the global consent receipts
+ * setting AND the template's own setting. The AJAX endpoint details are only
+ * included when receipts are enabled globally.
+ *
+ * @param array $payload  A payload from klaro_geo_build_template_payload().
+ * @param array $services The configured services.
+ * @param array $resolved Per-request values: templateName, templateSource,
+ *                        detectedCountry, detectedRegion, adminOverride.
+ *                        Client mode passes none; the resolver fills them.
+ * @return array
+ */
+function klaro_geo_build_consent_data( array $payload, array $services, array $resolved = array() ) {
+	$receipts_enabled = (bool) get_option( 'klaro_geo_enable_consent_receipts', false );
+	$service_maps     = klaro_geo_get_consent_mode_service_maps( $services );
+
+	$data = array(
+		'gtmId'                  => get_option( 'klaro_geo_gtm_id', '' ),
+		'consentModeType'        => get_option( 'klaro_geo_consent_mode_type', 'basic' ),
+		'templateName'           => $resolved['templateName'] ?? '',
+		'templateSource'         => $resolved['templateSource'] ?? '',
+		'detectedCountry'        => $resolved['detectedCountry'] ?? '',
+		'detectedRegion'         => $resolved['detectedRegion'] ?? '',
+		'adminOverride'          => ! empty( $resolved['adminOverride'] ),
+		'consentReceipts'        => $receipts_enabled,
+		'enableConsentLogging'   => $receipts_enabled && $payload['enable_consent_logging'],
+		'consentMode'            => 'v2',
+		'suppressConsentsEvents' => (bool) get_option( 'klaro_geo_suppress_consents_events', true ),
+		'consentModeServices'    => (object) $service_maps['consent_mode_services'],
+		'parentChildMap'         => (object) $service_maps['parent_child_map'],
+		'templateSettings'       => array_merge(
+			$payload['template_settings_block'],
+			array(
+				'config' => array(
+					'consent_mode_settings' => array(
+						'consent_defaults' => $payload['consent_defaults'],
+						'gtag_settings'    => array(
+							'ads_data_redaction' => $payload['gtag_settings']['ads_data_redaction'] === 'true',
+							'url_passthrough'    => $payload['gtag_settings']['url_passthrough'] === 'true',
+						),
+					),
+				),
+			)
+		),
+	);
+
+	if ( $receipts_enabled ) {
+		$data['ajaxUrl'] = admin_url( 'admin-ajax.php' );
+		$data['nonce']   = wp_create_nonce( 'klaro_geo_consent_nonce' );
+	}
+
+	return $data;
+}
+
+/**
  * Whether client-side geo resolution mode is active for this request.
  *
  * Client mode is skipped for admin debug overrides: logged-in requests bypass
@@ -660,27 +720,14 @@ function klaro_geo_generate_config_file() {
 	}
 
 	$klaro_config             = $payload['config'];
-	$template_config          = $payload['template_config'];
-	$dynamic_consent_defaults = $payload['consent_defaults'];
 	$gpc_enabled              = $payload['gpc_enabled'];
 	$gpc_purposes             = $payload['gpc_purposes'];
-	$ads_data_redaction       = $payload['gtag_settings']['ads_data_redaction'];
-	$url_passthrough          = $payload['gtag_settings']['url_passthrough'];
 	$custom_template_settings = array(
 		'enableConsentLogging' => $payload['enable_consent_logging'],
 	);
 
-	// Check if consent receipts are enabled
-	$enable_consent_receipts = get_option( 'klaro_geo_enable_consent_receipts', false );
-	klaro_geo_debug_log( 'Consent receipts enabled: ' . ( $enable_consent_receipts ? 'yes' : 'no' ) );
-
-	// Consent mode service maps (for klaroConsentData)
-	$service_maps          = klaro_geo_get_consent_mode_service_maps( $services );
-	$consent_mode_services = $service_maps['consent_mode_services'];
-	$parent_child_map      = $service_maps['parent_child_map'];
-
-	// Store consent defaults in globals for klaro_geo_add_gtm_head_script() to output
-	$GLOBALS['klaro_geo_consent_defaults'] = $dynamic_consent_defaults;
+	// Store consent defaults in globals for klaro_geo_enqueue_scripts() to output
+	$GLOBALS['klaro_geo_consent_defaults'] = $payload['consent_defaults'];
 	$GLOBALS['klaro_geo_gtag_settings']    = $payload['gtag_settings'];
 
 	// Generate the JavaScript content
@@ -823,86 +870,21 @@ if (klaroGeoGPC.detected) {
 		', consentLogging=' . ( $custom_template_settings['enableConsentLogging'] ? 'true' : 'false' )
 	);
 
-	// Define variables for consent receipts
-	$admin_ajax_url = admin_url( 'admin-ajax.php' );
-	$consent_nonce  = wp_create_nonce( 'klaro_geo_consent_nonce' );
+	// window.klaroConsentData: emitted once, on every page (see klaro_geo_build_consent_data()).
+	$consent_data = klaro_geo_build_consent_data(
+		$payload,
+		$services,
+		array(
+			'templateName'    => $template_to_use,
+			'templateSource'  => $template_source,
+			'detectedCountry' => $user_country,
+			'detectedRegion'  => $user_region,
+			'adminOverride'   => $using_debug_geo,
+		)
+	);
 
-	// Get the consent_mode value for JavaScript (always v2 - consent mode is always enabled)
-	$consent_mode    = 'v2';
-	$consent_mode_js = wp_json_encode( $consent_mode );
-
-	// Add consent receipt functionality if enabled
-	if ( $enable_consent_receipts ) {
-		// Prepare template settings values
-		$template_settings_block = $payload['template_settings_block'];
-
-		$modal_title       = $template_settings_block['consentModalTitle'];
-		$modal_description = $template_settings_block['consentModalDescription'];
-		$accept_all_text   = $template_settings_block['acceptAllText'];
-		$decline_all_text  = $template_settings_block['declineAllText'];
-
-		$default_consent      = $template_settings_block['defaultConsent'] ? 'true' : 'false';
-		$required_consent     = $template_settings_block['requiredConsent'] ? 'true' : 'false';
-		$admin_override_value = $using_debug_geo ? 'true' : 'false';
-
-		// Prepare custom template settings for JavaScript
-		$enable_consent_logging_value = $custom_template_settings['enableConsentLogging'] ? 'true' : 'false';
-
-		// NOTE: initialize_consent_mode has been removed - consent mode is always enabled
-
-		// Get dataLayer settings
-		$suppress_consents_events = get_option( 'klaro_geo_suppress_consents_events', true ) ? 'true' : 'false';
-
-		// Pre-encode consent_defaults for JavaScript output
-		$consent_defaults_json = wp_json_encode( $dynamic_consent_defaults );
-
-		// Get GTM ID for consent queue mode detection
-		$gtm_id = get_option( 'klaro_geo_gtm_id', '' );
-
-		// Get consent mode type (basic or advanced)
-		$consent_mode_type = get_option( 'klaro_geo_consent_mode_type', 'basic' );
-
-		// Pre-encode consent mode services map for JavaScript
-		$consent_mode_services_json = wp_json_encode( $consent_mode_services );
-		$parent_child_map_json      = wp_json_encode( $parent_child_map );
-
-		// Add variables for the consent receipts script
-		$klaro_config_content .= "// Consent Receipt Configuration\n";
-		$klaro_config_content .= "// NOTE: Consent mode is ALWAYS enabled - consent mode services are now first-class Klaro services\n";
-		$klaro_config_content .= "window.klaroConsentData = {\n";
-		$klaro_config_content .= '    gtmId: ' . wp_json_encode( $gtm_id ) . ",\n";
-		$klaro_config_content .= '    consentModeType: ' . wp_json_encode( $consent_mode_type ) . ",\n";
-		$klaro_config_content .= '    templateName: ' . wp_json_encode( $template_to_use ) . ",\n";
-		$klaro_config_content .= '    templateSource: ' . wp_json_encode( $template_source ) . ",\n";
-		$klaro_config_content .= '    detectedCountry: ' . wp_json_encode( $user_country ) . ",\n";
-		$klaro_config_content .= '    detectedRegion: ' . wp_json_encode( $user_region ) . ",\n";
-		$klaro_config_content .= '    adminOverride: ' . $admin_override_value . ",\n";
-		$klaro_config_content .= '    ajaxUrl: ' . wp_json_encode( $admin_ajax_url ) . ",\n";
-		$klaro_config_content .= '    nonce: ' . wp_json_encode( $consent_nonce ) . ",\n";
-		$klaro_config_content .= '    enableConsentLogging: ' . $enable_consent_logging_value . ",\n";
-		$klaro_config_content .= '    consentMode: ' . $consent_mode_js . ",\n";
-		$klaro_config_content .= '    suppressConsentsEvents: ' . $suppress_consents_events . ",\n";
-		$klaro_config_content .= '    consentModeServices: ' . $consent_mode_services_json . ",\n";
-		$klaro_config_content .= '    parentChildMap: ' . $parent_child_map_json . ",\n";
-		$klaro_config_content .= "    templateSettings: {\n";
-		$klaro_config_content .= '        consentModalTitle: ' . wp_json_encode( $modal_title ) . ",\n";
-		$klaro_config_content .= '        consentModalDescription: ' . wp_json_encode( $modal_description ) . ",\n";
-		$klaro_config_content .= '        acceptAllText: ' . wp_json_encode( $accept_all_text ) . ",\n";
-		$klaro_config_content .= '        declineAllText: ' . wp_json_encode( $decline_all_text ) . ",\n";
-		$klaro_config_content .= '        defaultConsent: ' . $default_consent . ",\n";
-		$klaro_config_content .= '        requiredConsent: ' . $required_consent . ",\n";
-		$klaro_config_content .= "        config: {\n";
-		$klaro_config_content .= "            consent_mode_settings: {\n";
-		$klaro_config_content .= '                consent_defaults: ' . $consent_defaults_json . ",\n";
-		$klaro_config_content .= "                gtag_settings: {\n";
-		$klaro_config_content .= '                    ads_data_redaction: ' . $ads_data_redaction . ",\n";
-		$klaro_config_content .= '                    url_passthrough: ' . $url_passthrough . "\n";
-		$klaro_config_content .= "                }\n";
-		$klaro_config_content .= "            }\n";
-		$klaro_config_content .= "        }\n";
-		$klaro_config_content .= "    }\n";
-		$klaro_config_content .= "};\n";
-	}
+	$klaro_config_content .= "// Plugin settings and resolved template for the frontend scripts\n";
+	$klaro_config_content .= 'window.klaroConsentData = ' . wp_json_encode( $consent_data, JSON_UNESCAPED_SLASHES ) . ";\n";
 
 	// Return the config content for use with wp_add_inline_script
 	return $klaro_config_content;
@@ -1033,12 +1015,6 @@ function klaro_geo_generate_client_config_content( $services ) {
 	$GLOBALS['klaro_geo_consent_defaults'] = $default_payload['consent_defaults'];
 	$GLOBALS['klaro_geo_gtag_settings']    = $default_payload['gtag_settings'];
 
-	// Check if consent receipts are enabled
-	$enable_consent_receipts = get_option( 'klaro_geo_enable_consent_receipts', false );
-
-	// Consent mode service maps (for klaroConsentData)
-	$service_maps = klaro_geo_get_consent_mode_service_maps( $services );
-
 	$timeout_ms = (int) get_option( 'klaro_geo_client_geo_timeout_ms', 2500 );
 	if ( $timeout_ms <= 0 ) {
 		$timeout_ms = 2500;
@@ -1062,7 +1038,7 @@ function klaro_geo_generate_client_config_content( $services ) {
 			'countries'        => (object) $rules_countries,
 		),
 		'templates'        => (object) $payload_templates,
-		'consentReceipts'  => (bool) $enable_consent_receipts,
+		'consentReceipts'  => (bool) get_option( 'klaro_geo_enable_consent_receipts', false ),
 	);
 
 	$content  = "// Klaro Geo client-side geo resolution payload\n";
@@ -1075,44 +1051,11 @@ function klaro_geo_generate_client_config_content( $services ) {
 	$content .= "window.gtag = window.gtag || function(){dataLayer.push(arguments);};\n";
 	$content .= "window.klaroGeo = window.klaroGeo || {};\n\n";
 
-	if ( $enable_consent_receipts ) {
-		// Static base for window.klaroConsentData. Geo/template fields are filled
-		// by the client resolver BEFORE Klaro initializes, so no receipt can be
-		// generated with unresolved values.
-		$consent_data_base = array(
-			'gtmId'                  => get_option( 'klaro_geo_gtm_id', '' ),
-			'consentModeType'        => get_option( 'klaro_geo_consent_mode_type', 'basic' ),
-			'templateName'           => '',
-			'templateSource'         => '',
-			'detectedCountry'        => '',
-			'detectedRegion'         => '',
-			'adminOverride'          => false,
-			'ajaxUrl'                => admin_url( 'admin-ajax.php' ),
-			'nonce'                  => wp_create_nonce( 'klaro_geo_consent_nonce' ),
-			'enableConsentLogging'   => $default_payload['enable_consent_logging'],
-			'consentMode'            => 'v2',
-			'suppressConsentsEvents' => (bool) get_option( 'klaro_geo_suppress_consents_events', true ),
-			'consentModeServices'    => (object) $service_maps['consent_mode_services'],
-			'parentChildMap'         => (object) $service_maps['parent_child_map'],
-			'templateSettings'       => array_merge(
-				$default_payload['template_settings_block'],
-				array(
-					'config' => array(
-						'consent_mode_settings' => array(
-							'consent_defaults' => $default_payload['consent_defaults'],
-							'gtag_settings'    => array(
-								'ads_data_redaction' => $default_payload['gtag_settings']['ads_data_redaction'] === 'true',
-								'url_passthrough'    => $default_payload['gtag_settings']['url_passthrough'] === 'true',
-							),
-						),
-					),
-				)
-			),
-		);
-
-		$content .= "// Consent Receipt Configuration (client mode: template/geo fields filled by resolver)\n";
-		$content .= 'window.klaroConsentData = ' . wp_json_encode( $consent_data_base, JSON_UNESCAPED_SLASHES ) . ";\n";
-	}
+	// Static base for window.klaroConsentData. Geo/template fields are filled
+	// by the client resolver BEFORE Klaro initializes, so no receipt can be
+	// generated with unresolved values.
+	$content .= "// Plugin settings for the frontend scripts (client mode: template/geo fields filled by resolver)\n";
+	$content .= 'window.klaroConsentData = ' . wp_json_encode( klaro_geo_build_consent_data( $default_payload, $services ), JSON_UNESCAPED_SLASHES ) . ";\n";
 
 	klaro_geo_debug_log(
 		'Client-mode config generated: templates=' . implode( ', ', array_keys( $payload_templates ) ) .

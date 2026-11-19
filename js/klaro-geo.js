@@ -242,36 +242,13 @@
 
   // Function to handle consent changes (moved from PHP)
   function handleConsentChange(manager) {
-      // Check if consent logging is enabled from the dataLayer first (country-specific setting)
-      let enableConsentLogging = true; // Default to true
+      // window.klaroConsentData.enableConsentLogging is the effective setting:
+      // receipts enabled globally AND consent logging enabled for this template.
+      const consentData = window.klaroConsentData;
+      const enableConsentLogging = !!(consentData && consentData.enableConsentLogging === true);
 
-      // Try to find the enableConsentLogging value from the dataLayer
-      if (window.dataLayer && Array.isArray(window.dataLayer)) {
-          // Look for the most recent klaroConfigLoaded event
-          for (let i = window.dataLayer.length - 1; i >= 0; i--) {
-              const item = window.dataLayer[i];
-              if (item &&
-                  item.event === 'Klaro Event' &&
-                  item.klaroEventName === 'klaroConfigLoaded' &&
-                  typeof item.klaroGeoEnableConsentLogging !== 'undefined') {
-                  enableConsentLogging = item.klaroGeoEnableConsentLogging === true;
-                  klaroGeoLog('Found enableConsentLogging in dataLayer:', enableConsentLogging);
-                  break;
-              }
-          }
-      }
-
-      // Fall back to the global setting if not found in dataLayer
-      if (window.klaroConsentData &&
-          (window.klaroConsentData.enableConsentLogging === "0" ||
-           window.klaroConsentData.enableConsentLogging === false ||
-           window.klaroConsentData.enableConsentLogging === undefined)) {
-          enableConsentLogging = false;
-      }
-
-      // If consent logging is disabled, store locally only and return
       if (!enableConsentLogging) {
-          klaroGeoLog('Consent logging is disabled for this template/country. Receipt stored locally only.');
+          klaroGeoLog('Consent logging is disabled for this template/country. No receipt generated.');
           return;
       }
 
@@ -303,38 +280,10 @@
       // Store the receipt in localStorage
       storeReceiptLocally(consentReceipt);
 
-      // Try to find the enableConsentLogging value from the dataLayer
-      if (window.dataLayer && Array.isArray(window.dataLayer)) {
-          // Look for the most recent klaroConfigLoaded event
-          for (let i = window.dataLayer.length - 1; i >= 0; i--) {
-              const item = window.dataLayer[i];
-              if (item &&
-                  item.event === 'Klaro Event' &&
-                  item.klaroEventName === 'klaroConfigLoaded' &&
-                  typeof item.klaroGeoEnableConsentLogging !== 'undefined') {
-                  enableConsentLogging = item.klaroGeoEnableConsentLogging === true;
-                  klaroGeoLog('Found enableConsentLogging in dataLayer for server send:', enableConsentLogging);
-                  break;
-              }
-          }
-      }
-
-      // Fall back to the global setting if not found in dataLayer
-      if (!enableConsentLogging && typeof window.klaroConsentData !== 'undefined' &&
-          typeof window.klaroConsentData.enableConsentLogging !== 'undefined') {
-          enableConsentLogging = window.klaroConsentData.enableConsentLogging !== "0" &&
-                                window.klaroConsentData.enableConsentLogging !== false;
-      }
-
-      // Only send to server if consent logging is enabled
-      if (enableConsentLogging) {
-          sendReceiptToServer(consentReceipt)
-              .catch(function(error) {
-                  console.error('Error from server when sending receipt:', error);
-              });
-      } else {
-          klaroGeoLog('Server-side consent logging is disabled for this template/country. Receipt stored locally only.');
-      }
+      sendReceiptToServer(consentReceipt)
+          .catch(function(error) {
+              console.error('Error from server when sending receipt:', error);
+          });
 
       // Push to dataLayer using event factory if available
       let receiptEvent;

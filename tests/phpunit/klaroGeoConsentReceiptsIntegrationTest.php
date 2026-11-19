@@ -54,41 +54,86 @@ class ConsentReceiptsIntegrationTest extends IgnoreDeprecatedTestCase {
     }
 
     /**
-     * Test that the JavaScript variables are added to the page when consent receipts are enabled.
+     * Decode the window.klaroConsentData object from generated config content.
+     *
+     * @param string $config_content Output of klaro_geo_generate_config_file().
+     * @return array
      */
-    public function test_js_variables_added() {
-        // Set up a test post
+    private function extract_consent_data($config_content) {
+        $this->assertSame(1, substr_count($config_content, 'window.klaroConsentData = '), 'klaroConsentData must be defined exactly once');
+        $this->assertSame(1, preg_match('/^window\.klaroConsentData = (\{.*\});$/m', $config_content, $matches), 'klaroConsentData should be a single JSON line');
+        $data = json_decode($matches[1], true);
+        $this->assertIsArray($data, 'klaroConsentData should be valid JSON');
+        return $data;
+    }
+
+    /**
+     * klaroConsentData reaches the page once, as part of the config attached to
+     * klaro-js. Nothing is localized onto the receipts script: a second copy
+     * there would overwrite the first with a smaller object.
+     */
+    public function test_consent_data_is_emitted_once_with_the_config() {
+        // Fresh script registry so an earlier test's enqueue cannot mask this one
+        unset($GLOBALS['wp_scripts']);
+
         $post_id = $this->factory->post->create();
         $this->go_to(get_permalink($post_id));
+        do_action('wp_enqueue_scripts');
 
-        // Capture the output of wp_head
-        ob_start();
-        do_action('wp_head');
-        $head_output = ob_get_clean();
+        $before = implode("\n", (array) wp_scripts()->get_data('klaro-js', 'before'));
+        $this->assertSame(1, substr_count($before, 'window.klaroConsentData = '), 'klaro-js config should define klaroConsentData exactly once');
 
-        // Capture the output of wp_footer
-        ob_start();
-        do_action('wp_footer');
-        $footer_output = ob_get_clean();
+        $this->assertTrue(wp_script_is('klaro-consent-receipts-js', 'enqueued'), 'Receipts script should be enqueued when receipts are enabled');
+        $this->assertEmpty(wp_scripts()->get_data('klaro-consent-receipts-js', 'data'), 'Nothing should be localized onto the receipts script');
+    }
 
-        // Check if the klaroConsentData object is added
-        $this->assertStringContainsString('klaroConsentData', $head_output . $footer_output, 'klaroConsentData object should be added');
+    /**
+     * With receipts enabled, klaroConsentData carries everything the frontend
+     * scripts read, with real booleans.
+     */
+    public function test_consent_data_contents_when_receipts_enabled() {
+        update_option('klaro_geo_gtm_id', 'GTM-TEST123');
+        update_option('klaro_geo_consent_mode_type', 'advanced');
 
-        // Generate the config content (returned as string since 0.3.5; no longer written to disk)
-        $config_content = klaro_geo_generate_config_file();
-        $plugin_dir = plugin_dir_path(dirname(dirname(__FILE__)));
+        $data = $this->extract_consent_data(klaro_geo_generate_config_file());
 
-        // Check that the config content contains the klaroConsentData object
-        $this->assertStringContainsString('window.klaroConsentData', $config_content, 'Config should include klaroConsentData object');
+        delete_option('klaro_geo_gtm_id');
+        delete_option('klaro_geo_consent_mode_type');
 
-        // Now check the klaro-geo.js file for the moved functionality
-        $klaro_geo_js_file = $plugin_dir . 'js/klaro-geo.js';
-        $this->assertFileExists($klaro_geo_js_file, 'klaro-geo.js file should exist');
-        $geo_js_content = file_get_contents($klaro_geo_js_file);
-        
-        // Check for the handleConsentChange function in klaro-geo.js
-        $this->assertStringContainsString('function handleConsentChange', $geo_js_content, 'klaro-geo.js should contain handleConsentChange function');
-        $this->assertStringContainsString('handleKlaroConsentEvents', $geo_js_content, 'klaro-geo.js should contain handleKlaroConsentEvents function');
+        $this->assertSame('GTM-TEST123', $data['gtmId']);
+        $this->assertSame('advanced', $data['consentModeType']);
+        $this->assertTrue($data['consentReceipts']);
+        $this->assertIsBool($data['enableConsentLogging']);
+        $this->assertIsBool($data['adminOverride']);
+        $this->assertIsBool($data['suppressConsentsEvents']);
+        $this->assertArrayHasKey('consentModeServices', $data);
+        $this->assertArrayHasKey('parentChildMap', $data);
+        $this->assertArrayHasKey('consent_defaults', $data['templateSettings']['config']['consent_mode_settings']);
+        $this->assertNotEmpty($data['nonce']);
+        $this->assertStringContainsString('admin-ajax.php', $data['ajaxUrl']);
+    }
+
+    /**
+     * enableConsentLogging is the effective value: receipts enabled globally
+     * AND consent logging enabled on the template.
+     */
+    public function test_enable_consent_logging_is_the_effective_value() {
+        $payload = array(
+            'enable_consent_logging'  => true,
+            'consent_defaults'        => array(),
+            'gtag_settings'           => array('ads_data_redaction' => 'true', 'url_passthrough' => 'false'),
+            'template_settings_block' => array(),
+        );
+
+        update_option('klaro_geo_enable_consent_receipts', true);
+        $this->assertTrue(klaro_geo_build_consent_data($payload, array())['enableConsentLogging'], 'global on + template on');
+
+        $payload['enable_consent_logging'] = false;
+        $this->assertFalse(klaro_geo_build_consent_data($payload, array())['enableConsentLogging'], 'global on + template off');
+
+        $payload['enable_consent_logging'] = true;
+        update_option('klaro_geo_enable_consent_receipts', false);
+        $this->assertFalse(klaro_geo_build_consent_data($payload, array())['enableConsentLogging'], 'global off + template on');
     }
 
     /**
@@ -231,37 +276,29 @@ class ConsentReceiptsIntegrationTest extends IgnoreDeprecatedTestCase {
     }
 
     /**
-     * Test that consent receipts are not processed when the feature is disabled.
-     *
-     * @expectedDeprecated the_block_template_skip_link
+     * With receipts disabled, klaroConsentData is still emitted (the frontend
+     * needs gtmId and consentModeType regardless), but logging is off and the
+     * AJAX endpoint details are withheld.
      */
     public function test_disabled_consent_receipts() {
-        // Disable consent receipts
         update_option('klaro_geo_enable_consent_receipts', false);
+        update_option('klaro_geo_consent_mode_type', 'advanced');
 
-        // Generate the config content (returned as string since 0.3.5; no longer written to disk)
-        $config_content = klaro_geo_generate_config_file();
-        $this->assertIsString($config_content, 'Config generation failed');
+        $data = $this->extract_consent_data(klaro_geo_generate_config_file());
 
-        // Check that consent receipt code is not included
-        // When consent receipts are disabled, the klaroConsentData object should not be present
-        $this->assertStringNotContainsString('window.klaroConsentData = {', $config_content, 'Config should not include klaroConsentData object when disabled');
-        $this->assertStringNotContainsString('enableConsentLogging:', $config_content, 'Config should not include enableConsentLogging setting when disabled');
+        delete_option('klaro_geo_consent_mode_type');
 
-        // Set up a test post
+        $this->assertFalse($data['consentReceipts']);
+        $this->assertFalse($data['enableConsentLogging']);
+        $this->assertSame('advanced', $data['consentModeType'], 'consentModeType must not depend on the receipts setting');
+        $this->assertArrayNotHasKey('nonce', $data);
+        $this->assertArrayNotHasKey('ajaxUrl', $data);
+
+        // The receipts script is not enqueued
+        unset($GLOBALS['wp_scripts']);
         $post_id = $this->factory->post->create();
         $this->go_to(get_permalink($post_id));
-
-        // Temporarily suppress deprecation notices
-        $old_filter = $GLOBALS['wp_filter']['deprecated_function_trigger_error'];
-        add_filter('deprecated_function_trigger_error', '__return_false', 999);
-
-        // Capture the output of wp_footer
-        ob_start();
-        do_action('wp_footer');
-        $footer_output = ob_get_clean();
-
-        // Restore the original filter
-        $GLOBALS['wp_filter']['deprecated_function_trigger_error'] = $old_filter;
+        do_action('wp_enqueue_scripts');
+        $this->assertFalse(wp_script_is('klaro-consent-receipts-js', 'enqueued'));
     }
 }

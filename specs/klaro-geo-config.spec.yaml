@@ -202,11 +202,44 @@ data_structures:
     plugin_settings:
       enable_consent_logging: "bool"
     consent_mode_settings:
-      # NOTE: initialize_consent_mode has been REMOVED - consent mode is always enabled
-      # NOTE: The plugin does NOT call gtag consent commands - GTM template handles this
-      # This simplifies the codebase and ensures all tag managers can read the consentMode object
-      analytics_storage_service: "string - Service name that controls analytics_storage"
-      ad_storage_service: "string - Service name that controls ad_storage"
+      # NOTE: initialize_consent_mode and initialization_code have been REMOVED -
+      # consent mode is always enabled, and both keys are stripped from klaroConfig.
+      # NOTE: The template-level analytics_storage_service / ad_storage_service
+      # mappings are REMOVED. Consent mode keys come from services with
+      # is_consent_mode_service=true and a consent_mode_key.
+      gtag_settings:
+        ads_data_redaction: "string - 'true' or 'false' (default 'true')"
+        url_passthrough: "string - 'true' or 'false' (default 'false')"
+
+  klaro_consent_data:
+    description: |
+      window.klaroConsentData - plugin settings and the resolved template for the
+      frontend scripts. Built by klaro_geo_build_consent_data() and emitted as one
+      JSON assignment in the config content.
+    rules:
+      - "MUST be emitted on every frontend page, in both geo modes, whether or not consent receipts are enabled"
+      - "MUST be defined exactly once per page; nothing else may assign it server-side (no wp_localize_script copy)"
+      - "All flags MUST be real booleans, never '1' / '0' / '' strings"
+      - "enableConsentLogging is the EFFECTIVE value: global consent receipts setting AND the template's enable_consent_logging"
+      - "ajaxUrl and nonce are present ONLY when consent receipts are enabled globally"
+      - "Frontend scripts read settings from this object, not from dataLayer events"
+    fields:
+      gtmId: "string"
+      consentModeType: "string - 'basic' or 'advanced'"
+      templateName: "string - empty in client mode until the resolver fills it"
+      templateSource: "string - empty in client mode until the resolver fills it"
+      detectedCountry: "string"
+      detectedRegion: "string"
+      adminOverride: "bool"
+      consentReceipts: "bool - global consent receipts setting"
+      enableConsentLogging: "bool - effective value, see rules"
+      consentMode: "string - always 'v2'"
+      suppressConsentsEvents: "bool"
+      consentModeServices: "object - consent_mode_key => service name"
+      parentChildMap: "object - parent service name => child service names"
+      templateSettings: "object - condensed template settings, including config.consent_mode_settings.consent_defaults and gtag_settings (booleans)"
+      ajaxUrl: "string - only when receipts are enabled"
+      nonce: "string - only when receipts are enabled"
 
   effective_settings:
     template: "string - Template key to use"

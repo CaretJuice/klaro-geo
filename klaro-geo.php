@@ -446,60 +446,24 @@ function klaro_geo_enqueue_scripts() {
 		3
 	);
 
-	wp_enqueue_script(
-		'klaro-geo-admin-bar-js',
-		plugins_url( 'js/klaro-geo-admin-bar.js', __FILE__ ),
-		array( 'jquery', 'klaro-js' ),
-		'1.0',
-		true
-	);
-	wp_localize_script(
-		'klaro-geo-admin-bar-js',
-		'klaroGeoAdminBar',
-		array(
-			'nonce' => wp_create_nonce( 'klaro_geo_debug_geo' ),
-		)
-	);
-
-	// Enqueue the consent mode extension script if needed
-	$template_settings = Klaro_Geo_Template_Settings::get_instance();
-	$templates         = $template_settings->get();
-
-	// Get user location
-	$location        = klaro_geo_get_user_location();
-	$user_country    = $location['country'];
-	$user_region     = $location['region'];
-	$using_debug_geo = $location['is_admin_override'];
-
-	// Get effective settings for the location, passing the admin override flag
-	$effective_settings = klaro_geo_get_effective_settings(
-		$user_country . ( $user_region ? '-' . $user_region : '' ),
-		$using_debug_geo
-	);
-
-	// Get template to use
-	$template_to_use = $effective_settings['template'] ?? 'default';
-
-	// Get the template config
-	$template_config = $templates[ $template_to_use ] ?? $templates['default'] ?? klaro_geo_get_default_templates()['default'];
-
-	// Get consent mode settings from template
-	// NOTE: Consent mode is ALWAYS enabled - no toggle check needed
-	// First check if consent_mode_settings is directly in the template
-	if ( isset( $template_config['consent_mode_settings'] ) ) {
-		$consent_mode_settings = $template_config['consent_mode_settings'];
-	} elseif ( isset( $template_config['config'] ) && isset( $template_config['config']['consent_mode_settings'] ) ) {
-		$consent_mode_settings = $template_config['config']['consent_mode_settings'];
-	} else {
-		$consent_mode_settings = [];
+	// The admin bar debug-geo menu is only rendered for administrators, so only
+	// they need its script (and the jQuery it depends on).
+	if ( current_user_can( 'manage_options' ) ) {
+		wp_enqueue_script(
+			'klaro-geo-admin-bar-js',
+			plugins_url( 'js/klaro-geo-admin-bar.js', __FILE__ ),
+			array( 'jquery', 'klaro-js' ),
+			KLARO_GEO_VERSION,
+			true
+		);
+		wp_localize_script(
+			'klaro-geo-admin-bar-js',
+			'klaroGeoAdminBar',
+			array(
+				'nonce' => wp_create_nonce( 'klaro_geo_debug_geo' ),
+			)
+		);
 	}
-
-	// Remove legacy initialize_consent_mode if present
-	unset( $consent_mode_settings['initialize_consent_mode'] );
-
-	// Debug log the consent mode settings (always enabled)
-	klaro_geo_debug_log( 'Consent mode enabled (always on) in wp_enqueue_scripts' );
-	klaro_geo_debug_log( 'Template config consent_mode_settings: ' . wp_json_encode( $consent_mode_settings ) );
 
 	if ( get_option( 'klaro_geo_enable_consent_receipts', false ) ) {
 		wp_enqueue_script(
@@ -510,70 +474,8 @@ function klaro_geo_enqueue_scripts() {
 			true
 		);
 
-		// Client mode: window.klaroConsentData is emitted cache-safely by the
-		// generated config content and filled by the client resolver — baking
-		// per-visitor values here would defeat cache safety (and this localized
-		// object would overwrite the resolver's assignments).
-		if ( ! $client_geo_active ) {
-			// Get user location for the script
-			$location        = klaro_geo_get_user_location();
-			$user_country    = $location['country'];
-			$user_region     = $location['region'];
-			$using_debug_geo = $location['is_admin_override'];
-
-			// Get template information, passing the admin override flag
-			$effective_settings = klaro_geo_get_effective_settings(
-				$user_country . ( $user_region ? '-' . $user_region : '' ),
-				$using_debug_geo
-			);
-			$template_to_use    = $effective_settings['template'] ?? 'default';
-
-			// Determine template source
-			$template_source = 'fallback';
-
-			// Use the source from effective settings
-			if ( isset( $effective_settings['source'] ) ) {
-				$template_source = $effective_settings['source'];
-			}
-
-			// Get template settings from the database
-			$template_settings = Klaro_Geo_Template_Settings::get_instance();
-			$templates         = $template_settings->get();
-			$template_config   = $templates[ $template_to_use ] ?? $templates['default'] ?? klaro_geo_get_default_templates()['default'];
-
-			// Debug log the admin override value
-			klaro_geo_debug_log( 'Admin override value being passed to JavaScript: ' . ( $using_debug_geo ? 'true' : 'false' ) );
-
-			// Get plugin settings from the template
-			$plugin_settings = isset( $templates[ $template_to_use ]['plugin_settings'] ) ?
-				$templates[ $template_to_use ]['plugin_settings'] :
-				array( 'enable_consent_logging' => true );
-
-			// Get enableConsentLogging setting
-			$enable_consent_logging = isset( $plugin_settings['enable_consent_logging'] ) ?
-				(bool) $plugin_settings['enable_consent_logging'] : true;
-
-			// Debug log the settings
-			klaro_geo_debug_log( 'Plugin settings for template ' . $template_to_use . ': ' . wp_json_encode( $plugin_settings ) );
-			klaro_geo_debug_log( 'enableConsentLogging: ' . ( $enable_consent_logging ? 'true' : 'false' ) );
-
-			// Add variables for the consent receipts script
-			wp_localize_script(
-				'klaro-consent-receipts-js',
-				'klaroConsentData',
-				array(
-					'ajaxUrl'              => admin_url( 'admin-ajax.php' ),
-					'nonce'                => wp_create_nonce( 'klaro_geo_consent_nonce' ),
-					'enableConsentLogging' => $enable_consent_logging,
-					'templateName'         => $template_to_use,
-					'templateSource'       => $template_source,
-					'detectedCountry'      => $user_country,
-					'detectedRegion'       => $user_region,
-					'adminOverride'        => $using_debug_geo ? true : false,
-					'templateSettings'     => $template_config,
-				)
-			);
-		} // end if ( ! $client_geo_active )
+		// window.klaroConsentData is emitted by the generated config content in
+		// both geo modes; do not localize a second copy onto this script.
 	}
 
 	// Get settings for the consent button
@@ -602,7 +504,9 @@ function klaro_geo_enqueue_scripts() {
 	wp_enqueue_script(
 		'klaro-geo-consent-button-js',
 		KLARO_GEO_URL . 'js/klaro-geo-consent-button.js',
-		array(),
+		// The script is written against jQuery. It used to rely on the admin bar
+		// script pulling jQuery in for every visitor; declare the dependency.
+		array( 'jquery' ),
 		KLARO_GEO_VERSION,
 		array(
 			'in_footer' => true,

@@ -395,7 +395,8 @@
             window.klaroConsentData.detectedCountry = geo.country || '';
             window.klaroConsentData.detectedRegion = geo.region || '';
             window.klaroConsentData.adminOverride = false;
-            window.klaroConsentData.enableConsentLogging = !!template.enableConsentLogging;
+            // Effective value: the global receipts setting AND the template's own setting
+            window.klaroConsentData.enableConsentLogging = payload.consentReceipts === true && !!template.enableConsentLogging;
             if (template.templateSettings) {
                 window.klaroConsentData.templateSettings = {
                     consentModalTitle: template.templateSettings.consentModalTitle,
