@@ -78,7 +78,7 @@ echo "GTM ID set to GTM-M2Z9TF4J"
 # Enable consent receipt logging (must match klaro-geo.php:220)
 wp option update klaro_geo_enable_consent_receipts 1 --allow-root --path=/var/www/html 2>/dev/null || true
 
-# Let the plugin use its default services (which includes GTM as required:true, default:true)
+# Let the plugin use its default services (GTM: required = Use Global Setting, so each template's Required decides)
 # The default services are defined in includes/klaro-geo-defaults.php
 echo "Using default plugin services (GTM, Google Analytics, Google Ads)"
 

@@ -128,8 +128,10 @@ class CorruptTemplateConfigTest extends WP_UnitTestCase {
 		$klaro   = $payload['config'];
 
 		$this->assertTrue( $klaro['default'], 'A valid config must still be copied' );
-		$this->assertTrue( $klaro['required'], 'A valid config must still be copied' );
 		$this->assertTrue( $klaro['mustConsent'], 'A valid config must still be copied' );
+
+		// required is applied per service, never as Klaro's global flag (issue #6)
+		$this->assertFalse( $klaro['required'], 'Global required must never reach Klaro' );
 	}
 
 	/**

@@ -128,7 +128,7 @@ function klaro_geo_services_page_content() {
 					<option value="true">Yes</option>
 					<option value="false">No</option>
 				</select>
-				<p class="description">When set to "Use Global Setting", this service will inherit the required setting from the template. When set to "Yes", users cannot decline this service. Only use for essential services that are required for your website to function.</p><br>
+				<p class="description">When set to "Use Global Setting", this service will inherit the required setting from each template, so it can be required in some templates and declinable in others (useful for Google Tag Manager). When set to "Yes", users cannot decline this service. Only use for essential services that are required for your website to function.</p><br>
 
 				<label for="service_default">Default:</label><br>
 				<select id="service_default" name="service_default">

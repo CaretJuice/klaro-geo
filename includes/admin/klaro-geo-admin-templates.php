@@ -574,7 +574,7 @@ function klaro_geo_templates_page() {
 							<input type="checkbox" name="template_config[required]" id="template_config_required" value="true"
 								<?php checked( isset( $current_config['required'] ) ? $current_config['required'] : false ); ?>>
 							<p class="description">
-							When enabled, users cannot decline services &mdash; Klaro grants every service even when the visitor clicks Decline. Only use for essential services that are required for your website to function. This setting can also be overridden per-service.</p>
+							When enabled, services whose Required field is set to &ldquo;Use Global Setting&rdquo; on the Services page are required in this template: visitors cannot decline them and they load on every page. Services set to Yes or No ignore this setting. Typical use: set Google Tag Manager to &ldquo;Use Global Setting&rdquo;, enable this in most templates, and leave it off in templates for regions where GTM needs consent.</p>
 						</td>
 					</tr>
 					<tr>

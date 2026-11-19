@@ -86,7 +86,7 @@ class KlaroGeoServiceSettingsClassTest extends WP_UnitTestCase {
                 // Check service properties
                 $this->assertEquals('Google Tag Manager', $service['title']);
                 $this->assertEquals(array('infrastructure'), $service['purposes']);
-                $this->assertFalse($service['required']);
+                $this->assertNull($service['required'], 'GTM inherits Required from each template');
                 $this->assertFalse($service['default']);
                 
                 break;

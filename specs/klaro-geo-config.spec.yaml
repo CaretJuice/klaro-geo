@@ -64,6 +64,16 @@ business_rules:
       - "Log WARNING when falling back to hardcoded defaults"
       - "Log WARNING when auto-detection of cookieDomain fails"
 
+  required_resolution:
+    description: "How the template's Required setting reaches Klaro (issue #6)"
+    rules:
+      - "klaroConfig.required MUST always be false. Klaro's changeAll() grants every service when it is true (Decline accepted everything) and its UI keeps such services switchable while loading them"
+      - "Every Klaro service entry MUST carry an explicit required, resolved by klaro_geo_resolve_service_required()"
+      - "A service whose stored required is null, missing, '' or 'global' (Use Global Setting) MUST take the template's Required setting"
+      - "A service with an explicit required (true/false) MUST keep it regardless of the template"
+      - "Consent defaults MUST use the same resolved value (required → 'granted')"
+      - "The default google-tag-manager service MUST use required=null, so each template decides"
+
   config_completeness:
     description: "klaroConfig must match what the templates admin page shows"
     rules:

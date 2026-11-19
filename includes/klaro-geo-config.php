@@ -57,6 +57,25 @@ function klaro_geo_get_admin_true_by_default_keys() {
 }
 
 /**
+ * Whether a service is required under a given template.
+ *
+ * A service's own Required setting wins. When it is "Use Global Setting"
+ * (stored as null, or missing), the template's Required setting applies, so
+ * one service (typically google-tag-manager) can be required in one template
+ * and consent-gated in another.
+ *
+ * @param array $service           The stored service.
+ * @param bool  $template_required The template's Required setting.
+ * @return bool
+ */
+function klaro_geo_resolve_service_required( array $service, $template_required ) {
+	if ( ! isset( $service['required'] ) || '' === $service['required'] || 'global' === $service['required'] ) {
+		return (bool) $template_required;
+	}
+	return filter_var( $service['required'], FILTER_VALIDATE_BOOLEAN );
+}
+
+/**
  * Give Klaro a title and description for every configured built-in purpose,
  * and a purpose display order.
  *
@@ -300,6 +319,16 @@ function klaro_geo_build_template_payload( $template_key, $templates, $services 
 
 	klaro_geo_apply_purpose_defaults( $klaro_config, $template_to_use );
 
+	// Never hand Klaro a global required=true. Klaro's changeAll() grants every
+	// service when config.required is set, so Decline accepted everything,
+	// including services explicitly marked not required; its UI also kept such
+	// services switchable while loading them regardless. The template's Required
+	// setting is applied per service instead (klaro_geo_resolve_service_required()).
+	if ( ! empty( $klaro_config['required'] ) ) {
+		klaro_geo_debug_log( 'Template "' . $template_to_use . '" Required=true applied per service to services set to "Use Global Setting"; global config.required set to false' );
+	}
+	$klaro_config['required'] = false;
+
 	// Set default cookiePath if not configured
 	if ( ! isset( $klaro_config['cookiePath'] ) || empty( $klaro_config['cookiePath'] ) ) {
 		$klaro_config['cookiePath'] = '/';
@@ -341,6 +370,11 @@ function klaro_geo_build_template_payload( $template_key, $templates, $services 
 	// Get template's default consent state (for inheritance)
 	$template_default_consent = isset( $template_config['config']['default'] ) && $template_config['config']['default'] ? true : false;
 
+	// Template's required setting, applied per service to services set to
+	// "Use Global Setting" (see klaro_geo_resolve_service_required()).
+	$template_required = isset( $template_config['config']['required'] ) &&
+		filter_var( $template_config['config']['required'], FILTER_VALIDATE_BOOLEAN );
+
 	// Get gtag settings from template if available (ads_data_redaction, url_passthrough)
 	$consent_mode_settings = array();
 	if ( isset( $template_config['consent_mode_settings'] ) ) {
@@ -379,7 +413,7 @@ function klaro_geo_build_template_payload( $template_key, $templates, $services 
 			// 1. Required services → always 'granted'
 			// 2. Service has explicit default → use it
 			// 3. Otherwise → inherit from template default
-			$is_required          = isset( $service['required'] ) && filter_var( $service['required'], FILTER_VALIDATE_BOOLEAN );
+			$is_required          = klaro_geo_resolve_service_required( $service, $template_required );
 			$has_explicit_default = isset( $service['default'] ) && $service['default'] !== null && $service['default'] !== '';
 
 			if ( $is_required ) {
@@ -407,12 +441,12 @@ function klaro_geo_build_template_payload( $template_key, $templates, $services 
 			'onDecline' => '',
 		);
 
-		// Only add required and default if they're explicitly set (not null)
-		// This allows inheriting these values from the template
-		if ( isset( $service['required'] ) && $service['required'] !== null ) {
-			$service_config['required'] = filter_var( $service['required'], FILTER_VALIDATE_BOOLEAN );
-		}
+		// Always emit required per service, resolving "Use Global Setting" against
+		// this template, so Klaro never needs its global config.required (see below).
+		$service_config['required'] = klaro_geo_resolve_service_required( $service, $template_required );
 
+		// default is only emitted when explicit; Klaro falls back to config.default
+		// for the rest, which inherits correctly.
 		if ( isset( $service['default'] ) && $service['default'] !== null ) {
 			$service_config['default'] = filter_var( $service['default'], FILTER_VALIDATE_BOOLEAN );
 		}

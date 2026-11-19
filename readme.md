@@ -116,7 +116,7 @@ Navigate to **Klaro Geo > Templates** to manage consent banner templates.
   - Width: Width of the consent notice.
 - **Behavior Settings**:
   - Default State: Default state for services if the user doesn't make a choice
-  - Required: When enabled, users cannot decline services. Only use for essential services that are required for your website to function. This setting can also be overridden per-service.
+  - Required: When enabled, every service whose Required field is "Use Global Setting" is required in this template: visitors cannot decline it and it loads on every page. Services set to Yes or No on the Services page ignore this. This is how one service, typically Google Tag Manager, can be required in some templates and consent-gated in others.
   - HTML Texts: Allow HTML in text fields.
   - Embedded Mode: If enabled, Klaro will render without the modal background, allowing you to embed it into a specific element of your website, such as your privacy notice. 
   - No Auto Load: If enabled, Klaro will not automatically load itself when the page is being loaded. You'll need to manually trigger it.
@@ -387,7 +387,7 @@ In Basic mode the `google-tag-manager` service gates GTM itself. A visitor who h
 
 If you want `Klaro Consent Update` to fire on every page view, including for visitors who decline everything, choose one of:
 
-- **Mark the `google-tag-manager` service as Required** (Klaro Geo > Services). Klaro then loads GTM for every visitor and visitors cannot turn it off. Individual tags are still gated by their consent keys, so declining analytics or advertising still blocks those tags. In effect GTM behaves as in Advanced mode, so check that loading GTM before consent fits your legal interpretation.
+- **Make GTM required in the templates where that fits your legal interpretation.** The `google-tag-manager` service defaults to Required = "Use Global Setting", so enabling **Required** on a template makes GTM required for visitors who get that template, while a template for, say, Germany can leave it off. Where it is required, Klaro loads GTM for every visitor and visitors cannot turn it off. (Setting the service itself to Required = Yes makes it required in every template.) Individual tags are still gated by their consent keys, so declining analytics or advertising still blocks those tags. In effect GTM behaves as in Advanced mode, so check that loading GTM before consent fits your legal interpretation.
 - **Switch to Advanced mode**, which loads GTM ungated. Visitors can still toggle the `google-tag-manager` service off in the dialog, which sets `google_tag_manager_consent` to `denied` for tags that require it.
 
 Leave GTM consent-gated (Basic mode, not required) if you need zero contact with Google before consent and accept that GTM sees nothing from visitors who decline it.

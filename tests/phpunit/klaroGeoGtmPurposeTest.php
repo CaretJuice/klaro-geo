@@ -62,7 +62,7 @@ class GtmPurposeTest extends WP_UnitTestCase {
 
 		$this->assertNotNull( $gtm );
 		$this->assertSame( array( 'infrastructure' ), $gtm['purposes'] );
-		$this->assertFalse( $gtm['required'], 'GTM must stay consent-gated' );
+		$this->assertNull( $gtm['required'], 'GTM must inherit Required from each template (issue #6)' );
 	}
 
 	/**

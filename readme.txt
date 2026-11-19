@@ -75,7 +75,7 @@ Geolocation is optional. Without it, the fallback template is shown to all visit
 
 = Why do my GTM tags never fire for visitors who decline Google Tag Manager? =
 
-In Basic mode, the Google Tag Manager service gates GTM itself, so a visitor who has not consented to it never loads GTM and no GTM trigger or tag can run for them, including the `Klaro Consent Update` trigger. To have GTM run for every visitor while still gating individual tags by consent, mark the Google Tag Manager service as Required under **Klaro Geo > Services**, or switch to Advanced mode. Both load GTM before consent, so confirm that fits your legal interpretation.
+In Basic mode, the Google Tag Manager service gates GTM itself, so a visitor who has not consented to it never loads GTM and no GTM trigger or tag can run for them, including the `Klaro Consent Update` trigger. To have GTM run for every visitor while still gating individual tags by consent, enable **Required** on the templates where that fits (the Google Tag Manager service inherits it by default, so other templates can keep GTM consent-gated), or switch to Advanced mode. Both load GTM before consent, so confirm that fits your legal interpretation.
 
 = How do I trigger non-Google tags based on consent? =
 

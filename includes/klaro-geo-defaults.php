@@ -331,7 +331,9 @@ function klaro_geo_get_default_services( $defaults = null ) {
 		[
 			'name'         => 'google-tag-manager',
 			'title'        => 'Google Tag Manager',
-			'required'     => false,
+			// Use Global Setting: each template's Required decides, so GTM can be
+			// required in most regions and consent-gated where the law calls for it.
+			'required'     => null,
 			'purposes'     => [ 'infrastructure' ],
 			'default'      => false,
 			'cookies'      => [],
