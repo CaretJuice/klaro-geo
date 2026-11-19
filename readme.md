@@ -375,9 +375,20 @@ In Advanced mode, **GTM loads immediately** (without Klaro gating) but all conse
 | Data sent before consent | None | Cookieless pings only (if configured in GA4) |
 | Consent defaults | `denied` (set in `<head>` via `gtag`) | `denied` (set in `<head>` via `gtag`) |
 | Behavioral modeling | Not available | Available |
-| `Klaro Consent Update` on initial load | Skipped (GTM not loaded yet) | Pushed immediately |
+| `Klaro Consent Update` on initial load | Skipped until the visitor consents to GTM (GTM not loaded yet) | Pushed immediately |
 | GTM script tag | `type="text/plain"` with `data-name` | Normal `<script>` tag |
 | User can revoke GTM consent | Yes (via consent dialog) | Yes (via consent dialog) |
+
+#### When a Visitor Declines Google Tag Manager
+
+In Basic mode the `google-tag-manager` service gates GTM itself. A visitor who has not consented to it (every fresh visitor until they choose, and every returning visitor who declined it) never loads GTM, so **nothing configured in GTM runs for them**: no `Klaro Consent Update` trigger, no `All Pages` trigger, no tags of any kind. This is the point of Basic mode, but it means the single-trigger setup only ever sees visitors who consented to GTM.
+
+If you want `Klaro Consent Update` to fire on every page view, including for visitors who decline everything, choose one of:
+
+- **Mark the `google-tag-manager` service as Required** (Klaro Geo > Services). Klaro then loads GTM for every visitor and visitors cannot turn it off. Individual tags are still gated by their consent keys, so declining analytics or advertising still blocks those tags. In effect GTM behaves as in Advanced mode, so check that loading GTM before consent fits your legal interpretation.
+- **Switch to Advanced mode**, which loads GTM ungated. Visitors can still toggle the `google-tag-manager` service off in the dialog, which sets `google_tag_manager_consent` to `denied` for tags that require it.
+
+Leave GTM consent-gated (Basic mode, not required) if you need zero contact with Google before consent and accept that GTM sees nothing from visitors who decline it.
 
 #### Configuring Tag Triggers in GTM
 

@@ -254,6 +254,7 @@ events:
       - Plugin calls gtag('consent', 'update', ...) BEFORE pushing this event
       - This event is the recommended trigger for GA4 and other tags
       - In Basic GTM mode, skipped for initialConsents when GTM not yet consented
+      - NOT skipped when consent values match consent_defaults (only the redundant gtag update is skipped)
 
   # ---------------------------------------------------------------------------
   # KLARO FORWARDED EVENTS (examples - Klaro may add more)

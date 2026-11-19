@@ -218,6 +218,15 @@ queue:
 
       Exception: In Advanced Consent Mode, GTM loads immediately (not gated by
       Klaro), so the skip is bypassed and 'Klaro Consent Update' is always pushed.
+      The same applies in Basic mode when the google-tag-manager service is
+      required, because Klaro then reports it as consented on every page load.
+
+      Matching defaults (issue #4): on initialConsents, when every consent value
+      matches the consent_defaults set in <head> (always the case for a fresh
+      visitor), the gtag('consent', 'update') call is redundant and is skipped.
+      'Klaro Consent Update' is still pushed, subject only to the Basic GTM rule
+      above. Skipping the event here previously meant fresh visitors never got
+      the initial trigger or a queue flush in any mode.
 
     behavior:
       basic_mode_new_user_no_consent:
@@ -255,7 +264,9 @@ queue:
       - MUST NOT skip 'Klaro Consent Update' for initialConsents in Advanced mode
       - MUST always push 'Klaro Consent Update' for saveConsents
       - MUST always push 'Klaro Consent Update' when GTM is already consented
-      - MUST always call gtag('consent', 'update') regardless of skip condition
+      - MUST call gtag('consent', 'update') regardless of the Basic GTM skip condition
+      - MAY skip gtag('consent', 'update') on initialConsents when all values match consent_defaults
+      - MUST NOT skip 'Klaro Consent Update' because values match consent_defaults
 
   queue_flushed_event:
     description: |

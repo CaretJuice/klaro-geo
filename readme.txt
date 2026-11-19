@@ -73,6 +73,10 @@ Geolocation is optional. Without it, the fallback template is shown to all visit
 
 **Advanced mode** loads GTM immediately but with all consent signals set to denied. Google tags can send cookieless pings for behavioral modeling before consent. Use this if your legal interpretation allows cookieless data collection.
 
+= Why do my GTM tags never fire for visitors who decline Google Tag Manager? =
+
+In Basic mode, the Google Tag Manager service gates GTM itself, so a visitor who has not consented to it never loads GTM and no GTM trigger or tag can run for them, including the `Klaro Consent Update` trigger. To have GTM run for every visitor while still gating individual tags by consent, mark the Google Tag Manager service as Required under **Klaro Geo > Services**, or switch to Advanced mode. Both load GTM before consent, so confirm that fits your legal interpretation.
+
 = How do I trigger non-Google tags based on consent? =
 
 Add the service's custom consent key (e.g., `facebook_consent`) to the tag's "Require additional consent for tag to fire" setting in GTM. The plugin automatically generates consent keys in the format `{service_name}_consent`.

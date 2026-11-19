@@ -810,8 +810,14 @@
           // Log the complete update being sent (now includes dynamic keys)
           klaroGeoLog('DEBUG: Consent update object (with dynamic service keys):', completeUpdate);
 
-          // On initialConsents, skip if all values match the defaults set in <head>
-          // This avoids a redundant gtag update and a misleading Klaro Consent Update event
+          // On initialConsents, if all values match the defaults set in <head>,
+          // the gtag('consent', 'update') call is redundant and is skipped.
+          // The 'Klaro Consent Update' event is still pushed: it is the signal that
+          // consent state is known, it flushes the consent queue, and it is the
+          // trigger tags fire on. A fresh visitor's state always matches the
+          // defaults, so skipping the event here meant fresh visitors never got it
+          // (issue #4).
+          let matchesDefaults = false;
           if (eventType === 'initialConsents' &&
               typeof window.klaroConsentData !== 'undefined' &&
               window.klaroConsentData.templateSettings &&
@@ -819,15 +825,9 @@
               window.klaroConsentData.templateSettings.config.consent_mode_settings &&
               window.klaroConsentData.templateSettings.config.consent_mode_settings.consent_defaults) {
               let defaults = window.klaroConsentData.templateSettings.config.consent_mode_settings.consent_defaults;
-              let allMatch = Object.keys(completeUpdate).every(function(key) {
+              matchesDefaults = Object.keys(completeUpdate).every(function(key) {
                   return completeUpdate[key] === (defaults[key] || 'denied');
               });
-              if (allMatch) {
-                  klaroGeoLog('DEBUG: Skipping redundant consent update on initialConsents - all values match defaults');
-                  window.lastConsentUpdate = completeUpdate;
-                  window.consentUpdateTimer = null;
-                  return;
-              }
           }
 
           // Store last update
@@ -840,9 +840,12 @@
               const acceptedServices = Object.keys(activeManager.consents)
                   .filter(serviceName => activeManager.consents[serviceName] === true);
 
-              // Always call gtag consent update
-              klaroGeoLog('DEBUG: Calling gtag consent update');
-              gtag('consent', 'update', completeUpdate);
+              if (matchesDefaults) {
+                  klaroGeoLog('DEBUG: Skipping redundant gtag consent update on initialConsents - all values match defaults');
+              } else {
+                  klaroGeoLog('DEBUG: Calling gtag consent update');
+                  gtag('consent', 'update', completeUpdate);
+              }
 
               // Determine skip condition for Klaro Consent Update event:
               // In Basic GTM mode, for initialConsents when GTM not consented,
