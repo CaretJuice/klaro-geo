@@ -37,6 +37,26 @@ function klaro_geo_get_consent_mode_service_maps( $services ) {
 }
 
 /**
+ * Template config keys whose admin checkbox renders as checked when the
+ * stored config does not set them (see klaro-geo-admin-templates.php).
+ *
+ * Klaro treats a missing key as false, so config generation backfills these
+ * to keep the frontend in line with what the admin page shows. Keep this list
+ * in sync with the `checked( isset(...) ? ... : true )` calls on that page.
+ *
+ * @return string[]
+ */
+function klaro_geo_get_admin_true_by_default_keys() {
+	return array(
+		'acceptAll',
+		'htmlTexts',
+		'groupByPurpose',
+		'showDescriptionEmptyStore',
+		'disablePoweredBy',
+	);
+}
+
+/**
  * Build the full Klaro config payload for a single template.
  *
  * Contains no visitor-specific data: given the same template/services/options,
@@ -185,22 +205,51 @@ function klaro_geo_build_template_payload( $template_key, $templates, $services 
 			klaro_geo_debug_log( 'Using basic translations' );
 		}
 
+		// The templates admin page renders these checkboxes as checked when the
+		// stored config does not set them, but Klaro reads a missing key as
+		// false. Without this backfill the admin shows a setting as on while the
+		// site behaves as if it were off. acceptAll is the costly one: when it is
+		// not true, the notice's "That's ok" button saves the default consents
+		// (usually everything declined) instead of accepting all services.
+		$backfilled = array();
+		foreach ( klaro_geo_get_admin_true_by_default_keys() as $key ) {
+			if ( ! array_key_exists( $key, $klaro_config ) ) {
+				$klaro_config[ $key ] = true;
+				$backfilled[]         = $key;
+			}
+		}
+		if ( ! empty( $backfilled ) ) {
+			klaro_geo_debug_log(
+				'Template "' . $template_to_use . '" config is missing ' . implode( ', ', $backfilled ) .
+				'; using the admin default (true). Re-save the template to store these explicitly.'
+			);
+		}
+
 		// Log applied template settings (compact)
 		klaro_geo_debug_log(
 			'Config applied: default=' . ( ( $klaro_config['default'] ?? false ) ? 'true' : 'false' ) .
-			', mustConsent=' . ( ( $klaro_config['mustConsent'] ?? false ) ? 'true' : 'false' )
+			', mustConsent=' . ( ( $klaro_config['mustConsent'] ?? false ) ? 'true' : 'false' ) .
+			', acceptAll=' . ( ( $klaro_config['acceptAll'] ?? false ) ? 'true' : 'false' )
 		);
 	} else {
-		// Ensure default values are set if template config is missing
+		// No usable template config (missing, or corrupt and dropped above):
+		// use the hardcoded default template's config, as the template
+		// priority rules require. The previous minimal key list omitted
+		// acceptAll, which made the notice's "That's ok" button decline
+		// every service.
+		$hardcoded    = klaro_geo_get_default_templates();
+		$klaro_config = $hardcoded['default']['config'];
+
+		// Fail closed regardless of what the hardcoded defaults say.
 		$klaro_config['default']                   = false;
 		$klaro_config['required']                  = false;
 		$klaro_config['noAutoLoad']                = false;
-		$klaro_config['embedded']                  = false;
 		$klaro_config['showDescriptionEmptyStore'] = true;
 		$klaro_config['autoFocus']                 = false;
 		$klaro_config['showNoticeTitle']           = false;
-		$klaro_config['disablePoweredBy']          = true;
 		$klaro_config['cookiePath']                = '/';
+
+		klaro_geo_debug_log( 'Template "' . $template_to_use . '" has no usable config; using hardcoded default template config' );
 	}
 
 	// Set default cookiePath if not configured

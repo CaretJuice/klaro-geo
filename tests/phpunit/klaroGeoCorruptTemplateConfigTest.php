@@ -131,4 +131,68 @@ class CorruptTemplateConfigTest extends WP_UnitTestCase {
 		$this->assertTrue( $klaro['required'], 'A valid config must still be copied' );
 		$this->assertTrue( $klaro['mustConsent'], 'A valid config must still be copied' );
 	}
+
+	/**
+	 * Issue #5: with acceptAll unset, Klaro wires the notice's "That's ok"
+	 * button to saveAndHide, which saves the default consents and so declines
+	 * every service. The corrupt-config fallback must therefore set it.
+	 *
+	 * @dataProvider corrupt_config_provider
+	 * @param mixed $config The corrupt config value.
+	 */
+	public function test_corrupt_config_fallback_enables_accept_all( $config ) {
+		$klaro = $this->payload_for_config( $config )['config'];
+
+		$this->assertArrayHasKey( 'acceptAll', $klaro );
+		$this->assertTrue( $klaro['acceptAll'], 'Fallback must use the hardcoded acceptAll=true' );
+		$this->assertNotEmpty( $klaro['translations'], 'Fallback must carry the hardcoded translations' );
+	}
+
+	/**
+	 * A stored config missing a key the admin page shows as checked by default
+	 * must get that default, so the frontend matches the admin.
+	 */
+	public function test_missing_admin_true_by_default_keys_are_backfilled() {
+		$klaro = $this->payload_for_config( array( 'default' => false ) )['config'];
+
+		foreach ( klaro_geo_get_admin_true_by_default_keys() as $key ) {
+			$this->assertArrayHasKey( $key, $klaro, "$key must be backfilled" );
+			$this->assertTrue( $klaro[ $key ], "$key must default to true" );
+		}
+	}
+
+	/**
+	 * An explicit false is a real choice and must survive the backfill.
+	 */
+	public function test_explicit_false_is_not_backfilled() {
+		$klaro = $this->payload_for_config(
+			array(
+				'default'   => false,
+				'acceptAll' => false,
+			)
+		)['config'];
+
+		$this->assertFalse( $klaro['acceptAll'], 'An explicit acceptAll=false must be kept' );
+	}
+
+	/**
+	 * The backfill list must match the checkboxes the templates admin page
+	 * renders as checked when unset, or the two will drift apart again.
+	 */
+	public function test_backfill_list_matches_admin_checkbox_defaults() {
+		$admin_source = file_get_contents( dirname( __DIR__, 2 ) . '/includes/admin/klaro-geo-admin-templates.php' );
+		preg_match_all(
+			"/checked\(\s*isset\(\s*\\\$current_config\['(\w+)'\]\s*\)\s*\?\s*\\\$current_config\['\\1'\]\s*:\s*true\s*\)/",
+			$admin_source,
+			$matches
+		);
+
+		$admin_keys    = $matches[1];
+		$backfill_keys = klaro_geo_get_admin_true_by_default_keys();
+		sort( $admin_keys );
+		sort( $backfill_keys );
+
+		$this->assertNotEmpty( $admin_keys, 'Pattern must find the admin checkboxes' );
+		$this->assertSame( $admin_keys, $backfill_keys );
+	}
 }

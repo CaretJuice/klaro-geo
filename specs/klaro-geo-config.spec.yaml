@@ -64,6 +64,14 @@ business_rules:
       - "Log WARNING when falling back to hardcoded defaults"
       - "Log WARNING when auto-detection of cookieDomain fails"
 
+  config_completeness:
+    description: "klaroConfig must match what the templates admin page shows"
+    rules:
+      - "A template config that is missing or not an array MUST be replaced by klaro_geo_get_default_templates()['default']['config'], with default=false and required=false forced, and MUST be logged"
+      - "Keys whose admin checkbox renders checked when unset (klaro_geo_get_admin_true_by_default_keys(): acceptAll, htmlTexts, groupByPurpose, showDescriptionEmptyStore, disablePoweredBy) MUST be backfilled to true when absent from a stored config, and the backfill MUST be logged"
+      - "An explicit false for any of those keys MUST be preserved"
+      - "Rationale (issue #5): Klaro reads a missing acceptAll as false, which wires the notice's 'That's ok' button to saveAndHide and declines every service"
+
 # =============================================================================
 # FUNCTIONS
 # =============================================================================
