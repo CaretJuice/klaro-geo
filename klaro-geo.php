@@ -337,27 +337,30 @@ function klaro_geo_enqueue_scripts() {
 	$klaro_version        = get_option( 'klaro_geo_js_version', '0.7' );
 	$klaro_variant        = get_option( 'klaro_geo_js_variant', 'klaro.js' );
 
-	// Cache-safe client-side geo resolution mode (admin debug override stays server-side)
-	$geo_location      = klaro_geo_get_user_location();
-	$client_geo_active = klaro_geo_is_client_geo_active( $geo_location['is_admin_override'] );
-	$klaro_js_deps     = array();
+	// The bootstrap applies the template payload and starts Klaro, in both geo
+	// resolution modes. It must run before klaro.js: it sets window.klaroConfig,
+	// which klaro.js auto-initializes from (in client mode, if klaro.js loads
+	// before the geo lookup returns, the bootstrap calls klaro.setup() itself).
+	wp_enqueue_script(
+		'klaro-geo-client-geo-js',
+		plugins_url( 'js/klaro-geo-client-geo.js', __FILE__ ),
+		array( 'klaro-geo-debug' ),
+		KLARO_GEO_VERSION,
+		array(
+			'strategy'  => 'defer',
+			'in_footer' => true,
+		)
+	);
 
-	if ( $client_geo_active ) {
-		// The resolver must run before klaro.js: it selects the template and sets
-		// window.klaroConfig, which klaro.js auto-initializes from (or, if klaro.js
-		// loaded first, the resolver calls klaro.setup() itself).
-		wp_enqueue_script(
-			'klaro-geo-client-geo-js',
-			plugins_url( 'js/klaro-geo-client-geo.js', __FILE__ ),
-			array( 'klaro-geo-debug' ),
-			KLARO_GEO_VERSION,
-			array(
-				'strategy'  => 'defer',
-				'in_footer' => true,
-			)
-		);
-		$klaro_js_deps[] = 'klaro-geo-client-geo-js';
-	}
+	// The payload is data only and is attached in front of the bootstrap, so it
+	// is defined when the bootstrap runs whether or not the scripts are deferred.
+	wp_add_inline_script(
+		'klaro-geo-client-geo-js',
+		'window.klaroVersion = "' . esc_js( $klaro_version ) . '";' . "\n" . $klaro_config_content,
+		'before'
+	);
+
+	$klaro_js_deps = array( 'klaro-geo-client-geo-js' );
 
 	// Check if local Klaro file exists (for E2E testing)
 	$local_klaro_path = plugin_dir_path( __FILE__ ) . 'e2e/klaro.js';
@@ -388,19 +391,6 @@ function klaro_geo_enqueue_scripts() {
 			)
 		);
 	}
-
-	// Attach config inline before klaro-js (replaces the old klaro-config.js file approach)
-	$version_script = 'window.klaroVersion = "' . esc_js( $klaro_version ) . '";' . "\n";
-	wp_add_inline_script( 'klaro-js', $version_script . $klaro_config_content, 'before' );
-
-	// Add a simple script to create the Klaro Geo namespace
-	wp_add_inline_script(
-		'klaro-js',
-		'
-        // Create a global Klaro Geo namespace
-        window.klaroGeo = window.klaroGeo || {};
-    '
-	);
 
 	// Event factory and consent-mode mapping. Loaded before klaro-geo.js, which
 	// calls into it.

@@ -23,7 +23,7 @@ file_meta:
   purpose: "Define cache-safe client-side geo lookup and template resolution contracts"
   dependencies:
     - "klaro-geo.php"                                    # enqueue flow, klaro-js deps, receipts localize guard
-    - "includes/klaro-geo-config.php"                    # klaro_geo_build_template_payload(), klaro_geo_generate_client_config_content(), klaro_geo_is_client_geo_active()
+    - "includes/klaro-geo-config.php"                    # klaro_geo_build_template_payload(), klaro_geo_get_frontend_payload(), klaro_geo_get_client_frontend_payload(), klaro_geo_render_frontend_payload(), klaro_geo_is_client_geo_active()
     - "includes/class-klaro-geo-country-settings.php"    # get_effective_settings() — mirrored client-side
     - "includes/admin/klaro-geo-admin-settings.php"      # settings registration + UI
     - "includes/admin/klaro-geo-admin-geoip-warning.php" # AJAX endpoint detection + admin notice
@@ -54,16 +54,49 @@ architecture:
 
   modes:
     server:
-      description: "Legacy/current behavior. Geo resolved in PHP at render time; template baked into config."
+      description: "Default. Geo resolved in PHP at render time; the payload holds that one template, marked as resolved."
       default: true
       cache_safety: "UNSAFE on full-page-cache hosting — documented limitation."
     client:
       description: "Cache-safe. PHP ships rules + all candidate templates; browser resolves geo and selects template before Klaro init."
       cache_safety: "Safe: rendered config is identical for all anonymous visitors."
 
+  one_payload_one_bootstrap:
+    contract: |
+      Both modes use the same two pieces:
+        1. PHP emits DATA ONLY, as an inline script attached in front of
+           js/klaro-geo-client-geo.js: window.klaroGeoClientGeo (the payload) and
+           window.klaroConsentData. klaro_geo_get_frontend_payload() builds it and
+           klaro_geo_render_frontend_payload() prints it. PHP MUST NOT generate
+           JavaScript logic.
+        2. js/klaro-geo-client-geo.js applies the payload: applyResolution() does
+           GPC, sets window.klaroConfig, pushes klaroConfigLoaded / gpcDetected
+           and starts Klaro. It is the ONLY implementation of those steps.
+      The payload MUST be attached to the bootstrap script itself (not to
+      klaro-js), so it is defined when the bootstrap runs whether WordPress
+      prints the scripts deferred or blocking.
+      The payload is printed with slashes escaped, so a stored value containing
+      "</script>" cannot end the inline script.
+
+  server_mode_payload:
+    contract: |
+      window.klaroGeoClientGeo = {
+        mode: 'server',
+        resolved: { template, templateSource, country, region,
+                    geoSource: 'server' | 'debug', adminOverride },
+        rules: { defaultTemplate: <the resolved template> },
+        templates: { <the resolved template>: { ...same entry shape as client mode } },
+        consentReceipts
+      }
+      The bootstrap applies it immediately, with no lookup. Because PHP rendered
+      the <head> consent defaults, the gtag flags and klaroConsentData for this
+      template, the bootstrap MUST NOT repeat them: in server mode it pushes
+      gtag('consent','update') only for GPC-denied keys, and leaves
+      klaroConsentData untouched.
+
   client_mode_flow:
     - step: 1
-      actor: "klaro_geo_generate_client_config_content()"
+      actor: "klaro_geo_get_client_frontend_payload()"
       contract: |
         Emit window.klaroGeoClientGeo — a visitor-independent payload:
           - geoAjax: { url, action } for the geoip-detect AJAX endpoint
@@ -108,8 +141,7 @@ architecture:
     - step: 5
       actor: "js/klaro-geo-client-geo.js (applyResolution)"
       contract: |
-        In order: apply GPC to the selected config (mirrors the server-mode
-        inline GPC block); push gtag('consent','update') with the selected
+        In order: apply GPC to the selected config; push gtag('consent','update') with the selected
         template's defaults when it differs from the fallback template or GPC
         applies; fill window.klaroConsentData BEFORE Klaro can initialize; set
         window.klaroConfig; push klaroConfigLoaded (and gpcDetected when
@@ -124,7 +156,9 @@ architecture:
       from the now-present config when it loads. Either way Klaro CANNOT
       initialize before resolution completes or times out.
       js/klaro-geo-client-geo.js is enqueued as a dependency of the klaro-js
-      handle so the payload and resolver are in place first.
+      handle in BOTH modes, with the payload attached in front of it, so the
+      payload and bootstrap are in place first. In server mode the bootstrap
+      sets window.klaroConfig synchronously, so klaro.js auto-initializes.
 
   consent_mode_defaults:
     contract: |

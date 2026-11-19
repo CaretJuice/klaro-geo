@@ -651,8 +651,78 @@ function klaro_geo_is_client_geo_active( $is_admin_override = false ) {
 	return get_option( 'klaro_geo_geo_resolution_mode', 'server' ) === 'client';
 }
 
-// Function to generate klaro-config.js
+/**
+ * One template as the frontend receives it: an entry of the payload's
+ * 'templates' map.
+ *
+ * @param array $payload A payload from klaro_geo_build_template_payload().
+ * @return array
+ */
+function klaro_geo_frontend_template_entry( array $payload ) {
+	return array(
+		'config'               => $payload['config'],
+		'consentDefaults'      => $payload['consent_defaults'],
+		'gtagSettings'         => $payload['gtag_settings'],
+		'enableConsentLogging' => $payload['enable_consent_logging'],
+		'gpcEnabled'           => $payload['gpc_enabled'],
+		'templateSettings'     => $payload['template_settings_block'],
+	);
+}
+
+/**
+ * Render the inline script that hands the frontend its data, in both geo modes.
+ *
+ * It contains data only: window.klaroGeoClientGeo (the template payload),
+ * the dataLayer/gtag bootstrap and window.klaroConsentData. All behaviour
+ * (GPC, klaroConfigLoaded, initializing Klaro) lives in
+ * js/klaro-geo-client-geo.js, which this script is attached in front of.
+ *
+ * Slashes are left escaped by wp_json_encode() on purpose: a stored value
+ * containing "</script>" cannot end the inline script.
+ *
+ * @param array $frontend_payload The window.klaroGeoClientGeo payload.
+ * @param array $consent_data     The window.klaroConsentData object.
+ * @return string
+ */
+function klaro_geo_render_frontend_payload( array $frontend_payload, array $consent_data ) {
+	$content  = "// Klaro Geo frontend payload (applied by klaro-geo-client-geo.js)\n";
+	$content .= 'window.klaroGeoClientGeo = ' . wp_json_encode( $frontend_payload ) . ";\n\n";
+	$content .= "window.dataLayer = window.dataLayer || [];\n";
+	$content .= "window.gtag = window.gtag || function(){dataLayer.push(arguments);};\n";
+	$content .= "window.klaroGeo = window.klaroGeo || {};\n\n";
+	$content .= "// Plugin settings and resolved template for the frontend scripts\n";
+	$content .= 'window.klaroConsentData = ' . wp_json_encode( $consent_data ) . ";\n";
+
+	return $content;
+}
+
+/**
+ * Generate the inline config content for the current request.
+ *
+ * @return string JavaScript content for wp_add_inline_script.
+ */
 function klaro_geo_generate_config_file() {
+	$frontend = klaro_geo_get_frontend_payload();
+	return klaro_geo_render_frontend_payload( $frontend['payload'], $frontend['consent_data'] );
+}
+
+/**
+ * Build the data the frontend receives for the current request.
+ *
+ * Server mode resolves the visitor's template here and ships that one
+ * template, marked as already resolved. Client mode ships the rules and every
+ * candidate template and lets the browser resolve (cache-safe). Either way the
+ * same script applies the result.
+ *
+ * Also stores the consent defaults for the <head> in
+ * $GLOBALS['klaro_geo_consent_defaults'] / ['klaro_geo_gtag_settings'].
+ *
+ * @return array {
+ *     @type array $payload      window.klaroGeoClientGeo.
+ *     @type array $consent_data window.klaroConsentData.
+ * }
+ */
+function klaro_geo_get_frontend_payload() {
 	// Get the services using the service settings class
 	$service_settings = Klaro_Geo_Service_Settings::get_instance();
 	$services         = $service_settings->get();
@@ -676,7 +746,7 @@ function klaro_geo_generate_config_file() {
 	// Client mode: emit a cache-safe payload with no visitor-specific values.
 	// The browser resolves geo and selects the template (js/klaro-geo-client-geo.js).
 	if ( klaro_geo_is_client_geo_active( $using_debug_geo ) ) {
-		return klaro_geo_generate_client_config_content( $services );
+		return klaro_geo_get_client_frontend_payload( $services );
 	}
 
 	klaro_geo_debug_log(
@@ -719,158 +789,30 @@ function klaro_geo_generate_config_file() {
 		$template_source = $payload['template_source_override'];
 	}
 
-	$klaro_config             = $payload['config'];
-	$gpc_enabled              = $payload['gpc_enabled'];
-	$gpc_purposes             = $payload['gpc_purposes'];
-	$custom_template_settings = array(
-		'enableConsentLogging' => $payload['enable_consent_logging'],
-	);
-
 	// Store consent defaults in globals for klaro_geo_enqueue_scripts() to output
 	$GLOBALS['klaro_geo_consent_defaults'] = $payload['consent_defaults'];
 	$GLOBALS['klaro_geo_gtag_settings']    = $payload['gtag_settings'];
 
-	// Generate the JavaScript content
-	$klaro_config_content = '// Detected/Debug Country Code: ' . esc_js( $user_country ) . "\n\n";
-
-	// Format the klaroConfig variable in a way that's easy to parse for tests
-	$klaro_config_content .= 'var klaroConfig = ' . wp_json_encode( $klaro_config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) . ";\n\n";
-
-	// Add a clear separator comment to help with parsing
-	$klaro_config_content .= "// ===== END OF KLARO CONFIG =====\n\n";
-
-	// GPC detection and service default override (runs before Klaro initializes)
-	$gpc_purposes_json     = wp_json_encode( $gpc_purposes );
-	$gpc_enabled_js        = $gpc_enabled ? 'true' : 'false';
-	$klaro_config_content .= "// ===== GLOBAL PRIVACY CONTROL (GPC) =====\n";
-	$klaro_config_content .= "var klaroGeoGPC = { detected: false, enabled: false, affectedServices: [] };\n";
-	$klaro_config_content .= "(function() {\n";
-	$klaro_config_content .= '    var gpcConfig = { enabled: ' . $gpc_enabled_js . ', gpc_purposes: ' . $gpc_purposes_json . " };\n";
-	$klaro_config_content .= "    klaroGeoGPC.enabled = gpcConfig.enabled;\n";
-	$klaro_config_content .= "\n";
-	$klaro_config_content .= "    if (!gpcConfig.enabled) return;\n";
-	$klaro_config_content .= "\n";
-	$klaro_config_content .= "    klaroGeoGPC.detected = (navigator.globalPrivacyControl === true);\n";
-	$klaro_config_content .= "    if (!klaroGeoGPC.detected) return;\n";
-	$klaro_config_content .= "\n";
-	$klaro_config_content .= "    // Override defaults for GPC-sensitive services\n";
-	$klaro_config_content .= "    if (klaroConfig && klaroConfig.services) {\n";
-	$klaro_config_content .= "        for (var i = 0; i < klaroConfig.services.length; i++) {\n";
-	$klaro_config_content .= "            var svc = klaroConfig.services[i];\n";
-	$klaro_config_content .= "            if (svc.gpc_sensitive && !svc.required) {\n";
-	$klaro_config_content .= "                svc.default = false;\n";
-	$klaro_config_content .= "                klaroGeoGPC.affectedServices.push(svc.name);\n";
-	$klaro_config_content .= "            }\n";
-	$klaro_config_content .= "        }\n";
-	$klaro_config_content .= "    }\n";
-	$klaro_config_content .= "})();\n";
-	$klaro_config_content .= "window.klaroGeo = window.klaroGeo || {};\n";
-	$klaro_config_content .= "window.klaroGeo.gpc = klaroGeoGPC;\n";
-	$klaro_config_content .= "// ===== END GPC =====\n\n";
-
-	// Add dataLayer push for debugging with JavaScript to include latest consent receipt
-	$klaro_config_content .= "// Push debug information to dataLayer with latest consent receipt\n";
-	$klaro_config_content .= "window.dataLayer = window.dataLayer || [];\n";
-	$klaro_config_content .= "
-// Get the latest consent receipt if available
-var latestReceipt = null;
-try {
-    if (typeof getLatestConsentReceipt === 'function') {
-        latestReceipt = getLatestConsentReceipt();
-    } else {
-        // Fallback if the function isn't loaded yet
-        var existingData = window.localStorage.getItem('klaro_consent_receipts');
-        if (existingData) {
-            var receipts = JSON.parse(existingData);
-            if (Array.isArray(receipts) && receipts.length > 0) {
-                latestReceipt = receipts[receipts.length - 1];
-            }
-        }
-    }
-} catch (e) {
-    console.error('Error retrieving latest consent receipt:', e);
-}
-
-// Create the dataLayer push object
-var klaroConfigLoadedData = {
-    'event': 'Klaro Event',
-    'eventSource': 'klaro-geo',
-    'klaroEventName': 'klaroConfigLoaded',
-    'klaroGeoConsentTemplate': " . wp_json_encode( $template_to_use ) . ",
-    'klaroGeoTemplateSource': " . wp_json_encode( $template_source ) . ",
-    'klaroGeoDetectedCountry': " . ( ! empty( $user_country ) ? wp_json_encode( $user_country ) : 'null' ) . ",
-    'klaroGeoDetectedRegion': " . ( ! empty( $user_region ) ? wp_json_encode( $user_region ) : 'null' ) . ",
-    'klaroGeoAdminOverride': " . ( $using_debug_geo ? 'true' : 'false' ) . ",
-    'klaroGeoResolutionMode': 'server',
-    'klaroGeoGeoSource': " . ( $using_debug_geo ? "'debug'" : "'server'" ) . ",
-    'klaroGeoGeoLatencyMs': null,
-    'klaroGeoEnableConsentLogging': " . ( $custom_template_settings['enableConsentLogging'] ? 'true' : 'false' ) . ",
-    'klaroGeoGPCDetected': klaroGeoGPC.detected,
-    'klaroGeoGPCEnabled': klaroGeoGPC.enabled,
-    'klaroGeoGPCAffectedServices': klaroGeoGPC.affectedServices
-};
-
-// Add the consent receipt ID if available and active consent data exists
-// (Receipt ID persists in localStorage even after consent data is cleared,
-// so we check for consent data to avoid including a stale receipt ID)
-if (latestReceipt) {
-    var klaroStorageName = (klaroConfig && (klaroConfig.storageName || klaroConfig.cookieName)) || 'klaro';
-    var hasActiveConsent = false;
-    if (klaroConfig && klaroConfig.storageMethod === 'localStorage') {
-        hasActiveConsent = window.localStorage.getItem(klaroStorageName) !== null;
-    } else {
-        hasActiveConsent = document.cookie.split(';').some(function(c) {
-            return c.trim().indexOf(klaroStorageName + '=') === 0;
-        });
-    }
-    if (hasActiveConsent) {
-        klaroConfigLoadedData.klaroGeoConsentReceiptId = latestReceipt.receipt_id;
-    }
-}
-
-// Push to dataLayer
-window.dataLayer.push(klaroConfigLoadedData);
-
-// ===== DATALAYER INITIALIZATION =====
-// Initialize dataLayer and gtag function
-// Consent defaults are set via gtag('consent','default') in the <head> by klaro_geo_add_gtm_head_script()
-// Consent updates are pushed via gtag('consent','update') in klaro-geo.js
-window.dataLayer = window.dataLayer || [];
-window.gtag = window.gtag || function(){dataLayer.push(arguments);};
-
-// GPC consent mode override: immediately update consent signals for GPC-sensitive services
-if (klaroGeoGPC.detected && klaroGeoGPC.affectedServices.length > 0 && typeof gtag === 'function') {
-    var gpcConsentOverride = {};
-    for (var i = 0; i < klaroConfig.services.length; i++) {
-        var svc = klaroConfig.services[i];
-        if (svc.gpc_sensitive) {
-            if (svc.is_consent_mode_service && svc.consent_mode_key) {
-                gpcConsentOverride[svc.consent_mode_key] = 'denied';
-            }
-            gpcConsentOverride[svc.name.replace(/-/g, '_') + '_consent'] = 'denied';
-        }
-    }
-    gtag('consent', 'update', gpcConsentOverride);
-}
-
-// Fire dedicated gpcDetected event when GPC is active
-if (klaroGeoGPC.detected) {
-    window.dataLayer.push({
-        'event': 'Klaro Event',
-        'eventSource': 'klaro-geo',
-        'klaroEventName': 'gpcDetected',
-        'klaroGeoGPCAffectedServices': klaroGeoGPC.affectedServices
-    });
-}
-\n";
-
-	// Log summary of config generation
-	klaro_geo_debug_log(
-		'Config generated: template=' . $template_to_use . ', services=' . count( $klaro_config['services'] ) .
-		', consentLogging=' . ( $custom_template_settings['enableConsentLogging'] ? 'true' : 'false' )
+	// One template, already resolved. The browser applies it without a lookup.
+	$frontend_payload = array(
+		'mode'            => 'server',
+		'resolved'        => array(
+			'template'       => $template_to_use,
+			'templateSource' => $template_source,
+			'country'        => $user_country,
+			'region'         => $user_region,
+			'geoSource'      => $using_debug_geo ? 'debug' : 'server',
+			'adminOverride'  => (bool) $using_debug_geo,
+		),
+		'rules'           => array(
+			'defaultTemplate' => $template_to_use,
+		),
+		'templates'       => array(
+			$template_to_use => klaro_geo_frontend_template_entry( $payload ),
+		),
+		'consentReceipts' => (bool) get_option( 'klaro_geo_enable_consent_receipts', false ),
 	);
 
-	// window.klaroConsentData: emitted once, on every page (see klaro_geo_build_consent_data()).
 	$consent_data = klaro_geo_build_consent_data(
 		$payload,
 		$services,
@@ -883,25 +825,29 @@ if (klaroGeoGPC.detected) {
 		)
 	);
 
-	$klaro_config_content .= "// Plugin settings and resolved template for the frontend scripts\n";
-	$klaro_config_content .= 'window.klaroConsentData = ' . wp_json_encode( $consent_data, JSON_UNESCAPED_SLASHES ) . ";\n";
+	klaro_geo_debug_log(
+		'Config generated: template=' . $template_to_use . ', services=' . count( $payload['config']['services'] ) .
+		', consentLogging=' . ( $payload['enable_consent_logging'] ? 'true' : 'false' )
+	);
 
-	// Return the config content for use with wp_add_inline_script
-	return $klaro_config_content;
+	return array(
+		'payload'      => $frontend_payload,
+		'consent_data' => $consent_data,
+	);
 }
 
 /**
- * Generate the cache-safe client-mode config content.
+ * Build the cache-safe client-mode frontend payload.
  *
- * The output MUST be identical for every anonymous visitor: it contains the
+ * The result MUST be identical for every anonymous visitor: it contains the
  * location→template rules map plus a full config payload for each candidate
  * template, and NO detected geo or pre-selected template. Resolution happens
  * in js/klaro-geo-client-geo.js.
  *
  * @param array $services The configured services.
- * @return string JavaScript content for wp_add_inline_script.
+ * @return array Same shape as klaro_geo_get_frontend_payload().
  */
-function klaro_geo_generate_client_config_content( $services ) {
+function klaro_geo_get_client_frontend_payload( $services ) {
 	klaro_geo_debug_log( 'Generating client-mode (cache-safe) config payload' );
 
 	$template_settings = Klaro_Geo_Template_Settings::get_instance();
@@ -982,14 +928,7 @@ function klaro_geo_generate_client_config_content( $services ) {
 
 		$payload = klaro_geo_build_template_payload( $candidate_key, $templates, $services );
 
-		$payload_templates[ $candidate_key ] = array(
-			'config'               => $payload['config'],
-			'consentDefaults'      => $payload['consent_defaults'],
-			'gtagSettings'         => $payload['gtag_settings'],
-			'enableConsentLogging' => $payload['enable_consent_logging'],
-			'gpcEnabled'           => $payload['gpc_enabled'],
-			'templateSettings'     => $payload['template_settings_block'],
-		);
+		$payload_templates[ $candidate_key ] = klaro_geo_frontend_template_entry( $payload );
 
 		if ( $candidate_key === $default_template ) {
 			$default_payload = $payload;
@@ -999,14 +938,7 @@ function klaro_geo_generate_client_config_content( $services ) {
 	// Defensive: the loop above always includes the default template, but never ship without one
 	if ( $default_payload === null ) {
 		$default_payload                        = klaro_geo_build_template_payload( $default_template, $templates, $services );
-		$payload_templates[ $default_template ] = array(
-			'config'               => $default_payload['config'],
-			'consentDefaults'      => $default_payload['consent_defaults'],
-			'gtagSettings'         => $default_payload['gtag_settings'],
-			'enableConsentLogging' => $default_payload['enable_consent_logging'],
-			'gpcEnabled'           => $default_payload['gpc_enabled'],
-			'templateSettings'     => $default_payload['template_settings_block'],
-		);
+		$payload_templates[ $default_template ] = klaro_geo_frontend_template_entry( $default_payload );
 	}
 
 	// Head consent defaults come from the fallback template (cache-safe: same for
@@ -1041,26 +973,16 @@ function klaro_geo_generate_client_config_content( $services ) {
 		'consentReceipts'  => (bool) get_option( 'klaro_geo_enable_consent_receipts', false ),
 	);
 
-	$content  = "// Klaro Geo client-side geo resolution payload\n";
-	$content .= "// Cache-safe: identical for all visitors; geo resolved in the browser.\n";
-	$content .= 'window.klaroGeoClientGeo = ' . wp_json_encode( $client_payload, JSON_UNESCAPED_SLASHES ) . ";\n\n";
-
-	// dataLayer / gtag bootstrap (same as server mode; consent defaults are
-	// emitted in the <head> from the fallback template)
-	$content .= "window.dataLayer = window.dataLayer || [];\n";
-	$content .= "window.gtag = window.gtag || function(){dataLayer.push(arguments);};\n";
-	$content .= "window.klaroGeo = window.klaroGeo || {};\n\n";
-
-	// Static base for window.klaroConsentData. Geo/template fields are filled
-	// by the client resolver BEFORE Klaro initializes, so no receipt can be
-	// generated with unresolved values.
-	$content .= "// Plugin settings for the frontend scripts (client mode: template/geo fields filled by resolver)\n";
-	$content .= 'window.klaroConsentData = ' . wp_json_encode( klaro_geo_build_consent_data( $default_payload, $services ), JSON_UNESCAPED_SLASHES ) . ";\n";
-
 	klaro_geo_debug_log(
 		'Client-mode config generated: templates=' . implode( ', ', array_keys( $payload_templates ) ) .
 		', default=' . $default_template . ', timeout=' . $timeout_ms . 'ms'
 	);
 
-	return $content;
+	// The klaroConsentData base has empty template/geo fields; the client
+	// resolver fills them BEFORE Klaro initializes, so no receipt can be
+	// generated with unresolved values.
+	return array(
+		'payload'      => $client_payload,
+		'consent_data' => klaro_geo_build_consent_data( $default_payload, $services ),
+	);
 }

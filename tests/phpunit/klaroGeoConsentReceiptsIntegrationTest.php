@@ -48,8 +48,8 @@ class ConsentReceiptsIntegrationTest extends IgnoreDeprecatedTestCase {
     }
 
     /**
-     * klaroConsentData reaches the page once, as part of the config attached to
-     * klaro-js. Nothing may be localized under the same name: a second copy
+     * klaroConsentData reaches the page once, as part of the payload attached in
+     * front of the bootstrap script. Nothing may be localized under the same name: a second copy
      * would overwrite the first.
      */
     public function test_consent_data_is_emitted_once_with_the_config() {
@@ -60,8 +60,8 @@ class ConsentReceiptsIntegrationTest extends IgnoreDeprecatedTestCase {
         $this->go_to(get_permalink($post_id));
         do_action('wp_enqueue_scripts');
 
-        $before = implode("\n", (array) wp_scripts()->get_data('klaro-js', 'before'));
-        $this->assertSame(1, substr_count($before, 'window.klaroConsentData = '), 'klaro-js config should define klaroConsentData exactly once');
+        $before = implode("\n", (array) wp_scripts()->get_data('klaro-geo-client-geo-js', 'before'));
+        $this->assertSame(1, substr_count($before, 'window.klaroConsentData = '), 'The payload script should define klaroConsentData exactly once');
 
         // No script carries a localized copy that would overwrite it
         foreach (wp_scripts()->registered as $handle => $script) {

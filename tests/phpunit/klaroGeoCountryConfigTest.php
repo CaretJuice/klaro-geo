@@ -64,6 +64,16 @@ class CountryConfigTest extends WP_UnitTestCase {
     }
 
     /**
+     * The Klaro config the current visitor would receive: the template PHP
+     * resolved for this request, read from the frontend payload.
+     */
+    private function resolvedConfig() {
+        $payload = klaro_geo_get_frontend_payload()['payload'];
+        $this->assertSame('server', $payload['mode']);
+        return $payload['templates'][$payload['resolved']['template']]['config'] ?? null;
+    }
+
+    /**
      * Test that strict template has services disabled by default
      */
     public function test_strict_template_config() {
@@ -100,8 +110,8 @@ class CountryConfigTest extends WP_UnitTestCase {
         $this->assertIsString($config_content, 'Config generation failed');
 
         // Parse the config content to get the service settings using a more robust method
-        if (preg_match('/var\s+klaroConfig\s*=\s*(\{[\s\S]*?\}\s*);/m', $config_content, $matches)) {
-            $config = json_decode($matches[1], true);
+        if (($resolved_config = $this->resolvedConfig()) !== null) {
+            $config = $resolved_config;
             error_log('Parsed config: ' . print_r($config, true)); // Log the entire parsed config
             error_log('Config default value: ' . json_encode(isset($config['default']) ? $config['default'] : 'default key not set')); // Log the specific 'default' value
 
@@ -208,9 +218,9 @@ class CountryConfigTest extends WP_UnitTestCase {
         klaro_geo_debug_log("Config content snippet: " . $snippet);
 
         // Parse the config content to get the service settings using a more robust method
-        if (preg_match('/var\s+klaroConfig\s*=\s*(\{[\s\S]*?\}\s*);/m', $config_content, $matches)) {
+        if (($resolved_config = $this->resolvedConfig()) !== null) {
             klaro_geo_debug_log("Config regex matched. Parsing JSON...");
-            $config = json_decode($matches[1], true);
+            $config = $resolved_config;
 
             if (json_last_error() !== JSON_ERROR_NONE) {
                 klaro_geo_debug_log("ERROR: JSON parsing failed: " . json_last_error_msg());

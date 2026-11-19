@@ -1,15 +1,22 @@
 /**
- * Klaro Geo — Client-Side Geo Resolution (cache-safe mode)
+ * Klaro Geo — frontend bootstrap: applies the template payload and starts Klaro.
  *
- * Active only when the cache-safe client resolution mode is on
- * (klaro_geo_geo_resolution_mode = 'client'). The server ships a
- * visitor-independent payload (window.klaroGeoClientGeo) containing the
- * location→template rules map and a full Klaro config per candidate template;
- * this file resolves the visitor's geo in the browser and selects the template
- * BEFORE Klaro initializes, so no visitor-specific value ever lives in
- * cacheable HTML.
+ * PHP emits data only: window.klaroGeoClientGeo, in front of this script. This
+ * file turns it into a running consent manager in both geo resolution modes:
  *
- * Resolution fallback chain (first success wins, never silently fails):
+ *   server  The payload holds one template, already resolved by PHP for this
+ *           visitor (payload.resolved). It is applied immediately.
+ *   client  Cache-safe mode. The payload is identical for every visitor: the
+ *           location→template rules plus every candidate template. This file
+ *           resolves the visitor's geo in the browser and selects the template
+ *           BEFORE Klaro initializes, so no visitor-specific value ever lives
+ *           in cacheable HTML.
+ *
+ * Applying a template (applyResolution) is the same code in both modes: GPC,
+ * window.klaroConfig, the klaroConfigLoaded and gpcDetected dataLayer events,
+ * and initializing Klaro.
+ *
+ * Client-mode fallback chain (first success wins, never silently fails):
  *   1. geoip-ajax — the GeoIP Detection plugin's AJAX endpoint (admin-ajax.php
  *      is excluded from page caches, so it is per-visitor accurate)
  *   2. timezone  — country inferred from Intl.DateTimeFormat().resolvedOptions()
@@ -294,15 +301,23 @@
     }
 
     /**
-     * Apply a resolved geo: select the template, apply GPC, expose klaroConfig,
-     * update klaroConsentData, emit consent-mode updates and dataLayer events,
-     * then initialize Klaro.
+     * Apply a template: apply GPC, expose klaroConfig, emit consent-mode updates
+     * and dataLayer events, then initialize Klaro. Used by both modes.
+     *
+     * In client mode the template is selected here from the resolved geo, and
+     * klaroConsentData and the consent state are brought in line with it (the
+     * page was rendered for the fallback template). In server mode PHP already
+     * selected the template and rendered everything for it.
      *
      * @param {Object} payload The window.klaroGeoClientGeo payload.
      * @param {Object} geo     {country, region, source, latencyMs}
      */
     function applyResolution(payload, geo) {
-        var resolution = resolveEffectiveTemplate(payload.rules, payload.templates, geo.country, geo.region);
+        var isServerMode = payload.mode === 'server';
+        var resolved = payload.resolved || {};
+        var resolution = isServerMode
+            ? { template: resolved.template, source: resolved.templateSource }
+            : resolveEffectiveTemplate(payload.rules, payload.templates, geo.country, geo.region);
         var templateKey = resolution.template;
         var templateSource = resolution.source;
         var template = payload.templates[templateKey];
@@ -313,7 +328,7 @@
             var keys = Object.keys(payload.templates || {});
             if (keys.length === 0) {
                 if (window.console && console.error) {
-                    console.error('[klaro-geo] Client geo payload contains no templates; Klaro not initialized');
+                    console.error('[klaro-geo] Payload contains no templates; Klaro not initialized');
                 }
                 return;
             }
@@ -322,14 +337,15 @@
             template = payload.templates[templateKey];
         }
 
-        log('Klaro Geo client geo: resolved', {
+        log('Klaro Geo: applying template', {
+            mode: payload.mode,
             country: geo.country, region: geo.region, geoSource: geo.source,
             template: templateKey, templateSource: templateSource, latencyMs: geo.latencyMs
         });
 
         var config = template.config;
 
-        // ----- GPC (mirrors the server-mode inline GPC block) -----
+        // ----- GPC: switch off gpc_sensitive services by default -----
         var gpc = { detected: false, enabled: !!template.gpcEnabled, affectedServices: [] };
         if (gpc.enabled && navigator.globalPrivacyControl === true) {
             gpc.detected = true;
@@ -348,48 +364,71 @@
         window.klaroGeo.gpc = gpc;
 
         // ----- Consent mode update -----
-        // The <head> defaults came from the fallback template. If a different
-        // template was selected (or GPC applies), update the consent state.
         window.dataLayer = window.dataLayer || [];
         window.gtag = window.gtag || function() { window.dataLayer.push(arguments); };
 
         var selectedDefaults = template.consentDefaults || {};
-        if (templateKey !== payload.rules.defaultTemplate || gpc.detected) {
-            var consentUpdate = {};
+        var gtagSettings = template.gtagSettings || {};
+
+        // GPC-sensitive services are denied, whatever the template defaults say.
+        var gpcDenied = {};
+        if (gpc.detected && config && config.services) {
+            for (var j = 0; j < config.services.length; j++) {
+                var gpcSvc = config.services[j];
+                if (gpcSvc.gpc_sensitive) {
+                    if (gpcSvc.is_consent_mode_service && gpcSvc.consent_mode_key) {
+                        gpcDenied[gpcSvc.consent_mode_key] = 'denied';
+                    }
+                    gpcDenied[gpcSvc.name.replace(/-/g, '_') + '_consent'] = 'denied';
+                }
+            }
+        }
+
+        var consentUpdate = null;
+        if (isServerMode) {
+            // The <head> defaults were rendered for this template; only GPC can
+            // change them.
+            if (gpc.detected && gpc.affectedServices.length > 0) {
+                consentUpdate = gpcDenied;
+            }
+        } else if (templateKey !== payload.rules.defaultTemplate || gpc.detected) {
+            // The <head> defaults came from the fallback template. If a different
+            // template was selected (or GPC applies), update the consent state.
+            consentUpdate = {};
             var key;
             for (key in selectedDefaults) {
                 if (Object.prototype.hasOwnProperty.call(selectedDefaults, key)) {
                     consentUpdate[key] = selectedDefaults[key];
                 }
             }
-            if (gpc.detected && config && config.services) {
-                for (var j = 0; j < config.services.length; j++) {
-                    var gpcSvc = config.services[j];
-                    if (gpcSvc.gpc_sensitive) {
-                        if (gpcSvc.is_consent_mode_service && gpcSvc.consent_mode_key) {
-                            consentUpdate[gpcSvc.consent_mode_key] = 'denied';
-                        }
-                        consentUpdate[gpcSvc.name.replace(/-/g, '_') + '_consent'] = 'denied';
-                    }
+            for (key in gpcDenied) {
+                if (Object.prototype.hasOwnProperty.call(gpcDenied, key)) {
+                    consentUpdate[key] = gpcDenied[key];
                 }
             }
+        }
+        if (consentUpdate) {
             window.gtag('consent', 'update', consentUpdate);
-            log('Klaro Geo client geo: consent update pushed for template "' + templateKey + '"' +
+            log('Klaro Geo: consent update pushed for template "' + templateKey + '"' +
                 (gpc.detected ? ' (GPC applied)' : ''));
         }
 
-        // gtag flags for the selected template (head already set the fallback
-        // template's flags when true; 'set' is additive-only, so only emit trues)
-        var gtagSettings = template.gtagSettings || {};
-        if (gtagSettings.ads_data_redaction === 'true') {
-            window.gtag('set', 'ads_data_redaction', true);
-        }
-        if (gtagSettings.url_passthrough === 'true') {
-            window.gtag('set', 'url_passthrough', true);
+        // gtag flags for the selected template. In client mode the head set the
+        // fallback template's flags when true; 'set' is additive-only, so only
+        // emit trues. In server mode the head already set this template's flags.
+        if (!isServerMode) {
+            if (gtagSettings.ads_data_redaction === 'true') {
+                window.gtag('set', 'ads_data_redaction', true);
+            }
+            if (gtagSettings.url_passthrough === 'true') {
+                window.gtag('set', 'url_passthrough', true);
+            }
         }
 
         // ----- klaroConsentData (consent receipts + GTM mode detection) -----
-        if (window.klaroConsentData) {
+        // Server mode: PHP emitted it complete. Client mode: fill the template
+        // and geo fields PHP had to leave empty.
+        if (!isServerMode && window.klaroConsentData) {
             window.klaroConsentData.templateName = templateKey;
             window.klaroConsentData.templateSource = templateSource;
             window.klaroConsentData.detectedCountry = geo.country || '';
@@ -424,15 +463,11 @@
         // ----- klaroConfigLoaded dataLayer event (after resolution, once) -----
         var latestReceipt = null;
         try {
-            if (typeof window.getLatestConsentReceipt === 'function') {
-                latestReceipt = window.getLatestConsentReceipt();
-            } else {
-                var existingData = window.localStorage.getItem('klaro_consent_receipts');
-                if (existingData) {
-                    var receipts = JSON.parse(existingData);
-                    if (Array.isArray(receipts) && receipts.length > 0) {
-                        latestReceipt = receipts[receipts.length - 1];
-                    }
+            var existingData = window.localStorage.getItem('klaro_consent_receipts');
+            if (existingData) {
+                var receipts = JSON.parse(existingData);
+                if (Array.isArray(receipts) && receipts.length > 0) {
+                    latestReceipt = receipts[receipts.length - 1];
                 }
             }
         } catch (e) {
@@ -449,8 +484,8 @@
             'klaroGeoTemplateSource': templateSource,
             'klaroGeoDetectedCountry': geo.country || null,
             'klaroGeoDetectedRegion': geo.region || null,
-            'klaroGeoAdminOverride': false,
-            'klaroGeoResolutionMode': 'client',
+            'klaroGeoAdminOverride': isServerMode ? resolved.adminOverride === true : false,
+            'klaroGeoResolutionMode': isServerMode ? 'server' : 'client',
             'klaroGeoGeoSource': geo.source,
             'klaroGeoGeoLatencyMs': (typeof geo.latencyMs === 'number') ? geo.latencyMs : null,
             'klaroGeoEnableConsentLogging': !!template.enableConsentLogging,
@@ -460,7 +495,6 @@
         };
 
         // Add the consent receipt ID if available and active consent data exists
-        // (mirrors the server-mode inline block)
         if (latestReceipt) {
             var storageName = (config && (config.storageName || config.cookieName)) || 'klaro';
             var hasActiveConsent = false;
@@ -493,9 +527,9 @@
         // auto-init from the window.klaroConfig we just set.
         if (window.klaro && typeof window.klaro.setup === 'function') {
             window.klaro.setup(window.klaroConfig);
-            log('Klaro Geo client geo: klaro.setup() called');
+            log('Klaro Geo: klaro.setup() called');
         } else {
-            log('Klaro Geo client geo: klaroConfig set; Klaro will auto-init on load');
+            log('Klaro Geo: klaroConfig set; Klaro will auto-init on load');
         }
     }
 
@@ -570,6 +604,20 @@
         // deferStart is a test hook: unit tests drive resolveAndApply() directly.
         if (!payload.deferStart) {
             payload.resolution = resolveAndApply(payload);
+        }
+    } else if (payload && payload.mode === 'server') {
+        // PHP resolved the template; apply it now, before klaro.js loads.
+        try {
+            applyResolution(payload, {
+                country: (payload.resolved && payload.resolved.country) || '',
+                region: (payload.resolved && payload.resolved.region) || '',
+                source: (payload.resolved && payload.resolved.geoSource) || 'server',
+                latencyMs: null
+            });
+        } catch (err) {
+            if (window.console && console.error) {
+                console.error('[klaro-geo] Could not apply the consent template:', err);
+            }
         }
     }
 

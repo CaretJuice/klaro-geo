@@ -302,37 +302,6 @@
   }
 
   /**
-   * Get the latest consent receipt from localStorage
-   * @returns {Object|null} The latest consent receipt or null if none exists
-   */
-  function getLatestConsentReceipt() {
-      try {
-          // Get existing receipts
-          let existingData = window.localStorage.getItem('klaro_consent_receipts');
-
-          if (existingData) {
-              try {
-                  let receipts = JSON.parse(existingData);
-
-                  // Ensure receipts is an array
-                  if (Array.isArray(receipts) && receipts.length > 0) {
-                      // Return the most recent receipt (last in the array)
-                      return receipts[receipts.length - 1];
-                  }
-              } catch (parseError) {
-                  console.error('Failed to parse existing receipts:', parseError);
-              }
-          }
-
-          // Return null if no receipts exist or there was an error
-          return null;
-      } catch (e) {
-          console.error('Failed to retrieve latest consent receipt:', e);
-          return null;
-      }
-  }
-
-  /**
    * Send the consent receipt to the server
    */
   function sendReceiptToServer(receipt) {
