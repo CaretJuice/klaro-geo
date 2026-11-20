@@ -771,10 +771,14 @@ The `Klaro Consent Update` event includes a `gpcActive` field indicating whether
 
 ### Consent Receipts
 
-When GPC is active, consent receipts include:
+Every consent receipt records GPC as it stood when the visitor saved their choice:
 
-- `gpc_detected`: `true` — confirms GPC was active when the receipt was generated
-- `gpc_affected_services`: array of service names whose defaults were overridden
+- `gpc_signal`: whether the browser sent the GPC signal. It is recorded even when GPC handling is switched off for the template, and the server also counts the browser's `Sec-GPC: 1` request header.
+- `gpc_affected_services`: the services the plugin switched off by default because of the signal (empty when there was no signal or GPC handling is off).
+
+Both are stored with the receipt and shown under **Klaro Geo > Consent Receipts**. Receipts stored before this was added show "Not recorded".
+
+A receipt is written when a visitor saves a choice in the consent banner. A visitor whose browser sends GPC and who never touches the banner is opted out of the GPC-sensitive services, but no receipt is written for that page view.
 
 ### `.well-known/gpc.json` Endpoint
 
@@ -825,6 +829,7 @@ This granular control allows you to retain consent receipts where they are legal
    - User's consent choices for each service
    - Template used and source (e.g., geo-match, fallback)
    - User's detected country and region
+   - Whether the browser sent a Global Privacy Control signal, and the services switched off because of it
    - Coarse browser/OS identification (e.g., "Chrome/macOS", "Safari Mobile/iOS" — not the full User Agent string)
    - Anonymized IP address (last octet zeroed for IPv4)
 

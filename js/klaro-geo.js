@@ -225,6 +225,11 @@
       // Generate a unique receipt ID
       let receiptId = 'receipt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 
+      // Global Privacy Control, as it stood when the choice was saved: whether
+      // the browser sent the signal, and which services the plugin switched
+      // off by default because of it (set by the bootstrap).
+      const gpc = (window.klaroGeo && window.klaroGeo.gpc) || {};
+
       // Create the consent receipt
       let consentReceipt = {
           receipt_id: receiptId,
@@ -236,7 +241,9 @@
           region_code: window.klaroConsentData.detectedRegion || null,
           admin_override: window.klaroConsentData.adminOverride === true,
           template_settings: window.klaroConsentData.templateSettings || {},
-          klaro_config: window.klaroConfig || null
+          klaro_config: window.klaroConfig || null,
+          gpc_signal: navigator.globalPrivacyControl === true,
+          gpc_affected_services: Array.isArray(gpc.affectedServices) ? gpc.affectedServices.slice() : []
       };
 
       // Get consents from the manager

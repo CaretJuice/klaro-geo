@@ -93,7 +93,7 @@ class KlaroGeoConsentReceiptStorageTest extends WP_UnitTestCase {
 		$table   = klaro_geo_receipts_table_name();
 		$columns = wp_list_pluck( $wpdb->get_results( "DESCRIBE $table" ), 'Field' );
 
-		foreach ( array( 'id', 'receipt_id', 'user_id', 'ip_address', 'timestamp', 'consent_data', 'template_name', 'template_source', 'country_code', 'region_code', 'user_agent', 'klaro_config' ) as $column ) {
+		foreach ( array( 'id', 'receipt_id', 'user_id', 'ip_address', 'timestamp', 'consent_data', 'template_name', 'template_source', 'country_code', 'region_code', 'user_agent', 'klaro_config', 'gpc_signal', 'gpc_affected_services' ) as $column ) {
 			$this->assertContains( $column, $columns );
 		}
 	}
@@ -310,6 +310,64 @@ class KlaroGeoConsentReceiptStorageTest extends WP_UnitTestCase {
 		$this->assertIsInt( klaro_geo_store_consent_receipt( $receipt ) );
 
 		$this->assertNull( $this->stored( $receipt['receipt_id'] )->klaro_config );
+	}
+
+	/**
+	 * The receipt records whether the browser sent Global Privacy Control and
+	 * which services were switched off because of it.
+	 */
+	public function test_gpc_signal_and_affected_services_are_stored() {
+		$with = $this->receipt(
+			array(
+				'gpc_signal'            => true,
+				'gpc_affected_services' => array( 'google-ads', 'facebook-pixel' ),
+			)
+		);
+		$without = $this->receipt();
+
+		$this->assertIsInt( klaro_geo_store_consent_receipt( $with ) );
+		$this->assertIsInt( klaro_geo_store_consent_receipt( $without ) );
+
+		$row = $this->stored( $with['receipt_id'] );
+		$this->assertSame( '1', (string) $row->gpc_signal );
+		$this->assertSame( array( 'google-ads', 'facebook-pixel' ), json_decode( $row->gpc_affected_services, true ) );
+		$this->assertSame( 'Yes', klaro_geo_receipt_gpc_label( $row ) );
+
+		$row = $this->stored( $without['receipt_id'] );
+		$this->assertSame( '0', (string) $row->gpc_signal );
+		$this->assertSame( array(), json_decode( $row->gpc_affected_services, true ) );
+		$this->assertSame( 'No', klaro_geo_receipt_gpc_label( $row ) );
+	}
+
+	/**
+	 * The browser's Sec-GPC request header counts even when the receipt body
+	 * does not report the signal.
+	 */
+	public function test_gpc_request_header_is_recorded() {
+		$_SERVER['HTTP_SEC_GPC'] = '1';
+		$receipt                 = $this->receipt();
+		$result                  = klaro_geo_store_consent_receipt( $receipt );
+		unset( $_SERVER['HTTP_SEC_GPC'] );
+
+		$this->assertIsInt( $result );
+		$this->assertSame( '1', (string) $this->stored( $receipt['receipt_id'] )->gpc_signal );
+	}
+
+	public function test_gpc_fields_accept_only_a_boolean_and_service_names() {
+		$receipt = klaro_geo_sanitize_receipt(
+			$this->receipt(
+				array(
+					'gpc_signal'            => 'true',
+					'gpc_affected_services' => array( 'google-ads<script>alert(1)</script>', array( 'nested' ), 42, '', str_repeat( 'a', 101 ) ),
+				)
+			)
+		);
+
+		$this->assertFalse( $receipt['gpc_signal'], 'Only a real boolean true counts' );
+		$this->assertSame( array( 'google-ads' ), $receipt['gpc_affected_services'] );
+
+		$receipt = klaro_geo_sanitize_receipt( $this->receipt( array( 'gpc_affected_services' => 'google-ads' ) ) );
+		$this->assertSame( array(), $receipt['gpc_affected_services'] );
 	}
 
 	/**

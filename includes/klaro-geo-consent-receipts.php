@@ -112,6 +112,13 @@ function klaro_geo_receipts_exists( $receipt_id ) {
 	return intval( $count ) > 0;
 }
 
+/**
+ * Schema version of the receipts table, stored in
+ * klaro_geo_consent_receipts_db_version. Raise it when a column is added and
+ * add the column to klaro_geo_upgrade_consent_receipts_table().
+ */
+define( 'KLARO_GEO_RECEIPTS_DB_VERSION', '1.1' );
+
 // Create the consent receipts table on plugin activation
 function klaro_geo_create_consent_receipts_table() {
 	global $wpdb;
@@ -162,6 +169,8 @@ function klaro_geo_create_consent_receipts_table() {
             region_code varchar(10) DEFAULT NULL,
             user_agent text DEFAULT NULL,
             klaro_config longtext DEFAULT NULL,
+            gpc_signal tinyint(1) DEFAULT NULL,
+            gpc_affected_services text DEFAULT NULL,
             PRIMARY KEY (id)
         ) $charset_collate";
 	} else {
@@ -178,6 +187,8 @@ function klaro_geo_create_consent_receipts_table() {
             region_code varchar(10) DEFAULT NULL,
             user_agent text DEFAULT NULL,
             klaro_config longtext DEFAULT NULL,
+            gpc_signal tinyint(1) DEFAULT NULL,
+            gpc_affected_services text DEFAULT NULL,
             PRIMARY KEY (id),
             KEY receipt_id (receipt_id),
             KEY user_id (user_id),
@@ -230,12 +241,51 @@ function klaro_geo_create_consent_receipts_table() {
 		}
 	}
 
-	// Add version to options
-	add_option( 'klaro_geo_consent_receipts_db_version', '1.0' );
+	update_option( 'klaro_geo_consent_receipts_db_version', KLARO_GEO_RECEIPTS_DB_VERSION );
 
 	klaro_geo_debug_log( "Table $table_name created successfully" );
 	return true;
 }
+
+/**
+ * Bring a receipts table created by an earlier version up to the current
+ * schema.
+ *
+ * 1.1 added gpc_signal and gpc_affected_services. Receipts stored before that
+ * keep NULL in both: whether the browser sent GPC was not recorded for them,
+ * which is not the same as "no signal".
+ */
+function klaro_geo_upgrade_consent_receipts_table() {
+	$version = get_option( 'klaro_geo_consent_receipts_db_version' );
+
+	// No version means no table yet; it is created with the current schema.
+	if ( false === $version || KLARO_GEO_RECEIPTS_DB_VERSION === $version ) {
+		return;
+	}
+
+	if ( klaro_geo_receipts_table_exists() ) {
+		global $wpdb;
+		$table_name = klaro_geo_receipts_table_name();
+		$columns    = array(
+			'gpc_signal'            => 'tinyint(1) DEFAULT NULL',
+			'gpc_affected_services' => 'text DEFAULT NULL',
+		);
+
+		foreach ( $columns as $column => $definition ) {
+			if ( klaro_geo_receipts_column_exists( $column ) ) {
+				continue;
+			}
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.SchemaChange, PluginCheck.Security.DirectDB.UnescapedDBParameter -- DDL statement; table name from $wpdb->prefix and the column definitions above are trusted and cannot be parameterized.
+			if ( false === $wpdb->query( "ALTER TABLE $table_name ADD COLUMN $column $definition" ) ) {
+				klaro_geo_debug_log( "Could not add column $column to $table_name: " . $wpdb->last_error );
+				return; // Version is left as it was, so this is tried again.
+			}
+		}
+	}
+
+	update_option( 'klaro_geo_consent_receipts_db_version', KLARO_GEO_RECEIPTS_DB_VERSION );
+}
+add_action( 'init', 'klaro_geo_upgrade_consent_receipts_table' );
 
 // Drop the consent receipts table on plugin deactivation if cleanup is enabled
 function klaro_geo_drop_consent_receipts_table() {
@@ -320,7 +370,20 @@ function klaro_geo_sanitize_receipt( $raw ) {
 		'region_code'     => $region_code,
 		'admin_override'  => $admin_override,
 		'klaro_config'    => null,
+		// Global Privacy Control: whether the browser reported the signal, and
+		// the services the plugin switched off by default because of it.
+		'gpc_signal'            => isset( $raw['gpc_signal'] ) && true === $raw['gpc_signal'],
+		'gpc_affected_services' => array(),
 	);
+
+	if ( isset( $raw['gpc_affected_services'] ) && is_array( $raw['gpc_affected_services'] ) && count( $raw['gpc_affected_services'] ) <= 200 ) {
+		foreach ( $raw['gpc_affected_services'] as $service_name ) {
+			$service_name = is_string( $service_name ) ? sanitize_text_field( $service_name ) : '';
+			if ( '' !== $service_name && strlen( $service_name ) <= 100 ) {
+				$receipt['gpc_affected_services'][] = $service_name;
+			}
+		}
+	}
 
 	// The Klaro config snapshot is optional. Strings are stripped of markup, and a
 	// snapshot too large to store whole is dropped rather than cut mid-JSON.
@@ -412,13 +475,28 @@ function klaro_geo_store_consent_receipt( $raw, $user_id = 0 ) {
 		'user_agent'      => klaro_geo_get_coarse_user_agent(),
 	);
 
+	// A browser with GPC on also sends "Sec-GPC: 1" with the request, so the
+	// signal is recorded when either the receipt or the request reports it.
+	$gpc = array(
+		'gpc_signal'            => ( $receipt['gpc_signal'] || klaro_geo_request_has_gpc_header() ) ? 1 : 0,
+		'gpc_affected_services' => wp_json_encode( $receipt['gpc_affected_services'] ),
+	);
+
 	// Tables created before the klaro_config column was added do not have it.
 	if ( null !== $receipt['klaro_config'] && klaro_geo_receipts_column_exists( 'klaro_config' ) ) {
 		$data['klaro_config'] = $receipt['klaro_config'];
 	}
 
 	global $wpdb;
-	if ( false === klaro_geo_receipts_insert( $data ) ) {
+	$inserted = klaro_geo_receipts_insert( array_merge( $data, $gpc ) );
+	if ( false === $inserted ) {
+		// Most likely a table that has not been upgraded yet. Losing the receipt
+		// would be worse than storing it without the GPC columns.
+		klaro_geo_debug_log( 'Receipt insert failed (' . $wpdb->last_error . '); retrying without the GPC columns' );
+		$inserted = klaro_geo_receipts_insert( $data );
+	}
+
+	if ( false === $inserted ) {
 		// The database error is logged, never returned: this is a public endpoint.
 		klaro_geo_debug_log( 'Database error when inserting consent receipt: ' . $wpdb->last_error );
 		return new WP_Error( 'klaro_geo_storage_failed', 'Could not store consent receipt' );
@@ -427,6 +505,15 @@ function klaro_geo_store_consent_receipt( $raw, $user_id = 0 ) {
 	klaro_geo_debug_log( 'Stored consent receipt ' . $receipt['receipt_id'] . ' (row ' . $wpdb->insert_id . ', source: ' . $receipt['template_source'] . ')' );
 
 	return (int) $wpdb->insert_id;
+}
+
+/**
+ * Whether the current request carries the Global Privacy Control header.
+ *
+ * @return bool
+ */
+function klaro_geo_request_has_gpc_header() {
+	return isset( $_SERVER['HTTP_SEC_GPC'] ) && '1' === trim( sanitize_text_field( wp_unslash( $_SERVER['HTTP_SEC_GPC'] ) ) );
 }
 
 // Get an anonymized IP address for privacy
@@ -649,6 +736,19 @@ function klaro_geo_add_consent_receipts_page() {
 }
 add_action( 'admin_menu', 'klaro_geo_add_consent_receipts_page', 20 );
 
+/**
+ * How a stored receipt's GPC signal is shown to an administrator.
+ *
+ * @param object $receipt A row from the receipts table.
+ * @return string
+ */
+function klaro_geo_receipt_gpc_label( $receipt ) {
+	if ( ! isset( $receipt->gpc_signal ) ) {
+		return 'Not recorded';
+	}
+	return $receipt->gpc_signal ? 'Yes' : 'No';
+}
+
 // Render the consent receipts admin page
 function klaro_geo_render_consent_receipts_page() {
 	// Check user capabilities
@@ -693,6 +793,7 @@ function klaro_geo_render_consent_receipts_page() {
 						<th>Source</th>
 						<th>Country</th>
 						<th>Region</th>
+						<th>GPC</th>
 						<th>Actions</th>
 					</tr>
 				</thead>
@@ -705,6 +806,7 @@ function klaro_geo_render_consent_receipts_page() {
 							<td><?php echo esc_html( $receipt->template_source ); ?></td>
 							<td><?php echo esc_html( $receipt->country_code ); ?></td>
 							<td><?php echo esc_html( $receipt->region_code ); ?></td>
+							<td><?php echo esc_html( klaro_geo_receipt_gpc_label( $receipt ) ); ?></td>
 							<td>
 								<button type="button" class="button view-receipt"
 										data-receipt-id="<?php echo esc_attr( $receipt->id ); ?>">
@@ -785,6 +887,10 @@ function klaro_geo_render_consent_receipts_page() {
 			$receipt_js   .= "          addRow('Source:', receipt.template_source);\n";
 			$receipt_js   .= "          addRow('Country:', receipt.country_code || 'N/A');\n";
 			$receipt_js   .= "          addRow('Region:', receipt.region_code || 'N/A');\n";
+			$receipt_js   .= "          addRow('GPC signal:', receipt.gpc_label);\n";
+			$receipt_js   .= "          if (receipt.gpc_affected_services) {\n";
+			$receipt_js   .= "            addRow('Switched off by GPC:', pretty(receipt.gpc_affected_services), true);\n";
+			$receipt_js   .= "          }\n";
 			$receipt_js   .= "          addRow('Consent Choices:', pretty(receipt.consent_data), true);\n";
 			$receipt_js   .= "          if (receipt.klaro_config) {\n";
 			$receipt_js   .= "            addRow('Klaro Config:', pretty(receipt.klaro_config), true);\n";
@@ -832,6 +938,7 @@ function klaro_geo_ajax_get_receipt_details() {
 	$receipt = klaro_geo_receipts_get_by_id( $receipt_id );
 
 	if ( $receipt ) {
+		$receipt->gpc_label = klaro_geo_receipt_gpc_label( $receipt );
 		wp_send_json_success( $receipt );
 	} else {
 		wp_send_json_error( 'Receipt not found' );
