@@ -45,6 +45,54 @@ class Klaro_Geo_Option {
 	protected $is_modified = false;
 
 	/**
+	 * One instance per class and option name, so an option is loaded from the
+	 * database once per request.
+	 *
+	 * @var array
+	 */
+	private static $instances = array();
+
+	/**
+	 * Get the shared instance for an option.
+	 *
+	 * @param string|null $option_name Option name; defaults to the class's OPTION_NAME.
+	 * @return static
+	 */
+	public static function get_instance( $option_name = null ) {
+		$option_name = null === $option_name ? static::OPTION_NAME : $option_name;
+		$key         = static::class . ':' . $option_name;
+		if ( ! isset( self::$instances[ $key ] ) ) {
+			self::$instances[ $key ] = new static( $option_name );
+		}
+		return self::$instances[ $key ];
+	}
+
+	/**
+	 * Forget this class's shared instances, so the next get_instance() reloads
+	 * from the database. Used by tests and after an option is replaced directly.
+	 *
+	 * @param string|null $option_name One option, or null for all of this class's.
+	 */
+	public static function clear_instance_cache( $option_name = null ) {
+		$prefix = static::class . ':';
+		foreach ( array_keys( self::$instances ) as $key ) {
+			if ( 0 === strpos( $key, $prefix ) && ( null === $option_name || $key === $prefix . $option_name ) ) {
+				unset( self::$instances[ $key ] );
+			}
+		}
+	}
+
+	/**
+	 * The value as it is written to the database. Subclasses that store a
+	 * different representation override this.
+	 *
+	 * @return mixed
+	 */
+	protected function value_to_store() {
+		return $this->value;
+	}
+
+	/**
 	 * Constructor
 	 *
 	 * @param string $option_name The option name in the WordPress database
@@ -104,14 +152,7 @@ class Klaro_Geo_Option {
 			klaro_geo_debug_log( 'WARNING: Attempting to save empty value for ' . $this->option_name );
 		}
 
-		// Special handling for services - always save as JSON string
-		if ( $this->option_name === 'klaro_geo_services' ) {
-			$json_value = wp_json_encode( $this->value, JSON_PRETTY_PRINT );
-			$result     = update_option( $this->option_name, $json_value );
-		} else {
-			// Save the option as is for other options
-			$result = update_option( $this->option_name, $this->value );
-		}
+		$result = update_option( $this->option_name, $this->value_to_store() );
 
 		if ( $result ) {
 			$this->is_modified = false;
@@ -206,18 +247,6 @@ class Klaro_Geo_Option {
 	 */
 	public function has_key( $key ) {
 		return isset( $this->value[ $key ] );
-	}
-
-	/**
-	 * Reset the option to its default value
-	 *
-	 * @return $this For method chaining
-	 */
-	public function reset() {
-		$this->value       = $this->default_value;
-		$this->is_modified = true;
-
-		return $this;
 	}
 
 	/**

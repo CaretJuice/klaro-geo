@@ -165,27 +165,4 @@ class KlaroGeoOptionClassTest extends WP_UnitTestCase {
         $option->remove_key('non_existent');
     }
 
-    /**
-     * Test resetting to default value
-     */
-    public function test_reset() {
-        // Create option with test data
-        $default_value = array('default' => 'value');
-        $option = new Klaro_Geo_Option($this->option_name, $default_value);
-        
-        // Modify the option
-        $option->set_key('new_key', 'new_value');
-        $this->assertTrue($option->has_key('new_key'));
-        
-        // Reset the option
-        $option->reset();
-
-        // Option should be back to default value
-        $this->assertEquals($default_value, $option->get());
-        $this->assertFalse($option->has_key('new_key'));
-        $reflection = new ReflectionClass($option);
-        $property = $reflection->getProperty('is_modified');
-        $property->setAccessible(true);
-        $this->assertTrue($property->getValue($option));
-    }
 }

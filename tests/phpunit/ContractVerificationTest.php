@@ -291,7 +291,7 @@ class ContractVerificationTest extends WP_UnitTestCase {
         ));
 
         // Set fallback template
-        $this->country_settings->set_default_template('default');
+        $this->country_settings->set_key( 'default_template', 'default');
 
         // Set visible countries
         $this->country_settings->set_visible_countries(array('US'));
@@ -328,7 +328,7 @@ class ContractVerificationTest extends WP_UnitTestCase {
         $this->template_settings->save();
 
         // Set fallback
-        $this->country_settings->set_default_template('fallback-template');
+        $this->country_settings->set_key( 'default_template', 'fallback-template');
 
         // Set country with region override
         $this->country_settings->set_country('US', array(
@@ -437,7 +437,7 @@ class ContractVerificationTest extends WP_UnitTestCase {
         $this->template_settings->save();
 
         // 2. Set up country settings
-        $this->country_settings->set_default_template('opt-in');  // Fallback
+        $this->country_settings->set_key( 'default_template', 'opt-in');  // Fallback
         $this->country_settings->set_country('US', array(
             'template' => 'opt-out'  // US uses opt-out
         ));

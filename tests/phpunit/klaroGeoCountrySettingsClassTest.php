@@ -166,53 +166,10 @@ class KlaroGeoCountrySettingsClassTest extends WP_UnitTestCase {
         $this->assertEquals($country_data, $settings->get_country('US'));
 
         // Test removing a country
-        $settings->remove_country('US');
+        $settings->remove_key('US');
 
         // Check that country was removed
         $this->assertNull($settings->get_country('US'));
-    }
-
-    /**
-     * Test getting and setting region settings
-     */
-    public function test_region_settings() {
-        // Create settings with our test option name
-        $settings = new Klaro_Geo_Country_Settings($this->option_name);
-
-        // Test getting non-existent region
-        $this->assertNull($settings->get_region('US', 'CA'));
-
-        // Test setting a region for a non-existent country
-        $settings->set_region('US', 'CA', 'strict');
-
-        // Check that country and region were created
-        $this->assertEquals('strict', $settings->get_region('US', 'CA'));
-
-        // Check that country was created with default template
-        $country = $settings->get_country('US');
-        $this->assertEquals('default', $country['template']);
-
-        // Test setting another region
-        $settings->set_region('US', 'NY', 'relaxed');
-
-        // Check that region was set
-        $this->assertEquals('relaxed', $settings->get_region('US', 'NY'));
-
-        // Test removing a region
-        $settings->remove_region('US', 'CA');
-
-        // Check that region was removed
-        $this->assertNull($settings->get_region('US', 'CA'));
-
-        // Check that other region still exists
-        $this->assertEquals('relaxed', $settings->get_region('US', 'NY'));
-
-        // Test removing all regions
-        $settings->remove_region('US', 'NY');
-
-        // Check that regions array was removed
-        $country = $settings->get_country('US');
-        $this->assertFalse(isset($country['regions']));
     }
 
     /**
@@ -226,7 +183,7 @@ class KlaroGeoCountrySettingsClassTest extends WP_UnitTestCase {
         $this->assertEquals('default', $settings->get_default_template());
 
         // Test setting default template
-        $settings->set_default_template('strict');
+        $settings->set_key('default_template', 'strict');
 
         // Check that default template was set
         $this->assertEquals('strict', $settings->get_default_template());

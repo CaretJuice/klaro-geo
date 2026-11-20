@@ -268,7 +268,9 @@ class KlaroGeoServiceSettingsClassTest extends WP_UnitTestCase {
         $this->assertTrue($result);
 
         // Check that services were validated before saving
-        $saved_services = get_option($this->option_name);
+        // Services are stored as a JSON string; read them back the way the plugin does.
+        $this->assertIsString(get_option($this->option_name));
+        $saved_services = (new Klaro_Geo_Service_Settings($this->option_name))->get();
         $this->assertIsArray($saved_services);
 
         $test_service_found = false;
