@@ -119,150 +119,89 @@ function klaro_geo_receipts_exists( $receipt_id ) {
  */
 define( 'KLARO_GEO_RECEIPTS_DB_VERSION', '1.2' );
 
-// Create the consent receipts table on plugin activation
+/**
+ * Create the receipts table, or bring an existing one up to the current
+ * schema. Runs on activation, when the stored schema version is behind (see
+ * klaro_geo_upgrade_consent_receipts_table()) and when an insert fails.
+ *
+ * Columns added after 1.0 are listed in $added. Receipts stored before a
+ * column existed keep NULL in it: for gpc_signal that means "not recorded",
+ * which is not the same as "no signal".
+ *
+ * @return bool Whether the table exists with the current schema.
+ */
 function klaro_geo_create_consent_receipts_table() {
 	global $wpdb;
 	$table_name = klaro_geo_receipts_table_name();
 
-	// Log database information for debugging
-	klaro_geo_debug_log( 'Database info: ' . $wpdb->db_version() );
-	klaro_geo_debug_log( 'Database prefix: ' . $wpdb->prefix );
+	// Columns added since schema 1.0, in the order they were added.
+	$added = array(
+		'klaro_config'          => 'longtext DEFAULT NULL',
+		'gpc_signal'            => 'tinyint(1) DEFAULT NULL',       // 1.1
+		'gpc_affected_services' => 'text DEFAULT NULL',             // 1.1
+		'receipt_type'          => 'varchar(20) DEFAULT NULL',      // 1.2
+	);
 
-	// Get a list of all tables for debugging
-	$all_tables = $wpdb->get_results( 'SHOW TABLES', ARRAY_N );
-	$table_list = [];
-	foreach ( $all_tables as $table ) {
-		$table_list[] = $table[0];
-	}
-	klaro_geo_debug_log( 'Existing tables: ' . implode( ', ', $table_list ) );
+	if ( ! klaro_geo_receipts_table_exists() ) {
+		$added_sql = '';
+		foreach ( $added as $column => $definition ) {
+			$added_sql .= "$column $definition,\n";
+		}
 
-
-	// Check if the table already exists
-	// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name from $wpdb->prefix is trusted.
-	$table_exists = $wpdb->get_var( "SHOW TABLES LIKE '$table_name'" ) === $table_name;
-
-	if ( $table_exists ) {
-		klaro_geo_debug_log( "Table $table_name already exists - skipping creation" );
-		return true;
-	}
-
-	klaro_geo_debug_log( "Creating table $table_name" );
-
-	$charset_collate = $wpdb->get_charset_collate();
-	klaro_geo_debug_log( 'Charset collate: ' . $charset_collate );
-
-	$sql = "CREATE TABLE $table_name (
-            id bigint(20) NOT NULL AUTO_INCREMENT,
-            receipt_id varchar(50) NOT NULL,
-            user_id bigint(20) DEFAULT NULL,
-            ip_address varchar(45) DEFAULT NULL,
-            timestamp datetime NOT NULL,
-            consent_data longtext NOT NULL,
-            template_name varchar(100) NOT NULL,
-            template_source varchar(50) NOT NULL,
-            country_code varchar(10) DEFAULT NULL,
-            region_code varchar(10) DEFAULT NULL,
-            user_agent text DEFAULT NULL,
-            klaro_config longtext DEFAULT NULL,
-            gpc_signal tinyint(1) DEFAULT NULL,
-            gpc_affected_services text DEFAULT NULL,
-            receipt_type varchar(20) DEFAULT NULL,
-            PRIMARY KEY (id),
-            KEY receipt_id (receipt_id),
-            KEY user_id (user_id),
-            KEY timestamp (timestamp),
-            KEY country_code (country_code)
-        ) $charset_collate";
-
-
-	// Use dbDelta for table creation (standard WordPress approach)
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
-		$result = dbDelta( $sql );
-		klaro_geo_debug_log( 'dbDelta result: ' . count( $result ) . ' operations' );
-
-	// Check if the table was created successfully
-	// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name from $wpdb->prefix is trusted.
-	$table_exists = $wpdb->get_var( "SHOW TABLES LIKE '$table_name'" ) === $table_name;
-
-	if ( ! $table_exists ) {
-		klaro_geo_debug_log( "Table $table_name still doesn't exist after creation attempt" );
-
-		// Try one more direct approach as a last resort
-		$simple_sql = "CREATE TABLE IF NOT EXISTS $table_name (
-            id bigint(20) NOT NULL AUTO_INCREMENT,
-            receipt_id varchar(50) NOT NULL,
-            timestamp datetime NOT NULL,
-            consent_data longtext NOT NULL,
-            template_name varchar(100) NOT NULL,
-            template_source varchar(50) NOT NULL,
-            klaro_config longtext DEFAULT NULL,
-            PRIMARY KEY (id)
-        ) $charset_collate";
-
-		klaro_geo_debug_log( 'Trying simplified table structure as last resort' );
-        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- DDL statement; table name from $wpdb->prefix is trusted.
-		$last_result = $wpdb->query( $simple_sql );
-
-		if ( $last_result === false ) {
-			klaro_geo_debug_log( 'Final attempt failed. Error: ' . $wpdb->last_error );
-			return false;
-		}
-
-		// Check one more time
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name from $wpdb->prefix is trusted.
-		$table_exists = $wpdb->get_var( "SHOW TABLES LIKE '$table_name'" ) === $table_name;
-
-		if ( ! $table_exists ) {
-			klaro_geo_debug_log( "All attempts to create table $table_name have failed" );
-			return false;
-		}
-	}
-
-	update_option( 'klaro_geo_consent_receipts_db_version', KLARO_GEO_RECEIPTS_DB_VERSION );
-
-	klaro_geo_debug_log( "Table $table_name created successfully" );
-	return true;
-}
-
-/**
- * Bring a receipts table created by an earlier version up to the current
- * schema.
- *
- * 1.1 added gpc_signal and gpc_affected_services; 1.2 added receipt_type.
- * Receipts stored before that keep NULL in all three: whether the browser sent GPC was not
- * recorded for them, which is not the same as "no signal", and every one of
- * them records a saved choice.
- */
-function klaro_geo_upgrade_consent_receipts_table() {
-	$version = get_option( 'klaro_geo_consent_receipts_db_version' );
-
-	// No version means no table yet; it is created with the current schema.
-	if ( false === $version || KLARO_GEO_RECEIPTS_DB_VERSION === $version ) {
-		return;
-	}
-
-	if ( klaro_geo_receipts_table_exists() ) {
-		global $wpdb;
-		$table_name = klaro_geo_receipts_table_name();
-		$columns    = array(
-			'gpc_signal'            => 'tinyint(1) DEFAULT NULL',
-			'gpc_affected_services' => 'text DEFAULT NULL',
-			'receipt_type'          => 'varchar(20) DEFAULT NULL',
+		dbDelta(
+			"CREATE TABLE $table_name (
+			id bigint(20) NOT NULL AUTO_INCREMENT,
+			receipt_id varchar(50) NOT NULL,
+			user_id bigint(20) DEFAULT NULL,
+			ip_address varchar(45) DEFAULT NULL,
+			timestamp datetime NOT NULL,
+			consent_data longtext NOT NULL,
+			template_name varchar(100) NOT NULL,
+			template_source varchar(50) NOT NULL,
+			country_code varchar(10) DEFAULT NULL,
+			region_code varchar(10) DEFAULT NULL,
+			user_agent text DEFAULT NULL,
+			$added_sql PRIMARY KEY  (id),
+			KEY receipt_id (receipt_id),
+			KEY user_id (user_id),
+			KEY timestamp (timestamp),
+			KEY country_code (country_code)
+			) " . $wpdb->get_charset_collate()
 		);
 
-		foreach ( $columns as $column => $definition ) {
+		if ( ! klaro_geo_receipts_table_exists() ) {
+			klaro_geo_debug_log( "Could not create $table_name: " . $wpdb->last_error );
+			return false;
+		}
+	} else {
+		foreach ( $added as $column => $definition ) {
 			if ( klaro_geo_receipts_column_exists( $column ) ) {
 				continue;
 			}
 			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.SchemaChange, PluginCheck.Security.DirectDB.UnescapedDBParameter -- DDL statement; table name from $wpdb->prefix and the column definitions above are trusted and cannot be parameterized.
 			if ( false === $wpdb->query( "ALTER TABLE $table_name ADD COLUMN $column $definition" ) ) {
 				klaro_geo_debug_log( "Could not add column $column to $table_name: " . $wpdb->last_error );
-				return; // Version is left as it was, so this is tried again.
+				return false; // The version is left as it was, so this is tried again.
 			}
 		}
 	}
 
 	update_option( 'klaro_geo_consent_receipts_db_version', KLARO_GEO_RECEIPTS_DB_VERSION );
+	return true;
+}
+
+/**
+ * Upgrade the receipts table after a plugin update that changed its schema.
+ */
+function klaro_geo_upgrade_consent_receipts_table() {
+	$version = get_option( 'klaro_geo_consent_receipts_db_version' );
+
+	// No version means the table was never created; activation or the first
+	// receipt creates it with the current schema.
+	if ( false !== $version && KLARO_GEO_RECEIPTS_DB_VERSION !== $version ) {
+		klaro_geo_create_consent_receipts_table();
+	}
 }
 add_action( 'init', 'klaro_geo_upgrade_consent_receipts_table' );
 
@@ -432,16 +371,6 @@ function klaro_geo_store_consent_receipt( $raw, $user_id = 0 ) {
 		return new WP_Error( 'klaro_geo_logging_disabled', 'Consent logging is disabled' );
 	}
 
-	if ( ! klaro_geo_receipts_table_exists() ) {
-		klaro_geo_debug_log( 'Consent receipts table does not exist. Attempting to create it.' );
-		klaro_geo_create_consent_receipts_table();
-
-		if ( ! klaro_geo_receipts_table_exists() ) {
-			klaro_geo_debug_log( 'Failed to create consent receipts table. Cannot store receipt.' );
-			return new WP_Error( 'klaro_geo_storage_failed', 'Could not store consent receipt' );
-		}
-	}
-
 	if ( klaro_geo_receipts_exists( $receipt['receipt_id'] ) ) {
 		klaro_geo_debug_log( 'Duplicate receipt_id detected: ' . $receipt['receipt_id'] );
 		return new WP_Error( 'klaro_geo_duplicate_receipt', 'Duplicate receipt ID skipped' );
@@ -464,24 +393,21 @@ function klaro_geo_store_consent_receipt( $raw, $user_id = 0 ) {
 
 	// A browser with GPC on also sends "Sec-GPC: 1" with the request, so the
 	// signal is recorded when either the receipt or the request reports it.
-	$gpc = array(
-		'gpc_signal'            => ( $receipt['gpc_signal'] || klaro_geo_request_has_gpc_header() ) ? 1 : 0,
-		'gpc_affected_services' => wp_json_encode( $receipt['gpc_affected_services'] ),
-		'receipt_type'          => $receipt['receipt_type'],
-	);
+	$data['gpc_signal']            = ( $receipt['gpc_signal'] || klaro_geo_request_has_gpc_header() ) ? 1 : 0;
+	$data['gpc_affected_services'] = wp_json_encode( $receipt['gpc_affected_services'] );
+	$data['receipt_type']          = $receipt['receipt_type'];
 
-	// Tables created before the klaro_config column was added do not have it.
-	if ( null !== $receipt['klaro_config'] && klaro_geo_receipts_column_exists( 'klaro_config' ) ) {
+	if ( null !== $receipt['klaro_config'] ) {
 		$data['klaro_config'] = $receipt['klaro_config'];
 	}
 
 	global $wpdb;
-	$inserted = klaro_geo_receipts_insert( array_merge( $data, $gpc ) );
+	$inserted = klaro_geo_receipts_insert( $data );
 	if ( false === $inserted ) {
-		// Most likely a table that has not been upgraded yet. Losing the receipt
-		// would be worse than storing it without the newer columns.
-		klaro_geo_debug_log( 'Receipt insert failed (' . $wpdb->last_error . '); retrying without the columns added since schema 1.0' );
-		$inserted = klaro_geo_receipts_insert( $data );
+		// The table is missing or behind the current schema. Create or
+		// upgrade it and try once more, so the receipt is not lost.
+		klaro_geo_debug_log( 'Receipt insert failed (' . $wpdb->last_error . '); creating or upgrading the receipts table and retrying' );
+		$inserted = klaro_geo_create_consent_receipts_table() ? klaro_geo_receipts_insert( $data ) : false;
 	}
 
 	if ( false === $inserted ) {
