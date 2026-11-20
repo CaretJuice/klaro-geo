@@ -76,6 +76,55 @@ function klaro_geo_resolve_service_required( array $service, $template_required 
 }
 
 /**
+ * The consent key a service is known by in the consent state and in Google
+ * Tag Manager: a consent mode service uses its Google key (analytics_storage),
+ * any other service uses "<name>_consent" (google_analytics_consent).
+ *
+ * js/klaro-geo-events.js getServiceConsentKey() is the same rule in JavaScript.
+ *
+ * @param array $service A service.
+ * @return string
+ */
+function klaro_geo_service_consent_key( array $service ) {
+	if ( isset( $service['is_consent_mode_service'] ) && true === $service['is_consent_mode_service'] && ! empty( $service['consent_mode_key'] ) ) {
+		return $service['consent_mode_key'];
+	}
+	return str_replace( '-', '_', $service['name'] ) . '_consent';
+}
+
+/**
+ * A service's consent default under a template, and where it comes from.
+ *
+ * In order: a required service is granted; a service with its own Default
+ * uses it; otherwise the template's Default applies. Used for the consent
+ * defaults sent to the page and for the preview on the Templates page, so the
+ * preview cannot disagree with what visitors get.
+ *
+ * @param array $service           A service.
+ * @param bool  $template_default  The template's Default setting.
+ * @param bool  $template_required The template's Required setting.
+ * @return array { key: string, default: 'granted'|'denied', source: 'required'|'service'|'template' }
+ */
+function klaro_geo_service_consent_default( array $service, $template_default, $template_required ) {
+	if ( klaro_geo_resolve_service_required( $service, $template_required ) ) {
+		$default = 'granted';
+		$source  = 'required';
+	} elseif ( isset( $service['default'] ) && '' !== $service['default'] ) {
+		$default = filter_var( $service['default'], FILTER_VALIDATE_BOOLEAN ) ? 'granted' : 'denied';
+		$source  = 'service';
+	} else {
+		$default = $template_default ? 'granted' : 'denied';
+		$source  = 'template';
+	}
+
+	return array(
+		'key'     => klaro_geo_service_consent_key( $service ),
+		'default' => $default,
+		'source'  => $source,
+	);
+}
+
+/**
  * Give Klaro a title and description for every configured built-in purpose,
  * and a purpose display order.
  *
@@ -196,7 +245,7 @@ function klaro_geo_build_template_payload( $template_key, $templates, $services 
 		? $template_config['plugin_settings']['gpc_enabled']
 		: true;
 	$gpc_enabled          = $gpc_global_enabled && $gpc_template_enabled;
-	$all_purposes         = array_map( 'trim', explode( ',', get_option( 'klaro_geo_purposes', klaro_geo_get_default_purposes_string() ) ) );
+	$all_purposes         = klaro_geo_get_purposes();
 	$gpc_purposes         = isset( $template_config['plugin_settings']['gpc_purposes'] )
 		? $template_config['plugin_settings']['gpc_purposes']
 		: $all_purposes;
@@ -395,31 +444,8 @@ function klaro_geo_build_template_payload( $template_key, $templates, $services 
 	foreach ( $services as $service ) {
 		$service_name = $service['name'] ?? '';
 		if ( ! empty( $service_name ) ) {
-			// For consent mode services, use the consent_mode_key directly (e.g., 'analytics_storage')
-			// For regular services, use service_name + '_consent' (e.g., 'google_analytics_consent')
-			$is_consent_mode_service = isset( $service['is_consent_mode_service'] ) && $service['is_consent_mode_service'] === true;
-			if ( $is_consent_mode_service && ! empty( $service['consent_mode_key'] ) ) {
-				$consent_key = $service['consent_mode_key'];
-			} else {
-				$consent_key = str_replace( '-', '_', $service_name ) . '_consent';
-			}
-
-			// Determine the default value based on priority:
-			// 1. Required services → always 'granted'
-			// 2. Service has explicit default → use it
-			// 3. Otherwise → inherit from template default
-			$is_required          = klaro_geo_resolve_service_required( $service, $template_required );
-			$has_explicit_default = isset( $service['default'] ) && $service['default'] !== null && $service['default'] !== '';
-
-			if ( $is_required ) {
-				$dynamic_consent_defaults[ $consent_key ] = 'granted';
-			} elseif ( $has_explicit_default ) {
-				$service_default                          = filter_var( $service['default'], FILTER_VALIDATE_BOOLEAN );
-				$dynamic_consent_defaults[ $consent_key ] = $service_default ? 'granted' : 'denied';
-			} else {
-				// Inherit from template default
-				$dynamic_consent_defaults[ $consent_key ] = $template_default_consent ? 'granted' : 'denied';
-			}
+			$consent_default                                         = klaro_geo_service_consent_default( $service, $template_default_consent, $template_required );
+			$dynamic_consent_defaults[ $consent_default['key'] ] = $consent_default['default'];
 		}
 	}
 

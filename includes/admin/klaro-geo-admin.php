@@ -70,11 +70,8 @@ function klaro_geo_activate() {
 		$service_settings->save();
 	}
 
-	// Set default geo settings
-	add_option( 'klaro_geo_country_settings', wp_json_encode( klaro_geo_get_default_geo_settings() ) );
-
 	// Set up the default templates using the template settings class
-	$template_settings = new Klaro_Geo_Template_Settings();
+	$template_settings = Klaro_Geo_Template_Settings::get_instance();
 	$default_templates = $template_settings->get_default_templates();
 
 	// Only set default templates if they don't already exist
@@ -123,26 +120,4 @@ function klaro_geo_verify_admin_ajax( $nonce_action, $nonce_field = 'nonce' ) {
 	}
 }
 
-// Helper function to get default geo settings
-function klaro_geo_get_default_geo_settings() {
-	// Get templates
-	$templates = get_option( 'klaro_geo_templates', array() );
-
-	// If there are templates, use the first one as the default
-	if ( ! empty( $templates ) ) {
-		$template_keys    = array_keys( $templates );
-		$default_template = reset( $template_keys );
-	} else {
-		// If no templates are available, use an empty string
-		// The get_default_template method will handle this case
-		$default_template = '';
-	}
-
-	return array(
-		'default_template' => $default_template,
-		'countries'        => array(),
-	);
-}
-
 // Default services are now defined in includes/klaro-geo-defaults.php
-

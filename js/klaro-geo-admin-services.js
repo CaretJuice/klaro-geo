@@ -1,88 +1,4 @@
-// Export functions for testing first, before any jQuery code
-// These functions validate the structure of service cookies and purposes
-function testServiceCookiesType(services) {
-    // Handle null/undefined services
-    if (!services) {
-        return false;
-    }
-
-    // Empty array is valid
-    if (Array.isArray(services) && services.length === 0) {
-        return true;
-    }
-
-    // Check each service
-    return services.every(service => {
-        // If service_cookies is missing, that's fine
-        if (!service.hasOwnProperty('service_cookies')) {
-            return true;
-        }
-
-        // service_cookies must be an array
-        if (!Array.isArray(service.service_cookies)) {
-            return false;
-        }
-
-        // Each item in the array must be a string or RegExp
-        return service.service_cookies.every(cookie => {
-            // Check for null, undefined, or non-string/non-RegExp values
-            if (cookie === null || cookie === undefined) {
-                return false;
-            }
-
-            // Check type
-            return typeof cookie === 'string' || cookie instanceof RegExp;
-        });
-    });
-}
-
-function testServicePurposesType(services) {
-    // Handle null/undefined services
-    if (!services) {
-        return false;
-    }
-
-    // Empty array is valid
-    if (Array.isArray(services) && services.length === 0) {
-        return true;
-    }
-
-    // Check each service
-    return services.every(service => {
-        // If service_purposes is missing, that's fine
-        if (!service.hasOwnProperty('service_purposes')) {
-            return true;
-        }
-
-        // service_purposes must be an array
-        if (!Array.isArray(service.service_purposes)) {
-            return false;
-        }
-
-        // Each item in the array must be a string
-        return service.service_purposes.every(purpose => {
-            // Check for null, undefined, or non-string values
-            if (purpose === null || purpose === undefined) {
-                return false;
-            }
-
-            // Check type
-            return typeof purpose === 'string';
-        });
-    });
-}
-
-// Make functions available for testing
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        testServiceCookiesType,
-        testServicePurposesType
-    };
-}
-
-// Only run jQuery code if we're in a browser environment, not during testing
-if (typeof jQuery !== 'undefined') {
-    jQuery(document).ready(function($) {
+jQuery(document).ready(function($) {
         // Ensure klaroGeoServices is available
         if (typeof klaroGeoServices === 'undefined') {
             klaroGeoError('klaroGeoServices not defined');
@@ -186,9 +102,6 @@ if (typeof jQuery !== 'undefined') {
 
     // Load languages from templates
     loadLanguagesFromTemplates();
-
-    // Make the function available globally for debugging
-    window.loadLanguagesFromTemplates = loadLanguagesFromTemplates;
 
     // Populate purposes checkboxes
     function populatePurposes() {
@@ -598,5 +511,4 @@ if (typeof jQuery !== 'undefined') {
 
     // Initialize
     populatePurposes();
-    });
-}
+});

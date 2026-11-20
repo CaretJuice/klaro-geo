@@ -98,20 +98,7 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
 	 * @param array  $default_value Default value if option doesn't exist
 	 */
 	public function __construct( $option_name = 'klaro_geo_country_settings', $default_value = array() ) {
-		// Get templates
-		$templates = get_option( 'klaro_geo_templates', array() );
-
-		// If there are templates, use the first one as the default
-		if ( ! empty( $templates ) ) {
-			$template_keys    = array_keys( $templates );
-			$default_template = reset( $template_keys );
-			$default_value    = array( 'default_template' => $default_template );
-		} else {
-			// If no templates are available, use an empty default value
-			// The get_default_template method will handle this case
-			$default_value = array();
-		}
-
+		// No stored default_template is handled by get_default_template().
 		parent::__construct( $option_name, $default_value );
 		$this->load_visible_countries();
 	}
@@ -204,8 +191,7 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
 
 		// If no fallback template is set, try to get the first available template
 		if ( empty( $fallback_template ) ) {
-			// Get templates
-			$templates = get_option( 'klaro_geo_templates', array() );
+			$templates = Klaro_Geo_Template_Settings::get_instance()->get();
 
 			// If there are templates, use the first one
 			if ( ! empty( $templates ) ) {

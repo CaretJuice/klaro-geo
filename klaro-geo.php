@@ -296,6 +296,20 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/klaro-geo-consent-button.ph
 // The consent receipts table check is now handled in includes/klaro-geo-consent-receipts.php
 
 /**
+ * Google's standard Tag Manager loader snippet for a container.
+ *
+ * @param string $gtm_id The container ID.
+ * @return string JavaScript.
+ */
+function klaro_geo_gtm_loader_js( $gtm_id ) {
+	return "(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':\n"
+		. "new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],\n"
+		. "j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=\n"
+		. "'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);\n"
+		. "})(window,document,'script','dataLayer','" . esc_js( $gtm_id ) . "');";
+}
+
+/**
  * Enqueue all frontend scripts and styles for Klaro Geo
  */
 function klaro_geo_enqueue_scripts() {
@@ -490,11 +504,7 @@ function klaro_geo_enqueue_scripts() {
 		$consent_mode_type = get_option( 'klaro_geo_consent_mode_type', 'basic' );
 		if ( $consent_mode_type === 'advanced' ) {
 			$gtm_deps = $consent_defaults ? array( 'klaro-geo-consent-defaults' ) : array();
-			$gtm_js   = "(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':\n";
-			$gtm_js  .= "new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],\n";
-			$gtm_js  .= "j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=\n";
-			$gtm_js  .= "'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);\n";
-			$gtm_js  .= "})(window,document,'script','dataLayer','" . esc_js( $gtm_id ) . "');";
+			$gtm_js   = klaro_geo_gtm_loader_js( $gtm_id );
 
 			wp_register_script( 'klaro-geo-gtm', false, $gtm_deps, KLARO_GEO_VERSION, false );
 			wp_enqueue_script( 'klaro-geo-gtm' );
@@ -538,11 +548,7 @@ function klaro_geo_add_gtm_head_script() {
 		// Uses data-type/data-name attributes so Klaro can intercept and gate execution.
 		// wp_print_inline_script_tag() is the WordPress-approved way to output inline
 		// scripts with custom attributes (available since WP 5.7).
-		$gtm_js  = "(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':\n";
-		$gtm_js .= "new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],\n";
-		$gtm_js .= "j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=\n";
-		$gtm_js .= "'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);\n";
-		$gtm_js .= "})(window,document,'script','dataLayer','" . esc_js( $gtm_id ) . "');";
+		$gtm_js = klaro_geo_gtm_loader_js( $gtm_id );
 
 		wp_print_inline_script_tag(
 			$gtm_js,

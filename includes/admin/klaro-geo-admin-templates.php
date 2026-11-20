@@ -64,7 +64,7 @@ function klaro_geo_templates_page() {
 	}
 
 	// Initialize the template settings class
-	$template_settings = new Klaro_Geo_Template_Settings();
+	$template_settings = Klaro_Geo_Template_Settings::get_instance();
 
 	// Ensure the template settings are saved
 	$template_settings->save();
@@ -197,7 +197,7 @@ function klaro_geo_templates_page() {
 				$template['plugin_settings'] = array(
 					'enable_consent_logging' => true,
 					'gpc_enabled'            => true,
-					'gpc_purposes'           => array_map( 'trim', explode( ',', get_option( 'klaro_geo_purposes', klaro_geo_get_default_purposes_string() ) ) ),
+					'gpc_purposes'           => klaro_geo_get_purposes(),
 				);
 				$template_settings->set_template( $current_template, $template );
 				klaro_geo_debug_log( 'Set default plugin_settings' );
@@ -656,40 +656,25 @@ function klaro_geo_templates_page() {
 					</thead>
 					<tbody>
 						<?php
-						// Get template default setting
-						$template_default = isset( $current_config['default'] ) && $current_config['default'] ? true : false;
+						$template_default  = ! empty( $current_config['default'] );
+						$template_required = isset( $current_config['required'] ) && filter_var( $current_config['required'], FILTER_VALIDATE_BOOLEAN );
+						$source_labels     = array(
+							'required' => 'Required service',
+							'service'  => 'Service override',
+							'template' => 'Template default',
+						);
 
-						// Load the services this preview table describes. Without this the
-						// variable is undefined and the table always renders empty.
-						$service_settings = Klaro_Geo_Service_Settings::get_instance();
-						$services         = $service_settings->get();
-						if ( ! is_array( $services ) ) {
-							$services = array();
-						}
-
-						foreach ( $services as $service ) {
+						foreach ( Klaro_Geo_Service_Settings::get_instance()->get() as $service ) {
 							if ( ! isset( $service['name'] ) ) {
 								continue;
 							}
 
-							$service_name = $service['name'];
-							$consent_key  = str_replace( '-', '_', $service_name ) . '_consent';
-
-							// Determine the default value and source
-							$is_required          = isset( $service['required'] ) && filter_var( $service['required'], FILTER_VALIDATE_BOOLEAN );
-							$has_explicit_default = isset( $service['default'] ) && $service['default'] !== null && $service['default'] !== '';
-
-							if ( $is_required ) {
-								$default_value = 'granted';
-								$source        = 'Required service';
-							} elseif ( $has_explicit_default ) {
-								$service_default = filter_var( $service['default'], FILTER_VALIDATE_BOOLEAN );
-								$default_value   = $service_default ? 'granted' : 'denied';
-								$source          = 'Service override';
-							} else {
-								$default_value = $template_default ? 'granted' : 'denied';
-								$source        = 'Template default';
-							}
+							// The same calculation the frontend config uses.
+							$consent_default = klaro_geo_service_consent_default( $service, $template_default, $template_required );
+							$service_name    = $service['name'];
+							$consent_key     = $consent_default['key'];
+							$default_value   = $consent_default['default'];
+							$source          = $source_labels[ $consent_default['source'] ];
 
 							// Get purpose for display
 							$purposes = isset( $service['purposes'] ) ? implode( ', ', $service['purposes'] ) : 'unknown';
@@ -736,7 +721,7 @@ function klaro_geo_templates_page() {
 						<td>
 							<?php
 							// Must be defined before $gpc_purposes, which falls back to it.
-							$available_purposes = explode( ',', get_option( 'klaro_geo_purposes', klaro_geo_get_default_purposes_string() ) );
+							$available_purposes = klaro_geo_get_purposes();
 							$gpc_purposes       = isset( $templates[ $current_template ]['plugin_settings']['gpc_purposes'] )
 								? $templates[ $current_template ]['plugin_settings']['gpc_purposes']
 								: $available_purposes;
@@ -1220,7 +1205,7 @@ function klaro_geo_create_template() {
 	$inherit_from  = sanitize_text_field( wp_unslash( $_POST['inherit_from'] ) );
 
 	// Initialize the template settings class
-	$template_settings = new Klaro_Geo_Template_Settings();
+	$template_settings = Klaro_Geo_Template_Settings::get_instance();
 
 	// Get existing templates
 	$templates = $template_settings->get();
@@ -1313,7 +1298,7 @@ function klaro_geo_save_translations_ajax() {
 	$template_id = sanitize_text_field( wp_unslash( $_POST['template_id'] ) );
 
 	// Initialize the template settings class
-	$template_settings = new Klaro_Geo_Template_Settings();
+	$template_settings = Klaro_Geo_Template_Settings::get_instance();
 
 	// Check if the template exists
 	$template = $template_settings->get_template( $template_id );
@@ -1397,7 +1382,7 @@ function klaro_geo_delete_template_ajax() {
 	}
 
 	// Initialize the template settings class
-	$template_settings = new Klaro_Geo_Template_Settings();
+	$template_settings = Klaro_Geo_Template_Settings::get_instance();
 
 	// Check if the template exists
 	$template = $template_settings->get_template( $template_id );

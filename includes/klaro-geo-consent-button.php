@@ -65,7 +65,7 @@ class Klaro_Consent_Menu_Button {
 		// Parse attributes
 		$atts = shortcode_atts(
 			array(
-				'text'  => get_option( 'klaro_geo_floating_button_text', 'Manage Consent Settings' ),
+				'text'  => get_option( 'klaro_geo_floating_button_text', __( 'Manage Consent', 'klaro-geo' ) ),
 				'class' => '',
 				'style' => 'button', // 'button' or 'link'
 			),

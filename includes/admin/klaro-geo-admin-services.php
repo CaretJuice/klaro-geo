@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 // Services Page Content
 
 function klaro_geo_services_page_content() {
-	$purposes = explode( ',', get_option( 'klaro_geo_purposes', klaro_geo_get_default_purposes_string() ) ); // Get available purposes from settings
+	$purposes = klaro_geo_get_purposes();
 
 	// Initialize the service settings class
 	$service_settings = Klaro_Geo_Service_Settings::get_instance();

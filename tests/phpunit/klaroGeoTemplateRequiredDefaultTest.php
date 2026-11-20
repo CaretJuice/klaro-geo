@@ -19,6 +19,8 @@ class TemplateRequiredDefaultTest extends WP_UnitTestCase {
 	public function setUp(): void {
 		parent::setUp();
 		delete_option( 'klaro_geo_templates' );
+		// The page reads templates through the shared instance.
+		Klaro_Geo_Template_Settings::clear_instance_cache();
 
 		$this->admin_user_id = $this->factory->user->create(
 			array( 'role' => 'administrator' )
@@ -28,6 +30,7 @@ class TemplateRequiredDefaultTest extends WP_UnitTestCase {
 
 	public function tearDown(): void {
 		delete_option( 'klaro_geo_templates' );
+		Klaro_Geo_Template_Settings::clear_instance_cache();
 		wp_delete_user( $this->admin_user_id );
 		parent::tearDown();
 	}
@@ -60,7 +63,7 @@ class TemplateRequiredDefaultTest extends WP_UnitTestCase {
 	 * consent for every service.
 	 */
 	public function test_required_checkbox_is_unchecked_when_template_omits_it() {
-		$template_settings = new Klaro_Geo_Template_Settings();
+		$template_settings = Klaro_Geo_Template_Settings::get_instance();
 		$templates         = $template_settings->get_default_templates();
 
 		$this->assertArrayNotHasKey(
@@ -84,7 +87,7 @@ class TemplateRequiredDefaultTest extends WP_UnitTestCase {
 	 * all services keep their setting.
 	 */
 	public function test_required_checkbox_is_checked_when_template_sets_it() {
-		$template_settings = new Klaro_Geo_Template_Settings();
+		$template_settings = Klaro_Geo_Template_Settings::get_instance();
 		$templates         = $template_settings->get_default_templates();
 
 		$templates['default']['config']['required'] = true;
@@ -103,7 +106,7 @@ class TemplateRequiredDefaultTest extends WP_UnitTestCase {
 	 * And an explicit false stays unchecked.
 	 */
 	public function test_required_checkbox_is_unchecked_when_template_disables_it() {
-		$template_settings = new Klaro_Geo_Template_Settings();
+		$template_settings = Klaro_Geo_Template_Settings::get_instance();
 		$templates         = $template_settings->get_default_templates();
 
 		$templates['default']['config']['required'] = false;
