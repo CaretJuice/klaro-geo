@@ -778,7 +778,14 @@ Every consent receipt records GPC as it stood when the visitor saved their choic
 
 Both are stored with the receipt and shown under **Klaro Geo > Consent Receipts**. Receipts stored before this was added show "Not recorded".
 
-A receipt is written when a visitor saves a choice in the consent banner. A visitor whose browser sends GPC and who never touches the banner is opted out of the GPC-sensitive services, but no receipt is written for that page view.
+A visitor whose browser sends GPC is opted out of the GPC-sensitive services without touching the banner. So that this opt-out is on record, the plugin writes one receipt for it, marked "GPC signal, no choice made" in the admin:
+
+- It is written once per browser, not on every page view, and not at all if the visitor has already saved a choice (that receipt records the signal too).
+- It is only written where GPC handling and consent logging are both on for the template.
+- The browser keeps a flag saying the receipt was stored, but not the receipt or its ID, so nothing identifying is left with a visitor who asked not to be tracked.
+- If the visitor later saves a choice in the banner, that is recorded as a second, ordinary receipt.
+
+In Google Tag Manager, both kinds push the `generateConsentReceipt` event; `klaroGeoConsentReceiptType` is `choice` or `gpc`.
 
 ### `.well-known/gpc.json` Endpoint
 
@@ -823,7 +830,7 @@ This granular control allows you to retain consent receipts where they are legal
 
 ### How Consent Receipts Work
 
-1. When a user makes consent choices, a receipt is generated containing:
+1. When a user makes consent choices (or, once per browser, when a Global Privacy Control signal opts them out without a choice), a receipt is generated containing:
    - Unique receipt ID (randomly generated, not derived from device characteristics)
    - Timestamp
    - User's consent choices for each service

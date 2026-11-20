@@ -79,9 +79,13 @@ events:
       event: "Klaro Event"
       eventSource: "klaro-geo"
       klaroEventName: "generateConsentReceipt"
-    when: "On saveConsents, when klaroConsentData.enableConsentLogging is true"
+    when: |
+      When klaroConsentData.enableConsentLogging is true: on saveConsents
+      (type 'choice'), and once per browser on page load when GPC was applied
+      and the visitor has no saved choice (type 'gpc').
     fields:
       klaroGeoConsentReceipt: "string - receipt ID"
+      klaroGeoConsentReceiptType: "string - 'choice' | 'gpc'"
       klaroGeoTemplateSource: "string"
       klaroGeoAdminOverride: "boolean"
       klaroGeoEnableConsentLogging: "boolean - always true when this event fires"
@@ -135,6 +139,13 @@ consumers:
     consentMode). Check it still parses after any change here.
 
 breaking_changes:
+  - plugin_version: "next after 0.3.7"
+    change: "generateConsentReceipt also fires for a GPC opt-out with no saved choice; klaroGeoConsentReceiptType added"
+    reason: |
+      A visitor whose browser sends GPC is opted out without touching the
+      banner, and that opt-out was not recorded anywhere.
+    migration: "A tag that must fire only for saved choices adds the condition klaroGeoConsentReceiptType equals 'choice'"
+
   - plugin_version: "next after 0.3.7"
     change: "Removed the 'Klaro Geo Consent Receipt' event"
     reason: |

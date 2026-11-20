@@ -15,7 +15,7 @@ class KlaroGeoConsentReceiptsUpgradeTest extends WP_UnitTestCase {
 		global $wpdb;
 		klaro_geo_create_consent_receipts_table();
 		$table = klaro_geo_receipts_table_name();
-		$wpdb->query( "ALTER TABLE $table DROP COLUMN gpc_signal, DROP COLUMN gpc_affected_services" );
+		$wpdb->query( "ALTER TABLE $table DROP COLUMN gpc_signal, DROP COLUMN gpc_affected_services, DROP COLUMN receipt_type" );
 		update_option( 'klaro_geo_consent_receipts_db_version', '1.0' );
 		update_option( 'klaro_geo_enable_consent_receipts', true );
 	}
@@ -64,12 +64,14 @@ class KlaroGeoConsentReceiptsUpgradeTest extends WP_UnitTestCase {
 
 		$this->assertTrue( klaro_geo_receipts_column_exists( 'gpc_signal' ) );
 		$this->assertTrue( klaro_geo_receipts_column_exists( 'gpc_affected_services' ) );
+		$this->assertTrue( klaro_geo_receipts_column_exists( 'receipt_type' ) );
 		$this->assertSame( KLARO_GEO_RECEIPTS_DB_VERSION, get_option( 'klaro_geo_consent_receipts_db_version' ) );
 
 		// The receipt stored before the upgrade says "not recorded", not "no signal".
 		$old = $this->stored( 'receipt_before_upgrade' );
 		$this->assertNull( $old->gpc_signal );
 		$this->assertSame( 'Not recorded', klaro_geo_receipt_gpc_label( $old ) );
+		$this->assertSame( 'Visitor saved a choice', klaro_geo_receipt_type_label( $old ) );
 
 		$this->assertIsInt( klaro_geo_store_consent_receipt( $this->receipt( 'receipt_after_upgrade' ) ) );
 		$new = $this->stored( 'receipt_after_upgrade' );

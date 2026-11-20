@@ -210,8 +210,62 @@
   // END CONSENT QUEUE
   // =============================================================================
 
-  // Function to handle consent changes (moved from PHP)
+  // The visitor saved a choice in the banner: record it.
   function handleConsentChange(manager) {
+      generateConsentReceipt(manager, 'choice');
+  }
+
+  // Set in localStorage once the GPC receipt below has been stored. It holds no
+  // identifier, only the fact that this browser's opt-out is already on record.
+  const GPC_RECEIPT_FLAG = 'klaro_geo_gpc_receipt_recorded';
+
+  /**
+   * Record a GPC opt-out for a visitor who has not used the banner.
+   *
+   * GPC switches services off without the visitor doing anything, so without
+   * this the opt-out most GPC visitors get would leave no record. One receipt
+   * is written per browser, not per page view: nothing is written once a
+   * choice has been saved (that receipt records the signal too) or once this
+   * receipt has been stored.
+   */
+  function recordGpcReceipt(manager) {
+      const gpc = window.klaroGeo && window.klaroGeo.gpc;
+      if (!gpc || gpc.detected !== true || manager.confirmed) {
+          return;
+      }
+
+      try {
+          if (window.localStorage.getItem(GPC_RECEIPT_FLAG)) {
+              return;
+          }
+      } catch (e) {
+          // Without storage every page view would write a receipt.
+          return;
+      }
+
+      const sent = generateConsentReceipt(manager, 'gpc');
+      if (sent) {
+          sent.then(function(data) {
+              if (data && data.success) {
+                  try {
+                      window.localStorage.setItem(GPC_RECEIPT_FLAG, '1');
+                  } catch (e) {
+                      klaroGeoLog('Could not remember that the GPC receipt was stored');
+                  }
+              }
+          });
+      }
+  }
+
+  /**
+   * Build a consent receipt from Klaro's current state and send it.
+   *
+   * @param {Object} manager     Klaro's consent manager.
+   * @param {string} receiptType 'choice' (the visitor saved a choice) or 'gpc'
+   *                             (GPC was applied and the visitor has not chosen).
+   * @returns {Promise|null} The server request, or null when logging is off.
+   */
+  function generateConsentReceipt(manager, receiptType) {
       // window.klaroConsentData.enableConsentLogging is the effective setting:
       // receipts enabled globally AND consent logging enabled for this template.
       const consentData = window.klaroConsentData;
@@ -219,7 +273,7 @@
 
       if (!enableConsentLogging) {
           klaroGeoLog('Consent logging is disabled for this template/country. No receipt generated.');
-          return;
+          return null;
       }
 
       // Generate a unique receipt ID
@@ -233,6 +287,7 @@
       // Create the consent receipt
       let consentReceipt = {
           receipt_id: receiptId,
+          receipt_type: receiptType,
           timestamp: Math.floor(Date.now() / 1000), // Unix timestamp
           consent_choices: {},
           template_name: window.klaroConsentData.templateName || 'default',
@@ -254,20 +309,27 @@
           consentReceipt.consent_choices[k] = consents[k] === true;
       }
 
-      // Store the receipt in localStorage
-      storeReceiptLocally(consentReceipt);
+      // Keep the visitor's own copy of a choice they made. A GPC receipt is
+      // not kept in the browser: the visitor has asked not to be tracked, and
+      // a stored receipt ID would be a persistent identifier.
+      if (receiptType === 'choice') {
+          storeReceiptLocally(consentReceipt);
+      }
 
-      sendReceiptToServer(consentReceipt)
+      const sent = sendReceiptToServer(consentReceipt)
           .catch(function(error) {
               console.error('Error from server when sending receipt:', error);
           });
 
       window.dataLayer.push(KlaroGeoEvents.createKlaroGeoEvent('generateConsentReceipt', {
           'klaroGeoConsentReceipt': consentReceipt.receipt_id,
+          'klaroGeoConsentReceiptType': receiptType,
           'klaroGeoTemplateSource': consentReceipt.template_source,
           'klaroGeoAdminOverride': consentReceipt.admin_override,
           'klaroGeoEnableConsentLogging': enableConsentLogging
       }));
+
+      return sent;
   }
 
   /**
@@ -472,6 +534,8 @@
 
               // Call consent handling functions
               handleKlaroConsentEvents(activeManager, 'initialConsents', activeManager.consents);
+
+              recordGpcReceipt(activeManager);
           }, 0); // Defer to next tick
       } else {
           klaroGeoWarn('DEBUG: dataLayer is not defined, cannot push initial Klaro event');

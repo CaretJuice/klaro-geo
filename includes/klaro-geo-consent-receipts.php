@@ -117,7 +117,7 @@ function klaro_geo_receipts_exists( $receipt_id ) {
  * klaro_geo_consent_receipts_db_version. Raise it when a column is added and
  * add the column to klaro_geo_upgrade_consent_receipts_table().
  */
-define( 'KLARO_GEO_RECEIPTS_DB_VERSION', '1.1' );
+define( 'KLARO_GEO_RECEIPTS_DB_VERSION', '1.2' );
 
 // Create the consent receipts table on plugin activation
 function klaro_geo_create_consent_receipts_table() {
@@ -171,6 +171,7 @@ function klaro_geo_create_consent_receipts_table() {
             klaro_config longtext DEFAULT NULL,
             gpc_signal tinyint(1) DEFAULT NULL,
             gpc_affected_services text DEFAULT NULL,
+            receipt_type varchar(20) DEFAULT NULL,
             PRIMARY KEY (id)
         ) $charset_collate";
 	} else {
@@ -189,6 +190,7 @@ function klaro_geo_create_consent_receipts_table() {
             klaro_config longtext DEFAULT NULL,
             gpc_signal tinyint(1) DEFAULT NULL,
             gpc_affected_services text DEFAULT NULL,
+            receipt_type varchar(20) DEFAULT NULL,
             PRIMARY KEY (id),
             KEY receipt_id (receipt_id),
             KEY user_id (user_id),
@@ -251,9 +253,10 @@ function klaro_geo_create_consent_receipts_table() {
  * Bring a receipts table created by an earlier version up to the current
  * schema.
  *
- * 1.1 added gpc_signal and gpc_affected_services. Receipts stored before that
- * keep NULL in both: whether the browser sent GPC was not recorded for them,
- * which is not the same as "no signal".
+ * 1.1 added gpc_signal and gpc_affected_services; 1.2 added receipt_type.
+ * Receipts stored before that keep NULL in all three: whether the browser sent GPC was not
+ * recorded for them, which is not the same as "no signal", and every one of
+ * them records a saved choice.
  */
 function klaro_geo_upgrade_consent_receipts_table() {
 	$version = get_option( 'klaro_geo_consent_receipts_db_version' );
@@ -269,6 +272,7 @@ function klaro_geo_upgrade_consent_receipts_table() {
 		$columns    = array(
 			'gpc_signal'            => 'tinyint(1) DEFAULT NULL',
 			'gpc_affected_services' => 'text DEFAULT NULL',
+			'receipt_type'          => 'varchar(20) DEFAULT NULL',
 		);
 
 		foreach ( $columns as $column => $definition ) {
@@ -374,6 +378,10 @@ function klaro_geo_sanitize_receipt( $raw ) {
 		// the services the plugin switched off by default because of it.
 		'gpc_signal'            => isset( $raw['gpc_signal'] ) && true === $raw['gpc_signal'],
 		'gpc_affected_services' => array(),
+		// 'choice': the visitor saved a choice in the banner. 'gpc': GPC was
+		// applied and the visitor had not chosen (see recordGpcReceipt() in
+		// js/klaro-geo.js).
+		'receipt_type'          => ( isset( $raw['receipt_type'] ) && 'gpc' === $raw['receipt_type'] ) ? 'gpc' : 'choice',
 	);
 
 	if ( isset( $raw['gpc_affected_services'] ) && is_array( $raw['gpc_affected_services'] ) && count( $raw['gpc_affected_services'] ) <= 200 ) {
@@ -480,6 +488,7 @@ function klaro_geo_store_consent_receipt( $raw, $user_id = 0 ) {
 	$gpc = array(
 		'gpc_signal'            => ( $receipt['gpc_signal'] || klaro_geo_request_has_gpc_header() ) ? 1 : 0,
 		'gpc_affected_services' => wp_json_encode( $receipt['gpc_affected_services'] ),
+		'receipt_type'          => $receipt['receipt_type'],
 	);
 
 	// Tables created before the klaro_config column was added do not have it.
@@ -491,8 +500,8 @@ function klaro_geo_store_consent_receipt( $raw, $user_id = 0 ) {
 	$inserted = klaro_geo_receipts_insert( array_merge( $data, $gpc ) );
 	if ( false === $inserted ) {
 		// Most likely a table that has not been upgraded yet. Losing the receipt
-		// would be worse than storing it without the GPC columns.
-		klaro_geo_debug_log( 'Receipt insert failed (' . $wpdb->last_error . '); retrying without the GPC columns' );
+		// would be worse than storing it without the newer columns.
+		klaro_geo_debug_log( 'Receipt insert failed (' . $wpdb->last_error . '); retrying without the columns added since schema 1.0' );
 		$inserted = klaro_geo_receipts_insert( $data );
 	}
 
@@ -749,6 +758,19 @@ function klaro_geo_receipt_gpc_label( $receipt ) {
 	return $receipt->gpc_signal ? 'Yes' : 'No';
 }
 
+/**
+ * What caused a stored receipt to be written, for an administrator.
+ *
+ * @param object $receipt A row from the receipts table.
+ * @return string
+ */
+function klaro_geo_receipt_type_label( $receipt ) {
+	if ( isset( $receipt->receipt_type ) && 'gpc' === $receipt->receipt_type ) {
+		return 'GPC signal, no choice made';
+	}
+	return 'Visitor saved a choice';
+}
+
 // Render the consent receipts admin page
 function klaro_geo_render_consent_receipts_page() {
 	// Check user capabilities
@@ -793,6 +815,7 @@ function klaro_geo_render_consent_receipts_page() {
 						<th>Source</th>
 						<th>Country</th>
 						<th>Region</th>
+						<th>Recorded when</th>
 						<th>GPC</th>
 						<th>Actions</th>
 					</tr>
@@ -806,6 +829,7 @@ function klaro_geo_render_consent_receipts_page() {
 							<td><?php echo esc_html( $receipt->template_source ); ?></td>
 							<td><?php echo esc_html( $receipt->country_code ); ?></td>
 							<td><?php echo esc_html( $receipt->region_code ); ?></td>
+							<td><?php echo esc_html( klaro_geo_receipt_type_label( $receipt ) ); ?></td>
 							<td><?php echo esc_html( klaro_geo_receipt_gpc_label( $receipt ) ); ?></td>
 							<td>
 								<button type="button" class="button view-receipt"
@@ -887,6 +911,7 @@ function klaro_geo_render_consent_receipts_page() {
 			$receipt_js   .= "          addRow('Source:', receipt.template_source);\n";
 			$receipt_js   .= "          addRow('Country:', receipt.country_code || 'N/A');\n";
 			$receipt_js   .= "          addRow('Region:', receipt.region_code || 'N/A');\n";
+			$receipt_js   .= "          addRow('Recorded when:', receipt.type_label);\n";
 			$receipt_js   .= "          addRow('GPC signal:', receipt.gpc_label);\n";
 			$receipt_js   .= "          if (receipt.gpc_affected_services) {\n";
 			$receipt_js   .= "            addRow('Switched off by GPC:', pretty(receipt.gpc_affected_services), true);\n";
@@ -938,7 +963,8 @@ function klaro_geo_ajax_get_receipt_details() {
 	$receipt = klaro_geo_receipts_get_by_id( $receipt_id );
 
 	if ( $receipt ) {
-		$receipt->gpc_label = klaro_geo_receipt_gpc_label( $receipt );
+		$receipt->gpc_label  = klaro_geo_receipt_gpc_label( $receipt );
+		$receipt->type_label = klaro_geo_receipt_type_label( $receipt );
 		wp_send_json_success( $receipt );
 	} else {
 		wp_send_json_error( 'Receipt not found' );

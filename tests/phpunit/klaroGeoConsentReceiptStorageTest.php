@@ -93,7 +93,7 @@ class KlaroGeoConsentReceiptStorageTest extends WP_UnitTestCase {
 		$table   = klaro_geo_receipts_table_name();
 		$columns = wp_list_pluck( $wpdb->get_results( "DESCRIBE $table" ), 'Field' );
 
-		foreach ( array( 'id', 'receipt_id', 'user_id', 'ip_address', 'timestamp', 'consent_data', 'template_name', 'template_source', 'country_code', 'region_code', 'user_agent', 'klaro_config', 'gpc_signal', 'gpc_affected_services' ) as $column ) {
+		foreach ( array( 'id', 'receipt_id', 'user_id', 'ip_address', 'timestamp', 'consent_data', 'template_name', 'template_source', 'country_code', 'region_code', 'user_agent', 'klaro_config', 'gpc_signal', 'gpc_affected_services', 'receipt_type' ) as $column ) {
 			$this->assertContains( $column, $columns );
 		}
 	}
@@ -337,6 +337,28 @@ class KlaroGeoConsentReceiptStorageTest extends WP_UnitTestCase {
 		$this->assertSame( '0', (string) $row->gpc_signal );
 		$this->assertSame( array(), json_decode( $row->gpc_affected_services, true ) );
 		$this->assertSame( 'No', klaro_geo_receipt_gpc_label( $row ) );
+	}
+
+	/**
+	 * A receipt written because GPC was applied, with no choice made, is
+	 * marked as such so it is not read as the visitor having chosen.
+	 */
+	public function test_receipt_type_is_choice_unless_the_receipt_says_gpc() {
+		$gpc     = $this->receipt( array( 'receipt_type' => 'gpc', 'gpc_signal' => true ) );
+		$choice  = $this->receipt( array( 'receipt_type' => 'choice' ) );
+		$missing = $this->receipt();
+		$hostile = $this->receipt( array( 'receipt_type' => '<script>alert(1)</script>' ) );
+
+		foreach ( array( $gpc, $choice, $missing, $hostile ) as $receipt ) {
+			$this->assertIsInt( klaro_geo_store_consent_receipt( $receipt ) );
+		}
+
+		$this->assertSame( 'gpc', $this->stored( $gpc['receipt_id'] )->receipt_type );
+		$this->assertSame( 'GPC signal, no choice made', klaro_geo_receipt_type_label( $this->stored( $gpc['receipt_id'] ) ) );
+		foreach ( array( $choice, $missing, $hostile ) as $receipt ) {
+			$this->assertSame( 'choice', $this->stored( $receipt['receipt_id'] )->receipt_type );
+			$this->assertSame( 'Visitor saved a choice', klaro_geo_receipt_type_label( $this->stored( $receipt['receipt_id'] ) ) );
+		}
 	}
 
 	/**
