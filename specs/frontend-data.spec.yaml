@@ -18,7 +18,9 @@ klaro_consent_data:
     - "MUST be defined exactly once per page, as one JSON assignment in the payload script attached in front of js/klaro-geo-client-geo.js. Nothing else may assign it server-side (no wp_localize_script copy)"
     - "All flags MUST be real booleans, never '1' / '0' / '' strings"
     - "enableConsentLogging is the EFFECTIVE value: the global consent receipts setting AND the template's enable_consent_logging"
-    - "ajaxUrl and nonce are present ONLY when consent receipts are enabled globally"
+    - "ajaxUrl is present ONLY when consent receipts are enabled globally"
+    - "nonce is present ONLY when consent receipts are enabled AND the visitor is logged in. Pages for anonymous visitors carry no nonce, so a cached page holds nothing that expires"
+    - "The receipt endpoint MUST accept a request with no nonce or an invalid one. JS sends the nonce when it has one; PHP uses it only to decide whether the receipt is recorded against the logged-in user (klaro_geo_receipt_user_id())"
     - "In client geo mode the template and geo fields are emitted empty and filled by the resolver before Klaro initializes"
     - "Frontend scripts read settings from this object, not from dataLayer events"
   fields:
@@ -37,7 +39,7 @@ klaro_consent_data:
     parentChildMap: "object - parent service name => array of child service names"
     templateSettings: "object - consentModalTitle, consentModalDescription, acceptAllText, declineAllText, defaultConsent, requiredConsent, and config.consent_mode_settings.{consent_defaults, gtag_settings}"
     ajaxUrl: "string - only when receipts are enabled"
-    nonce: "string - only when receipts are enabled"
+    nonce: "string - only when receipts are enabled and the visitor is logged in"
 
 klaro_config_extensions:
   global: "window.klaroConfig"

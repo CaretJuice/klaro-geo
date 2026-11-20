@@ -625,7 +625,13 @@ function klaro_geo_build_consent_data( array $payload, array $services, array $r
 
 	if ( $receipts_enabled ) {
 		$data['ajaxUrl'] = admin_url( 'admin-ajax.php' );
-		$data['nonce']   = wp_create_nonce( 'klaro_geo_consent_nonce' );
+
+		// Only a logged-in user's receipt uses a nonce (to record their user ID,
+		// see klaro_geo_receipt_user_id()). Anonymous pages carry none, so there
+		// is nothing in them to expire in a page cache.
+		if ( is_user_logged_in() ) {
+			$data['nonce'] = wp_create_nonce( 'klaro_geo_consent_nonce' );
+		}
 	}
 
 	return $data;

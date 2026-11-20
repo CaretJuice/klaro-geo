@@ -260,9 +260,9 @@ function klaro_geo_generate_receipt_id() {
 /**
  * Validate and sanitize a consent receipt submitted by a browser.
  *
- * Everything in $raw is untrusted: the endpoint is public and its nonce is
- * printed on every page. Only the shapes below are accepted; nothing is
- * stored as submitted.
+ * Everything in $raw is untrusted: the endpoint is public and takes requests
+ * without a nonce. Only the shapes below are accepted; nothing is stored as
+ * submitted.
  *
  * @param mixed $raw The decoded receipt.
  * @return array|WP_Error Sanitized receipt, or an error describing the rejection.
@@ -365,12 +365,14 @@ function klaro_geo_is_consent_logging_enabled( $template_name ) {
  * The single implementation of receipt storage; the AJAX handler is a thin
  * wrapper around it.
  *
- * @param mixed $raw The decoded receipt as submitted.
+ * @param mixed $raw     The decoded receipt as submitted.
+ * @param int   $user_id User to record the receipt against, from
+ *                       klaro_geo_receipt_user_id(). 0 records it as anonymous.
  * @return int|WP_Error Row ID of the stored receipt, or an error. Error code
  *                      'klaro_geo_duplicate_receipt' means the receipt_id was
  *                      already stored.
  */
-function klaro_geo_store_consent_receipt( $raw ) {
+function klaro_geo_store_consent_receipt( $raw, $user_id = 0 ) {
 	$receipt = klaro_geo_sanitize_receipt( $raw );
 	if ( is_wp_error( $receipt ) ) {
 		return $receipt;
@@ -395,7 +397,7 @@ function klaro_geo_store_consent_receipt( $raw ) {
 		return new WP_Error( 'klaro_geo_duplicate_receipt', 'Duplicate receipt ID skipped' );
 	}
 
-	$user_id = get_current_user_id();
+	$user_id = absint( $user_id );
 
 	$data = array(
 		'receipt_id'      => $receipt['receipt_id'],
@@ -556,15 +558,44 @@ function klaro_geo_receipt_rate_limit_exceeded() {
 }
 
 /**
+ * The user a receipt request may be recorded against.
+ *
+ * A receipt is never refused for its nonce. A nonce printed in a cached page
+ * expires (and belongs to whoever the page was generated for), so requiring
+ * one loses the record of a real visitor's choice. For anonymous visitors a
+ * nonce proves nothing anyway: it is the same for all of them.
+ *
+ * The nonce still guards one thing: a user ID is recorded only when the
+ * request carries that user's valid nonce. Without it another site could have
+ * a logged-in user's browser submit a receipt that is then stored under their
+ * account. Such a receipt is stored as anonymous instead.
+ *
+ * @param string $nonce The nonce sent with the request, or ''.
+ * @return int User ID, or 0 for anonymous.
+ */
+function klaro_geo_receipt_user_id( $nonce ) {
+	$user_id = get_current_user_id();
+	if ( ! $user_id ) {
+		return 0;
+	}
+
+	if ( ! wp_verify_nonce( $nonce, 'klaro_geo_consent_nonce' ) ) {
+		klaro_geo_debug_log( 'Consent receipt from a logged-in user without a valid nonce; storing it as anonymous' );
+		return 0;
+	}
+
+	return $user_id;
+}
+
+/**
  * AJAX handler to store a consent receipt. Public (logged-out visitors submit
- * receipts), so it only authenticates the request and decodes it; validation
- * and storage are in klaro_geo_store_consent_receipt().
+ * receipts) and not nonce-protected (see klaro_geo_receipt_user_id()), so the
+ * size limit, the rate limit and klaro_geo_sanitize_receipt() are what protect
+ * it. Validation and storage are in klaro_geo_store_consent_receipt().
  */
 function klaro_geo_ajax_store_consent_receipt() {
+	// phpcs:disable WordPress.Security.NonceVerification.Missing -- Deliberate, see klaro_geo_receipt_user_id().
 	$nonce = isset( $_POST['nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['nonce'] ) ) : '';
-	if ( ! wp_verify_nonce( $nonce, 'klaro_geo_consent_nonce' ) ) {
-		wp_send_json_error( 'Invalid security token' );
-	}
 
 	if ( ! isset( $_POST['receipt_data'] ) || ! is_string( $_POST['receipt_data'] ) ) {
 		wp_send_json_error( 'No receipt data provided' );
@@ -584,7 +615,9 @@ function klaro_geo_ajax_store_consent_receipt() {
 		wp_send_json_error( 'Invalid receipt data' );
 	}
 
-	$result = klaro_geo_store_consent_receipt( $receipt_data );
+	// phpcs:enable WordPress.Security.NonceVerification.Missing
+
+	$result = klaro_geo_store_consent_receipt( $receipt_data, klaro_geo_receipt_user_id( $nonce ) );
 
 	if ( is_wp_error( $result ) ) {
 		if ( 'klaro_geo_duplicate_receipt' === $result->get_error_code() ) {

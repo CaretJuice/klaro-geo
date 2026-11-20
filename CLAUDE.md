@@ -66,7 +66,7 @@ When fallbacks are used (template not found, hardcoded defaults, `cookieDomain` 
 - Every admin AJAX handler and form handler checks a nonce and `current_user_can( 'manage_options' )`. A nonce alone is not authorization.
 - Do not print admin nonces on the frontend.
 - Sanitize input where it enters: `sanitize_text_field()`, `absint()`, `wp_unslash()` on `$_GET` / `$_POST`. Escape output where it is echoed: `esc_html()`, `esc_attr()`, `esc_url()`.
-- The consent receipt endpoint is public and its nonce is on every page. Treat everything it receives as hostile: it goes through `klaro_geo_sanitize_receipt()`, which stores consent choices as booleans only.
+- The consent receipt endpoint is public and never refuses a request for its nonce (a nonce in a cached page expires, and a lost receipt is a lost consent record). Treat everything it receives as hostile: it goes through `klaro_geo_sanitize_receipt()`, which stores consent choices as booleans only. A receipt is recorded against a user ID only when the request carries that user's valid nonce (`klaro_geo_receipt_user_id()`).
 - In admin JavaScript, insert data with `.text()` or DOM APIs, never by concatenating it into `.html()`.
 - Use `$wpdb->prepare()` for queries with variables.
 - Do not return database or exception messages to unauthenticated callers; log them.

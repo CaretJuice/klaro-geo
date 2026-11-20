@@ -312,6 +312,45 @@ class KlaroGeoConsentReceiptStorageTest extends WP_UnitTestCase {
 		$this->assertNull( $this->stored( $receipt['receipt_id'] )->klaro_config );
 	}
 
+	/**
+	 * A receipt is never refused for its nonce: a nonce in a cached page has
+	 * expired by the time a visitor uses it, and the receipt is the record of
+	 * their choice.
+	 */
+	public function test_anonymous_receipt_needs_no_nonce() {
+		wp_set_current_user( 0 );
+
+		foreach ( array( '', 'expired-or-forged' ) as $nonce ) {
+			$receipt = $this->receipt();
+			$this->assertSame( 0, klaro_geo_receipt_user_id( $nonce ) );
+			$this->assertIsInt( klaro_geo_store_consent_receipt( $receipt, klaro_geo_receipt_user_id( $nonce ) ) );
+			$this->assertNull( $this->stored( $receipt['receipt_id'] )->user_id );
+		}
+	}
+
+	/**
+	 * A user ID is recorded only with that user's valid nonce. Without one the
+	 * receipt is still stored, as anonymous, so a forged cross-site request
+	 * cannot put a receipt on someone's account.
+	 */
+	public function test_user_id_is_recorded_only_with_a_valid_nonce() {
+		$user_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
+		wp_set_current_user( $user_id );
+
+		$with_nonce = $this->receipt();
+		$valid      = klaro_geo_receipt_user_id( wp_create_nonce( 'klaro_geo_consent_nonce' ) );
+		$this->assertSame( $user_id, $valid );
+		$this->assertIsInt( klaro_geo_store_consent_receipt( $with_nonce, $valid ) );
+		$this->assertSame( $user_id, (int) $this->stored( $with_nonce['receipt_id'] )->user_id );
+
+		foreach ( array( '', 'expired-or-forged', wp_create_nonce( 'some_other_action' ) ) as $nonce ) {
+			$receipt = $this->receipt();
+			$this->assertSame( 0, klaro_geo_receipt_user_id( $nonce ) );
+			$this->assertIsInt( klaro_geo_store_consent_receipt( $receipt, klaro_geo_receipt_user_id( $nonce ) ) );
+			$this->assertNull( $this->stored( $receipt['receipt_id'] )->user_id );
+		}
+	}
+
 	public function test_rate_limit_refuses_requests_over_the_limit() {
 		$_SERVER['REMOTE_ADDR'] = '198.51.100.23';
 		$limit                  = function () {

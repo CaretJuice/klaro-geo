@@ -91,8 +91,22 @@ class ConsentReceiptsIntegrationTest extends IgnoreDeprecatedTestCase {
         $this->assertArrayHasKey('consentModeServices', $data);
         $this->assertArrayHasKey('parentChildMap', $data);
         $this->assertArrayHasKey('consent_defaults', $data['templateSettings']['config']['consent_mode_settings']);
-        $this->assertNotEmpty($data['nonce']);
         $this->assertStringContainsString('admin-ajax.php', $data['ajaxUrl']);
+    }
+
+    /**
+     * A page for an anonymous visitor may sit in a page cache for days, so it
+     * must not carry a nonce: there would be nothing valid left to send.
+     */
+    public function test_nonce_is_emitted_only_for_logged_in_users() {
+        wp_set_current_user(0);
+        $anonymous = $this->extract_consent_data(klaro_geo_generate_config_file());
+
+        wp_set_current_user(self::factory()->user->create(array('role' => 'subscriber')));
+        $logged_in = $this->extract_consent_data(klaro_geo_generate_config_file());
+
+        $this->assertArrayNotHasKey('nonce', $anonymous);
+        $this->assertSame(1, wp_verify_nonce($logged_in['nonce'], 'klaro_geo_consent_nonce'));
     }
 
     /**
