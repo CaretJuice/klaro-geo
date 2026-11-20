@@ -708,20 +708,11 @@
                 formData.append('translations_json', jsonText);
             }
 
-            // Add a nonce for security - try multiple sources
-            let nonce = $('#klaro_geo_nonce').val();
-            if (!nonce && typeof klaroGeoTemplates !== 'undefined' && klaroGeoTemplates.nonce) {
-                nonce = klaroGeoTemplates.nonce;
-            }
-            if (nonce) {
-                formData.append('nonce', nonce);
-            } else {
-                klaroGeoError('No nonce found for AJAX request');
-            }
+            formData.append('nonce', $('#klaro_geo_nonce').val());
 
             // Send the AJAX request
             $.ajax({
-                url: typeof klaroGeoTemplates !== 'undefined' && klaroGeoTemplates.ajax_url ? klaroGeoTemplates.ajax_url : ajaxurl, // Use localized URL or fallback to WordPress global
+                url: ajaxurl,
                 type: 'POST',
                 data: formData,
                 processData: false,

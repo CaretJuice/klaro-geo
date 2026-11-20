@@ -78,19 +78,6 @@ function klaro_geo_templates_page() {
     // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only template tab selection within manage_options-gated admin page; no data is modified.
 	$current_template = isset( $_GET['template'] ) ? sanitize_text_field( wp_unslash( $_GET['template'] ) ) : 'default';
 
-	// Pass templates to JavaScript
-	wp_localize_script(
-		'klaro-geo-template-translations',
-		'klaroGeoTemplates',
-		array(
-			'templates'        => $templates,
-			'timestamp'        => time(), // Add timestamp to prevent caching issues
-			'current_template' => $current_template, // Pass the current template ID
-			'ajax_url'         => admin_url( 'admin-ajax.php' ), // Add AJAX URL for JavaScript
-			'nonce'            => wp_create_nonce( 'klaro_geo_template_nonce' ), // Add nonce for AJAX security
-		)
-	);
-
 	// Save template changes
 	if ( isset( $_POST['submit_template'] ) ) {
 		check_admin_referer( 'klaro_geo_template_nonce' );
@@ -1379,17 +1366,6 @@ function klaro_geo_templates_page() {
 }
 
 // Helper function to create default templates
-function klaro_geo_create_templates() {
-	// Initialize the template settings class
-	$template_settings = new Klaro_Geo_Template_Settings();
-
-	// The constructor already initializes with default templates if empty
-	// Just make sure to save any changes
-	$template_settings->save();
-
-	return $template_settings->get();
-}
-
 // AJAX handler for template creation
 function klaro_geo_create_template() {
 	klaro_geo_verify_admin_ajax( 'klaro_geo_template_nonce', 'nonce' );
@@ -1483,17 +1459,7 @@ add_action( 'wp_ajax_klaro_geo_create_template', 'klaro_geo_create_template' );
  * It processes the JSON data, updates the template in the database, and returns a JSON response.
  */
 function klaro_geo_save_translations_ajax() {
-	// Check if user has permission
-	if ( ! current_user_can( 'manage_options' ) ) {
-		wp_send_json_error( array( 'message' => 'You do not have permission to perform this action.' ) );
-		return;
-	}
-
-	// Verify nonce
-	if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ) ), 'klaro_geo_template_nonce' ) ) {
-		wp_send_json_error( array( 'message' => 'Security check failed. Please refresh the page and try again.' ) );
-		return;
-	}
+	klaro_geo_verify_admin_ajax( 'klaro_geo_template_nonce' );
 
 	// Check if we have a template ID
 	if ( ! isset( $_POST['template_id'] ) || empty( $_POST['template_id'] ) ) {
@@ -1572,17 +1538,7 @@ add_action( 'wp_ajax_klaro_geo_save_translations', 'klaro_geo_save_translations_
  * AJAX handler for deleting a template
  */
 function klaro_geo_delete_template_ajax() {
-	// Check nonce for security
-	if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ) ), 'klaro_geo_template_nonce' ) ) {
-		wp_send_json_error( array( 'message' => 'Security check failed.' ) );
-		return;
-	}
-
-	// Check if user has permission
-	if ( ! current_user_can( 'manage_options' ) ) {
-		wp_send_json_error( array( 'message' => 'You do not have permission to delete templates.' ) );
-		return;
-	}
+	klaro_geo_verify_admin_ajax( 'klaro_geo_template_nonce' );
 
 	// Get the template ID
 	if ( ! isset( $_POST['template_id'] ) || empty( $_POST['template_id'] ) ) {

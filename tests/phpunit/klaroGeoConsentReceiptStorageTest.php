@@ -60,7 +60,7 @@ class KlaroGeoConsentReceiptStorageTest extends WP_UnitTestCase {
 	private function receipt( array $overrides = array() ) {
 		return array_merge(
 			array(
-				'receipt_id'      => klaro_geo_generate_receipt_id(),
+				'receipt_id'      => 'receipt_' . wp_generate_password( 16, false ),
 				'timestamp'       => 1795000000,
 				'consent_choices' => array(
 					'google-analytics' => true,
@@ -95,16 +95,6 @@ class KlaroGeoConsentReceiptStorageTest extends WP_UnitTestCase {
 
 		foreach ( array( 'id', 'receipt_id', 'user_id', 'ip_address', 'timestamp', 'consent_data', 'template_name', 'template_source', 'country_code', 'region_code', 'user_agent', 'klaro_config', 'gpc_signal', 'gpc_affected_services', 'receipt_type' ) as $column ) {
 			$this->assertContains( $column, $columns );
-		}
-	}
-
-	public function test_generated_receipt_ids_are_unique_and_valid() {
-		$ids = array();
-		for ( $i = 0; $i < 10; $i++ ) {
-			$id = klaro_geo_generate_receipt_id();
-			$this->assertMatchesRegularExpression( '/^receipt_[A-Za-z0-9_\-]{1,42}$/', $id );
-			$this->assertNotContains( $id, $ids );
-			$ids[] = $id;
 		}
 	}
 

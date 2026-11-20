@@ -58,24 +58,18 @@ function klaro_geo_admin_scripts( $hook ) {
 		true
 	);
 
-	// Get templates and countries for admin script
-	$templates         = get_option( 'klaro_geo_templates', array() );
-	$visible_countries = get_option( 'klaro_geo_visible_countries', array() );
+	$templates = Klaro_Geo_Template_Settings::get_instance()->get();
 
-	// Localize the script with necessary data
 	wp_localize_script(
 		'klaro-geo-admin-js',
 		'klaroGeoAdmin',
 		array(
-			'ajaxurl'          => admin_url( 'admin-ajax.php' ),
-			'nonce'            => wp_create_nonce( 'klaro_geo_nonce' ),
-			'templates'        => $templates,
-			'visibleCountries' => $visible_countries,
-			'version'          => KLARO_GEO_VERSION,
+			'ajaxurl' => admin_url( 'admin-ajax.php' ),
+			'nonce'   => wp_create_nonce( 'klaro_geo_nonce' ),
 		)
 	);
 
-	// Make templates available globally for backward compatibility
+	// The templates, for every admin script (window.klaroTemplates).
 	wp_add_inline_script( 'klaro-geo-admin-js', 'window.klaroTemplates = ' . wp_json_encode( $templates ) . ';', 'before' );
 
 	wp_enqueue_script( 'klaro-geo-admin-js' );
@@ -85,7 +79,7 @@ function klaro_geo_admin_scripts( $hook ) {
 	// Services page
 	if ( strpos( $hook, 'klaro-geo-services' ) !== false ) {
 		// Get available purposes from settings
-		$purposes = explode( ',', get_option( 'klaro_geo_purposes', klaro_geo_get_default_purposes_string() ) );
+		$purposes = klaro_geo_get_purposes();
 		$services = klaro_geo_validate_services();
 
 		// Register and enqueue the service translations script
@@ -102,12 +96,9 @@ function klaro_geo_admin_scripts( $hook ) {
 			'klaro-geo-service-translations-js',
 			'klaroGeoServices',
 			array(
-				'ajaxurl'   => admin_url( 'admin-ajax.php' ),
-				'nonce'     => wp_create_nonce( 'klaro_geo_nonce' ),
-				'purposes'  => $purposes,
-				'services'  => $services ? $services : [],
-				'templates' => $templates,
-				'version'   => KLARO_GEO_VERSION,
+				'nonce'    => wp_create_nonce( 'klaro_geo_nonce' ),
+				'purposes' => $purposes,
+				'services' => $services ? $services : [],
 			)
 		);
 

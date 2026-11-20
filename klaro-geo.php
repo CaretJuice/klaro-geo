@@ -620,26 +620,7 @@ function klaro_geo_admin_bar_menu( $wp_admin_bar ) {
 		);
 		$wp_admin_bar->add_node( $args );
 
-		// Add country and region options
-		$debug_locations = get_option( 'klaro_geo_debug_countries', [ 'US', 'US-CA', 'CA', 'CA-QC', 'UK', 'FR', 'AU' ] );
-
-		// Ensure debug_locations is an array
-		if ( ! is_array( $debug_locations ) ) {
-			klaro_geo_debug_log( 'Converting debug locations from string to array: ' . wp_json_encode( $debug_locations ) );
-
-			if ( is_string( $debug_locations ) ) {
-				// Convert string to array
-				$debug_locations = explode( ',', $debug_locations );
-				$debug_locations = array_map( 'trim', $debug_locations );
-				$debug_locations = array_filter( $debug_locations );
-
-				// Update the option to ensure it's stored as an array for next time
-				update_option( 'klaro_geo_debug_countries', $debug_locations );
-			} else {
-				// Use default if not a string or array
-				$debug_locations = [ 'US', 'US-CA', 'CA', 'CA-QC', 'UK', 'FR', 'AU' ];
-			}
-		}
+		$debug_locations = klaro_geo_get_debug_locations();
 
 		// Add Countries submenu
 		$wp_admin_bar->add_node(
@@ -660,11 +641,6 @@ function klaro_geo_admin_bar_menu( $wp_admin_bar ) {
 		);
 
 		foreach ( $debug_locations as $code ) {
-			// Validate code format before use (defense in depth — also validated on save)
-			if ( ! preg_match( '/^[A-Z]{2}(-[A-Z0-9]{1,3})?$/', $code ) ) {
-				continue;
-			}
-
 			// Determine if this is a region code
 			$is_region = strpos( $code, '-' ) !== false;
 
@@ -755,17 +731,46 @@ add_shortcode( 'klaro_embedded', 'klaro_geo_embedded_shortcode' );
 
 
 
-// Add sanitization for ISO 3166-2 codes
-function klaro_geo_sanitize_debug_geo( $value ) {
-	$value = strtoupper( $value ); // Transform to uppercase first
-	if ( preg_match( '/^[A-Z]{2}(-[A-Z0-9]{2,3})?$/', $value ) ) { // Check if it's a 2-letter country code or ISO 3166-2
-		return $value;
-	} else {
-		return ''; // Return empty string if not valid
-	}
+/**
+ * A location code as the plugin uses it: an ISO 3166-1 country ("US") or an
+ * ISO 3166-2 region ("US-CA"), upper case. The one place the format is defined.
+ *
+ * @param mixed $value The code as entered or received.
+ * @return string The normalized code, or '' when it is not a location code.
+ */
+function klaro_geo_normalize_location_code( $value ) {
+	$value = is_string( $value ) ? strtoupper( trim( $value ) ) : '';
+	return preg_match( '/^[A-Z]{2}(-[A-Z0-9]{1,3})?$/', $value ) ? $value : '';
 }
 
-add_filter( 'sanitize_option_klaro_geo_debug_geo', 'klaro_geo_sanitize_debug_geo' );
+/**
+ * Normalize a list of location codes, given as an array or a comma-separated
+ * string. Codes that are not location codes are dropped.
+ *
+ * @param mixed $codes Array or comma-separated string.
+ * @return string[]
+ */
+function klaro_geo_normalize_location_codes( $codes ) {
+	if ( is_string( $codes ) ) {
+		$codes = explode( ',', $codes );
+	}
+	if ( ! is_array( $codes ) ) {
+		return array();
+	}
+	return array_values( array_filter( array_map( 'klaro_geo_normalize_location_code', $codes ) ) );
+}
+
+/**
+ * The locations offered in the admin bar debug menu
+ * (klaro_geo_debug_countries option), falling back to a default list.
+ *
+ * @return string[]
+ */
+function klaro_geo_get_debug_locations() {
+	$defaults = array( 'US', 'US-CA', 'CA', 'CA-QC', 'UK', 'FR', 'AU' );
+	$codes    = klaro_geo_normalize_location_codes( get_option( 'klaro_geo_debug_countries', $defaults ) );
+	return $codes ? $codes : $defaults;
+}
 
 // Register the query variable for debug geo
 function klaro_geo_register_query_vars( $vars ) {
@@ -776,7 +781,6 @@ add_filter( 'query_vars', 'klaro_geo_register_query_vars' );
 
 
 function klaro_geo_validate_services() {
-	global $klaro_geo_default_services;
 	static $is_validating = false;
 
 	// Prevent recursive validation
@@ -791,13 +795,10 @@ function klaro_geo_validate_services() {
 	$service_settings = Klaro_Geo_Service_Settings::get_instance();
 	$services         = $service_settings->get();
 
-	// Make sure we have the default services available globally
-	$klaro_geo_default_services = $service_settings->get_default_services();
-
 	// Validate that services is an array with expected structure
 	if ( empty( $services ) || ! is_array( $services ) || ! isset( $services[0]['name'] ) ) {
 		klaro_geo_debug_log( 'Services has invalid structure, using defaults' );
-		$services = $klaro_geo_default_services;
+		$services = $service_settings->get_default_services();
 
 		// Update the services using the service settings class
 		$service_settings->set( $services );
@@ -909,6 +910,7 @@ function klaro_geo_get_user_location() {
 	if ( empty( $debug_geo ) && isset( $_GET['klaro_geo_debug_geo'] ) && isset( $_GET['_wpnonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'klaro_geo_debug_geo' ) ) {
 		$debug_geo = sanitize_text_field( wp_unslash( $_GET['klaro_geo_debug_geo'] ) );
 	}
+	$debug_geo = klaro_geo_normalize_location_code( $debug_geo );
 
 	// If we have a debug geo value and user has admin permissions, use it
 	if ( ! empty( $debug_geo ) && current_user_can( 'manage_options' ) ) {

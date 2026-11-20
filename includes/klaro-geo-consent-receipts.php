@@ -222,13 +222,6 @@ function klaro_geo_drop_consent_receipts_table_on_deactivate() {
 	}
 }
 
-// Generate a unique receipt ID based on timestamp and random string
-function klaro_geo_generate_receipt_id() {
-	$timestamp = microtime( true );
-	$random    = bin2hex( random_bytes( 8 ) ); // 16 character random string
-	return 'receipt_' . str_replace( '.', '', $timestamp ) . '_' . $random;
-}
-
 /**
  * Validate and sanitize a consent receipt submitted by a browser.
  *
@@ -845,16 +838,7 @@ function klaro_geo_render_consent_receipts_page() {
 
 // AJAX handler to get receipt details
 function klaro_geo_ajax_get_receipt_details() {
-	// Verify nonce for security
-	$admin_nonce = isset( $_POST['nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['nonce'] ) ) : '';
-	if ( ! wp_verify_nonce( $admin_nonce, 'klaro_geo_admin_nonce' ) ) {
-		wp_send_json_error( 'Invalid security token' );
-	}
-
-	// Check user capabilities
-	if ( ! current_user_can( 'manage_options' ) ) {
-		wp_send_json_error( 'Insufficient permissions' );
-	}
+	klaro_geo_verify_admin_ajax( 'klaro_geo_admin_nonce' );
 
 	$receipt_id = isset( $_POST['receipt_id'] ) ? intval( $_POST['receipt_id'] ) : 0;
 

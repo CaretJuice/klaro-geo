@@ -135,8 +135,7 @@ jQuery(document).ready(function($) {
                             html += '<td>' + esc(name) + '</td>';
                             html += '<td><select name="klaro_geo_region_settings[' + esc(countryCode) + '][' + esc(code) + '][template]" data-country="' + esc(countryCode) + '" data-region="' + esc(code) + '">';
                             html += '<option value="inherit">Use country template</option>';
-                            // Use klaroGeoAdmin.templates if available, otherwise try window.klaroTemplates
-                            let templates = klaroGeoAdmin.templates || window.klaroTemplates || {};
+                            let templates = window.klaroTemplates;
                             klaroGeoLog('Available templates:', templates);
 
                             Object.keys(templates).forEach(function(key) {

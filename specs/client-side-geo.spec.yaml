@@ -101,7 +101,7 @@ architecture:
         Emit window.klaroGeoClientGeo — a visitor-independent payload:
           - geoAjax: { url, action } for the geoip-detect AJAX endpoint
           - timeoutMs, timezoneFallback (from settings)
-          - rules: { defaultTemplate, fallbackBehavior, visibleCountries,
+          - rules: { defaultTemplate, visibleCountries,
                      countries: { CC: { template, regions: { RC: template } } } }
           - templates: { key: { config, consentDefaults, gtagSettings,
                                 enableConsentLogging, gpcEnabled, templateSettings } }

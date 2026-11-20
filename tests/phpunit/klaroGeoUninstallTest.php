@@ -78,6 +78,28 @@ class KlaroGeoUninstallTest extends WP_UnitTestCase {
 		$this->assertSame( '', get_user_meta( $user_id, 'klaro_geo_dismiss_geoip_ajax_warning', true ) );
 	}
 
+	/**
+	 * Deactivation removes the same options as uninstall, and only when
+	 * "Remove all plugin settings when deactivating" is on.
+	 */
+	public function test_deactivation_removes_options_only_when_cleanup_is_on() {
+		global $wpdb;
+
+		klaro_geo_activate();
+		update_option( 'klaro_geo_gtm_id', 'GTM-TEST' );
+		update_option( 'klaro_geo_gpc_enabled', true );
+		update_option( 'klaro_geo_visible_countries', array( 'US' ) );
+
+		klaro_geo_deactivate();
+		$this->assertSame( 'GTM-TEST', get_option( 'klaro_geo_gtm_id' ) );
+
+		update_option( 'klaro_geo_cleanup_on_deactivate', true );
+		klaro_geo_deactivate();
+
+		$left = $wpdb->get_col( "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE 'klaro\_geo\_%'" );
+		$this->assertSame( array(), $left );
+	}
+
 	public function test_receipts_table_is_kept_by_default() {
 		klaro_geo_uninstall();
 

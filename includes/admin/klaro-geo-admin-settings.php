@@ -6,18 +6,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // Main settings page content
 function klaro_geo_settings_page_content() {
-	global $klaro_geo_default_services;
-
-	add_filter( 'pre_update_option_klaro_geo_debug_countries', 'klaro_geo_process_debug_countries', 10, 2 );
-
-	// Get existing services or initialize with defaults using the service settings class
-	$service_settings           = Klaro_Geo_Service_Settings::get_instance();
-	$klaro_geo_default_services = $service_settings->get();
-
-	if ( empty( $klaro_geo_default_services ) ) {
-		// Get default services from the service settings class
-		$klaro_geo_default_services = $service_settings->get_default_services();
-	}
 	?>
 	<div class="wrap">
 		<h1>Klaro Geo Settings</h1>
@@ -217,24 +205,7 @@ function klaro_geo_settings_page_content() {
 					<th scope="row"><label for="klaro_geo_debug_countries">Debug Countries/Regions (comma-separated):</label></th>
 					<td>
 						<?php
-						$debug_countries = get_option( 'klaro_geo_debug_countries', [ 'US','UK','CA','FR','AU', 'US-CA', 'CA-QC' ] );
-
-						// Ensure we have an array
-						if ( ! is_array( $debug_countries ) ) {
-							if ( is_string( $debug_countries ) ) {
-								// Convert string to array
-								$debug_countries = explode( ',', $debug_countries );
-								$debug_countries = array_map( 'trim', $debug_countries );
-								$debug_countries = array_filter( $debug_countries );
-							} else {
-								// Use default
-								$debug_countries = [ 'US', 'UK', 'CA', 'FR', 'AU', 'US-CA', 'CA-QC' ];
-							}
-							// Update the option to ensure it's stored as an array
-							update_option( 'klaro_geo_debug_countries', $debug_countries );
-						}
-
-						$debug_countries_str = implode( ',', $debug_countries );
+						$debug_countries_str = implode( ',', klaro_geo_get_debug_locations() );
 						?>
 						<input type="text" name="klaro_geo_debug_countries" id="klaro_geo_debug_countries" value="<?php echo esc_attr( $debug_countries_str ); ?>" class="regular-text" />
 						<p class="description">Enter two-digit country codes or hyphen-separated ISO 3166-2 region codes for debugging, separated by commas (e.g., US,UK,CA,FR,AU,US-CA,CA-QC).</p>
@@ -269,25 +240,6 @@ function klaro_geo_settings_page_content() {
 		</form>
 	</div>
 	<?php
-}
-
-// Function to process the debug countries option
-function klaro_geo_process_debug_countries( $new_value, $old_value ) {
-	if ( is_string( $new_value ) ) {
-		$new_value = array_map( 'trim', explode( ',', $new_value ) );
-	}
-	if ( ! is_array( $new_value ) ) {
-		return $old_value;
-	}
-	// Normalize and validate ISO 3166 format
-	$new_value = array_map( 'strtoupper', $new_value );
-	$new_value = array_filter(
-		$new_value,
-		function ( $code ) {
-			return preg_match( '/^[A-Z]{2}(-[A-Z0-9]{1,3})?$/', $code );
-		}
-	);
-	return ! empty( $new_value ) ? array_values( $new_value ) : $old_value;
 }
 
 // Register settings for the main settings page
@@ -406,32 +358,9 @@ function klaro_geo_register_main_settings() {
 		'klaro_geo_debug_countries',
 		[
 			'type'              => 'array',
-			'default'           => [ 'US', 'US-CA', 'CA', 'CA-QC', 'UK', 'FR', 'AU' ],
-			'sanitize_callback' => function ( $input ) {
-				$defaults = [ 'US', 'US-CA', 'CA', 'CA-QC', 'UK', 'FR', 'AU' ];
-
-				if ( is_string( $input ) ) {
-					$codes = explode( ',', $input );
-				} elseif ( is_array( $input ) ) {
-					$codes = $input;
-				} else {
-					return $defaults;
-				}
-
-				$codes = array_map( 'trim', $codes );
-				$codes = array_map( 'strtoupper', $codes );
-				$codes = array_filter( $codes );
-
-				// Validate each code matches ISO 3166 format: XX (country) or XX-XX/XX-XXX (region)
-				$codes = array_filter(
-					$codes,
-					function ( $code ) {
-						return preg_match( '/^[A-Z]{2}(-[A-Z0-9]{1,3})?$/', $code );
-					}
-				);
-
-				return ! empty( $codes ) ? array_values( $codes ) : $defaults;
-			},
+			// An empty or unusable list falls back to the defaults when read
+			// (klaro_geo_get_debug_locations()).
+			'sanitize_callback' => 'klaro_geo_normalize_location_codes',
 		]
 	);
 	register_setting(

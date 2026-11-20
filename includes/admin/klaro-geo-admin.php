@@ -58,11 +58,7 @@ add_action( 'admin_menu', 'klaro_geo_admin_menu' );
 // Activation function
 function klaro_geo_activate() {
 	// Set up the default services using the service settings class
-	$service_settings           = Klaro_Geo_Service_Settings::get_instance();
-	$klaro_geo_default_services = $service_settings->get_default_services();
-
-	// Make default services available globally
-	$GLOBALS['klaro_geo_default_services'] = $klaro_geo_default_services;
+	$service_settings = Klaro_Geo_Service_Settings::get_instance();
 
 	// Check if services already exist
 	$existing_services = $service_settings->get();
@@ -70,7 +66,7 @@ function klaro_geo_activate() {
 	// Only set default services if they don't already exist
 	if ( empty( $existing_services ) ) {
 		// Set default services only on first activation
-		$service_settings->set( $klaro_geo_default_services );
+		$service_settings->set( $service_settings->get_default_services() );
 		$service_settings->save();
 	}
 
@@ -91,55 +87,19 @@ function klaro_geo_activate() {
 	add_option( 'klaro_geo_enable_floating_button', false );
 
 	// Other settings
-	add_option( 'klaro_geo_debug_countries', [ 'US', 'UK', 'CA', 'FR', 'AU', 'US-CA', 'CA-QC' ] );
 	add_option( 'klaro_geo_enable_consent_receipts', false );
 }
 
-// Deactivation function
+// On deactivation, remove the plugin's options if "Remove all plugin settings
+// when deactivating" is on. The list is the one uninstall uses.
 function klaro_geo_deactivate() {
-	// Only delete options if cleanup is enabled
-	if ( get_option( 'klaro_geo_cleanup_on_deactivate' ) ) {
-		// Template settings
-		delete_option( 'klaro_geo_templates' );
+	if ( ! get_option( 'klaro_geo_cleanup_on_deactivate' ) ) {
+		return;
+	}
 
-		// Country and region settings
-		delete_option( 'klaro_geo_country_settings' );
-
-		// Service and purpose settings
-		delete_option( 'klaro_geo_services' );
-		delete_option( 'klaro_geo_analytics_purposes' );
-		delete_option( 'klaro_geo_ad_purposes' );
-		delete_option( 'klaro_geo_purposes' );
-
-		// GTM settings
-		delete_option( 'klaro_geo_gtm_id' );
-		delete_option( 'klaro_geo_consent_mode_type' );
-		delete_option( 'klaro_geo_gtm_oninit' );
-		delete_option( 'klaro_geo_gtm_onaccept' );
-		delete_option( 'klaro_geo_gtm_ondecline' );
-
-		// Consent Mode settings
-		delete_option( 'klaro_geo_consent_mode_settings' );
-		delete_option( 'klaro_geo_analytics_storage_service' );
-		// Legacy option removed
-		delete_option( 'klaro_geo_initialization_code' );
-
-		// Other settings
-		delete_option( 'klaro_geo_js_version' );
-		delete_option( 'klaro_geo_js_variant' );
-		delete_option( 'klaro_geo_fallback_behavior' );
-		delete_option( 'klaro_geo_debug_countries' );
-		delete_option( 'klaro_geo_debug_geo' );
-		delete_option( 'klaro_geo_enable_consent_receipts' );
-		delete_option( 'klaro_geo_cleanup_on_deactivate' );
-
-		// Button settings
-		delete_option( 'klaro_geo_enable_floating_button' );
-		delete_option( 'klaro_geo_button_text' );
-		delete_option( 'klaro_geo_button_theme' );
-		delete_option( 'klaro_geo_floating_button_text' );
-		delete_option( 'klaro_geo_floating_button_theme' );
-		delete_option( 'klaro_geo_floating_button_position' );
+	require_once dirname( __DIR__ ) . '/klaro-geo-uninstall.php';
+	foreach ( klaro_geo_uninstall_option_names() as $option ) {
+		delete_option( $option );
 	}
 }
 

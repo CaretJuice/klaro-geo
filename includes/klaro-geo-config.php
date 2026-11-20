@@ -963,7 +963,6 @@ function klaro_geo_get_client_frontend_payload( $services ) {
 		'timezoneFallback' => (bool) get_option( 'klaro_geo_client_geo_timezone_fallback', true ),
 		'rules'            => array(
 			'defaultTemplate'  => $default_template,
-			'fallbackBehavior' => $geo_settings['fallback_behavior'] ?? 'default',
 			'visibleCountries' => array_values( $visible_countries ),
 			'countries'        => (object) $rules_countries,
 		),

@@ -117,6 +117,54 @@ class KlaroGeoAdminAjaxAuthorizationTest extends WP_Ajax_UnitTestCase {
 		$this->assertArrayNotHasKey( 'injected-template', Klaro_Geo_Template_Settings::get_instance()->get() );
 	}
 
+	/**
+	 * Every admin AJAX action the plugin registers refuses a user without
+	 * manage_options, and an administrator without a valid nonce. New handlers
+	 * are picked up automatically; the receipt endpoint is the one public action.
+	 */
+	public function test_every_admin_ajax_action_requires_capability_and_nonce() {
+		global $wp_filter;
+
+		$actions = array();
+		foreach ( array_keys( $wp_filter ) as $hook ) {
+			if ( 0 === strpos( $hook, 'wp_ajax_klaro_geo_' ) ) {
+				$actions[] = substr( $hook, strlen( 'wp_ajax_' ) );
+			}
+		}
+		$actions = array_diff( $actions, array( 'klaro_geo_store_consent_receipt' ) );
+		$this->assertGreaterThanOrEqual( 9, count( $actions ) );
+
+		foreach ( $actions as $action ) {
+			$this->_setRole( 'subscriber' );
+			$nonces = array();
+			foreach ( array( 'klaro_geo_nonce', 'klaro_geo_template_nonce', 'klaro_geo_admin_nonce' ) as $nonce_action ) {
+				$nonces[ $nonce_action ] = wp_create_nonce( $nonce_action );
+			}
+			// A subscriber holding a valid nonce for whichever action the handler checks.
+			foreach ( $nonces as $nonce ) {
+				$response = $this->request(
+					$action,
+					array(
+						'nonce'    => $nonce,
+						'_wpnonce' => $nonce,
+					)
+				);
+				$this->assertFalse( $response['success'], "$action must refuse a subscriber" );
+			}
+
+			$this->_setRole( 'administrator' );
+			$response = $this->request(
+				$action,
+				array(
+					'nonce'    => 'not-a-nonce',
+					'_wpnonce' => 'not-a-nonce',
+				)
+			);
+			$this->assertFalse( $response['success'], "$action must refuse a request without a valid nonce" );
+			$this->assertSame( 'Security check failed. Please refresh the page and try again.', $response['data']['message'], "$action must use klaro_geo_verify_admin_ajax()" );
+		}
+	}
+
 	public function unprivileged_roles() {
 		return array(
 			'subscriber' => array( 'subscriber' ),

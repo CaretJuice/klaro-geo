@@ -599,7 +599,6 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
 		// Default settings
 		$effective_settings = array(
 			'template'          => $default_template, // Use the default template from settings
-			'fallback_behavior' => $geo_settings['fallback_behavior'] ?? 'default',
 			'source'            => 'default', // Track where the template came from
 		);
 
