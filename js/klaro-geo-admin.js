@@ -2,45 +2,6 @@
  * Consolidated admin functionality for Klaro Geo
  */
 jQuery(document).ready(function($) {
-    // Initialize tabs if they exist
-    if ($.fn.tabs && $('.tabs-container').length) {
-        $('.tabs-container').tabs();
-    }
-
-    // Common form validation
-    $('.klaro-geo-form').on('submit', function(e) {
-        let requiredFields = $(this).find('[required]');
-        let valid = true;
-
-        requiredFields.each(function() {
-            if (!$(this).val()) {
-                valid = false;
-                $(this).addClass('error');
-            } else {
-                $(this).removeClass('error');
-            }
-        });
-
-        if (!valid) {
-            e.preventDefault();
-            alert('Please fill in all required fields.');
-        }
-    });
-
-    // Toggle advanced sections
-    $('.toggle-advanced').on('click', function(e) {
-        e.preventDefault();
-        let target = $(this).data('target');
-        $('#' + target).slideToggle();
-        $(this).toggleClass('open');
-
-        if ($(this).hasClass('open')) {
-            $(this).text($(this).data('hide-text') || 'Hide Advanced Options');
-        } else {
-            $(this).text($(this).data('show-text') || 'Show Advanced Options');
-        }
-    });
-
     // Ensure klaroGeoAdmin is available
     if (typeof klaroGeoAdmin === 'undefined') {
         klaroGeoError('klaroGeoAdmin not defined');
@@ -49,13 +10,6 @@ jQuery(document).ready(function($) {
 
     // Debug log
     klaroGeoLog('klaroGeoAdmin loaded:', klaroGeoAdmin);
-
-    // EU country codes
-    const euCountries = [
-        'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR',
-        'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL',
-        'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE'
-    ];
 
     // ===== COUNTRY MANAGEMENT =====
 
@@ -394,94 +348,6 @@ jQuery(document).ready(function($) {
         let countryCode = $(this).data('country');
         klaroGeoLog('Save regions button clicked for country:', countryCode);
         saveRegions(countryCode);
-    });
-
-    // ===== BULK EDIT FUNCTIONALITY =====
-
-    // Bulk edit button
-    $('#bulk_edit_templates').click(function() {
-        $('#bulk_edit_modal').show();
-    });
-
-    // Close modal
-    $('#close_bulk_modal').click(function() {
-        $('#bulk_edit_modal').hide();
-    });
-
-    // Close modal when clicking outside
-    $(window).click(function(event) {
-        if ($(event.target).is('#bulk_edit_modal')) {
-            $('#bulk_edit_modal').hide();
-        }
-    });
-
-    // Select all countries
-    $('#select_all_countries').change(function() {
-        $('.country-checkbox').prop('checked', $(this).prop('checked'));
-    });
-
-    // Select EU countries
-    $('#select_eu_countries').change(function() {
-        $('.country-checkbox').prop('checked', false);
-        euCountries.forEach(code => $(`.country-checkbox[value="${code}"]`).prop('checked', true));
-    });
-
-    // Apply bulk template
-    $('#apply_bulk_template').click(function() {
-        let selectedTemplate = $('#bulk_template').val();
-        let selectedCountries = $('.country-checkbox:checked').map(function() {
-            return $(this).val();
-        }).get();
-
-        if (selectedCountries.length === 0) {
-            alert('Please select at least one country.');
-            return;
-        }
-
-        let formData = {
-            countries: {}
-        };
-
-        selectedCountries.forEach(function(code) {
-            formData.countries[code] = {
-                template: selectedTemplate
-            };
-        });
-
-        // Save changes via AJAX
-        $.ajax({
-            url: klaroGeoAdmin.ajaxurl,
-            type: 'POST',
-            data: {
-                action: 'save_klaro_settings',
-                settings: JSON.stringify(formData),
-                nonce: klaroGeoAdmin.nonce
-            },
-            beforeSend: function() {
-                $('#apply_bulk_template').prop('disabled', true).text('Saving...');
-            },
-            success: function(response) {
-                if (response.success) {
-                    $('#bulk_edit_modal').hide();
-                    // Show success message
-                    $('<div class="notice notice-success is-dismissible"><p>Settings saved successfully.</p></div>')
-                        .insertAfter('.wp-header-end').delay(3000).fadeOut();
-
-                    // Update the UI
-                    selectedCountries.forEach(function(code) {
-                        $('select[name="klaro_geo_settings[countries][' + code + '][template]"]').val(selectedTemplate);
-                    });
-                } else {
-                    klaroGeoError('Save failed:', response);
-                }
-            },
-            error: function(xhr, status, error) {
-                klaroGeoError('AJAX error:', status, error);
-            },
-            complete: function() {
-                $('#apply_bulk_template').prop('disabled', false).text('Apply to Selected');
-            }
-        });
     });
 
     // ===== AUTOSAVE FUNCTIONALITY =====

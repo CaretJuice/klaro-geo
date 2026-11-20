@@ -87,11 +87,6 @@
     color: #666;
 }
 
-/* Tabs */
-.tabs-container {
-    margin-top: 20px;
-}
-
 .ui-tabs-nav {
     margin: 0;
     padding: 0;
@@ -240,14 +235,6 @@
 .no-regions {
     font-style: italic;
     color: #999;
-}
-
-/* Advanced settings toggle */
-.toggle-advanced {
-    margin: 10px 0;
-    cursor: pointer;
-    color: #0073aa;
-    text-decoration: underline;
 }
 
 .advanced-settings {
