@@ -43,7 +43,7 @@ jQuery(document).ready(function($) {
 
     // Ensure klaroGeoAdmin is available
     if (typeof klaroGeoAdmin === 'undefined') {
-        console.error('klaroGeoAdmin not defined');
+        klaroGeoError('klaroGeoAdmin not defined');
         return;
     }
 
@@ -98,13 +98,13 @@ jQuery(document).ready(function($) {
                     klaroGeoLog('Successfully saved visible countries');
                     location.reload();
                 } else {
-                    console.error('Failed to save country visibility:', response);
+                    klaroGeoError('Failed to save country visibility:', response);
                     alert('Failed to save country visibility. Please check the browser console for details.');
                 }
             },
             error: function(xhr, status, error) {
-                console.error('AJAX error:', status, error);
-                console.error('Response text:', xhr.responseText);
+                klaroGeoError('AJAX error:', status, error);
+                klaroGeoError('Response text:', xhr.responseText);
                 alert('Error saving country visibility: ' + status + ' - ' + error);
             }
         });
@@ -199,15 +199,15 @@ jQuery(document).ready(function($) {
                     html += '</tbody></table>';
                     regionList.html(html);
                 } else {
-                    console.error('Failed to load regions:', response);
+                    klaroGeoError('Failed to load regions:', response);
 
                     // Show error message in the region list
                     regionList.empty().append($('<div class="error"></div>').text('Failed to load regions: ' + (response.data ? response.data.message : 'Unknown error')));
                 }
             },
             error: function(xhr, status, error) {
-                console.error('AJAX error:', status, error);
-                console.error('Response text:', xhr.responseText);
+                klaroGeoError('AJAX error:', status, error);
+                klaroGeoError('Response text:', xhr.responseText);
 
                 // Show error message in the region list
                 let regionList = modal.find('.region-list');
@@ -309,7 +309,7 @@ jQuery(document).ready(function($) {
                     }, 2000);
                 } else {
                     // Log the error for debugging
-                    console.error('Error saving regions:', response);
+                    klaroGeoError('Error saving regions:', response);
 
                     // Show error message
                     var form = modal.find('.region-form');
@@ -318,8 +318,8 @@ jQuery(document).ready(function($) {
             },
             error: function(xhr, status, error) {
                 // Show detailed error message
-                console.error('AJAX error:', status, error);
-                console.error('Response:', xhr.responseText);
+                klaroGeoError('AJAX error:', status, error);
+                klaroGeoError('Response:', xhr.responseText);
                 let form = modal.find('.region-form');
                 form.find('.saving').removeClass('saving').addClass('error')
                     .text('Error saving region settings: ' + status + ' - ' + error + '. Please check the browser console for more details.');
@@ -359,13 +359,13 @@ jQuery(document).ready(function($) {
                     modal.show();
                     loadRegions(countryCode);
                 } else {
-                    console.error('Failed to save country settings:', response);
+                    klaroGeoError('Failed to save country settings:', response);
                     alert('Failed to save country settings before opening region modal. Please try again.');
                 }
             },
             error: function(xhr, status, error) {
-                console.error('AJAX error:', status, error);
-                console.error('Response text:', xhr.responseText);
+                klaroGeoError('AJAX error:', status, error);
+                klaroGeoError('Response text:', xhr.responseText);
                 alert('Error saving country settings: ' + status + ' - ' + error);
 
                 // Still show the modal and load regions even if saving failed
@@ -472,11 +472,11 @@ jQuery(document).ready(function($) {
                         $('select[name="klaro_geo_settings[countries][' + code + '][template]"]').val(selectedTemplate);
                     });
                 } else {
-                    console.error('Save failed:', response);
+                    klaroGeoError('Save failed:', response);
                 }
             },
             error: function(xhr, status, error) {
-                console.error('AJAX error:', status, error);
+                klaroGeoError('AJAX error:', status, error);
             },
             complete: function() {
                 $('#apply_bulk_template').prop('disabled', false).text('Apply to Selected');
@@ -595,7 +595,7 @@ jQuery(document).ready(function($) {
                     if (changedElement) {
                         $(changedElement).removeClass('klaro-field-saving');
                     }
-                    console.error('Autosave failed:', response);
+                    klaroGeoError('Autosave failed:', response);
                 }
             },
             error: function(xhr, status, error) {
@@ -604,7 +604,7 @@ jQuery(document).ready(function($) {
                 if (changedElement) {
                     $(changedElement).removeClass('klaro-field-saving');
                 }
-                console.error('Autosave AJAX error:', status, error);
+                klaroGeoError('Autosave AJAX error:', status, error);
             }
         });
     }

@@ -58,11 +58,11 @@
                                 $('#translations_json_editor').val(JSON.stringify(translations, null, 2));
                             }
                         } catch (e) {
-                            console.error('Error removing deleted languages from JSON:', e);
+                            klaroGeoError('Error removing deleted languages from JSON:', e);
                         }
                     }
                 } catch (e) {
-                    console.error('Error parsing deleted languages from localStorage:', e);
+                    klaroGeoError('Error parsing deleted languages from localStorage:', e);
                 }
 
                 // Clear the localStorage item
@@ -114,7 +114,7 @@
                                 $("#translations-tabs").tabs("refresh");
                             }
                         } catch (e) {
-                            console.error('Error checking JSON data:', e);
+                            klaroGeoError('Error checking JSON data:', e);
                         }
                     }
                 }, 500);
@@ -148,7 +148,7 @@
 
                 klaroGeoLog('Translations tabs initialized');
             } else {
-                console.error('Translations tabs container not found');
+                klaroGeoError('Translations tabs container not found');
             }
         }
 
@@ -171,7 +171,7 @@
                 templatesData = window.klaroTemplates;
                 klaroGeoLog('Using window.klaroTemplates for template data');
             } else {
-                console.error('No templates data found');
+                klaroGeoError('No templates data found');
                 return;
             }
 
@@ -180,20 +180,20 @@
             klaroGeoLog('Current template:', currentTemplate);
 
             if (!currentTemplate) {
-                console.error('Current template selector not found');
+                klaroGeoError('Current template selector not found');
                 // Try to get the first template key as a fallback
                 let templateKeys = Object.keys(templatesData);
                 if (templateKeys.length > 0) {
                     currentTemplate = templateKeys[0];
                     klaroGeoLog('Using first template as fallback:', currentTemplate);
                 } else {
-                    console.error('No templates available');
+                    klaroGeoError('No templates available');
                     return;
                 }
             }
 
             if (!templatesData[currentTemplate]) {
-                console.error('Template not found:', currentTemplate);
+                klaroGeoError('Template not found:', currentTemplate);
                 return;
             }
 
@@ -403,13 +403,13 @@
             } else if (typeof window.klaroTemplates !== 'undefined') {
                 templatesData = window.klaroTemplates;
             } else {
-                console.error('No templates data found');
+                klaroGeoError('No templates data found');
                 return;
             }
 
             let currentTemplate = $('#template_selector').val() || $('#current_template').val();
             if (!currentTemplate || !templatesData[currentTemplate]) {
-                console.error('Current template not found');
+                klaroGeoError('Current template not found');
                 return;
             }
 
@@ -681,7 +681,7 @@
                 return true;
             } catch (e) {
                 alert('Error parsing JSON: ' + e.message);
-                console.error('Error parsing JSON:', e);
+                klaroGeoError('Error parsing JSON:', e);
                 return false;
             }
         }
@@ -761,7 +761,7 @@
                         klaroGeoWarn('Language not found in JSON:', langCode);
                     }
                 } catch (e) {
-                    console.error('Error updating JSON after deleting language:', e);
+                    klaroGeoError('Error updating JSON after deleting language:', e);
                 }
             }
         });
@@ -806,7 +806,7 @@
                         updateFormFromJson();
                     }
                 } catch (e) {
-                    console.error('Error parsing JSON when copying language:', e);
+                    klaroGeoError('Error parsing JSON when copying language:', e);
                 }
             }
 
@@ -878,7 +878,7 @@
                 alert('JSON formatted successfully!');
             } catch (e) {
                 alert('Error formatting JSON: ' + e.message + '\n\nTry fixing the JSON manually or use the "Update JSON from Form" button.');
-                console.error('JSON formatting error:', e);
+                klaroGeoError('JSON formatting error:', e);
                 klaroGeoLog('Problematic JSON:', jsonText);
             }
         });
@@ -905,7 +905,7 @@
                 errorMsg += 'Try using the "Format JSON" button to fix common issues automatically.';
 
                 alert(errorMsg);
-                console.error('JSON validation error:', e);
+                klaroGeoError('JSON validation error:', e);
                 klaroGeoLog('Problematic JSON:', jsonText);
             }
         });
@@ -964,54 +964,6 @@
             }, 1500); // Wait 1.5 seconds after the last edit
         });
 
-        // Debug translations button
-        $('#debug_translations').click(function() {
-            console.group('Translations Debug Info');
-
-            // Log form data
-            klaroGeoLog('Form data:');
-            let formData = {};
-            $('form').serializeArray().forEach(function(item) {
-                formData[item.name] = item.value;
-            });
-            klaroGeoLog(formData);
-
-            // Log translations from form
-            klaroGeoLog('Translations from form:');
-            let translations = updateJsonFromForm();
-            klaroGeoLog(translations);
-
-            // Log JSON editor content
-            klaroGeoLog('JSON editor content:');
-            let jsonText = $('#translations_json_editor').val();
-            klaroGeoLog(jsonText);
-
-            try {
-                let parsedJson = JSON.parse(jsonText);
-                klaroGeoLog('Parsed JSON:', parsedJson);
-            } catch (e) {
-                console.error('Error parsing JSON:', e);
-            }
-
-            // Log template data
-            klaroGeoLog('Template data:');
-            if (typeof klaroGeoTemplates !== 'undefined') {
-                klaroGeoLog('klaroGeoTemplates:', klaroGeoTemplates);
-            }
-            if (typeof window.klaroTemplates !== 'undefined') {
-                klaroGeoLog('window.klaroTemplates:', window.klaroTemplates);
-            }
-
-            // Log current template
-            klaroGeoLog('Current template:');
-            let currentTemplate = $('#template_selector').val() || $('#current_template').val();
-            klaroGeoLog(currentTemplate);
-
-            console.groupEnd();
-
-            alert('Debug information has been logged to the console. Please open the browser developer tools to view it.');
-        });
-
         // Update JSON before form submission
         $('form').on('submit', function() {
             klaroGeoLog('Form is being submitted, updating JSON from form...');
@@ -1030,7 +982,7 @@
                             klaroGeoLog('Current translations from JSON editor:', currentTranslations);
                         }
                     } catch (e) {
-                        console.error('Error parsing current JSON:', e);
+                        klaroGeoError('Error parsing current JSON:', e);
                     }
 
                     // Now update the JSON from the form
@@ -1042,14 +994,14 @@
 
                     // Check if translations are empty
                     if (!translations || Object.keys(translations).length === 0) {
-                        console.error('No translations found in form!');
+                        klaroGeoError('No translations found in form!');
 
                         // If we have current translations, use those
                         if (currentTranslations && Object.keys(currentTranslations).length > 0) {
                             klaroGeoLog('Using current translations from JSON editor');
                             // No need to update the JSON editor as it already has these values
                         } else {
-                            console.error('No translations found in JSON editor either!');
+                            klaroGeoError('No translations found in JSON editor either!');
 
                             // Set a default JSON value to prevent syntax errors
                             $('#translations_json_editor').val(JSON.stringify({
@@ -1096,7 +1048,7 @@
                     $(this).attr('action', formAction);
                 }
             } catch (e) {
-                console.error('Error updating JSON from form:', e);
+                klaroGeoError('Error updating JSON from form:', e);
 
                 // Set a default JSON value to prevent syntax errors if we have a JSON editor
                 if ($('#translations_json_editor').length) {
@@ -1150,7 +1102,7 @@
             if (nonce) {
                 formData.append('nonce', nonce);
             } else {
-                console.error('No nonce found for AJAX request');
+                klaroGeoError('No nonce found for AJAX request');
             }
 
             // Send the AJAX request
@@ -1179,7 +1131,7 @@
                             callback(true, response);
                         }
                     } else {
-                        console.error('Error saving translations:', response.data ? response.data.message : 'Unknown error');
+                        klaroGeoError('Error saving translations:', response.data ? response.data.message : 'Unknown error');
 
                         // Call the callback if provided
                         if (typeof callback === 'function') {
@@ -1188,7 +1140,7 @@
                     }
                 },
                 error: function(xhr, status, error) {
-                    console.error('AJAX error:', status, error);
+                    klaroGeoError('AJAX error:', status, error);
 
                     // Call the callback if provided
                     if (typeof callback === 'function') {
@@ -1339,7 +1291,6 @@
         // Handle template selection change
         $('#template_selector').on('change', function() {
             let selectedTemplate = $(this).val();
-            console.log('Template selected:', selectedTemplate);
 
             // Update the hidden input
             $('#current_template').val(selectedTemplate);
@@ -1412,14 +1363,12 @@
 
         // Initialize tabs when the page loads
         if ($('#translations-tabs').length) {
-            console.log('Initializing tabs on page load');
             $('#translations-tabs').tabs();
 
             // Add a small delay to ensure the DOM is ready
             setTimeout(function() {
                 // Get the current template data
                 let currentTemplate = $('#current_template').val();
-                console.log('Current template on page load:', currentTemplate);
 
                 if (typeof klaroGeoTemplates !== 'undefined' &&
                     klaroGeoTemplates.templates &&
@@ -1428,14 +1377,12 @@
                     klaroGeoTemplates.templates[currentTemplate].config.translations) {
 
                     let translations = klaroGeoTemplates.templates[currentTemplate].config.translations;
-                    console.log('Found translations on page load:', translations);
 
                     // Get the purposes from the page
                     let purposes = [];
                     $('#tab-zz h5').each(function() {
                         purposes.push($(this).text().toLowerCase());
                     });
-                    console.log('Found purposes on page:', purposes);
 
                     // Add tabs for each language
                     Object.keys(translations).forEach(function(langCode) {
@@ -1464,7 +1411,6 @@
 
                         // Check if tab already exists
                         if (!$('#tab-' + langCode).length) {
-                            console.log('Adding tab for language on page load:', langCode);
 
                             // Add new tab
                             let newTab = $('<li><a href="#tab-' + langCode + '">' + langName + ' (' + langCode + ')</a></li>');
@@ -1512,11 +1458,10 @@
                     if (savedTabIndex !== null) {
                         try {
                             $('#translations-tabs').tabs('option', 'active', parseInt(savedTabIndex));
-                            console.log('Restored active tab to index:', savedTabIndex);
                             // Clear the saved index after using it
                             localStorage.removeItem('klaro_active_tab_index');
                         } catch (e) {
-                            console.error('Error restoring active tab:', e);
+                            klaroGeoError('Error restoring active tab:', e);
                         }
                     }
                 }

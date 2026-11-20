@@ -81,7 +81,7 @@
           if (window.klaroGeo.queue.length >= QUEUE_MAX_SIZE) {
               // Drop oldest event
               const dropped = window.klaroGeo.queue.shift();
-              console.warn('[klaro-geo] Consent queue limit reached (100). Dropping oldest event:', dropped.event || 'unknown');
+              klaroGeoError('Consent queue limit reached (100). Dropping oldest event:', dropped.event || 'unknown');
           }
           klaroGeoLog('Consent Queue - queuing event:', eventData.event || 'unknown event',
                       '(queue size:', window.klaroGeo.queue.length + 1, ')');
@@ -296,7 +296,7 @@
 
       const sent = sendReceiptToServer(consentReceipt)
           .catch(function(error) {
-              console.error('Error from server when sending receipt:', error);
+              klaroGeoError('Error from server when sending receipt:', error);
           });
 
       window.dataLayer.push(KlaroGeoEvents.createKlaroGeoEvent('generateConsentReceipt', {
@@ -323,7 +323,7 @@
               try {
                   receipts = JSON.parse(existingData);
               } catch (parseError) {
-                  console.error('Failed to parse existing receipts:', parseError);
+                  klaroGeoError('Failed to parse existing receipts:', parseError);
                   receipts = [];
               }
           }
@@ -344,7 +344,7 @@
           // Store back in localStorage
           window.localStorage.setItem('klaro_consent_receipts', JSON.stringify(receipts));
       } catch (e) {
-          console.error('Failed to store consent receipt locally:', e);
+          klaroGeoError('Failed to store consent receipt locally:', e);
       }
   }
 
@@ -395,7 +395,7 @@
       })
       .then(function(data) {
           if (!data.success) {
-              console.error('Failed to store consent receipt:', data);
+              klaroGeoError('Failed to store consent receipt:', data);
           }
           return data;
       })
@@ -407,23 +407,20 @@
   }
 
   function setupKlaroDataLayerWatcher() {
-      // Try to access Klaro immediately
-      if (typeof window.klaro !== 'undefined' && typeof window.klaro.getManager === 'function') {
-          try {
-              const manager = window.klaro.getManager();
-              if (manager) {
-                  setupWatcher(manager);
-                  return; // Success, don't retry
-              } else {
-                  klaroGeoWarn('Klaro manager is undefined, even though klaro is defined.');
-              }
-          } catch (error) {
-              klaroGeoError('Error getting manager early:', error);
-          }
+      // getManager() throws until window.klaroConfig exists. In client geo
+      // mode that is after the geo lookup, so keep trying until it does.
+      let manager = null;
+      try {
+          manager = window.klaro.getManager();
+      } catch (error) {
+          manager = null;
       }
 
-      // Fallback: Retry with setTimeout
-      setTimeout(setupKlaroDataLayerWatcher, 50); // Very short delay
+      if (manager) {
+          setupWatcher(manager);
+      } else {
+          setTimeout(setupKlaroDataLayerWatcher, 50);
+      }
   }
 
   function setupWatcher(manager) {
@@ -479,21 +476,8 @@
           // Defer to next event loop tick to let Klaro fully hydrate consent from cookies
           // Without this delay, manager.consents may be empty even for returning users
           setTimeout(function() {
-              // Get fresh manager to ensure we have the latest consent state
-              let activeManager = manager;
-              try {
-                  if (typeof window.klaro !== 'undefined' && typeof window.klaro.getManager === 'function') {
-                      const freshManager = window.klaro.getManager();
-                      if (freshManager && freshManager.consents && Object.keys(freshManager.consents).length > 0) {
-                          activeManager = freshManager;
-                      }
-                  }
-              } catch (e) {
-                  klaroGeoLog('Error getting fresh manager in pushConsentData');
-              }
-
               // Deep copy consents to capture current state (not a reference that changes later)
-              const consentsCopy = JSON.parse(JSON.stringify(activeManager.consents || {}));
+              const consentsCopy = JSON.parse(JSON.stringify(manager.consents || {}));
 
               // initialConsents represents Klaro manager state, so it uses the 'klaro' eventSource
               const initialData = KlaroGeoEvents.createKlaroForwardedEvent('initialConsents', consentsCopy);
@@ -501,9 +485,9 @@
               window.dataLayer.push(initialData);
 
               // Call consent handling functions
-              handleKlaroConsentEvents(activeManager, 'initialConsents', activeManager.consents);
+              handleKlaroConsentEvents(manager, 'initialConsents', manager.consents);
 
-              recordGpcReceipt(activeManager);
+              recordGpcReceipt(manager);
           }, 0); // Defer to next tick
       } else {
           klaroGeoWarn('dataLayer is not defined, cannot push initial Klaro event');
@@ -552,27 +536,13 @@
       // Set a new timer to debounce
       window.consentUpdateTimer = setTimeout(function() {
 
-          // Get consent state from Klaro
-          let activeManager = manager; // Track the manager we'll use for consent state
-
-          // ALWAYS get a fresh manager to ensure we have the latest consent state
-          // This is critical because Klaro may not have fully hydrated consent from cookies
-          // when the initial call was made (the passed manager may have stale/empty consents)
-          try {
-              if (typeof window.klaro !== 'undefined' && typeof window.klaro.getManager === 'function') {
-                  const freshManager = window.klaro.getManager();
-                  if (freshManager && freshManager.consents && Object.keys(freshManager.consents).length > 0) {
-                      activeManager = freshManager;
-                  }
-              }
-          } catch (e) {
-              klaroGeoLog('Error getting fresh manager, using provided manager');
-          }
-
+          // klaro.getManager() returns one manager object per config, so the
+          // manager passed in is always the current one; its consents are read
+          // here, when the timer fires, not when the update was requested.
           // Standard Google keys from consent mode services (with parent-child
           // dependencies enforced) plus a dynamic key for every service
           const completeUpdate = KlaroGeoEvents.buildConsentMode(
-              (activeManager && activeManager.consents) || {}
+              (manager && manager.consents) || {}
           );
 
           // Log the complete update being sent (now includes dynamic keys)
@@ -603,10 +573,10 @@
 
           // Call gtag('consent', 'update') directly — no intermediary event needed
           // This queues in dataLayer for GTM to process (or works standalone without GTM)
-          if (typeof window.dataLayer !== 'undefined' && activeManager && activeManager.consents) {
+          if (typeof window.dataLayer !== 'undefined' && manager && manager.consents) {
               // Create acceptedServices array for the update event
-              const acceptedServices = Object.keys(activeManager.consents)
-                  .filter(serviceName => activeManager.consents[serviceName] === true);
+              const acceptedServices = Object.keys(manager.consents)
+                  .filter(serviceName => manager.consents[serviceName] === true);
 
               if (matchesDefaults) {
                   klaroGeoLog('Skipping redundant gtag consent update on initialConsents - all values match defaults');
@@ -618,7 +588,7 @@
               // In Basic GTM mode, for initialConsents when GTM not consented,
               // do NOT push Klaro Consent Update (would flush consent queue prematurely)
               const isGtmMode = window.klaroGeo && window.klaroGeo.useGTM;
-              const gtmConsented = activeManager.consents['google-tag-manager'] === true;
+              const gtmConsented = manager.consents['google-tag-manager'] === true;
               const isAdvancedMode = window.klaroGeo && window.klaroGeo.consentModeType === 'advanced';
 
               if (eventType === 'initialConsents' && isGtmMode && !gtmConsented && !isAdvancedMode) {

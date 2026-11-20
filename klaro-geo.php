@@ -443,9 +443,9 @@ function klaro_geo_enqueue_scripts() {
 	wp_enqueue_script(
 		'klaro-geo-consent-button-js',
 		KLARO_GEO_URL . 'js/klaro-geo-consent-button.js',
-		// The script is written against jQuery. It used to rely on the admin bar
-		// script pulling jQuery in for every visitor; declare the dependency.
-		array( 'jquery' ),
+		// The script is written against jQuery and logs through the debug
+		// helper; both are declared so load order does not depend on luck.
+		array( 'jquery', 'klaro-geo-debug' ),
 		KLARO_GEO_VERSION,
 		array(
 			'in_footer' => true,

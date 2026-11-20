@@ -190,17 +190,18 @@ describe('Consent Queue', () => {
         });
 
         test('should warn when queue limit is exceeded', () => {
-            const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+            // Dropping an event is reported through klaroGeoError(), which is
+            // shown whether or not debug logging is on.
+            window.klaroGeoError = jest.fn();
+            global.klaroGeoError = window.klaroGeoError;
 
             // Queue 101 events
             for (let i = 0; i < 101; i++) {
                 window.klaroGeo.push({ event: `event_${i}` });
             }
 
-            expect(warnSpy).toHaveBeenCalled();
-            expect(warnSpy.mock.calls[0][0]).toContain('queue limit');
-
-            warnSpy.mockRestore();
+            expect(window.klaroGeoError).toHaveBeenCalledTimes(1);
+            expect(window.klaroGeoError.mock.calls[0][0]).toContain('queue limit');
         });
     });
 

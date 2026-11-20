@@ -122,7 +122,7 @@ define( 'KLARO_GEO_RECEIPTS_DB_VERSION', '1.2' );
 // Create the consent receipts table on plugin activation
 function klaro_geo_create_consent_receipts_table() {
 	global $wpdb;
-	$table_name = $wpdb->prefix . 'klaro_geo_consent_receipts';
+	$table_name = klaro_geo_receipts_table_name();
 
 	// Log database information for debugging
 	klaro_geo_debug_log( 'Database info: ' . $wpdb->db_version() );
@@ -269,7 +269,7 @@ add_action( 'init', 'klaro_geo_upgrade_consent_receipts_table' );
 // Drop the consent receipts table and forget its schema version.
 function klaro_geo_drop_consent_receipts_table() {
 	global $wpdb;
-	$table_name = $wpdb->prefix . 'klaro_geo_consent_receipts';
+	$table_name = klaro_geo_receipts_table_name();
 
 	// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- DDL statement; table name from $wpdb->prefix is trusted and cannot be parameterized.
 	$wpdb->query( "DROP TABLE IF EXISTS $table_name" );

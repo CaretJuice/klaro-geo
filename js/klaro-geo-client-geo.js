@@ -33,12 +33,6 @@
 (function() {
     'use strict';
 
-    function log() {
-        if (typeof window.klaroGeoLog === 'function') {
-            window.klaroGeoLog.apply(null, arguments);
-        }
-    }
-
     // IANA timezone → ISO 3166-1 alpha-2 country. Generated from tzdata
     // zone1970.tab plus common deprecated aliases some environments still return.
     var TZ_COUNTRY = {
@@ -224,7 +218,7 @@
 
         // Validation: the selected template must be among the shipped candidates
         if (!templates || typeof templates[template] === 'undefined') {
-            log('Klaro Geo client geo: template "' + template + '" not shipped, falling back to "' + rules.defaultTemplate + '"');
+            klaroGeoLog('Klaro Geo client geo: template "' + template + '" not shipped, falling back to "' + rules.defaultTemplate + '"');
             template = rules.defaultTemplate;
             source = 'fallback';
         }
@@ -327,9 +321,7 @@
             // template, but never leave the page without a consent manager.
             var keys = Object.keys(payload.templates || {});
             if (keys.length === 0) {
-                if (window.console && console.error) {
-                    console.error('[klaro-geo] Payload contains no templates; Klaro not initialized');
-                }
+                klaroGeoError('Payload contains no templates; Klaro not initialized');
                 return;
             }
             templateKey = keys[0];
@@ -337,7 +329,7 @@
             template = payload.templates[templateKey];
         }
 
-        log('Klaro Geo: applying template', {
+        klaroGeoLog('Klaro Geo: applying template', {
             mode: payload.mode,
             country: geo.country, region: geo.region, geoSource: geo.source,
             template: templateKey, templateSource: templateSource, latencyMs: geo.latencyMs
@@ -409,7 +401,7 @@
         }
         if (consentUpdate) {
             window.gtag('consent', 'update', consentUpdate);
-            log('Klaro Geo: consent update pushed for template "' + templateKey + '"' +
+            klaroGeoLog('Klaro Geo: consent update pushed for template "' + templateKey + '"' +
                 (gpc.detected ? ' (GPC applied)' : ''));
         }
 
@@ -471,9 +463,7 @@
                 }
             }
         } catch (e) {
-            if (window.console && console.error) {
-                console.error('Error retrieving latest consent receipt:', e);
-            }
+            klaroGeoError('Error retrieving latest consent receipt:', e);
         }
 
         var configLoadedData = {
@@ -527,9 +517,9 @@
         // auto-init from the window.klaroConfig we just set.
         if (window.klaro && typeof window.klaro.setup === 'function') {
             window.klaro.setup(window.klaroConfig);
-            log('Klaro Geo: klaro.setup() called');
+            klaroGeoLog('Klaro Geo: klaro.setup() called');
         } else {
-            log('Klaro Geo: klaroConfig set; Klaro will auto-init on load');
+            klaroGeoLog('Klaro Geo: klaroConfig set; Klaro will auto-init on load');
         }
     }
 
@@ -550,12 +540,12 @@
                 };
             })
             .catch(function(err) {
-                log('Klaro Geo client geo: AJAX lookup failed (' + (err && err.message) + ')');
+                klaroGeoLog('Klaro Geo client geo: AJAX lookup failed (' + (err && err.message) + ')');
 
                 if (payload.timezoneFallback) {
                     var tzCountry = timezoneToCountry();
                     if (tzCountry) {
-                        log('Klaro Geo client geo: falling back to timezone-derived country ' + tzCountry);
+                        klaroGeoLog('Klaro Geo client geo: falling back to timezone-derived country ' + tzCountry);
                         return {
                             country: tzCountry,
                             region: '',
@@ -563,10 +553,10 @@
                             latencyMs: elapsedMs(start)
                         };
                     }
-                    log('Klaro Geo client geo: timezone fallback could not resolve a country');
+                    klaroGeoLog('Klaro Geo client geo: timezone fallback could not resolve a country');
                 }
 
-                log('Klaro Geo client geo: falling back to fallback template (no geo)');
+                klaroGeoLog('Klaro Geo client geo: falling back to fallback template (no geo)');
                 return {
                     country: '',
                     region: '',
@@ -581,9 +571,7 @@
             .catch(function(err) {
                 // applyResolution must never leave the page without Klaro; if it
                 // threw, log loudly — this indicates a payload bug, not a geo miss.
-                if (window.console && console.error) {
-                    console.error('[klaro-geo] Client geo resolution failed:', err);
-                }
+                klaroGeoError('Client geo resolution failed:', err);
             });
     }
 
@@ -615,9 +603,7 @@
                 latencyMs: null
             });
         } catch (err) {
-            if (window.console && console.error) {
-                console.error('[klaro-geo] Could not apply the consent template:', err);
-            }
+            klaroGeoError('Could not apply the consent template:', err);
         }
     }
 

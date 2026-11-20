@@ -85,7 +85,7 @@ if (typeof jQuery !== 'undefined') {
     jQuery(document).ready(function($) {
         // Ensure klaroGeoServices is available
         if (typeof klaroGeoServices === 'undefined') {
-            console.error('klaroGeoServices not defined');
+            klaroGeoError('klaroGeoServices not defined');
             return;
         }
 
@@ -157,7 +157,7 @@ if (typeof jQuery !== 'undefined') {
         klaroGeoLog('Loading languages from templates...');
 
         if (typeof window.klaroTemplates === 'undefined') {
-            console.error('klaroTemplates not defined');
+            klaroGeoError('klaroTemplates not defined');
             return;
         }
 

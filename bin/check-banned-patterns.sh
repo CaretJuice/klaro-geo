@@ -47,6 +47,12 @@ fi
 check "hand-typed DEBUG prefix in a log message (klaroGeoLog() adds the prefix)" \
     "['\"]DEBUG:" $JS_FILES
 
+# One logger: js/klaro-geo-debug.js. Everything else calls klaroGeoLog/Warn/Error.
+check "direct console.* call (use klaroGeoLog(), klaroGeoWarn() or klaroGeoError())" \
+    "console\.[a-zA-Z]+\(" $(ls js/*.js | grep -v klaro-geo-debug.js)
+check "hand-typed [klaro-geo] prefix in a log message" \
+    "klaroGeo(Log|Warn|Error)\(['\"]\[" $JS_FILES
+
 if [ "$failed" -eq 0 ]; then
     echo "No banned patterns."
 fi

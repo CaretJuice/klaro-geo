@@ -147,7 +147,7 @@
         if (isKlaroLoaded()) {
             window.klaro.show();
         } else {
-            console.error('Klaro is not initialized or show() function is missing.');
+            klaroGeoError('Klaro is not initialized or show() function is missing.');
         }
     }
 

@@ -194,7 +194,7 @@ describe('Klaro Consent Button', function() {
         expect(mockEvent.preventDefault).toHaveBeenCalled();
         
         // Console.error should be called
-        expect(console.error).toHaveBeenCalledWith('Klaro is not initialized or show() function is missing.');
+        expect(klaroGeoError).toHaveBeenCalledWith('Klaro is not initialized or show() function is missing.');
     });
 
     test('should handle case when Klaro is loaded but show method is missing', function() {
@@ -239,7 +239,7 @@ describe('Klaro Consent Button', function() {
         expect(mockEvent.preventDefault).toHaveBeenCalled();
         
         // Console.error should be called
-        expect(console.error).toHaveBeenCalledWith('Klaro is not initialized or show() function is missing.');
+        expect(klaroGeoError).toHaveBeenCalledWith('Klaro is not initialized or show() function is missing.');
     });
 
     test('should create floating button when enabled in settings', function() {

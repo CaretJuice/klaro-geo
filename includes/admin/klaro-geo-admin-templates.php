@@ -1349,7 +1349,6 @@ function klaro_geo_templates_page() {
 							<button type="button" class="button" id="validate_json">Validate JSON</button>
 							<button type="button" class="button" id="update_form_from_json">Update Form from JSON</button>
 							<button type="button" class="button" id="update_json_from_form">Update JSON from Form</button>
-							<button type="button" class="button" id="debug_translations">Debug Translations</button>
 						</div>
 					</div>
 					<textarea id="translations_json_editor" name="template_config[translations_json]" rows="15" class="large-text code">
