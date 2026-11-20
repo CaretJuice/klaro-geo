@@ -63,6 +63,33 @@ class ServicesTest extends WP_UnitTestCase {
     }
 
     /**
+     * Deleting from the services page removes an ordinary service, refuses a
+     * consent mode service (consent mode depends on them) and reports a
+     * position that does not exist.
+     */
+    public function test_delete_service_at_position() {
+        $settings = Klaro_Geo_Service_Settings::get_instance();
+        $settings->set(array(
+            array('name' => 'analytics-storage', 'purposes' => array('analytics'), 'is_consent_mode_service' => true, 'consent_mode_key' => 'analytics_storage'),
+            array('name' => 'my-pixel', 'purposes' => array('advertising')),
+        ));
+        $settings->save();
+
+        $protected = klaro_geo_delete_service_at(0);
+        $this->assertWPError($protected);
+        $this->assertSame('klaro_geo_service_protected', $protected->get_error_code());
+
+        $this->assertWPError(klaro_geo_delete_service_at(7));
+        $this->assertWPError(klaro_geo_delete_service_at(-1));
+
+        $this->assertTrue(klaro_geo_delete_service_at(1));
+
+        Klaro_Geo_Service_Settings::clear_instance_cache();
+        $this->assertSame(array('analytics-storage'), wp_list_pluck(Klaro_Geo_Service_Settings::get_instance()->get(), 'name'));
+        Klaro_Geo_Service_Settings::clear_instance_cache();
+    }
+
+    /**
      * Test deleting a service
      */
     public function test_delete_service() {

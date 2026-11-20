@@ -297,32 +297,41 @@ function klaro_geo_save_services() {
 
 add_action( 'wp_ajax_klaro_geo_delete_service', 'klaro_geo_delete_service' );
 
+/**
+ * Delete the service at a position in the stored list.
+ *
+ * Goes through Klaro_Geo_Service_Settings::remove_service(), which refuses to
+ * delete consent mode services: consent mode depends on them, and they can
+ * only be hidden.
+ *
+ * @param int $index Position of the service in the stored list.
+ * @return true|WP_Error
+ */
+function klaro_geo_delete_service_at( $index ) {
+	$service_settings = Klaro_Geo_Service_Settings::get_instance();
+	$services         = $service_settings->get();
+
+	if ( ! isset( $services[ $index ]['name'] ) ) {
+		return new WP_Error( 'klaro_geo_service_not_found', 'Service not found.' );
+	}
+
+	$result = $service_settings->remove_service( $services[ $index ]['name'] );
+	if ( is_array( $result ) ) {
+		return new WP_Error( 'klaro_geo_service_protected', $result['message'] );
+	}
+
+	$service_settings->save();
+	return true;
+}
+
 function klaro_geo_delete_service() {
 	klaro_geo_verify_admin_ajax( 'klaro_geo_nonce', '_wpnonce' );
 
-	$index = isset( $_POST['index'] ) ? intval( $_POST['index'] ) : -1;
-	if ( $index < 0 ) {
-		wp_send_json_error( [ 'message' => 'Invalid service index.' ] );
-		wp_die(); // Always wp_die() after wp_send_json_error()
+	$result = klaro_geo_delete_service_at( isset( $_POST['index'] ) ? intval( $_POST['index'] ) : -1 );
+	if ( is_wp_error( $result ) ) {
+		wp_send_json_error( [ 'message' => $result->get_error_message() ] );
 	}
 
-	// Initialize the service settings class
-	$service_settings = Klaro_Geo_Service_Settings::get_instance();
-
-	// Get the existing services
-	$services = $service_settings->get();
-
-	if ( is_array( $services ) && isset( $services[ $index ] ) ) {
-		array_splice( $services, $index, 1 ); // Remove the service
-
-		// Update the services using the service settings class
-		$service_settings->set( $services );
-		$service_settings->save();
-
-		wp_send_json_success( $services );  // Send the updated services data
-	} else {
-		wp_send_json_error( [ 'message' => 'Service not found or invalid services data.' ] );
-	}
-	wp_die();
+	wp_send_json_success( Klaro_Geo_Service_Settings::get_instance()->get() );
 }
 ?>

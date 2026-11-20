@@ -93,8 +93,8 @@ function klaro_geo_settings_page_content() {
 				<tr valign="top">
 					<th scope="row"><label for="klaro_geo_enable_floating_button">Enable Floating Consent Button</label></th>
 					<td>
-						<input type="checkbox" name="klaro_geo_enable_floating_button" id="klaro_geo_enable_floating_button" value="1" <?php checked( get_option( 'klaro_geo_enable_floating_button', true ), 1 ); ?> />
-						<p class="description">When enabled, a floating "Manage Consent Settings" button will appear at the bottom right of your website. This button allows visitors to easily access and update their consent preferences at any time.</p>
+						<input type="checkbox" name="klaro_geo_enable_floating_button" id="klaro_geo_enable_floating_button" value="1" <?php checked( (bool) get_option( 'klaro_geo_enable_floating_button', false ) ); ?> />
+						<p class="description">When enabled, a floating button lets visitors reopen their consent settings at any time. It is off by default: most sites will want to style it to match their theme first, with CSS overrides for <code>.klaro-floating-button</code>. The shortcode and menu item do not need this setting.</p>
 					</td>
 				</tr>
 				<tr valign="top">
@@ -508,7 +508,7 @@ function klaro_geo_register_main_settings() {
 		'klaro_geo_enable_floating_button',
 		[
 			'type'              => 'boolean',
-			'default'           => true,
+			'default'           => false,
 			'sanitize_callback' => 'rest_sanitize_boolean',
 		]
 	);

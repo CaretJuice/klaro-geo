@@ -34,11 +34,11 @@ check "function_exists() on one of the plugin's own functions" \
     "function_exists\( *'klaro_geo_" $PHP_FILES
 
 # wp_send_json_*() already ends the request.
-check "exit or die straight after wp_send_json_*()" \
-    "wp_send_json(_success|_error)?\(.*\); *(exit|die)" $PHP_FILES
-if grep -rnE -A1 "^\s*wp_send_json(_success|_error)?\(.*\);\s*$" $PHP_FILES | grep -E "^\S+-[0-9]+-\s*(exit|die)\b" >/dev/null; then
-    echo "BANNED: exit or die on the line after wp_send_json_*()"
-    grep -rnE -A1 "^\s*wp_send_json(_success|_error)?\(.*\);\s*$" $PHP_FILES | grep -E "^\S+-[0-9]+-\s*(exit|die)\b" | sed 's/^/  /'
+check "exit, die or wp_die() straight after wp_send_json_*()" \
+    "wp_send_json(_success|_error)?\(.*\); *(exit|die|wp_die)" $PHP_FILES
+if grep -rnE -A1 "^\s*wp_send_json(_success|_error)?\(.*\);\s*$" $PHP_FILES | grep -E "^\S+-[0-9]+-\s*(exit|die|wp_die)\b" >/dev/null; then
+    echo "BANNED: exit, die or wp_die() on the line after wp_send_json_*()"
+    grep -rnE -A1 "^\s*wp_send_json(_success|_error)?\(.*\);\s*$" $PHP_FILES | grep -E "^\S+-[0-9]+-\s*(exit|die|wp_die)\b" | sed 's/^/  /'
     echo
     failed=1
 fi

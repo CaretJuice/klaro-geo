@@ -420,7 +420,9 @@ function klaro_geo_enqueue_scripts() {
 	// (emitted with the config) tells it whether logging is enabled.
 
 	// Get settings for the consent button
-	$enable_floating_button = get_option( 'klaro_geo_enable_floating_button', true );
+	// Off until the site owner turns it on: the button usually needs styling
+	// to match the theme before it is shown to visitors.
+	$enable_floating_button = get_option( 'klaro_geo_enable_floating_button', false );
 	$button_text            = get_option( 'klaro_geo_floating_button_text', __( 'Manage Consent', 'klaro-geo' ) );
 	$button_theme           = get_option( 'klaro_geo_floating_button_theme', 'light' );
 	$button_position        = get_option( 'klaro_geo_floating_button_position', 'bottom-right' );

@@ -70,7 +70,7 @@ Navigate to **Klaro Geo > Klaro Geo** to configure the general plugin settings:
   - Google Tag Manager ID: Enter your Google Tag Manager container ID (e.g., GTM-XXXXXX)
   - Consent Mode Type: Choose between Basic and Advanced consent mode (see [Basic vs Advanced Consent Mode](#basic-vs-advanced-consent-mode) below)
 - **Consent Management Buttons**:
-  - Enable Floating Consent Button: Create a persistent floating button that opens the Klaro service management modal
+  - Enable Floating Consent Button: Create a persistent floating button that opens the Klaro service management modal. Off by default; see [Floating Button](#floating-button)
   - Button Text: Enter the text for the floating consent button
   - Button Theme: Select a style for the button
   - Button Position: Select where the button should appear on the screen
@@ -292,6 +292,8 @@ Examples:
 ### Floating Button
 
 The plugin also provides a floating button option that can be enabled in the settings. This button can be configured to appear at the bottom or top to the left or right of the viewport and is always accessible to visitors.
+
+The floating button is off by default. Most sites will want to style it to match their theme before showing it to visitors: override the `.klaro-floating-button` rules (and the `.klaro-theme-*` / `.klaro-position-*` variants) in your theme's CSS, then enable it under **Klaro Geo > Klaro Geo**. The menu item and shortcode work whether or not the floating button is enabled.
 
 ## Customizing Klaro Appearance
 
