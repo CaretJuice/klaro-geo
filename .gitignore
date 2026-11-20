@@ -51,6 +51,10 @@ e2e-report/
 playwright-report/
 playwright/.cache/
 
+# Local WordPress config files (the Docker stacks generate their own)
+/wp-config.php
+/wp-tests-config.php
+
 # Temporary Files
 *.log
 *.tmp
