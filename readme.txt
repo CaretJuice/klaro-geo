@@ -89,24 +89,18 @@ No. GPC changes service defaults to denied but does not prevent users from expli
 
 The dataLayer events follow GTM conventions but work with other tag managers (Tealium, Adobe Launch, etc.) or without any tag manager. The `Klaro Consent Update` event is pushed directly by the plugin.
 
-== External Services ==
+== Bundled Libraries ==
 
-This plugin connects to the following external services:
+The Klaro consent management library (version 0.7) that powers the consent banner is bundled with the plugin as `klaro.js` and `klaro.css`. It is served from your own site and runs entirely in the visitor's browser. The plugin does not load it from a CDN and makes no request to KIProtect.
 
-= Klaro (KIProtect) =
-
-This plugin loads the Klaro consent management JavaScript library and its CSS stylesheet from KIProtect's CDN:
-
-* `https://cdn.kiprotect.com/klaro/v0.7/klaro.js` (or `klaro-no-css.js`)
-* `https://cdn.kiprotect.com/klaro/v0.7/klaro.css`
-
-Klaro is the open-source consent management tool that powers the consent banner UI. The script runs entirely in the visitor's browser. No personal data is transmitted to KIProtect — the CDN only serves the static JavaScript and CSS files.
+`klaro.js` is the unmodified minified build published by KIProtect. Its source code is available at:
 
 * Klaro GitHub repository: [https://github.com/KIProtect/klaro](https://github.com/KIProtect/klaro)
 * Klaro license: BSD-3-Clause
-* KIProtect privacy policy: [https://kiprotect.com/privacy](https://kiprotect.com/privacy)
 
-The Klaro JS version is configurable in the plugin settings under **Klaro Geo > Klaro Geo > Klaro JS Version**.
+== External Services ==
+
+This plugin connects to the following external services:
 
 = Google Tag Manager =
 

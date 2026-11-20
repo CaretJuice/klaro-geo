@@ -334,8 +334,6 @@ function klaro_geo_enqueue_scripts() {
 	);
 
 	$klaro_config_content = klaro_geo_generate_config_file();
-	$klaro_version        = get_option( 'klaro_geo_js_version', '0.7' );
-	$klaro_variant        = get_option( 'klaro_geo_js_variant', 'klaro.js' );
 
 	// The bootstrap applies the template payload and starts Klaro, in both geo
 	// resolution modes. It must run before klaro.js: it sets window.klaroConfig,
@@ -356,41 +354,24 @@ function klaro_geo_enqueue_scripts() {
 	// is defined when the bootstrap runs whether or not the scripts are deferred.
 	wp_add_inline_script(
 		'klaro-geo-client-geo-js',
-		'window.klaroVersion = "' . esc_js( $klaro_version ) . '";' . "\n" . $klaro_config_content,
+		$klaro_config_content,
 		'before'
 	);
 
 	$klaro_js_deps = array( 'klaro-geo-client-geo-js' );
 
-	// Check if local Klaro file exists (for E2E testing)
-	$local_klaro_path = plugin_dir_path( __FILE__ ) . 'e2e/klaro.js';
-	$use_local_klaro  = file_exists( $local_klaro_path );
-
-	if ( $use_local_klaro ) {
-		// Use local Klaro file for E2E testing
-		wp_enqueue_script(
-			'klaro-js',
-			plugins_url( 'e2e/klaro.js', __FILE__ ),
-			$klaro_js_deps,
-			filemtime( $local_klaro_path ), // Use file modification time as version
-			array(
-				'strategy'  => 'defer',
-				'in_footer' => true,
-			)
-		);
-	} else {
-		// Use CDN version in production
-		wp_enqueue_script(
-			'klaro-js',
-			'https://cdn.kiprotect.com/klaro/v' . $klaro_version . '/' . $klaro_variant,
-			$klaro_js_deps,
-			$klaro_version,
-			array(
-				'strategy'  => 'defer',
-				'in_footer' => true,
-			)
-		);
-	}
+	// Klaro is bundled with the plugin (klaro.js is the unmodified v0.7 build,
+	// which includes its own styles). It is never loaded from a remote host.
+	wp_enqueue_script(
+		'klaro-js',
+		plugins_url( 'klaro.js', __FILE__ ),
+		$klaro_js_deps,
+		KLARO_GEO_VERSION,
+		array(
+			'strategy'  => 'defer',
+			'in_footer' => true,
+		)
+	);
 
 	// Event factory and consent-mode mapping. Loaded before klaro-geo.js, which
 	// calls into it.
@@ -415,15 +396,6 @@ function klaro_geo_enqueue_scripts() {
 			'in_footer' => true,
 		)
 	);
-
-	if ( $klaro_variant === 'klaro-no-css.js' ) {
-		wp_enqueue_style(
-			'klaro-cdn-css',
-			'https://cdn.kiprotect.com/klaro/v' . $klaro_version . '/klaro.min.css',
-			array(),
-			$klaro_version
-		);
-	}
 
 	add_filter(
 		'script_loader_tag',

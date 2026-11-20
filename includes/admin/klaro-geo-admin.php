@@ -93,7 +93,6 @@ function klaro_geo_activate() {
 	add_option( 'klaro_geo_button_theme', 'light' );
 
 	// Other settings
-	add_option( 'klaro_geo_js_version', '0.7' );
 	add_option( 'klaro_geo_debug_countries', [ 'US', 'UK', 'CA', 'FR', 'AU', 'US-CA', 'CA-QC' ] );
 	add_option( 'klaro_geo_enable_consent_receipts', false );
 }

@@ -271,21 +271,13 @@ The plugin also provides a floating button option that can be enabled in the set
 
 Klaro has built-in theme settings and Klaro Geo has theme settings for the floating consent button.
 
-Klaro Geo allows you to select either the standard Klaro script (`klaro.js`) or a version that does not load its own CSS (`klaro-no-css.js`). Both scripts provide similar functionality, but they differ in their approach to styling.
+Klaro (version 0.7) is bundled with the plugin and served from your own site; nothing is loaded from a CDN.
 
 The translation settings for the plugin are managed in template and service configurations.
 
 Developers can set custom CSS classes and override Klaro's default styles. 
 
 The GeoIP Detection plugin also includes an option to add the detected country and region as a class to the body element. This can be used to customize the appearance of the consent banner based on the visitor's location beyond the text and behavior settings provided natively by Klaro and Klaro Geo.
-
-### Klaro Script Variants 
-
-The plugin supports different Klaro script variants:
-
-1. **Standard (klaro.js)**: The default Klaro script with built-in styles.
-2. **No CSS (klaro-no-css.js)**: A version of Klaro without styles, which is useful if you want to use your own CSS or customize the default styles.
-
 
 ## Google Tag Manager Integration
 

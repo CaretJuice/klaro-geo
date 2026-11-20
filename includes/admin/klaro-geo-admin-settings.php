@@ -35,23 +35,6 @@ function klaro_geo_settings_page_content() {
 						<p class="description">When enabled, consent choices will be pushed to the dataLayer for tracking and auditing purposes.</p>
 					</td>
 				</tr>
-				<tr valign="top">
-					<th scope="row"><label for="klaro_geo_js_version">Klaro JS Version</label></th>
-					<td>
-						<input type="text" name="klaro_geo_js_version" id="klaro_geo_js_version" value="<?php echo esc_attr( get_option( 'klaro_geo_js_version', '0.7' ) ); ?>" />
-						<p class="description">Enter the version number of Klaro.js to load (e.g., "0.7").</p>
-					</td>
-				</tr>
-				<tr valign="top">
-					<th scope="row"><label for="klaro_geo_js_variant">Klaro Script Variant</label></th>
-					<td>
-						<select name="klaro_geo_js_variant" id="klaro_geo_js_variant">
-							<option value="klaro.js" <?php selected( get_option( 'klaro_geo_js_variant', 'klaro.js' ), 'klaro.js' ); ?>>Standard (klaro.js)</option>
-							<option value="klaro-no-css.js" <?php selected( get_option( 'klaro_geo_js_variant', 'klaro.js' ), 'klaro-no-css.js' ); ?>>No CSS (klaro-no-css.js)</option>
-						</select>
-						<p class="description">Choose which Klaro script variant to load. The "No CSS" option is useful if you want to use your own styles.</p>
-					</td>
-				</tr>
 			</table>
 
 			<h2>Geo Resolution</h2>
@@ -413,28 +396,6 @@ function klaro_geo_register_main_settings() {
 	);
 
 	// Other settings
-	register_setting(
-		'klaro_geo_settings_group',
-		'klaro_geo_js_version',
-		[
-			// The version becomes part of the script URL, so only a version
-			// number is accepted (for example 0.7 or 0.7.22).
-			'sanitize_callback' => function ( $input ) {
-				$input = is_string( $input ) ? trim( $input ) : '';
-				return preg_match( '/^\d+(\.\d+){1,3}$/', $input ) ? $input : '0.7';
-			},
-		]
-	);
-	register_setting(
-		'klaro_geo_settings_group',
-		'klaro_geo_js_variant',
-		[
-			'sanitize_callback' => function ( $input ) {
-				$valid_variants = [ 'klaro.js', 'klaro-no-css.js' ];
-				return in_array( $input, $valid_variants, true ) ? $input : 'klaro.js';
-			},
-		]
-	);
 	register_setting(
 		'klaro_geo_settings_group',
 		'klaro_geo_fallback_behavior',
