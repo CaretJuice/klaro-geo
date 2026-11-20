@@ -250,6 +250,18 @@ function klaro_geo_settings_page_content() {
 						<p class="description">Warning: If enabled, all settings will be deleted when the plugin is deactivated.</p>
 					</td>
 				</tr>
+				<tr valign="top">
+					<th scope="row">Consent Receipts on Delete</th>
+					<td>
+						<label>
+							<input type="checkbox"
+									name="klaro_geo_delete_receipts_on_uninstall"
+									value="1" <?php checked( get_option( 'klaro_geo_delete_receipts_on_uninstall', false ) ); ?> />
+							Delete stored consent receipts when the plugin is deleted
+						</label>
+						<p class="description">Deleting the plugin always removes its settings. Consent receipts are your record of what visitors agreed to, so they are kept unless this is checked. This cannot be undone.</p>
+					</td>
+				</tr>
 			</table>
 			<?php submit_button(); ?>
 		</form>
@@ -448,6 +460,15 @@ function klaro_geo_register_main_settings() {
 	register_setting(
 		'klaro_geo_settings_group',
 		'klaro_geo_cleanup_on_deactivate',
+		[
+			'type'              => 'boolean',
+			'default'           => false,
+			'sanitize_callback' => 'rest_sanitize_boolean',
+		]
+	);
+	register_setting(
+		'klaro_geo_settings_group',
+		'klaro_geo_delete_receipts_on_uninstall',
 		[
 			'type'              => 'boolean',
 			'default'           => false,

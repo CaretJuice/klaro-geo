@@ -96,6 +96,7 @@ Navigate to **Klaro Geo > Klaro Geo** to configure the general plugin settings:
   - Enable Plugin Debug Logging: When enabled, the plugin will output debug messages to WordPress logs (PHP) and browser console (JavaScript). Useful for troubleshooting but should be disabled in production to reduce log noise. Note: WP_DEBUG must also be enabled for PHP logging to work.
   - Debug Countries/Regions (comma-separated): Enter a list of two-digit country codes or ISO 3166-2 region codes (e.g., US, UK, US-CA, CA-QC). These codes will populate a dropdown in the WordPress Admin Bar, allowing you to simulate browsing from those locations to test your Klaro configuration.
   - Plugin Cleanup: Remove all settings when deactivating the plugin. You will need to reconfigure everything if you reactivate the plugin.
+  - Consent Receipts on Delete: Deleting the plugin from the Plugins screen always removes its settings. Stored consent receipts are kept unless this is checked.
 
 ### Templates
 

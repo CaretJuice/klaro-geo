@@ -108,6 +108,7 @@ mkdir -p "$PLUGIN_DIR"
 # Copy main plugin files
 echo -e "${YELLOW}Copying plugin files...${NC}"
 cp klaro-geo.php "$PLUGIN_DIR/"
+cp uninstall.php "$PLUGIN_DIR/"
 cp klaro.js "$PLUGIN_DIR/"
 cp klaro.css "$PLUGIN_DIR/"
 cp countries.csv "$PLUGIN_DIR/"
