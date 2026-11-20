@@ -1,0 +1,16 @@
+# Run `pre-commit install` once after cloning.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: check-added-large-files
+  - repo: local
+    hooks:
+      - id: banned-patterns
+        name: Banned patterns (see CLAUDE.md)
+        entry: bin/check-banned-patterns.sh
+        language: script
+        pass_filenames: false
+        files: ^(klaro-geo\.php|uninstall\.php|includes/|js/)

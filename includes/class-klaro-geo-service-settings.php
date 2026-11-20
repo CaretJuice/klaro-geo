@@ -80,14 +80,6 @@ class Klaro_Geo_Service_Settings extends Klaro_Geo_Option {
 	public function get_default_services() {
 		// Always use the global function to get default services
 		// This ensures we have a single source of truth for service definitions
-		if ( ! function_exists( 'klaro_geo_get_default_services' ) ) {
-			// If the function doesn't exist, include the defaults file that defines it
-			require_once __DIR__ . '/klaro-geo-defaults.php';
-
-			// Log a warning that we had to include the file
-			klaro_geo_debug_log( 'WARNING: Had to include klaro-geo-defaults.php to get default services' );
-		}
-
 		// Now get the services from the global function
 		$services = klaro_geo_get_default_services();
 

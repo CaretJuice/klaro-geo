@@ -146,11 +146,6 @@ function klaro_geo_apply_purpose_defaults( array &$klaro_config, $template_to_us
  */
 function klaro_geo_build_template_payload( $template_key, $templates, $services ) {
 	// Get the template config from the database, or fall back to default if not found
-	if ( ! function_exists( 'klaro_geo_get_default_templates' ) ) {
-		// If the function doesn't exist, include the defaults file that defines it
-		require_once __DIR__ . '/klaro-geo-defaults.php';
-	}
-
 	// Try to get the template, tracking which fallback was used
 	// IMPORTANT: Update $template_to_use when falling back so that metadata
 	// (klaroGeoConsentTemplate, klaroGeoTemplateSource) reflects actual template used

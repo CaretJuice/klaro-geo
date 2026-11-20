@@ -1,5 +1,4 @@
 (function() {
-  klaroGeoLog('DEBUG: klaro-geo.js loaded (early capture attempt)');
 
   // Event creation and consent-mode mapping live in klaro-geo-events.js, which
   // is enqueued as a dependency of this script.
@@ -25,14 +24,6 @@
   const preExistingKlaroGeo = window.klaroGeo;
   const preExistingQueue = preExistingKlaroGeo ? preExistingKlaroGeo.queue : undefined;
 
-  klaroGeoLog('DEBUG: klaro-geo.js init - preExistingKlaroGeo:',
-      preExistingKlaroGeo ? 'exists' : 'undefined',
-      'preExistingQueue:', preExistingQueue ? preExistingQueue.length + ' events' : 'undefined');
-
-  if (preExistingQueue && preExistingQueue.length > 0) {
-      klaroGeoLog('DEBUG: Pre-existing queue contents:', JSON.stringify(preExistingQueue.map(e => e.event || 'no-event-name')));
-  }
-
   window.klaroGeo = window.klaroGeo || {};
   const existingQueue = window.klaroGeo.queue || [];
 
@@ -42,8 +33,6 @@
   // Queue state
   window.klaroGeo.queue = existingQueue; // Preserve events from stub
   window.klaroGeo.consentConfirmed = false;
-
-  klaroGeoLog('DEBUG: Queue initialized - existingQueue length:', existingQueue.length);
 
   // Note: The queue's job is TIMING (wait for consent state to be SET), not consent enforcement.
   // GTM's consent mode handles whether tags actually fire based on consent state.
@@ -67,14 +56,14 @@
                             });
 
       window.klaroGeo.useGTM = hasGtmId || hasGtmService;
-      klaroGeoLog('DEBUG: GTM mode detection - hasGtmId=' + hasGtmId + ', hasGtmService=' + hasGtmService + ', useGTM=' + window.klaroGeo.useGTM);
+      klaroGeoLog('GTM mode detection - hasGtmId=' + hasGtmId + ', hasGtmService=' + hasGtmService + ', useGTM=' + window.klaroGeo.useGTM);
   }
 
   // Detect consent mode type (basic or advanced)
   if (typeof window.klaroGeo.consentModeType === 'undefined') {
       window.klaroGeo.consentModeType = (typeof window.klaroConsentData !== 'undefined' &&
                                           window.klaroConsentData.consentModeType) || 'basic';
-      klaroGeoLog('DEBUG: Consent mode type detection - consentModeType=' + window.klaroGeo.consentModeType);
+      klaroGeoLog('Consent mode type detection - consentModeType=' + window.klaroGeo.consentModeType);
   }
 
   /**
@@ -82,12 +71,10 @@
    * @param {Object} eventData - The dataLayer event object
    */
   window.klaroGeo.push = function(eventData) {
-      klaroGeoLog('DEBUG: klaroGeo.push called with:', eventData.event || 'no-event-name',
-                  'consentConfirmed:', window.klaroGeo.consentConfirmed);
 
       if (window.klaroGeo.consentConfirmed) {
           // Consent event already fired, push directly to dataLayer
-          klaroGeoLog('DEBUG: Consent Queue - pushing directly to dataLayer:', eventData.event || 'unknown event');
+          klaroGeoLog('Consent Queue - pushing directly to dataLayer:', eventData.event || 'unknown event');
           window.dataLayer.push(eventData);
       } else {
           // Consent not yet confirmed, queue the event
@@ -96,29 +83,25 @@
               const dropped = window.klaroGeo.queue.shift();
               console.warn('[klaro-geo] Consent queue limit reached (100). Dropping oldest event:', dropped.event || 'unknown');
           }
-          klaroGeoLog('DEBUG: Consent Queue - queuing event:', eventData.event || 'unknown event',
+          klaroGeoLog('Consent Queue - queuing event:', eventData.event || 'unknown event',
                       '(queue size:', window.klaroGeo.queue.length + 1, ')');
           window.klaroGeo.queue.push(eventData);
       }
   };
-
-  klaroGeoLog('DEBUG: klaroGeo.push function installed, replacing any stub');
 
   /**
    * Flush all queued events to dataLayer
    */
   function flushConsentQueue() {
       if (window.klaroGeo.queue.length === 0) {
-          klaroGeoLog('DEBUG: Consent Queue - nothing to flush');
           return;
       }
 
       const queueSize = window.klaroGeo.queue.length;
-      klaroGeoLog('DEBUG: Consent Queue - flushing', queueSize, 'events to dataLayer');
+      klaroGeoLog('Consent Queue - flushing', queueSize, 'events to dataLayer');
 
       while (window.klaroGeo.queue.length > 0) {
           const event = window.klaroGeo.queue.shift();
-          klaroGeoLog('DEBUG: Consent Queue - pushing event:', event.event || 'no-event-name', event);
           window.dataLayer.push(event);
       }
 
@@ -127,7 +110,6 @@
           'queueSize': queueSize
       }));
 
-      klaroGeoLog('DEBUG: Consent Queue - flush complete');
   }
 
   /**
@@ -136,11 +118,11 @@
    */
   function onConsentEvent(eventName) {
       if (window.klaroGeo.consentConfirmed) {
-          klaroGeoLog('DEBUG: Consent Queue - consent already confirmed, ignoring:', eventName);
+          klaroGeoLog('Consent Queue - consent already confirmed, ignoring:', eventName);
           return;
       }
 
-      klaroGeoLog('DEBUG: Consent Queue - consent event received:', eventName);
+      klaroGeoLog('Consent Queue - consent event received:', eventName);
       window.klaroGeo.consentConfirmed = true;
       flushConsentQueue();
   }
@@ -167,7 +149,6 @@
               const triggerEvent = 'Klaro Consent Update';
 
               if (eventName === triggerEvent) {
-                  klaroGeoLog('DEBUG: Consent Queue - detected consent event:', eventName);
                   onConsentEvent(eventName);
               }
           }
@@ -175,12 +156,11 @@
           return result;
       };
 
-      klaroGeoLog('DEBUG: Consent Queue - listener initialized, waiting for: Klaro Consent Update');
   })();
 
   // Process any events that were queued before this script loaded (stub pattern)
   if (existingQueue.length > 0) {
-      klaroGeoLog('DEBUG: Consent Queue - found', existingQueue.length, 'pre-queued events from stub');
+      klaroGeoLog('Consent Queue - found', existingQueue.length, 'pre-queued events from stub');
   }
 
   // Set up a watcher for late-arriving stub events (in case inline scripts run after klaro-geo.js)
@@ -191,13 +171,11 @@
       set: function(newQueue) {
           // If someone tries to set queue to a new array with items, merge them
           if (Array.isArray(newQueue) && newQueue.length > 0) {
-              klaroGeoLog('DEBUG: Consent Queue - detected late stub queue assignment with', newQueue.length, 'events');
+              klaroGeoLog('Consent Queue - detected late stub queue assignment with', newQueue.length, 'events');
               newQueue.forEach(function(event) {
                   if (window.klaroGeo.consentConfirmed) {
-                      klaroGeoLog('DEBUG: Consent Queue - late event pushed directly to dataLayer:', event.event || 'no-event-name');
                       window.dataLayer.push(event);
                   } else {
-                      klaroGeoLog('DEBUG: Consent Queue - late event queued:', event.event || 'no-event-name');
                       originalQueue.push(event);
                   }
               });
@@ -422,10 +400,7 @@
           return data;
       })
       .catch(function(error) {
-          // In test environments, don't log errors
-          if (typeof process === 'undefined' || process.env.NODE_ENV !== 'test') {
-              console.error('Error sending consent receipt:', error);
-          }
+          klaroGeoError('Error sending consent receipt:', error);
           // Don't throw the error further to prevent unhandled promise rejection
           return { success: false, error: error.message };
       });
@@ -437,19 +412,17 @@
           try {
               const manager = window.klaro.getManager();
               if (manager) {
-                  klaroGeoLog('DEBUG: Klaro manager available early, setting up watcher');
                   setupWatcher(manager);
                   return; // Success, don't retry
               } else {
-                  klaroGeoWarn('DEBUG: Klaro manager is undefined, even though klaro is defined.');
+                  klaroGeoWarn('Klaro manager is undefined, even though klaro is defined.');
               }
           } catch (error) {
-              console.error('DEBUG: Error getting manager early:', error);
+              klaroGeoError('Error getting manager early:', error);
           }
       }
 
       // Fallback: Retry with setTimeout
-      klaroGeoLog('DEBUG: Klaro not fully ready, retrying setupKlaroDataLayerWatcher');
       setTimeout(setupKlaroDataLayerWatcher, 50); // Very short delay
   }
 
@@ -474,10 +447,8 @@
                       // These fire once per service as Klaro updates each service individually.
                       // We only want to forward 'saveConsents' which fires once after all services are updated.
                       if (suppressConsentsEvents && !alwaysForward.includes(name)) {
-                          klaroGeoLog('DEBUG: Suppressing intermediate Klaro event:', name);
                           // For initialConsents, pushConsentData already handles it, so skip here to avoid duplicates
                           if (name === 'initialConsents') {
-                              klaroGeoLog('DEBUG: Skipping watcher handling of initialConsents (already handled by pushConsentData)');
                               return;
                           }
                           // Still call consent handling for internal processing, but don't push to dataLayer
@@ -487,20 +458,18 @@
 
                       const pushData = KlaroGeoEvents.createKlaroForwardedEvent(name, data);
 
-                      klaroGeoLog('DEBUG: Pushing Klaro event to dataLayer:', pushData);
                       window.dataLayer.push(pushData);
 
                       // Call consent handling functions
                       handleKlaroConsentEvents(manager, name, data);
                   } else {
-                      klaroGeoWarn('DEBUG: dataLayer is not defined, cannot push Klaro event');
+                      klaroGeoWarn('dataLayer is not defined, cannot push Klaro event');
                   }
               }
           });
-          klaroGeoLog('DEBUG: Generic Klaro dataLayer watcher setup complete');
 
       } catch (error) {
-          console.error('DEBUG: Error setting up Klaro dataLayer watcher:', error);
+          klaroGeoError('Error setting up Klaro dataLayer watcher:', error);
       }
   }
 
@@ -520,7 +489,7 @@
                       }
                   }
               } catch (e) {
-                  klaroGeoLog('DEBUG: Error getting fresh manager in pushConsentData');
+                  klaroGeoLog('Error getting fresh manager in pushConsentData');
               }
 
               // Deep copy consents to capture current state (not a reference that changes later)
@@ -529,7 +498,6 @@
               // initialConsents represents Klaro manager state, so it uses the 'klaro' eventSource
               const initialData = KlaroGeoEvents.createKlaroForwardedEvent('initialConsents', consentsCopy);
 
-              klaroGeoLog('DEBUG: Pushing initial Klaro event to dataLayer:', initialData);
               window.dataLayer.push(initialData);
 
               // Call consent handling functions
@@ -538,60 +506,50 @@
               recordGpcReceipt(activeManager);
           }, 0); // Defer to next tick
       } else {
-          klaroGeoWarn('DEBUG: dataLayer is not defined, cannot push initial Klaro event');
+          klaroGeoWarn('dataLayer is not defined, cannot push initial Klaro event');
       }
   }
 
   // Consolidated function to handle consent events
   // NOTE: Consent mode is ALWAYS enabled - no toggle check needed
   function handleKlaroConsentEvents(manager, eventName, data) {
-      klaroGeoLog('DEBUG: Handling Klaro consent event:', eventName);
 
       if (eventName === 'initialConsents') {
           // For initial consents, update the Google consent mode
-          klaroGeoLog('DEBUG: Initial consents detected, updating Google consent mode');
           updateGoogleConsentMode(manager, eventName, data);
       }
       else if (eventName === 'saveConsents') {
           // For save consents, update the Google consent mode and store the consent receipt
-          klaroGeoLog('DEBUG: Save consents detected, updating Google consent mode and storing receipt');
           updateGoogleConsentMode(manager, eventName, data);
 
           // Always store the consent receipt
           handleConsentChange(manager);
       }
-      else {
-          // For other events, just log them but don't trigger updates
-          klaroGeoLog('DEBUG: Other Klaro event detected:', eventName, '- not triggering consent update');
-      }
   }
 
   function updateGoogleConsentMode(manager, eventType, data) {
-      klaroGeoLog('DEBUG: Google consent mode update triggered by:', eventType,
+      klaroGeoLog('Google consent mode update triggered by:', eventType,
           'with data:', data ? (typeof data === 'object' ? 'consent object' : data) : 'no data');
-      klaroGeoLog('DEBUG: updateGoogleConsentMode ENTRY - eventType=' + eventType + ', timestamp=' + Date.now());
 
       // Check if gtag is available
       if (typeof window.gtag !== 'function') {
-          klaroGeoLog('DEBUG: gtag not available, skipping consent update');
+          klaroGeoLog('gtag not available, skipping consent update');
           return;
       }
 
       // Check for duplicate update if data is provided
       if (data && window.lastConsentUpdate &&
           JSON.stringify(window.lastConsentUpdate) === JSON.stringify(data)) {
-          klaroGeoLog('DEBUG: Skipping duplicate consent update');
+          klaroGeoLog('Skipping duplicate consent update');
           return;
       }
 
       // Clear any pending update timer
       if (window.consentUpdateTimer) {
-          klaroGeoLog('DEBUG: Clearing pending consent update timer');
           clearTimeout(window.consentUpdateTimer);
       }
 
       // Set a new timer to debounce
-      klaroGeoLog('DEBUG: Setting debounced consent update timer');
       window.consentUpdateTimer = setTimeout(function() {
 
           // Get consent state from Klaro
@@ -604,12 +562,11 @@
               if (typeof window.klaro !== 'undefined' && typeof window.klaro.getManager === 'function') {
                   const freshManager = window.klaro.getManager();
                   if (freshManager && freshManager.consents && Object.keys(freshManager.consents).length > 0) {
-                      klaroGeoLog('DEBUG: Using fresh Klaro manager for consent state');
                       activeManager = freshManager;
                   }
               }
           } catch (e) {
-              klaroGeoLog('DEBUG: Error getting fresh manager, using provided manager');
+              klaroGeoLog('Error getting fresh manager, using provided manager');
           }
 
           // Standard Google keys from consent mode services (with parent-child
@@ -619,7 +576,7 @@
           );
 
           // Log the complete update being sent (now includes dynamic keys)
-          klaroGeoLog('DEBUG: Consent update object (with dynamic service keys):', completeUpdate);
+          klaroGeoLog('Consent update object (with dynamic service keys):', completeUpdate);
 
           // On initialConsents, if all values match the defaults set in <head>,
           // the gtag('consent', 'update') call is redundant and is skipped.
@@ -652,9 +609,8 @@
                   .filter(serviceName => activeManager.consents[serviceName] === true);
 
               if (matchesDefaults) {
-                  klaroGeoLog('DEBUG: Skipping redundant gtag consent update on initialConsents - all values match defaults');
+                  klaroGeoLog('Skipping redundant gtag consent update on initialConsents - all values match defaults');
               } else {
-                  klaroGeoLog('DEBUG: Calling gtag consent update');
                   gtag('consent', 'update', completeUpdate);
               }
 
@@ -665,16 +621,9 @@
               const gtmConsented = activeManager.consents['google-tag-manager'] === true;
               const isAdvancedMode = window.klaroGeo && window.klaroGeo.consentModeType === 'advanced';
 
-              klaroGeoLog('DEBUG: Klaro Consent Update skip check:',
-                  'eventType=' + eventType,
-                  'isGtmMode=' + isGtmMode,
-                  'gtmConsented=' + gtmConsented,
-                  'isAdvancedMode=' + isAdvancedMode);
-
               if (eventType === 'initialConsents' && isGtmMode && !gtmConsented && !isAdvancedMode) {
-                  klaroGeoLog('DEBUG: Skipping Klaro Consent Update push for initialConsents - GTM not yet consented in Basic mode');
+                  klaroGeoLog('Skipping Klaro Consent Update push for initialConsents - GTM not yet consented in Basic mode');
               } else {
-                  klaroGeoLog('DEBUG: Pushing Klaro Consent Update event to dataLayer');
                   window.dataLayer.push({
                       'event': 'Klaro Consent Update',
                       'consent_trigger': eventType,
@@ -728,7 +677,7 @@
                   });
 
                   if (otherPurposeActive && manager.consents[service.name] !== true) {
-                      klaroGeoLog('DEBUG: Re-enabling multi-purpose service "' + service.name +
+                      klaroGeoLog('Re-enabling multi-purpose service "' + service.name +
                           '" (purpose "' + purposeName + '" disabled, but other purpose still active)');
                       if (typeof manager.updateConsent === 'function') {
                           manager.updateConsent(service.name, true);
@@ -740,7 +689,7 @@
           }, 0);
       });
 
-      klaroGeoLog('DEBUG: Multi-purpose protection enabled for: ' +
+      klaroGeoLog('Multi-purpose protection enabled for: ' +
           multiPurposeServices.map(function(s) { return s.name; }).join(', '));
   }
 

@@ -61,6 +61,29 @@ Tests must call the plugin's real functions. Do not add a helper that re-impleme
 
 When fallbacks are used (template not found, hardcoded defaults, `cookieDomain` auto-detection failing), log it with `klaro_geo_debug_log()`. Never fall back silently.
 
+## Checks: at the boundary, not everywhere
+
+Data is untrusted in the places below. It is validated there, once, and trusted after that. Do not re-check it further in.
+
+| Boundary | Checked by | After that |
+|----------|------------|------------|
+| `$_GET` / `$_POST` / AJAX request bodies | the sanitize functions (`klaro_geo_sanitize_receipt()`, `klaro_geo_sanitize_services()`, and so on) | Typed and trusted |
+| Options read from the database | the `Klaro_Geo_Option` classes, which fall back and log when a value is corrupt | Always an array of the documented shape |
+| `window.klaroConsentData` and the template payload, in JavaScript | PHP builds them; `specs/frontend-data.spec.yaml` is the contract | Read fields directly |
+| Things the plugin does not control: geoip-detect, `window.klaro` before it loads, `navigator.globalPrivacyControl`, `localStorage`, `fetch` | the one function that touches each | Callers do not re-check |
+
+Rules:
+
+- A guard must be able to fail. Before writing `isset()`, `is_array()`, `typeof x !== 'undefined'` or a `try`, name the real input that makes it false or throw. If there is none, leave it out.
+- `try` / `catch` only around what throws (JSON parsing, `localStorage`, `fetch`), and the `catch` must do something: fall back and log, or report.
+- Production code never behaves differently under test. No `WP_TESTS_DOMAIN`, `process.env` or similar outside `tests/`. If a test needs different conditions, the test sets them up (see `tests/phpunit/bootstrap.php`).
+- Do not guard the plugin's own functions with `function_exists()`; its files are always loaded.
+- `wp_send_json_*()` ends the request. Do not follow it with `exit`.
+- Log through `klaro_geo_debug_log()` in PHP and `klaroGeoLog()` / `klaroGeoWarn()` / `klaroGeoError()` in JavaScript, never `console.*` directly, and do not type a prefix into the message (the helpers add one). Log decisions, fallbacks and skips. Do not log that a function was entered, a file loaded or a step completed.
+- Before writing a helper, search for one that already does the job.
+
+`bin/check-banned-patterns.sh` fails on the patterns above that can be matched mechanically. It runs in pre-commit (`pre-commit install` once after cloning) and can be run by hand.
+
 ## Security rules
 
 - Every admin AJAX handler and form handler checks a nonce and `current_user_can( 'manage_options' )`. A nonce alone is not authorization.
@@ -80,6 +103,7 @@ klaro-geo/
 │   └── admin/                # Admin pages and their AJAX handlers
 ├── js/                       # Frontend and admin scripts
 ├── specs/                    # Contracts (see above)
+├── bin/                      # check-banned-patterns.sh
 ├── tests/phpunit/            # PHP tests
 ├── tests/js/                 # Jest tests
 ├── e2e/                      # Playwright tests
@@ -98,7 +122,7 @@ All WordPress environments for this plugin live in this repo; there are no share
 | Dev site | `docker/docker-compose.yml`, service `wordpress` (+ `db`) | `docker/` | http://localhost:8000 | Manual testing; avoid (see warning) |
 
 **Tests:**
-- PHP: `cd docker && docker compose run --rm wordpress_test vendor/bin/phpunit` (add `--filter ClassName` for one test class). Debug output lands in `docker/logs/debug_test.log`.
+- PHP: `cd docker && docker compose run --rm wordpress_test vendor/bin/phpunit` (add `--filter ClassName` for one test class). The bootstrap turns the plugin's debug logging on; its output lands in `docker/logs/debug_test.log`, not in the terminal.
 - JS: `npx jest` from the repo root, on the host (no container needed).
 - E2E: `npm run e2e:setup` (starts the E2E stack and waits), `npm run e2e:test`, then `npm run e2e:docker:down`. The suite runs with one worker because the tests share one site and change its options; do not turn parallelism back on. A full run takes about two and a half minutes.
 

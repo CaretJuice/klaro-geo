@@ -26,14 +26,8 @@ if ( ! defined( 'KLARO_GEO_URL' ) ) {
 
 // Debug logging function — acts as a sanitization boundary for all logged data
 function klaro_geo_debug_log( $message ) {
-	// Always log during tests, regardless of WP_DEBUG setting
-	$is_test = defined( 'WP_TESTS_DOMAIN' ) && WP_TESTS_DOMAIN;
-
-	// Check if debug logging is enabled in plugin settings
-	$debug_enabled = get_option( 'klaro_geo_enable_debug_logging', false );
-
-	// Log if: (1) we're in tests, OR (2) WP_DEBUG is on AND plugin debug logging is enabled
-	if ( $is_test || ( defined( 'WP_DEBUG' ) && WP_DEBUG === true && $debug_enabled ) ) {
+	// Logs only when WP_DEBUG is on and debug logging is enabled in the plugin settings.
+	if ( defined( 'WP_DEBUG' ) && WP_DEBUG === true && get_option( 'klaro_geo_enable_debug_logging', false ) ) {
 		// Sanitize input before logging
 		$formatted_message = '[Klaro Geo Debug] ';
 		if ( is_array( $message ) || is_object( $message ) ) {
@@ -45,12 +39,6 @@ function klaro_geo_debug_log( $message ) {
 
 		// Write to the standard error_log (which will go to the configured WP_DEBUG_LOG location)
 		error_log( $formatted_message );
-
-		// During tests, also output to stderr for console capture
-		if ( $is_test ) {
-            // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite -- Writing to STDERR during tests only.
-			fwrite( STDERR, gmdate( '[Y-m-d H:i:s] ' ) . $formatted_message . PHP_EOL );
-		}
 	}
 }
 
@@ -286,7 +274,7 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/klaro-geo-defaults.php';
 // Include admin file
 require_once plugin_dir_path( __FILE__ ) . 'includes/admin/klaro-geo-admin.php';
 
-if ( is_admin() || ( defined( 'WP_TESTS_DOMAIN' ) && WP_TESTS_DOMAIN ) ) {
+if ( is_admin() ) {
 	require_once plugin_dir_path( __FILE__ ) . 'includes/admin/klaro-geo-admin-countries.php';
 	require_once plugin_dir_path( __FILE__ ) . 'includes/admin/klaro-geo-admin-services.php';
 	require_once plugin_dir_path( __FILE__ ) . 'includes/admin/klaro-geo-admin-settings.php';
@@ -520,7 +508,7 @@ register_activation_hook( __FILE__, 'klaro_geo_create_consent_receipts_table' );
 
 // Register deactivation hooks
 register_deactivation_hook( __FILE__, 'klaro_geo_deactivate' );
-register_deactivation_hook( __FILE__, 'klaro_geo_drop_consent_receipts_table' );
+register_deactivation_hook( __FILE__, 'klaro_geo_drop_consent_receipts_table_on_deactivate' );
 
 /**
  * Add Google Tag Manager scripts with Klaro compatibility

@@ -56,7 +56,7 @@
                 }
             }
         } catch (e) {
-            klaroGeoLog('DEBUG: KlaroGeoEvents.getConsentState error:', e);
+            klaroGeoLog('KlaroGeoEvents.getConsentState error:', e);
         }
 
         let acceptedServices = Object.keys(consents).filter(function(k) {
@@ -229,5 +229,4 @@
         createKlaroGeoEvent: createKlaroGeoEvent
     };
 
-    klaroGeoLog('DEBUG: KlaroGeoEvents module loaded');
 })();

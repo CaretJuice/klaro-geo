@@ -56,8 +56,21 @@ if (file_exists($polyfills_path)) {
 require_once $_tests_dir . '/includes/functions.php';
 
 function _manually_load_plugin() {
+    $plugin_dir = dirname(dirname(__DIR__));
+
     // Load main plugin file
-    require dirname(dirname(__DIR__)) . '/klaro-geo.php';
+    require $plugin_dir . '/klaro-geo.php';
+
+    // The plugin loads its admin pages only when is_admin(). Tests call their
+    // functions directly, so load them here instead of branching on the test
+    // environment in the plugin.
+    foreach (array('countries', 'services', 'settings', 'templates', 'scripts') as $page) {
+        require_once $plugin_dir . '/includes/admin/klaro-geo-admin-' . $page . '.php';
+    }
+
+    // Send the plugin's debug log to debug.log during tests (WP_DEBUG is on in
+    // the test config; this is the plugin setting that goes with it).
+    add_filter('pre_option_klaro_geo_enable_debug_logging', '__return_true');
 }
 
 tests_add_filter('muplugins_loaded', '_manually_load_plugin');
@@ -68,9 +81,3 @@ require $_tests_dir . '/includes/bootstrap.php';
 // Disable deprecation notices after WordPress is loaded
 add_filter('deprecated_function_trigger_error', '__return_false');
 
-// Define a debug log function if it doesn't exist
-if (!function_exists('klaro_geo_debug_log')) {
-    function klaro_geo_debug_log($message) {
-        // Do nothing in tests
-    }
-}

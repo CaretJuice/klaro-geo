@@ -124,9 +124,6 @@ function klaro_geo_create_consent_receipts_table() {
 	global $wpdb;
 	$table_name = $wpdb->prefix . 'klaro_geo_consent_receipts';
 
-	// Check if we're in a test environment
-	$is_test = defined( 'WP_TESTS_DOMAIN' );
-
 	// Log database information for debugging
 	klaro_geo_debug_log( 'Database info: ' . $wpdb->db_version() );
 	klaro_geo_debug_log( 'Database prefix: ' . $wpdb->prefix );
@@ -154,28 +151,7 @@ function klaro_geo_create_consent_receipts_table() {
 	$charset_collate = $wpdb->get_charset_collate();
 	klaro_geo_debug_log( 'Charset collate: ' . $charset_collate );
 
-	// For test environments, use a simpler table structure to avoid potential issues
-	if ( $is_test ) {
-		$sql = "CREATE TABLE $table_name (
-            id bigint(20) NOT NULL AUTO_INCREMENT,
-            receipt_id varchar(50) NOT NULL,
-            user_id bigint(20) DEFAULT NULL,
-            ip_address varchar(45) DEFAULT NULL,
-            timestamp datetime NOT NULL,
-            consent_data longtext NOT NULL,
-            template_name varchar(100) NOT NULL,
-            template_source varchar(50) NOT NULL,
-            country_code varchar(10) DEFAULT NULL,
-            region_code varchar(10) DEFAULT NULL,
-            user_agent text DEFAULT NULL,
-            klaro_config longtext DEFAULT NULL,
-            gpc_signal tinyint(1) DEFAULT NULL,
-            gpc_affected_services text DEFAULT NULL,
-            receipt_type varchar(20) DEFAULT NULL,
-            PRIMARY KEY (id)
-        ) $charset_collate";
-	} else {
-		$sql = "CREATE TABLE $table_name (
+	$sql = "CREATE TABLE $table_name (
             id bigint(20) NOT NULL AUTO_INCREMENT,
             receipt_id varchar(50) NOT NULL,
             user_id bigint(20) DEFAULT NULL,
@@ -197,7 +173,6 @@ function klaro_geo_create_consent_receipts_table() {
             KEY timestamp (timestamp),
             KEY country_code (country_code)
         ) $charset_collate";
-	}
 
 
 	// Use dbDelta for table creation (standard WordPress approach)
@@ -291,16 +266,20 @@ function klaro_geo_upgrade_consent_receipts_table() {
 }
 add_action( 'init', 'klaro_geo_upgrade_consent_receipts_table' );
 
-// Drop the consent receipts table on plugin deactivation if cleanup is enabled
+// Drop the consent receipts table and forget its schema version.
 function klaro_geo_drop_consent_receipts_table() {
-	// Always drop the table in test environment, otherwise check the cleanup setting
-	if ( defined( 'WP_TESTS_DOMAIN' ) || get_option( 'klaro_geo_cleanup_on_deactivate', false ) ) {
-		global $wpdb;
-		$table_name = $wpdb->prefix . 'klaro_geo_consent_receipts';
+	global $wpdb;
+	$table_name = $wpdb->prefix . 'klaro_geo_consent_receipts';
 
-        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- DDL statement; table name from $wpdb->prefix is trusted and cannot be parameterized.
-		$wpdb->query( "DROP TABLE IF EXISTS $table_name" );
-		delete_option( 'klaro_geo_consent_receipts_db_version' );
+	// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- DDL statement; table name from $wpdb->prefix is trusted and cannot be parameterized.
+	$wpdb->query( "DROP TABLE IF EXISTS $table_name" );
+	delete_option( 'klaro_geo_consent_receipts_db_version' );
+}
+
+// On deactivation the table is dropped only when "Remove all plugin settings when deactivating" is on.
+function klaro_geo_drop_consent_receipts_table_on_deactivate() {
+	if ( get_option( 'klaro_geo_cleanup_on_deactivate', false ) ) {
+		klaro_geo_drop_consent_receipts_table();
 	}
 }
 
@@ -944,20 +923,17 @@ function klaro_geo_ajax_get_receipt_details() {
 	$admin_nonce = isset( $_POST['nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['nonce'] ) ) : '';
 	if ( ! wp_verify_nonce( $admin_nonce, 'klaro_geo_admin_nonce' ) ) {
 		wp_send_json_error( 'Invalid security token' );
-		exit;
 	}
 
 	// Check user capabilities
 	if ( ! current_user_can( 'manage_options' ) ) {
 		wp_send_json_error( 'Insufficient permissions' );
-		exit;
 	}
 
 	$receipt_id = isset( $_POST['receipt_id'] ) ? intval( $_POST['receipt_id'] ) : 0;
 
 	if ( ! $receipt_id ) {
 		wp_send_json_error( 'Invalid receipt ID' );
-		exit;
 	}
 
 	$receipt = klaro_geo_receipts_get_by_id( $receipt_id );
@@ -969,7 +945,5 @@ function klaro_geo_ajax_get_receipt_details() {
 	} else {
 		wp_send_json_error( 'Receipt not found' );
 	}
-
-	exit;
 }
 add_action( 'wp_ajax_klaro_geo_get_receipt_details', 'klaro_geo_ajax_get_receipt_details' );
