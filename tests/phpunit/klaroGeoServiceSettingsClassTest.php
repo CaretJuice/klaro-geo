@@ -109,12 +109,7 @@ class KlaroGeoServiceSettingsClassTest extends WP_UnitTestCase {
             'purposes' => array('analytics', 'advertising'),
             'required' => false,
             'default' => false,
-            'cookies' => array(),
-            'callback' => array(
-                'onInit' => "window.dataLayer = window.dataLayer || []",
-                'onAccept' => "console.log('accept')",
-                'onDecline' => "console.log('decline')"
-            )
+            'cookies' => array()
         );
         $settings->set_service('google-tag-manager', $gtm_service);
 
@@ -133,12 +128,7 @@ class KlaroGeoServiceSettingsClassTest extends WP_UnitTestCase {
             'purposes' => array('functional'),
             'required' => true,
             'default' => true,
-            'cookies' => array('test_cookie'),
-            'callback' => array(
-                'onInit' => 'console.log("init")',
-                'onAccept' => 'console.log("accept")',
-                'onDecline' => 'console.log("decline")'
-            )
+            'cookies' => array('test_cookie')
         );
         $settings->set_service('test-service', $new_service);
         
@@ -157,54 +147,6 @@ class KlaroGeoServiceSettingsClassTest extends WP_UnitTestCase {
         
         // Check that service was removed
         $this->assertNull($settings->get_service('test-service'));
-    }
-
-    /**
-     * Test getting and setting service callbacks
-     */
-    public function test_service_callbacks() {
-        // Create settings with our test option name
-        $settings = new Klaro_Geo_Service_Settings($this->option_name);
-
-        // Add a test service with callbacks
-        $test_service = array(
-            'name' => 'google-tag-manager',
-            'title' => 'Google Tag Manager',
-            'purposes' => array('analytics', 'advertising'),
-            'required' => false,
-            'default' => false,
-            'cookies' => array(),
-            'callback' => array(
-                'onInit' => "window.dataLayer = window.dataLayer || []; window.gtag = function(){dataLayer.push(Array.from(arguments))}",
-                'onAccept' => "console.log('accept')",
-                'onDecline' => "console.log('decline')"
-            )
-        );
-        $settings->set_service('google-tag-manager', $test_service);
-
-        // Test getting a service callback
-        $init_callback = $settings->get_service_callback('google-tag-manager', 'onInit');
-        $this->assertNotNull($init_callback);
-        $this->assertStringContainsString('window.dataLayer = window.dataLayer || []', $init_callback);
-
-        // Test getting a non-existent service callback
-        $this->assertNull($settings->get_service_callback('non_existent', 'onInit'));
-
-        // Test getting a non-existent callback type
-        $this->assertNull($settings->get_service_callback('google-tag-manager', 'non_existent'));
-
-        // Test setting a service callback
-        $new_callback = 'console.log("new callback")';
-        $settings->set_service_callback('google-tag-manager', 'onInit', $new_callback);
-
-        // Check that callback was set
-        $this->assertEquals($new_callback, $settings->get_service_callback('google-tag-manager', 'onInit'));
-
-        // Test setting a callback for a non-existent service (should not error)
-        $settings->set_service_callback('non_existent', 'onInit', $new_callback);
-
-        // Check that callback was not set
-        $this->assertNull($settings->get_service_callback('non_existent', 'onInit'));
     }
 
     /**
@@ -236,7 +178,6 @@ class KlaroGeoServiceSettingsClassTest extends WP_UnitTestCase {
                 'name' => 'test-service-4',
                 'purposes' => array('functional'),
                 'cookies' => array('cookie1'),
-                'callback' => 'not-an-array', // Invalid callback (should be converted to array)
             ),
             array(
                 'name' => 'test-service-5',
@@ -290,9 +231,6 @@ class KlaroGeoServiceSettingsClassTest extends WP_UnitTestCase {
         // Same issue as above - let's just check it's an array
         $this->assertIsArray($validated[2]['cookies']);
 
-        // Check that invalid callback was converted to array
-        $this->assertIsArray($validated[3]['callback']);
-
         // Check that invalid required and default were converted to boolean
         $this->assertIsBool($validated[4]['required']);
         $this->assertIsBool($validated[4]['default']);
@@ -341,7 +279,6 @@ class KlaroGeoServiceSettingsClassTest extends WP_UnitTestCase {
                 // Check that all required fields exist
                 $this->assertArrayHasKey('purposes', $service);
                 $this->assertArrayHasKey('cookies', $service);
-                $this->assertArrayHasKey('callback', $service);
 
                 // Note: 'required' and 'default' keys might not be present when they're set to inherit from the template
                 // We don't assert their existence anymore

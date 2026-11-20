@@ -32,6 +32,26 @@ class KlaroGeoServiceSanitizeTest extends WP_UnitTestCase {
 		$this->assertSame( 'T', $clean['translations']['zz']['title'] );
 	}
 
+	/**
+	 * Service callbacks were removed. JavaScript left in a service saved by an
+	 * earlier version must not survive a save.
+	 */
+	public function test_callback_fields_are_dropped() {
+		$clean = klaro_geo_sanitize_services(
+			array(
+				array(
+					'name'      => 'svc',
+					'onInit'    => 'alert(1)',
+					'onAccept'  => 'alert(2)',
+					'onDecline' => 'alert(3)',
+					'callback'  => array( 'onInit' => 'alert(4)' ),
+				),
+			)
+		)[0];
+
+		$this->assertSame( array( 'name' ), array_keys( $clean ) );
+	}
+
 	public function test_boolean_fields_and_use_global_setting() {
 		$clean = klaro_geo_sanitize_services(
 			array(

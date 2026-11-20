@@ -263,12 +263,6 @@ if (typeof jQuery !== 'undefined') {
         $('#service_onlyonce').prop('checked', false);
         $('#service_contextual').prop('checked', false);
 
-        // KLARO_CALLBACKS_START
-        // Clear callback scripts
-        $('#service_oninit').val('');
-        $('#service_onaccept').val('');
-        $('#service_ondecline').val('');
-        // KLARO_CALLBACKS_END
 
         // Clear translation fields
         $('input[name^="service_translations"], textarea[name^="service_translations"]').val('');
@@ -331,12 +325,6 @@ if (typeof jQuery !== 'undefined') {
         $('#service_onlyonce').prop('checked', service.onlyOnce === true);
         $('#service_contextual').prop('checked', service.contextualConsentOnly === true);
 
-        // KLARO_CALLBACKS_START
-        // Set callback scripts
-        $('#service_oninit').val(service.onInit || '');
-        $('#service_onaccept').val(service.onAccept || '');
-        $('#service_ondecline').val(service.onDecline || '');
-        // KLARO_CALLBACKS_END
 
         // Clear existing translation fields
         $('input[name^="service_translations"], textarea[name^="service_translations"]').val('');
@@ -490,12 +478,6 @@ if (typeof jQuery !== 'undefined') {
         let onlyOnce = $('#service_onlyonce').prop('checked');
         let contextualConsentOnly = $('#service_contextual').prop('checked');
 
-        // KLARO_CALLBACKS_START
-        // Get callback scripts
-        let onInit = $('#service_oninit').val();
-        let onAccept = $('#service_onaccept').val();
-        let onDecline = $('#service_ondecline').val();
-        // KLARO_CALLBACKS_END
 
         // Collect translations
         let translations = {};
@@ -570,11 +552,6 @@ if (typeof jQuery !== 'undefined') {
             default: defaultValue === 'true' ? true : (defaultValue === 'false' ? false : null),
             purposes: purposes,
             cookies: cookies,
-            // KLARO_CALLBACKS_START
-            onInit: onInit,
-            onAccept: onAccept,
-            onDecline: onDecline,
-            // KLARO_CALLBACKS_END
         };
 
         // Add translations if we have any

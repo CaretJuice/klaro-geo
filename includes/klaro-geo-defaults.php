@@ -337,11 +337,6 @@ function klaro_geo_get_default_services( $defaults = null ) {
 			'purposes'     => [ 'infrastructure' ],
 			'default'      => false,
 			'cookies'      => [],
-			// KLARO_CALLBACKS_START
-			'onInit'       => '',
-			'onAccept'     => '',
-			'onDecline'    => '',
-			// KLARO_CALLBACKS_END
 			'translations' => [
 				'zz' => [
 					'title'       => 'Google Tag Manager',
@@ -356,11 +351,6 @@ function klaro_geo_get_default_services( $defaults = null ) {
 			'purposes'     => [ 'analytics' ],
 			'default'      => false,
 			'cookies'      => [],
-			// KLARO_CALLBACKS_START
-			'onInit'       => '',
-			'onAccept'     => '',
-			'onDecline'    => '',
-			// KLARO_CALLBACKS_END
 			'translations' => [
 				'zz' => [
 					'title'       => 'Google Analytics',
@@ -375,11 +365,6 @@ function klaro_geo_get_default_services( $defaults = null ) {
 			'purposes'     => [ 'advertising' ],
 			'default'      => false,
 			'cookies'      => [],
-			// KLARO_CALLBACKS_START
-			'onInit'       => '',
-			'onAccept'     => '',
-			'onDecline'    => '',
-			// KLARO_CALLBACKS_END
 			'translations' => [
 				'zz' => [
 					'title'       => 'Google Ads',
@@ -397,11 +382,6 @@ function klaro_geo_get_default_services( $defaults = null ) {
 			'cookies'                 => [],
 			'is_consent_mode_service' => true,
 			'consent_mode_key'        => 'analytics_storage',
-			// KLARO_CALLBACKS_START
-			'onInit'                  => '',
-			'onAccept'                => '',
-			'onDecline'               => '',
-			// KLARO_CALLBACKS_END
 			'translations'            => [
 				'zz' => [
 					'title'       => 'Analytics Storage',
@@ -418,11 +398,6 @@ function klaro_geo_get_default_services( $defaults = null ) {
 			'cookies'                 => [],
 			'is_consent_mode_service' => true,
 			'consent_mode_key'        => 'ad_storage',
-			// KLARO_CALLBACKS_START
-			'onInit'                  => '',
-			'onAccept'                => '',
-			'onDecline'               => '',
-			// KLARO_CALLBACKS_END
 			'translations'            => [
 				'zz' => [
 					'title'       => 'Advertising Storage',
@@ -440,11 +415,6 @@ function klaro_geo_get_default_services( $defaults = null ) {
 			'is_consent_mode_service' => true,
 			'consent_mode_key'        => 'ad_user_data',
 			'parent_service'          => 'ad-storage',
-			// KLARO_CALLBACKS_START
-			'onInit'                  => '',
-			'onAccept'                => '',
-			'onDecline'               => '',
-			// KLARO_CALLBACKS_END
 			'translations'            => [
 				'zz' => [
 					'title'       => 'Ad User Data',
@@ -462,11 +432,6 @@ function klaro_geo_get_default_services( $defaults = null ) {
 			'is_consent_mode_service' => true,
 			'consent_mode_key'        => 'ad_personalization',
 			'parent_service'          => 'ad-storage',
-			// KLARO_CALLBACKS_START
-			'onInit'                  => '',
-			'onAccept'                => '',
-			'onDecline'               => '',
-			// KLARO_CALLBACKS_END
 			'translations'            => [
 				'zz' => [
 					'title'       => 'Ad Personalization',

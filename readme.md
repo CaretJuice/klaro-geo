@@ -24,21 +24,10 @@ This plugin gives you a lot of control over how consent is managed and tracked a
 - **Bidirectional Data Layer Integration**: A full-duplex integration that listens for dataLayer events to trigger plugin actions, forwards native Klaro events to the dataLayer, and dispatches its own enhanced consent status events.
 - **Admin Debug Tools**: Test different geolocation scenarios directly from the admin bar.
 
-
-
 ## Requirements
 
 - Tested on WordPress 6.3 and 6.4 (earlier versions may work but are untested)
 - [GeoIP Detection](https://wordpress.org/plugins/geoip-detect/) plugin (for geolocation features to work)
-
-## Versions
-
-Two builds are available:
-
-- **WordPress.org** (`klaro-geo-{version}.zip`) — Available from the WordPress plugin directory. Service callback fields (`onInit`, `onAccept`, `onDecline`) are removed for security. This is the recommended version for most users.
-- **Full** (`klaro-geo-{version}-full.zip`) — Available from [GitHub releases](https://github.com/CaretJuice/klaro-geo/releases). Includes service callback fields that allow custom JavaScript to run on consent events. Use this version if you need direct control over service lifecycle hooks.
-
-Both versions are functionally identical in all other respects.
 
 ## Installation
 
@@ -202,7 +191,43 @@ Each service gets the following settings that Klaro consumes and uses:
 - Default: Load this service by default before the consent banner is interacted with. Overrides the template-level setting of the same name.
 - Purpose: Select the purpose(s) associated with this service. The list of purposes is managed on the main settings page at **Klaro Geo > Klaro Geo > Purposes (comma-separated)**. It is best to decide on your list of purposes before you start assigning them here.
 - Advanced Settings: Manage additional Klaro settings for the service (these have not been tested with the plugin).
-- Callback Scripts: Customize the JavaScript functions called during consent initialization, acceptance, and decline events.
+
+#### Running your own code when consent changes
+
+Services do not have callback script fields. To react to a visitor's choice:
+
+- **Load a script only with consent:** mark it up as an inline script Klaro manages (see the top of this section).
+- **With Google Tag Manager:** fire a tag on the `Klaro Consent Update` event and gate it with the service's custom consent key.
+- **Without a tag manager:** watch Klaro's consent manager from your theme. This runs once on page load and again each time the visitor saves a choice:
+
+```javascript
+(function start() {
+  // Wait until Klaro and its config are on the page (in client-side geo
+  // mode the config arrives after the geo lookup).
+  if (!window.klaro || !window.klaroConfig) {
+    return setTimeout(start, 100);
+  }
+
+  var manager = window.klaro.getManager();
+
+  function apply() {
+    if (manager.consents['facebook-pixel']) {
+      // The service is accepted.
+    } else {
+      // The service is declined, or the visitor has not chosen yet.
+    }
+  }
+
+  apply();
+  manager.watch({
+    update: function (obj, name) {
+      if (name === 'saveConsents') {
+        apply();
+      }
+    }
+  });
+})();
+```
 
 #### Service Translations (only shown when editing a specific service)
 

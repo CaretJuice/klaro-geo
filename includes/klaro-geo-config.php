@@ -436,9 +436,6 @@ function klaro_geo_build_template_payload( $template_key, $templates, $services 
 			'name'      => $service['name'] ?? 'undefined',
 			'purposes'  => $service['purposes'] ?? $service['service_purposes'] ?? array( 'analytics' ),
 			'cookies'   => isset( $service['cookies'] ) ? $service['cookies'] : array(),
-			'onInit' => '',
-			'onAccept' => '',
-			'onDecline' => '',
 		);
 
 		// Always emit required per service, resolving "Use Global Setting" against

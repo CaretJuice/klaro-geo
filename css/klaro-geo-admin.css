@@ -258,16 +258,6 @@
     border-radius: 4px;
 }
 
-/* Callback scripts */
-.callback-scripts {
-    margin-top: 15px;
-}
-
-.callback-scripts textarea {
-    font-family: monospace;
-    resize: vertical;
-}
-
 /* JSON editor */
 #translations_json_editor {
     font-family: monospace;

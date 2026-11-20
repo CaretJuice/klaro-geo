@@ -31,9 +31,6 @@ function klaro_geo_services_page_content() {
 					<th>Purposes</th>
 					<th>Advanced</th>
 					<th>Cookies</th>
-					<?php // KLARO_CALLBACKS_START ?>
-					<th>Callbacks</th>
-					<?php // KLARO_CALLBACKS_END ?>
 					<th>Actions</th>
 				</tr>
 			</thead>
@@ -71,23 +68,6 @@ function klaro_geo_services_page_content() {
 						$cookies     = isset( $service['cookies'] ) ? $service['cookies'] : array();
 						$cookies_str = ! empty( $cookies ) && is_array( $cookies ) ?
 						json_encode( $cookies ) : 'N/A';
-						// KLARO_CALLBACKS_START
-						// Check for callbacks
-						$has_oninit    = ! empty( $service['onInit'] );
-						$has_onaccept  = ! empty( $service['onAccept'] );
-						$has_ondecline = ! empty( $service['onDecline'] );
-						$callbacks     = array();
-						if ( $has_oninit ) {
-							$callbacks[] = 'onInit';
-						}
-						if ( $has_onaccept ) {
-							$callbacks[] = 'onAccept';
-						}
-						if ( $has_ondecline ) {
-							$callbacks[] = 'onDecline';
-						}
-						$callbacks_str = ! empty( $callbacks ) ? implode( ', ', $callbacks ) : 'None';
-						// KLARO_CALLBACKS_END
 
 						echo '<tr>';
 						echo '<td>' . esc_html( $name ) . '</td>';
@@ -96,9 +76,6 @@ function klaro_geo_services_page_content() {
 						echo '<td>' . esc_html( $purposes_str ) . '</td>';
 						echo '<td>' . esc_html( $advanced_str ) . '</td>';
 						echo '<td>' . esc_html( $cookies_str ) . '</td>';
-						// KLARO_CALLBACKS_START
-						echo '<td>' . esc_html( $callbacks_str ) . '</td>';
-						// KLARO_CALLBACKS_END
 						echo '<td>';
 						echo "<button class='edit-service button button-secondary' data-index='" . esc_attr( $index ) . "'>Edit</button> ";
 						echo "<button class='delete-service button button-danger' data-index='" . esc_attr( $index ) . "'>Delete</button>";
@@ -172,23 +149,6 @@ function klaro_geo_services_page_content() {
 					<p class="description">If enabled, this service will only be shown in the consent modal when it's actually used on the page (e.g., embedded YouTube videos).</p>
 				</div>
 
-				<?php // KLARO_CALLBACKS_START ?>
-				<h3>Callback Scripts</h3>
-				<div class="callback-scripts">
-					<label for="service_oninit">onInit Script:</label><br>
-					<textarea id="service_oninit" name="service_oninit" rows="4" cols="50"></textarea>
-					<p class="description">JavaScript to execute when Klaro initializes this service.</p>
-
-					<label for="service_onaccept">onAccept Script:</label><br>
-					<textarea id="service_onaccept" name="service_onaccept" rows="4" cols="50"></textarea>
-					<p class="description">JavaScript to execute when the user accepts this service.</p>
-
-					<label for="service_ondecline">onDecline Script:</label><br>
-					<textarea id="service_ondecline" name="service_ondecline" rows="4" cols="50"></textarea>
-					<p class="description">JavaScript to execute when the user declines this service.</p>
-				</div>
-				<?php // KLARO_CALLBACKS_END ?>
-
 				<h3>Service Translations</h3>
 				<div class="translations">
 					<p class="description">Configure translations for this service. The "zz" language code is used as a fallback for any missing translations.</p>
@@ -258,11 +218,9 @@ function klaro_geo_services_page_content() {
  */
 function klaro_geo_sanitize_services( array $services ) {
 	$bool_fields = array( 'required', 'default', 'optOut', 'onlyOnce', 'contextualConsentOnly', 'is_consent_mode_service', 'hidden', 'gpc_sensitive' );
-	// KLARO_CALLBACKS_START
-	// Callback fields hold JavaScript by design and are stored as entered. Only
-	// administrators reach this code (see klaro_geo_verify_admin_ajax()).
-	$raw_fields = array( 'onInit', 'onAccept', 'onDecline', 'callback' );
-	// KLARO_CALLBACKS_END
+	// Service callbacks held admin-entered JavaScript and were removed. Services
+	// saved by an earlier version may still carry them; they are dropped here.
+	$removed_fields = array( 'onInit', 'onAccept', 'onDecline', 'callback' );
 
 	$sanitized = array();
 
@@ -276,6 +234,10 @@ function klaro_geo_sanitize_services( array $services ) {
 		foreach ( $service as $field => $value ) {
 			$field = sanitize_text_field( (string) $field );
 
+			if ( in_array( $field, $removed_fields, true ) ) {
+				continue;
+			}
+
 			if ( in_array( $field, $bool_fields, true ) ) {
 				// null means "Use Global Setting" for required / default.
 				$clean[ $field ] = ( null === $value ) ? null : filter_var( $value, FILTER_VALIDATE_BOOLEAN );
@@ -285,10 +247,6 @@ function klaro_geo_sanitize_services( array $services ) {
 				$clean[ $field ] = is_array( $value ) ? array_values( array_map( 'sanitize_text_field', array_filter( $value, 'is_scalar' ) ) ) : array();
 			} elseif ( 'cookies' === $field ) {
 				$clean[ $field ] = is_array( $value ) ? klaro_geo_sanitize_deep( $value, false ) : array();
-				// KLARO_CALLBACKS_START
-			} elseif ( in_array( $field, $raw_fields, true ) ) {
-				$clean[ $field ] = $value;
-				// KLARO_CALLBACKS_END
 			} elseif ( is_array( $value ) ) {
 				$clean[ $field ] = klaro_geo_sanitize_array( $value );
 			} elseif ( is_string( $value ) ) {

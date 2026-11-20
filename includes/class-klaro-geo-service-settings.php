@@ -201,48 +201,6 @@ class Klaro_Geo_Service_Settings extends Klaro_Geo_Option {
 		return $this;
 	}
 
-	// KLARO_CALLBACKS_START
-	/**
-	 * Get a service's callback
-	 *
-	 * @param string $service_name The service name
-	 * @param string $callback_type The callback type (onInit, onAccept, onDecline)
-	 * @return string|null The callback or null if not found
-	 */
-	public function get_service_callback( $service_name, $callback_type ) {
-		$service = $this->get_service( $service_name );
-
-		if ( ! $service || ! isset( $service['callback'] ) || ! isset( $service['callback'][ $callback_type ] ) ) {
-			return null;
-		}
-
-		return $service['callback'][ $callback_type ];
-	}
-
-	/**
-	 * Set a service's callback
-	 *
-	 * @param string $service_name The service name
-	 * @param string $callback_type The callback type (onInit, onAccept, onDecline)
-	 * @param string $callback The callback to set
-	 * @return $this For method chaining
-	 */
-	public function set_service_callback( $service_name, $callback_type, $callback ) {
-		$service = $this->get_service( $service_name );
-
-		if ( ! $service ) {
-			return $this;
-		}
-
-		if ( ! isset( $service['callback'] ) ) {
-			$service['callback'] = array();
-		}
-
-		$service['callback'][ $callback_type ] = $callback;
-
-		return $this->set_service( $service_name, $service );
-	}
-	// KLARO_CALLBACKS_END
 
 	/**
 	 * Validate services
@@ -268,12 +226,6 @@ class Klaro_Geo_Service_Settings extends Klaro_Geo_Option {
 				$service['cookies'] = array();
 			}
 
-			// KLARO_CALLBACKS_START
-			// Ensure callback is an array
-			if ( ! isset( $service['callback'] ) || ! is_array( $service['callback'] ) ) {
-				$service['callback'] = array();
-			}
-			// KLARO_CALLBACKS_END
 
 			// Handle required and default settings
 			// If value is null, it means "inherit from template"
