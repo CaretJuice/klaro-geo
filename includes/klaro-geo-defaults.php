@@ -76,245 +76,124 @@ function klaro_geo_get_default_purpose_translations() {
 }
 
 /**
+ * The default Klaro translations ("zz" is Klaro's fallback language), shared by
+ * every built-in template.
+ *
+ * @return array
+ */
+function klaro_geo_get_default_translations() {
+	return [
+		'zz' => [
+			'privacyPolicyUrl' => '/privacy-policy/',
+			'consentModal'     => [
+				'title'       => 'Privacy Settings',
+				'description' => 'Here you can assess and customize the services that we\'d like to use on this website. You\'re in charge! Enable or disable services as you see fit.',
+			],
+			'consentNotice'    => [
+				'title'             => 'Privacy Settings',
+				'changeDescription' => 'There were changes since your last visit, please update your consent.',
+				'description'       => 'We use cookies and similar technologies to provide certain features, enhance the user experience and deliver content that is relevant to your interests.',
+				'learnMore'         => 'Learn more',
+			],
+			'acceptAll'        => 'Accept all',
+			'acceptSelected'   => 'Accept selected',
+			'decline'          => 'I decline',
+			'close'            => 'Close',
+			'purposes'         => klaro_geo_get_default_purpose_translations(),
+			'purposeItem'      => [
+				'service'  => 'service',
+				'services' => 'services',
+			],
+			'service'          => [
+				'disableAll'        => [
+					'title'       => 'Enable or disable all services',
+					'description' => 'Use this switch to enable or disable all services.',
+				],
+				'optOut'            => [
+					'title'       => '(opt-out)',
+					'description' => 'This services is loaded by default (but you can opt out)',
+				],
+				'required'          => [
+					'title'       => '(always required)',
+					'description' => 'This services is always required',
+				],
+				'purpose'           => 'purpose',
+				'purposes'          => 'purposes',
+				'contextualConsent' => [
+					'description'  => 'Would you like to consent to {title}?',
+					'acceptOnce'   => 'Yes',
+					'acceptAlways' => 'Always',
+				],
+			],
+			'ok'               => 'OK',
+			'save'             => 'Save',
+			'poweredBy'        => 'Realized with Klaro!',
+		],
+	];
+}
+
+/**
  * Get default templates for Klaro Geo
+ *
+ * The three built-in templates share one configuration. "strict" is the same
+ * opt-in configuration as "default" under another name; "relaxed" is opt-out.
  *
  * @return array The default templates
  */
 function klaro_geo_get_default_templates() {
+	$opt_in = [
+		'version'                => 1,
+		'elementID'              => 'klaro',
+		'styling'                => [
+			'theme' => [
+				'color'    => 'light',
+				'position' => 'top',
+				'width'    => 'wide',
+			],
+		],
+		'htmlTexts'              => true,
+		'embedded'               => false,
+		'groupByPurpose'         => true,
+		'storageMethod'          => 'cookie',
+		'cookieName'             => 'klaro',
+		'cookieExpiresAfterDays' => 365,
+		'cookieDomain'           => '', // Empty string means auto-detect with leading dot for subdomain sharing
+		'default'                => false,
+		'mustConsent'            => true,
+		'acceptAll'              => true,
+		'hideDeclineAll'         => false,
+		'hideLearnMore'          => false,
+		'noticeAsModal'          => true,
+		'disablePoweredBy'       => true,
+		'consent_mode'           => 'none',
+		'translations'           => klaro_geo_get_default_translations(),
+	];
+
+	$opt_out = array_merge(
+		$opt_in,
+		[
+			'default'        => true,
+			'mustConsent'    => false,
+			'hideDeclineAll' => true,
+			'noticeAsModal'  => false,
+		]
+	);
+
 	return [
 		'default' => [
 			'name'        => 'Default Template',
 			'description' => 'The default template used when no location-specific template is found',
-			'config'      => [
-				'version'                => 1,
-				'elementID'              => 'klaro',
-				'styling'                => [
-					'theme' => [
-						'color'    => 'light',
-						'position' => 'top',
-						'width'    => 'wide',
-					],
-				],
-				'htmlTexts'              => true,
-				'embedded'               => false,
-				'groupByPurpose'         => true,
-				'storageMethod'          => 'cookie',
-				'cookieName'             => 'klaro',
-				'cookieExpiresAfterDays' => 365,
-				'cookieDomain'           => '', // Empty string means auto-detect with leading dot for subdomain sharing
-				'default'                => false,
-				'mustConsent'            => true,
-				'acceptAll'              => true,
-				'hideDeclineAll'         => false,
-				'hideLearnMore'          => false,
-				'noticeAsModal'          => true,
-				'disablePoweredBy'       => true,
-				'consent_mode'           => 'none',
-				'translations'           => [
-					'zz' => [
-						'privacyPolicyUrl' => '/privacy-policy/',
-						'consentModal'     => [
-							'title'       => 'Privacy Settings',
-							'description' => 'Here you can assess and customize the services that we\'d like to use on this website. You\'re in charge! Enable or disable services as you see fit.',
-						],
-						'consentNotice'    => [
-							'title'             => 'Privacy Settings',
-							'changeDescription' => 'There were changes since your last visit, please update your consent.',
-							'description'       => 'We use cookies and similar technologies to provide certain features, enhance the user experience and deliver content that is relevant to your interests.',
-							'learnMore'         => 'Learn more',
-						],
-						'acceptAll'        => 'Accept all',
-						'acceptSelected'   => 'Accept selected',
-						'decline'          => 'I decline',
-						'close'            => 'Close',
-						'purposes'         => klaro_geo_get_default_purpose_translations(),
-						'purposeItem'      => [
-							'service'  => 'service',
-							'services' => 'services',
-						],
-						'service'          => [
-							'disableAll'        => [
-								'title'       => 'Enable or disable all services',
-								'description' => 'Use this switch to enable or disable all services.',
-							],
-							'optOut'            => [
-								'title'       => '(opt-out)',
-								'description' => 'This services is loaded by default (but you can opt out)',
-							],
-							'required'          => [
-								'title'       => '(always required)',
-								'description' => 'This services is always required',
-							],
-							'purpose'           => 'purpose',
-							'purposes'          => 'purposes',
-							'contextualConsent' => [
-								'description'  => 'Would you like to consent to {title}?',
-								'acceptOnce'   => 'Yes',
-								'acceptAlways' => 'Always',
-							],
-						],
-						'ok'               => 'OK',
-						'save'             => 'Save',
-						'poweredBy'        => 'Realized with Klaro!',
-					],
-				],
-			],
+			'config'      => $opt_in,
 		],
 		'strict'  => [
 			'name'        => 'Strict Opt-In',
 			'description' => 'Requires explicit consent for all services (opt-in)',
-			'config'      => [
-				'version'                => 1,
-				'elementID'              => 'klaro',
-				'styling'                => [
-					'theme' => [
-						'color'    => 'light',
-						'position' => 'top',
-						'width'    => 'wide',
-					],
-				],
-				'htmlTexts'              => true,
-				'embedded'               => false,
-				'groupByPurpose'         => true,
-				'storageMethod'          => 'cookie',
-				'cookieName'             => 'klaro',
-				'cookieExpiresAfterDays' => 365,
-				'cookieDomain'           => '', // Empty string means auto-detect with leading dot for subdomain sharing
-				'default'                => false,
-				'mustConsent'            => true,
-				'acceptAll'              => true,
-				'hideDeclineAll'         => false,
-				'hideLearnMore'          => false,
-				'noticeAsModal'          => true,
-				'disablePoweredBy'       => true,
-				'consent_mode'           => 'none',
-				'translations'           => [
-					'zz' => [
-						'privacyPolicyUrl' => '/privacy-policy/',
-						'consentModal'     => [
-							'title'       => 'Privacy Settings',
-							'description' => 'Here you can assess and customize the services that we\'d like to use on this website. You\'re in charge! Enable or disable services as you see fit.',
-						],
-						'consentNotice'    => [
-							'title'             => 'Privacy Settings',
-							'changeDescription' => 'There were changes since your last visit, please update your consent.',
-							'description'       => 'We use cookies and similar technologies to provide certain features, enhance the user experience and deliver content that is relevant to your interests.',
-							'learnMore'         => 'Learn more',
-						],
-						'acceptAll'        => 'Accept all',
-						'acceptSelected'   => 'Accept selected',
-						'decline'          => 'I decline',
-						'close'            => 'Close',
-						'purposes'         => klaro_geo_get_default_purpose_translations(),
-						'purposeItem'      => [
-							'service'  => 'service',
-							'services' => 'services',
-						],
-						'service'          => [
-							'disableAll'        => [
-								'title'       => 'Enable or disable all services',
-								'description' => 'Use this switch to enable or disable all services.',
-							],
-							'optOut'            => [
-								'title'       => '(opt-out)',
-								'description' => 'This services is loaded by default (but you can opt out)',
-							],
-							'required'          => [
-								'title'       => '(always required)',
-								'description' => 'This services is always required',
-							],
-							'purpose'           => 'purpose',
-							'purposes'          => 'purposes',
-							'contextualConsent' => [
-								'description'  => 'Would you like to consent to {title}?',
-								'acceptOnce'   => 'Yes',
-								'acceptAlways' => 'Always',
-							],
-						],
-						'ok'               => 'OK',
-						'save'             => 'Save',
-						'poweredBy'        => 'Realized with Klaro!',
-					],
-				],
-			],
+			'config'      => $opt_in,
 		],
 		'relaxed' => [
 			'name'        => 'Relaxed Opt-Out',
 			'description' => 'Assumes consent for all services (opt-out)',
-			'config'      => [
-				'version'                => 1,
-				'elementID'              => 'klaro',
-				'styling'                => [
-					'theme' => [
-						'color'    => 'light',
-						'position' => 'top',
-						'width'    => 'wide',
-					],
-				],
-				'htmlTexts'              => true,
-				'embedded'               => false,
-				'groupByPurpose'         => true,
-				'storageMethod'          => 'cookie',
-				'cookieName'             => 'klaro',
-				'cookieExpiresAfterDays' => 365,
-				'cookieDomain'           => '', // Empty string means auto-detect with leading dot for subdomain sharing
-				'default'                => true,
-				'mustConsent'            => false,
-				'acceptAll'              => true,
-				'hideDeclineAll'         => true,
-				'hideLearnMore'          => false,
-				'noticeAsModal'          => false,
-				'disablePoweredBy'       => true,
-				'consent_mode'           => 'none',
-				'translations'           => [
-					'zz' => [
-						'privacyPolicyUrl' => '/privacy-policy/',
-						'consentModal'     => [
-							'title'       => 'Privacy Settings',
-							'description' => 'Here you can assess and customize the services that we\'d like to use on this website. You\'re in charge! Enable or disable services as you see fit.',
-						],
-						'consentNotice'    => [
-							'title'             => 'Privacy Settings',
-							'changeDescription' => 'There were changes since your last visit, please update your consent.',
-							'description'       => 'We use cookies and similar technologies to provide certain features, enhance the user experience and deliver content that is relevant to your interests.',
-							'learnMore'         => 'Learn more',
-						],
-						'acceptAll'        => 'Accept all',
-						'acceptSelected'   => 'Accept selected',
-						'decline'          => 'I decline',
-						'close'            => 'Close',
-						'purposes'         => klaro_geo_get_default_purpose_translations(),
-						'purposeItem'      => [
-							'service'  => 'service',
-							'services' => 'services',
-						],
-						'service'          => [
-							'disableAll'        => [
-								'title'       => 'Enable or disable all services',
-								'description' => 'Use this switch to enable or disable all services.',
-							],
-							'optOut'            => [
-								'title'       => '(opt-out)',
-								'description' => 'This services is loaded by default (but you can opt out)',
-							],
-							'required'          => [
-								'title'       => '(always required)',
-								'description' => 'This services is always required',
-							],
-							'purpose'           => 'purpose',
-							'purposes'          => 'purposes',
-							'contextualConsent' => [
-								'description'  => 'Would you like to consent to {title}?',
-								'acceptOnce'   => 'Yes',
-								'acceptAlways' => 'Always',
-							],
-						],
-						'ok'               => 'OK',
-						'save'             => 'Save',
-						'poweredBy'        => 'Realized with Klaro!',
-					],
-				],
-			],
+			'config'      => $opt_out,
 		],
 	];
 }
@@ -322,10 +201,9 @@ function klaro_geo_get_default_templates() {
 /**
  * Get default services for Klaro Geo
  *
- * @param array $defaults Optional. Default values for callbacks.
  * @return array The default services
  */
-function klaro_geo_get_default_services( $defaults = null ) {
+function klaro_geo_get_default_services() {
 	// Define the default services
 	return [
 		[

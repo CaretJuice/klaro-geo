@@ -468,82 +468,35 @@
         });
 
         // Handle JSON buttons
-        $('#format_json').click(function() {
+        // Format and Validate both parse the editor's text as it is. Invalid
+        // JSON is reported, never rewritten: a "repair" by pattern cannot tell
+        // JSON syntax from the text inside a translation.
+        function parseJsonEditor() {
             try {
-                var jsonText = $('#translations_json_editor').val();
-
-                // Pre-process the JSON to handle common issues
-                jsonText = jsonText.trim();
-
-                // Take a simpler approach to fix JSON issues
-
-                // 1. Fix unquoted property names
-                jsonText = jsonText.replace(/([{,])\s*([a-zA-Z0-9_]+)\s*:/g, '$1"$2":');
-
-                // 2. Remove trailing commas
-                jsonText = jsonText.replace(/,\s*}/g, '}');
-                jsonText = jsonText.replace(/,\s*]/g, ']');
-
-                // 3. Fix common contractions with apostrophes - using simple string replacements
-                // This is safer than complex regex patterns
-                jsonText = jsonText.replace(/"we"d/g, '"we\'d');
-                jsonText = jsonText.replace(/"you"re/g, '"you\'re');
-                jsonText = jsonText.replace(/"don"t/g, '"don\'t');
-                jsonText = jsonText.replace(/"can"t/g, '"can\'t');
-                jsonText = jsonText.replace(/"won"t/g, '"won\'t');
-                jsonText = jsonText.replace(/"it"s/g, '"it\'s');
-                jsonText = jsonText.replace(/"that"s/g, '"that\'s');
-                jsonText = jsonText.replace(/"there"s/g, '"there\'s');
-                jsonText = jsonText.replace(/"what"s/g, '"what\'s');
-                jsonText = jsonText.replace(/"let"s/g, '"let\'s');
-
-                // 4. Fix specific phrases that commonly have apostrophes
-                jsonText = jsonText.replace(/we"d like to use/g, 'we\'d like to use');
-                jsonText = jsonText.replace(/You"re in charge/g, 'You\'re in charge');
-                jsonText = jsonText.replace(/That"s ok/g, 'That\'s ok');
-
-                let translations = JSON.parse(jsonText);
-
-                // Format with proper options
-                // Use a simpler approach - just stringify with nice formatting
-                let jsonString = JSON.stringify(translations, null, 2);
-
-                // Don't try to fix escaping issues here - it's safer to let the browser handle it
-
-                $('#translations_json_editor').val(jsonString);
-
-                alert('JSON formatted successfully!');
+                return JSON.parse($('#translations_json_editor').val());
             } catch (e) {
-                alert('Error formatting JSON: ' + e.message + '\n\nTry fixing the JSON manually or use the "Update JSON from Form" button.');
-                klaroGeoError('JSON formatting error:', e);
-                klaroGeoLog('Problematic JSON:', jsonText);
+                alert('Invalid JSON: ' + e.message + '\n\n' +
+                    'Common issues to check:\n' +
+                    '- Missing quotes around property names\n' +
+                    '- Trailing commas at the end of lists or objects\n' +
+                    '- Unescaped quotes in strings\n' +
+                    '- Missing closing brackets or braces\n\n' +
+                    'Fix it in the editor, or use "Update JSON from Form" to rebuild it from the fields above.');
+                return null;
+            }
+        }
+
+        $('#format_json').click(function() {
+            let translations = parseJsonEditor();
+            if (translations !== null) {
+                $('#translations_json_editor').val(JSON.stringify(translations, null, 2));
+                alert('JSON formatted successfully!');
             }
         });
 
         $('#validate_json').click(function() {
-            try {
-                var jsonText = $('#translations_json_editor').val();
-
-                // Pre-process the JSON to handle common issues
-                jsonText = jsonText.trim();
-
-                // Try to parse the JSON
-                JSON.parse(jsonText);
-
+            if (parseJsonEditor() !== null) {
                 alert('JSON is valid! You can save your changes now.');
-            } catch (e) {
-                // Provide more helpful error message
-                let errorMsg = 'Invalid JSON: ' + e.message + '\n\n';
-                errorMsg += 'Common issues to check:\n';
-                errorMsg += '- Missing quotes around property names\n';
-                errorMsg += '- Trailing commas at the end of lists or objects\n';
-                errorMsg += '- Unescaped quotes in strings\n';
-                errorMsg += '- Missing closing brackets or braces\n\n';
-                errorMsg += 'Try using the "Format JSON" button to fix common issues automatically.';
-
-                alert(errorMsg);
-                klaroGeoError('JSON validation error:', e);
-                klaroGeoLog('Problematic JSON:', jsonText);
             }
         });
 
