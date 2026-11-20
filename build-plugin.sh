@@ -97,6 +97,10 @@ if [ -d "$BUILD_DIR" ]; then
     rm -rf "$BUILD_DIR"
 fi
 
+# Remove zips left by an earlier build of this version. `zip -r` adds to an
+# existing archive, so files deleted from the plugin since then would stay in it.
+rm -f "$ZIP_NAME" "$FULL_ZIP_NAME"
+
 # Create build directory structure
 echo -e "${YELLOW}Creating build directory...${NC}"
 mkdir -p "$PLUGIN_DIR"
