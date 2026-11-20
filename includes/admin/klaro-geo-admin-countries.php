@@ -447,9 +447,8 @@ function klaro_geo_save_region_settings_ajax() {
 
 	wp_send_json_success(
 		[
-			'message'          => 'Region settings saved successfully',
-			'settings'         => $settings,
-			'updated_settings' => $updated_settings,
+			'message'  => 'Region settings saved successfully',
+			'settings' => $settings,
 		]
 	);
 }

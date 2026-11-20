@@ -89,8 +89,6 @@ function klaro_geo_activate() {
 
 	// Floating button settings
 	add_option( 'klaro_geo_enable_floating_button', false );
-	add_option( 'klaro_geo_button_text', 'Manage Consent' );
-	add_option( 'klaro_geo_button_theme', 'light' );
 
 	// Other settings
 	add_option( 'klaro_geo_debug_countries', [ 'US', 'UK', 'CA', 'FR', 'AU', 'US-CA', 'CA-QC' ] );

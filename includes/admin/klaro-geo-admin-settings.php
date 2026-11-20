@@ -107,11 +107,12 @@ function klaro_geo_settings_page_content() {
 				<tr valign="top">
 					<th scope="row"><label for="klaro_geo_floating_button_theme">Button Theme</label></th>
 					<td>
+						<?php $button_theme = get_option( 'klaro_geo_floating_button_theme', 'light' ); ?>
 						<select name="klaro_geo_floating_button_theme" id="klaro_geo_floating_button_theme">
-							<option value="light" <?php selected( get_option( 'klaro_geo_floating_button_theme', 'light' ), 'light' ); ?>>Light</option>
-							<option value="dark" <?php selected( get_option( 'klaro_geo_floating_button_theme', 'dark' ), 'dark' ); ?>>Dark</option>
-							<option value="blue" <?php selected( get_option( 'klaro_geo_floating_button_theme', 'blue' ), 'blue' ); ?>>Blue</option>
-							<option value="green" <?php selected( get_option( 'klaro_geo_floating_button_theme', 'green' ), 'green' ); ?>>Green</option>
+							<option value="light" <?php selected( $button_theme, 'light' ); ?>>Light</option>
+							<option value="dark" <?php selected( $button_theme, 'dark' ); ?>>Dark</option>
+							<option value="blue" <?php selected( $button_theme, 'blue' ); ?>>Blue</option>
+							<option value="green" <?php selected( $button_theme, 'green' ); ?>>Green</option>
 						</select>
 						<p class="description">Choose the button style theme.</p>
 					</td>
@@ -119,11 +120,12 @@ function klaro_geo_settings_page_content() {
 				<tr valign="top">
 					<th scope="row"><label for="klaro_geo_floating_button_position">Button Position</label></th>
 					<td>
+						<?php $button_position = get_option( 'klaro_geo_floating_button_position', 'bottom-right' ); ?>
 						<select name="klaro_geo_floating_button_position" id="klaro_geo_floating_button_position">
-							<option value="bottom-right" <?php selected( get_option( 'klaro_geo_floating_button_position', 'bottom-right' ), 'bottom-right' ); ?>>Bottom Right</option>
-							<option value="bottom-left" <?php selected( get_option( 'klaro_geo_floating_button_position', 'bottom-left' ), 'bottom-left' ); ?>>Bottom Left</option>
-							<option value="top-right" <?php selected( get_option( 'klaro_geo_floating_button_position', 'top-right' ), 'top-right' ); ?>>Top Right</option>
-							<option value="top-left" <?php selected( get_option( 'klaro_geo_floating_button_position', 'top-left' ), 'top-left' ); ?>>Top Left</option>
+							<option value="bottom-right" <?php selected( $button_position, 'bottom-right' ); ?>>Bottom Right</option>
+							<option value="bottom-left" <?php selected( $button_position, 'bottom-left' ); ?>>Bottom Left</option>
+							<option value="top-right" <?php selected( $button_position, 'top-right' ); ?>>Top Right</option>
+							<option value="top-left" <?php selected( $button_position, 'top-left' ); ?>>Top Left</option>
 						</select>
 						<p class="description">Choose where the floating button should appear on the page.</p>
 					</td>
@@ -290,9 +292,14 @@ function klaro_geo_process_debug_countries( $new_value, $old_value ) {
 
 // Register settings for the main settings page
 function klaro_geo_register_main_settings() {
-	// Template settings
+	// Templates are saved by the Templates page, not by this form. They are
+	// registered only so the sanitize callback runs on every update_option(),
+	// and in a group of their own: options.php saves every option in the
+	// submitted group, and writes null for one that has no field in the form.
+	// In klaro_geo_settings_group that wiped all templates whenever the main
+	// settings page was saved.
 	register_setting(
-		'klaro_geo_settings_group',
+		'klaro_geo_templates_group',
 		'klaro_geo_templates',
 		[
 			'sanitize_callback' => function ( $input ) {
@@ -308,21 +315,7 @@ function klaro_geo_register_main_settings() {
 		]
 	);
 
-	// Service and purpose settings
-	register_setting(
-		'klaro_geo_settings_group',
-		'klaro_geo_analytics_purposes',
-		[
-			'sanitize_callback' => 'sanitize_text_field',
-		]
-	);
-	register_setting(
-		'klaro_geo_settings_group',
-		'klaro_geo_ad_purposes',
-		[
-			'sanitize_callback' => 'sanitize_text_field',
-		]
-	);
+	// Purposes
 	register_setting(
 		'klaro_geo_settings_group',
 		'klaro_geo_purposes',
@@ -408,13 +401,6 @@ function klaro_geo_register_main_settings() {
 	);
 
 	// Other settings
-	register_setting(
-		'klaro_geo_settings_group',
-		'klaro_geo_fallback_behavior',
-		[
-			'sanitize_callback' => 'sanitize_text_field',
-		]
-	);
 	register_setting(
 		'klaro_geo_settings_group',
 		'klaro_geo_debug_countries',
