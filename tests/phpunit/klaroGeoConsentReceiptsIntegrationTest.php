@@ -60,7 +60,7 @@ class ConsentReceiptsIntegrationTest extends IgnoreDeprecatedTestCase {
         $this->go_to(get_permalink($post_id));
         do_action('wp_enqueue_scripts');
 
-        $before = implode("\n", (array) wp_scripts()->get_data('klaro-geo-client-geo-js', 'before'));
+        $before = implode("\n", (array) wp_scripts()->get_data('klaro-geo-bootstrap-js', 'before'));
         $this->assertSame(1, substr_count($before, 'window.klaroConsentData = '), 'The payload script should define klaroConsentData exactly once');
 
         // No script carries a localized copy that would overwrite it

@@ -342,8 +342,8 @@ function klaro_geo_enqueue_scripts() {
 	// which klaro.js auto-initializes from (in client mode, if klaro.js loads
 	// before the geo lookup returns, the bootstrap calls klaro.setup() itself).
 	wp_enqueue_script(
-		'klaro-geo-client-geo-js',
-		plugins_url( 'js/klaro-geo-client-geo.js', __FILE__ ),
+		'klaro-geo-bootstrap-js',
+		plugins_url( 'js/klaro-geo-bootstrap.js', __FILE__ ),
 		array( 'klaro-geo-debug', 'klaro-geo-events-js' ),
 		KLARO_GEO_VERSION,
 		array(
@@ -355,12 +355,12 @@ function klaro_geo_enqueue_scripts() {
 	// The payload is data only and is attached in front of the bootstrap, so it
 	// is defined when the bootstrap runs whether or not the scripts are deferred.
 	wp_add_inline_script(
-		'klaro-geo-client-geo-js',
+		'klaro-geo-bootstrap-js',
 		$klaro_config_content,
 		'before'
 	);
 
-	$klaro_js_deps = array( 'klaro-geo-client-geo-js' );
+	$klaro_js_deps = array( 'klaro-geo-bootstrap-js' );
 
 	// Klaro is bundled with the plugin (klaro.js is the unmodified v0.7 build,
 	// which includes its own styles). It is never loaded from a remote host.

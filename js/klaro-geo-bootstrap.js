@@ -1,7 +1,7 @@
 /**
  * Klaro Geo — frontend bootstrap: applies the template payload and starts Klaro.
  *
- * PHP emits data only: window.klaroGeoClientGeo, in front of this script. This
+ * PHP emits data only: window.klaroGeoTemplatePayload, in front of this script. This
  * file turns it into a running consent manager in both geo resolution modes:
  *
  *   server  The payload holds one template, already resolved by PHP for this
@@ -299,7 +299,7 @@
      * page was rendered for the fallback template). In server mode PHP already
      * selected the template and rendered everything for it.
      *
-     * @param {Object} payload The window.klaroGeoClientGeo payload.
+     * @param {Object} payload The window.klaroGeoTemplatePayload payload.
      * @param {Object} geo     {country, region, source, latencyMs}
      */
     function applyResolution(payload, geo) {
@@ -577,7 +577,7 @@
         TZ_COUNTRY: TZ_COUNTRY
     };
 
-    var payload = window.klaroGeoClientGeo;
+    var payload = window.klaroGeoTemplatePayload;
     if (payload && payload.mode === 'client') {
         payload._internal = api;
         // deferStart is a test hook: unit tests drive resolveAndApply() directly.

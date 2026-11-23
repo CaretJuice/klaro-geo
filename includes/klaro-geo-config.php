@@ -696,21 +696,21 @@ function klaro_geo_frontend_template_entry( array $payload ) {
 /**
  * Render the inline script that hands the frontend its data, in both geo modes.
  *
- * It contains data only: window.klaroGeoClientGeo (the template payload),
+ * It contains data only: window.klaroGeoTemplatePayload (the template payload),
  * the dataLayer/gtag bootstrap and window.klaroConsentData. All behaviour
  * (GPC, klaroConfigLoaded, initializing Klaro) lives in
- * js/klaro-geo-client-geo.js, which this script is attached in front of.
+ * js/klaro-geo-bootstrap.js, which this script is attached in front of.
  *
  * Slashes are left escaped by wp_json_encode() on purpose: a stored value
  * containing "</script>" cannot end the inline script.
  *
- * @param array $frontend_payload The window.klaroGeoClientGeo payload.
+ * @param array $frontend_payload The window.klaroGeoTemplatePayload payload.
  * @param array $consent_data     The window.klaroConsentData object.
  * @return string
  */
 function klaro_geo_render_frontend_payload( array $frontend_payload, array $consent_data ) {
-	$content  = "// Klaro Geo frontend payload (applied by klaro-geo-client-geo.js)\n";
-	$content .= 'window.klaroGeoClientGeo = ' . wp_json_encode( $frontend_payload ) . ";\n\n";
+	$content  = "// Klaro Geo frontend payload (applied by klaro-geo-bootstrap.js)\n";
+	$content .= 'window.klaroGeoTemplatePayload = ' . wp_json_encode( $frontend_payload ) . ";\n\n";
 	$content .= "window.dataLayer = window.dataLayer || [];\n";
 	$content .= "window.gtag = window.gtag || function(){dataLayer.push(arguments);};\n";
 	$content .= "window.klaroGeo = window.klaroGeo || {};\n\n";
@@ -742,7 +742,7 @@ function klaro_geo_generate_config_file() {
  * $GLOBALS['klaro_geo_consent_defaults'] / ['klaro_geo_gtag_settings'].
  *
  * @return array {
- *     @type array $payload      window.klaroGeoClientGeo.
+ *     @type array $payload      window.klaroGeoTemplatePayload.
  *     @type array $consent_data window.klaroConsentData.
  * }
  */
@@ -760,7 +760,7 @@ function klaro_geo_get_frontend_payload() {
 	$using_debug_geo = $location['is_admin_override'];
 
 	// Client mode: emit a cache-safe payload with no visitor-specific values.
-	// The browser resolves geo and selects the template (js/klaro-geo-client-geo.js).
+	// The browser resolves geo and selects the template (js/klaro-geo-bootstrap.js).
 	if ( klaro_geo_is_client_geo_active( $using_debug_geo ) ) {
 		return klaro_geo_get_client_frontend_payload( $services );
 	}
@@ -858,7 +858,7 @@ function klaro_geo_get_frontend_payload() {
  * The result MUST be identical for every anonymous visitor: it contains the
  * location→template rules map plus a full config payload for each candidate
  * template, and NO detected geo or pre-selected template. Resolution happens
- * in js/klaro-geo-client-geo.js.
+ * in js/klaro-geo-bootstrap.js.
  *
  * @param array $services The configured services.
  * @return array Same shape as klaro_geo_get_frontend_payload().

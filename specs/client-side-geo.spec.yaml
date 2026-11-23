@@ -3,7 +3,7 @@
 #
 # CONTRACT BETWEEN PHP AND JAVASCRIPT: template resolution is implemented twice
 # (Klaro_Geo_Country_Settings::get_effective_settings() in PHP and
-# resolveEffectiveTemplate() in js/klaro-geo-client-geo.js) and the two must
+# resolveEffectiveTemplate() in js/klaro-geo-bootstrap.js) and the two must
 # agree. tests/fixtures/geo-resolution-parity.json is run against both.
 #
 # Problem: in server mode, klaro_geo_get_user_location() runs at page-render
@@ -27,7 +27,7 @@ file_meta:
     - "includes/class-klaro-geo-country-settings.php"    # get_effective_settings() — mirrored client-side
     - "includes/admin/klaro-geo-admin-settings.php"      # settings registration + UI
     - "includes/admin/klaro-geo-admin-geoip-warning.php" # AJAX endpoint detection + admin notice
-    - "js/klaro-geo-client-geo.js"                       # client-side resolver
+    - "js/klaro-geo-bootstrap.js"                        # applies the payload in both modes; client-side resolver
     - "js/klaro-geo.js"                                  # consumes detectedCountry/Region via klaroConsentData for receipts
   external_dependencies:
     geoip_detect:
@@ -65,11 +65,11 @@ architecture:
     contract: |
       Both modes use the same two pieces:
         1. PHP emits DATA ONLY, as an inline script attached in front of
-           js/klaro-geo-client-geo.js: window.klaroGeoClientGeo (the payload) and
+           js/klaro-geo-bootstrap.js: window.klaroGeoTemplatePayload (the payload) and
            window.klaroConsentData. klaro_geo_get_frontend_payload() builds it and
            klaro_geo_render_frontend_payload() prints it. PHP MUST NOT generate
            JavaScript logic.
-        2. js/klaro-geo-client-geo.js applies the payload: applyResolution() does
+        2. js/klaro-geo-bootstrap.js applies the payload: applyResolution() does
            GPC, sets window.klaroConfig, pushes klaroConfigLoaded / gpcDetected
            and starts Klaro. It is the ONLY implementation of those steps.
       The payload MUST be attached to the bootstrap script itself (not to
@@ -80,7 +80,7 @@ architecture:
 
   server_mode_payload:
     contract: |
-      window.klaroGeoClientGeo = {
+      window.klaroGeoTemplatePayload = {
         mode: 'server',
         resolved: { template, templateSource, country, region,
                     geoSource: 'server' | 'debug', adminOverride },
@@ -98,7 +98,7 @@ architecture:
     - step: 1
       actor: "klaro_geo_get_client_frontend_payload()"
       contract: |
-        Emit window.klaroGeoClientGeo — a visitor-independent payload:
+        Emit window.klaroGeoTemplatePayload — a visitor-independent payload:
           - geoAjax: { url, action } for the geoip-detect AJAX endpoint
           - timeoutMs, timezoneFallback (from settings)
           - rules: { defaultTemplate, visibleCountries,
@@ -117,20 +117,20 @@ architecture:
         Per-template configs are built by klaro_geo_build_template_payload() —
         the same builder server mode uses, so the two modes cannot diverge.
     - step: 2
-      actor: "js/klaro-geo-client-geo.js"
+      actor: "js/klaro-geo-bootstrap.js"
       contract: |
         Request geo from the AJAX endpoint (same-origin fetch, GET
         action=geoip_detect2_get_info_from_current_ip), racing timeoutMs
         (setting, default 2500).
     - step: 3
-      actor: "js/klaro-geo-client-geo.js (parseGeoRecord)"
+      actor: "js/klaro-geo-bootstrap.js (parseGeoRecord)"
       contract: |
         Read country = record.country.iso_code, region = the most specific
         subdivision (LAST element of record.subdivisions). is_empty === true or
         a missing/empty country is a lookup failure that triggers the fallback
         chain — never an exception.
     - step: 4
-      actor: "js/klaro-geo-client-geo.js (resolveEffectiveTemplate)"
+      actor: "js/klaro-geo-bootstrap.js (resolveEffectiveTemplate)"
       contract: |
         Resolve the effective template CLIENT-SIDE with precedence identical to
         Klaro_Geo_Country_Settings::get_effective_settings():
@@ -139,7 +139,7 @@ architecture:
         The shared parity fixture (tests/fixtures/geo-resolution-parity.json)
         MUST pass against both implementations (see testing.parity).
     - step: 5
-      actor: "js/klaro-geo-client-geo.js (applyResolution)"
+      actor: "js/klaro-geo-bootstrap.js (applyResolution)"
       contract: |
         In order: apply GPC to the selected config; push gtag('consent','update') with the selected
         template's defaults when it differs from the fallback template or GPC
@@ -155,7 +155,7 @@ architecture:
       already loaded, calls klaro.setup(config); otherwise klaro.js auto-inits
       from the now-present config when it loads. Either way Klaro CANNOT
       initialize before resolution completes or times out.
-      js/klaro-geo-client-geo.js is enqueued as a dependency of the klaro-js
+      js/klaro-geo-bootstrap.js is enqueued as a dependency of the klaro-js
       handle in BOTH modes, with the payload attached in front of it, so the
       payload and bootstrap are in place first. In server mode the bootstrap
       sets window.klaroConfig synchronously, so klaro.js auto-initializes.

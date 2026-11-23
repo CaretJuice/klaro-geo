@@ -1,7 +1,7 @@
 /**
  * E2E Test: geo resolution modes
  *
- * Both modes hand the browser a data payload that js/klaro-geo-client-geo.js
+ * Both modes hand the browser a data payload that js/klaro-geo-bootstrap.js
  * applies. These tests load a real page in each mode and check that Klaro
  * starts and that klaroConfigLoaded reports the mode. Unit tests cannot cover
  * this: it depends on the order WordPress prints the scripts in.
@@ -38,7 +38,7 @@ test.describe('Geo resolution modes', () => {
     await klaroHelper.waitForKlaroLoad();
     await klaroHelper.waitForModal();
 
-    const payload = await page.evaluate(() => window.klaroGeoClientGeo);
+    const payload = await page.evaluate(() => window.klaroGeoTemplatePayload);
     expect(payload.mode).toBe('server');
     expect(Object.keys(payload.templates)).toEqual([payload.resolved.template]);
 
@@ -50,7 +50,7 @@ test.describe('Geo resolution modes', () => {
 
     // The config Klaro runs with is the one from the payload
     const sameConfig = await page.evaluate(() =>
-      window.klaroConfig === window.klaroGeoClientGeo.templates[window.klaroGeoClientGeo.resolved.template].config
+      window.klaroConfig === window.klaroGeoTemplatePayload.templates[window.klaroGeoTemplatePayload.resolved.template].config
     );
     expect(sameConfig).toBe(true);
   });
@@ -63,9 +63,9 @@ test.describe('Geo resolution modes', () => {
     await klaroHelper.waitForModal();
 
     const payload = await page.evaluate(() => ({
-      mode: window.klaroGeoClientGeo.mode,
-      hasResolved: 'resolved' in window.klaroGeoClientGeo,
-      templates: Object.keys(window.klaroGeoClientGeo.templates),
+      mode: window.klaroGeoTemplatePayload.mode,
+      hasResolved: 'resolved' in window.klaroGeoTemplatePayload,
+      templates: Object.keys(window.klaroGeoTemplatePayload.templates),
     }));
     expect(payload.mode).toBe('client');
     expect(payload.hasResolved).toBe(false);

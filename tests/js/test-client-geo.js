@@ -10,7 +10,7 @@
 
 // Loaded first, as on the page: the resolver uses window.KlaroGeoEvents.
 require('../../js/klaro-geo-events.js');
-const clientGeo = require('../../js/klaro-geo-client-geo.js');
+const clientGeo = require('../../js/klaro-geo-bootstrap.js');
 const parityFixture = require('../fixtures/geo-resolution-parity.json');
 
 // Build a rules object + candidate templates map from the shared fixture
@@ -543,12 +543,12 @@ describe('Server mode (template resolved by PHP)', function() {
     });
 
     test('a payload with mode "server" is applied when the script loads', function() {
-        window.klaroGeoClientGeo = serverPayload();
+        window.klaroGeoTemplatePayload = serverPayload();
         jest.resetModules();
-        require('../../js/klaro-geo-client-geo.js');
+        require('../../js/klaro-geo-bootstrap.js');
 
-        expect(window.klaroConfig).toBe(window.klaroGeoClientGeo.templates.relaxed.config);
+        expect(window.klaroConfig).toBe(window.klaroGeoTemplatePayload.templates.relaxed.config);
         expect(configLoaded()).toHaveLength(1);
-        delete window.klaroGeoClientGeo;
+        delete window.klaroGeoTemplatePayload;
     });
 });

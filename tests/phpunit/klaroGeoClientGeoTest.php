@@ -89,11 +89,11 @@ class KlaroGeoClientGeoTest extends WP_UnitTestCase {
 
     private function extract_client_payload( $content ) {
         $this->assertMatchesRegularExpression(
-            '/window\.klaroGeoClientGeo = (\{.*?\});\n/s',
+            '/window\.klaroGeoTemplatePayload = (\{.*?\});\n/s',
             $content,
-            'Client content must define window.klaroGeoClientGeo'
+            'Client content must define window.klaroGeoTemplatePayload'
         );
-        preg_match( '/window\.klaroGeoClientGeo = (\{.*?\});\n/s', $content, $matches );
+        preg_match( '/window\.klaroGeoTemplatePayload = (\{.*?\});\n/s', $content, $matches );
         $payload = json_decode( $matches[1], true );
         $this->assertIsArray( $payload, 'Client payload must be valid JSON' );
         return $payload;
@@ -176,7 +176,7 @@ class KlaroGeoClientGeoTest extends WP_UnitTestCase {
 
     /**
      * The generated script is data only. Behaviour (GPC, dataLayer events,
-     * starting Klaro) lives in js/klaro-geo-client-geo.js for both modes.
+     * starting Klaro) lives in js/klaro-geo-bootstrap.js for both modes.
      */
     public function test_generated_content_contains_no_logic() {
         foreach ( array( 'server', 'client' ) as $mode ) {
@@ -186,7 +186,7 @@ class KlaroGeoClientGeoTest extends WP_UnitTestCase {
             $this->assertStringNotContainsString( 'klaroConfigLoaded', $content, "$mode mode" );
             $this->assertStringNotContainsString( 'globalPrivacyControl', $content, "$mode mode" );
             $this->assertStringNotContainsString( 'var klaroConfig', $content, "$mode mode" );
-            $this->assertSame( 1, substr_count( $content, 'window.klaroGeoClientGeo = ' ), "$mode mode" );
+            $this->assertSame( 1, substr_count( $content, 'window.klaroGeoTemplatePayload = ' ), "$mode mode" );
             $this->assertSame( 1, substr_count( $content, 'window.klaroConsentData = ' ), "$mode mode" );
         }
     }

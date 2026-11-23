@@ -31,7 +31,7 @@ events:
       event: "Klaro Event"
       eventSource: "klaro-geo"
       klaroEventName: "klaroConfigLoaded"
-    pushed_by: "js/klaro-geo-client-geo.js (applyResolution), in both geo modes"
+    pushed_by: "js/klaro-geo-bootstrap.js (applyResolution), in both geo modes"
     when: "Once per page load, when the template has been resolved and klaroConfig is set"
     fields:
       klaroGeoConsentTemplate: "string - key of the template in use"

@@ -1,5 +1,5 @@
 {
-    "description": "Shared parity fixture for template resolution. Run against BOTH Klaro_Geo_Country_Settings::get_effective_settings() (PHP) and resolveEffectiveTemplate() in js/klaro-geo-client-geo.js so the two implementations cannot drift. Spec: specs/client-side-geo.spec.yaml (testing.parity).",
+    "description": "Shared parity fixture for template resolution. Run against BOTH Klaro_Geo_Country_Settings::get_effective_settings() (PHP) and resolveEffectiveTemplate() in js/klaro-geo-bootstrap.js so the two implementations cannot drift. Spec: specs/client-side-geo.spec.yaml (testing.parity).",
     "visibleCountries": ["US", "CA", "FR", "DE", "GB", "BR", "JP"],
     "defaultTemplate": "default",
     "availableTemplates": ["default", "strict", "relaxed"],

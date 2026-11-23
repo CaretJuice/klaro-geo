@@ -2,13 +2,13 @@
  * GPC (Global Privacy Control) Tests
  *
  * Drives the real template-application code (applyResolution in
- * js/klaro-geo-client-geo.js) with a server-mode payload, and checks what GPC
+ * js/klaro-geo-bootstrap.js) with a server-mode payload, and checks what GPC
  * does to service defaults, the consent state and the dataLayer.
  */
 
 // Loaded first, as on the page: the resolver uses window.KlaroGeoEvents.
 require('../../js/klaro-geo-events.js');
-const clientGeo = require('../../js/klaro-geo-client-geo.js');
+const clientGeo = require('../../js/klaro-geo-bootstrap.js');
 
 describe('GPC', function() {
     function setGpcSignal(value) {

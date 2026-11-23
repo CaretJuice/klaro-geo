@@ -12,10 +12,10 @@
 klaro_consent_data:
   global: "window.klaroConsentData"
   built_by: "klaro_geo_build_consent_data() in includes/klaro-geo-config.php"
-  read_by: "js/klaro-geo.js, js/klaro-geo-events.js, js/klaro-geo-client-geo.js"
+  read_by: "js/klaro-geo.js, js/klaro-geo-events.js, js/klaro-geo-bootstrap.js"
   rules:
     - "MUST be emitted on every frontend page, in both geo modes, whether or not consent receipts are enabled"
-    - "MUST be defined exactly once per page, as one JSON assignment in the payload script attached in front of js/klaro-geo-client-geo.js. Nothing else may assign it server-side (no wp_localize_script copy)"
+    - "MUST be defined exactly once per page, as one JSON assignment in the payload script attached in front of js/klaro-geo-bootstrap.js. Nothing else may assign it server-side (no wp_localize_script copy)"
     - "All flags MUST be real booleans, never '1' / '0' / '' strings"
     - "enableConsentLogging is the EFFECTIVE value: the global consent receipts setting AND the template's enable_consent_logging"
     - "ajaxUrl is present ONLY when consent receipts are enabled globally"
@@ -44,8 +44,8 @@ klaro_consent_data:
 klaro_config_extensions:
   global: "window.klaroConfig"
   description: |
-    Set by js/klaro-geo-client-geo.js from the template payload
-    (window.klaroGeoClientGeo, see client-side-geo.spec.yaml).
+    Set by js/klaro-geo-bootstrap.js from the template payload
+    (window.klaroGeoTemplatePayload, see client-side-geo.spec.yaml).
     klaroConfig is Klaro's own config object. The plugin adds these fields, which
     Klaro ignores and the plugin's scripts read.
   per_service:
