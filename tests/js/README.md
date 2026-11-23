@@ -7,4 +7,4 @@ Every test loads the real script and checks what it does. Do not copy a function
 - `helpers/page.js` builds the page the scripts expect: `setUpPage()` provides what PHP's inline script defines (`window.dataLayer`, `window.gtag`, `window.klaroGeo`, `window.klaroConsentData`), `loadBootstrap()` loads `js/klaro-geo-bootstrap.js`, and `loadConsentScript()` loads `js/klaro-geo.js` with a Klaro manager.
 - `setup.js` runs before each file: it replaces the log helpers with mocks and loads `js/klaro-geo-events.js`.
 
-The admin scripts (`js/klaro-geo-admin*.js`) have no Jest tests; the Templates page is covered by the Playwright suite in `e2e/`.
+The admin scripts (`js/klaro-geo-admin*.js`) have no Jest tests; the Templates, Services and Country Settings pages are covered by the Playwright suite in `e2e/`.
