@@ -122,6 +122,9 @@ class Klaro_Geo_Template_Settings extends Klaro_Geo_Option {
 	/**
 	 * Set a template's config
 	 *
+	 * The config is stored as given. Form strings ('true', 'on') are turned
+	 * into booleans where the form is read, by klaro_geo_sanitize_array().
+	 *
 	 * @param string $template_key The template key
 	 * @param array  $config The config to set
 	 * @return $this For method chaining
@@ -146,87 +149,10 @@ class Klaro_Geo_Template_Settings extends Klaro_Geo_Option {
 				klaro_geo_debug_log( 'Preserved existing translations for template ' . $template_key );
 			}
 
-			// Process consent mode settings to prevent over-escaping
-			if ( isset( $config['consent_mode_settings'] ) ) {
-				// Fix initialize_consent_mode checkbox value
-				if ( isset( $config['consent_mode_settings']['initialize_consent_mode'] ) ) {
-					$config['consent_mode_settings']['initialize_consent_mode'] =
-						filter_var( $config['consent_mode_settings']['initialize_consent_mode'], FILTER_VALIDATE_BOOLEAN );
-				}
-
-				// Fix initialization code escaping
-				if ( isset( $config['consent_mode_settings']['initialization_code'] ) ) {
-					// First, strip all slashes to get to the raw code
-					$raw_code = stripslashes( $config['consent_mode_settings']['initialization_code'] );
-
-					// Store the raw code back
-					$config['consent_mode_settings']['initialization_code'] = $raw_code;
-
-					klaro_geo_debug_log( 'Processed initialization code to prevent over-escaping' );
-				}
-			}
-
-			// Process boolean values in the config
-			$this->process_boolean_values( $config );
-
 			$template['config'] = $config;
 		}
 
 		return $this->set_template( $template_key, $template );
-	}
-
-	/**
-	 * Process boolean values in the config array
-	 *
-	 * @param array &$config The config array to process
-	 */
-	private function process_boolean_values( &$config ) {
-		// List of keys that should be boolean
-		$boolean_keys = array(
-			'default',
-			'required',
-			'htmlTexts',
-			'embedded',
-			'noAutoLoad',
-			'autoFocus',
-			'groupByPurpose',
-			'mustConsent',
-			'acceptAll',
-			'hideDeclineAll',
-			'hideLearnMore',
-			'noticeAsModal',
-			'disablePoweredBy',
-		);
-
-		foreach ( $boolean_keys as $key ) {
-			if ( isset( $config[ $key ] ) ) {
-				// Convert string values to boolean
-				if ( $config[ $key ] === 'true' || $config[ $key ] === 'on' ) {
-					$config[ $key ] = true;
-				} elseif ( $config[ $key ] === 'false' ) {
-					$config[ $key ] = false;
-				}
-
-				// Ensure the value is actually boolean
-				$config[ $key ] = (bool) $config[ $key ];
-			}
-		}
-
-		// Process consent mode settings
-		if ( isset( $config['consent_mode_settings'] ) && is_array( $config['consent_mode_settings'] ) ) {
-			if ( isset( $config['consent_mode_settings']['initialize_consent_mode'] ) ) {
-				if ( $config['consent_mode_settings']['initialize_consent_mode'] === 'true' ||
-					$config['consent_mode_settings']['initialize_consent_mode'] === 'on' ) {
-					$config['consent_mode_settings']['initialize_consent_mode'] = true;
-				} elseif ( $config['consent_mode_settings']['initialize_consent_mode'] === 'false' ) {
-					$config['consent_mode_settings']['initialize_consent_mode'] = false;
-				}
-
-				// Ensure the value is actually boolean
-				$config['consent_mode_settings']['initialize_consent_mode'] =
-					(bool) $config['consent_mode_settings']['initialize_consent_mode'];
-			}
-		}
 	}
 
 }
