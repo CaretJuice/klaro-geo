@@ -3,6 +3,9 @@
  * @jest-environment jsdom
  */
 
+
+const { setUpPage } = require('./helpers/page.js');
+
 describe('Consent Queue', () => {
     let originalDataLayer;
 
@@ -13,10 +16,8 @@ describe('Consent Queue', () => {
         // Save original dataLayer
         originalDataLayer = window.dataLayer;
 
-        // Reset all klaroGeo state
-        delete window.klaroGeo;
-        delete window.klaroConsentData;
-        window.dataLayer = [];
+        // The page before klaro-geo.js runs
+        setUpPage();
 
         // Mock klaroGeoLog
         window.klaroGeoLog = jest.fn();
@@ -92,13 +93,6 @@ describe('Consent Queue', () => {
             expect(window.klaroGeo.useGTM).toBe(false);
         });
 
-        test('should detect non-GTM mode when klaroConsentData missing', () => {
-            // No klaroConsentData at all
-            loadKlaroGeoJs();
-
-            expect(window.klaroGeo.useGTM).toBe(false);
-        });
-
         test('should allow manual override of useGTM', () => {
             // Manually set useGTM before loading
             window.klaroGeo = { useGTM: false };
@@ -121,12 +115,6 @@ describe('Consent Queue', () => {
         test('should default consentModeType to basic when not specified', () => {
             window.klaroConsentData = { gtmId: 'GTM-XXXXX' };
 
-            loadKlaroGeoJs();
-
-            expect(window.klaroGeo.consentModeType).toBe('basic');
-        });
-
-        test('should default consentModeType to basic when klaroConsentData missing', () => {
             loadKlaroGeoJs();
 
             expect(window.klaroGeo.consentModeType).toBe('basic');

@@ -4,19 +4,20 @@
  * setting back out of the dataLayer.
  */
 
+
+const { setUpPage } = require('./helpers/page.js');
+
 describe('Consent receipt generation follows klaroConsentData.enableConsentLogging', function() {
     let watchCallbacks;
 
     function loadWith(consentData) {
         document.body.innerHTML = '';
-        window.dataLayer = [];
+        setUpPage(consentData);
         window.klaroConfig = { services: [{ name: 'google-analytics', purposes: ['analytics'] }] };
-        window.gtag = jest.fn();
         window.klaroGeoLog = jest.fn();
         window.klaroGeoWarn = jest.fn();
         global.klaroGeoLog = window.klaroGeoLog;
         global.klaroGeoWarn = window.klaroGeoWarn;
-        delete window.klaroGeo;
         window.localStorage.clear();
 
         const manager = {
@@ -25,12 +26,6 @@ describe('Consent receipt generation follows klaroConsentData.enableConsentLoggi
             config: window.klaroConfig
         };
         window.klaro = { getManager: jest.fn(function() { return manager; }) };
-
-        if (consentData === undefined) {
-            delete window.klaroConsentData;
-        } else {
-            window.klaroConsentData = consentData;
-        }
 
         global.fetch = jest.fn(function() {
             return Promise.resolve({ ok: true, json: function() { return Promise.resolve({ success: true }); } });
@@ -84,21 +79,6 @@ describe('Consent receipt generation follows klaroConsentData.enableConsentLoggi
         });
         watchCallbacks.update(manager, 'saveConsents', manager.consents);
 
-        expect(receiptEvents()).toHaveLength(0);
-        expect(receiptPosts()).toBe(0);
-    });
-
-    test('klaroConsentData missing → no receipt and no error', function() {
-        const manager = loadWith(undefined);
-        window.dataLayer.push({
-            event: 'Klaro Event',
-            klaroEventName: 'klaroConfigLoaded',
-            klaroGeoEnableConsentLogging: true
-        });
-
-        expect(function() {
-            watchCallbacks.update(manager, 'saveConsents', manager.consents);
-        }).not.toThrow();
         expect(receiptEvents()).toHaveLength(0);
         expect(receiptPosts()).toBe(0);
     });

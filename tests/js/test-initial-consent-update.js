@@ -11,6 +11,9 @@
  * initial event is still skipped.
  */
 
+
+const { setUpPage } = require('./helpers/page.js');
+
 describe('Initial Klaro Consent Update', function() {
     const WAIT_MS = 150; // pushConsentData defers a tick, then a 50ms debounce
 
@@ -37,9 +40,14 @@ describe('Initial Klaro Consent Update', function() {
      */
     function load(opts) {
         jest.resetModules();
-        window.dataLayer = [];
-        window.gtag = jest.fn();
-        delete window.klaroGeo;
+        setUpPage({
+            consentModeType: opts.consentModeType,
+            templateSettings: {
+                config: {
+                    consent_mode_settings: { consent_defaults: opts.defaults }
+                }
+            }
+        });
 
         window.klaroConfig = {
             services: [
@@ -53,18 +61,6 @@ describe('Initial Klaro Consent Update', function() {
             watch: jest.fn()
         };
         window.klaro = { getManager: jest.fn(() => manager) };
-
-        window.klaroConsentData = {
-            gtmId: '',
-            consentModeType: opts.consentModeType,
-            consentModeServices: {},
-            parentChildMap: {},
-            templateSettings: {
-                config: {
-                    consent_mode_settings: { consent_defaults: opts.defaults }
-                }
-            }
-        };
 
         require('../../js/klaro-geo.js');
     }

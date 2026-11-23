@@ -4,6 +4,9 @@
  * switched off by default because of it.
  */
 
+
+const { setUpPage } = require('./helpers/page.js');
+
 describe('Consent receipt records GPC', function() {
     function setGpcSignal(value) {
         Object.defineProperty(navigator, 'globalPrivacyControl', {
@@ -21,14 +24,17 @@ describe('Consent receipt records GPC', function() {
     function savedReceipt(gpc) {
         let watchCallbacks;
         document.body.innerHTML = '';
-        window.dataLayer = [];
+        setUpPage({
+            enableConsentLogging: true,
+            detectedCountry: 'US',
+            detectedRegion: 'CA',
+            ajaxUrl: '/wp-admin/admin-ajax.php'
+        }, gpc ? { gpc: gpc } : {});
         window.klaroConfig = { services: [{ name: 'google-ads', purposes: ['advertising'] }] };
-        window.gtag = jest.fn();
         window.klaroGeoLog = jest.fn();
         window.klaroGeoWarn = jest.fn();
         global.klaroGeoLog = window.klaroGeoLog;
         global.klaroGeoWarn = window.klaroGeoWarn;
-        delete window.klaroGeo;
         window.localStorage.clear();
 
         const manager = {
@@ -37,24 +43,12 @@ describe('Consent receipt records GPC', function() {
             config: window.klaroConfig
         };
         window.klaro = { getManager: jest.fn(function() { return manager; }) };
-        window.klaroConsentData = {
-            enableConsentLogging: true,
-            templateName: 'default',
-            templateSource: 'fallback',
-            detectedCountry: 'US',
-            detectedRegion: 'CA',
-            adminOverride: false,
-            ajaxUrl: '/wp-admin/admin-ajax.php'
-        };
         global.fetch = jest.fn(function() {
             return Promise.resolve({ ok: true, json: function() { return Promise.resolve({ success: true }); } });
         });
 
         jest.resetModules();
         require('../../js/klaro-geo.js');
-        if (gpc) {
-            window.klaroGeo.gpc = gpc;
-        }
         watchCallbacks.update(manager, 'saveConsents', manager.consents);
 
         expect(global.fetch).toHaveBeenCalledTimes(1);
@@ -108,14 +102,17 @@ describe('GPC receipt for a visitor who has not used the banner', function() {
      */
     async function pageLoad(options) {
         document.body.innerHTML = '';
-        window.dataLayer = [];
+        setUpPage({
+            enableConsentLogging: options.enableConsentLogging !== false,
+            detectedCountry: 'US',
+            detectedRegion: 'CA',
+            ajaxUrl: '/wp-admin/admin-ajax.php'
+        }, options.gpc ? { gpc: options.gpc } : {});
         window.klaroConfig = { services: [{ name: 'google-ads', purposes: ['advertising'] }] };
-        window.gtag = jest.fn();
         window.klaroGeoLog = jest.fn();
         window.klaroGeoWarn = jest.fn();
         global.klaroGeoLog = window.klaroGeoLog;
         global.klaroGeoWarn = window.klaroGeoWarn;
-        window.klaroGeo = options.gpc ? { gpc: options.gpc } : {};
 
         const manager = {
             consents: { 'google-ads': false },
@@ -124,15 +121,6 @@ describe('GPC receipt for a visitor who has not used the banner', function() {
             config: window.klaroConfig
         };
         window.klaro = { getManager: jest.fn(function() { return manager; }) };
-        window.klaroConsentData = {
-            enableConsentLogging: options.enableConsentLogging !== false,
-            templateName: 'default',
-            templateSource: 'fallback',
-            detectedCountry: 'US',
-            detectedRegion: 'CA',
-            adminOverride: false,
-            ajaxUrl: '/wp-admin/admin-ajax.php'
-        };
         global.fetch = jest.fn(function() {
             return Promise.resolve({
                 ok: true,

@@ -8,20 +8,28 @@
  * - Event handling
  */
 
+
+const { setUpPage } = require('./helpers/page.js');
+
 describe('Klaro Geo Core - DataLayer Integration', function() {
     beforeEach(function() {
         // Set up clean environment
         document.body.innerHTML = '';
-        window.dataLayer = [];
+        setUpPage({
+            enableConsentLogging: true,
+            templateName: 'default',
+            templateSource: 'test',
+            detectedCountry: 'US',
+            detectedRegion: null,
+            ajaxUrl: '/wp-admin/admin-ajax.php',
+            nonce: 'test-nonce'
+        });
         window.klaroConfig = {
             services: [
                 { name: 'google-analytics', purposes: ['analytics'] },
                 { name: 'facebook-pixel', purposes: ['advertising'] }
             ]
         };
-
-        // Mock gtag
-        window.gtag = jest.fn();
 
         // Create a manager object that will be reused
         const mockManager = {
@@ -40,16 +48,6 @@ describe('Klaro Geo Core - DataLayer Integration', function() {
         // Mock klaro with consistent manager reference
         window.klaro = {
             getManager: jest.fn(() => mockManager)
-        };
-
-        window.klaroConsentData = {
-            enableConsentLogging: true,
-            templateName: 'default',
-            templateSource: 'test',
-            detectedCountry: 'US',
-            detectedRegion: null,
-            ajaxUrl: '/wp-admin/admin-ajax.php',
-            nonce: 'test-nonce'
         };
 
         // Mock fetch
@@ -120,14 +118,6 @@ describe('Klaro Geo Core - DataLayer Integration', function() {
                 expect(window.dataLayer).toBeDefined();
                 expect(Array.isArray(window.dataLayer)).toBe(true);
             });
-        });
-
-        test('dataLayer should be initialized if not exists', function() {
-            delete window.dataLayer;
-            require('../../js/klaro-geo.js');
-
-            expect(window.dataLayer).toBeDefined();
-            expect(Array.isArray(window.dataLayer)).toBe(true);
         });
     });
 
@@ -255,21 +245,6 @@ describe('Klaro Geo Core - DataLayer Integration', function() {
                 require('../../js/klaro-geo.js');
             }).not.toThrow();
         });
-
-        test('should handle manager without watch method', function() {
-            window.klaro = {
-                getManager: jest.fn(() => ({
-                    consents: {}
-                    // No watch method
-                }))
-            };
-
-            jest.resetModules();
-
-            expect(() => {
-                require('../../js/klaro-geo.js');
-            }).not.toThrow();
-        });
     });
 
     describe('Accepted services calculation', function() {
@@ -318,16 +293,6 @@ describe('Klaro Geo Core - DataLayer Integration', function() {
     });
 
     describe('Global variables initialization', function() {
-        test('should initialize window.dataLayer if not exists', function() {
-            delete window.dataLayer;
-
-            jest.resetModules();
-            require('../../js/klaro-geo.js');
-
-            expect(window.dataLayer).toBeDefined();
-            expect(Array.isArray(window.dataLayer)).toBe(true);
-        });
-
         test('should not override existing dataLayer', function() {
             window.dataLayer = [{ existing: 'data' }];
 
