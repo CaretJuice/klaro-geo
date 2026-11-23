@@ -164,6 +164,8 @@ configuration:
       - MUST check klaroConfig.services for google-tag-manager service
       - MUST enable GTM mode if EITHER source indicates GTM is configured
       - MUST allow JavaScript override before queue processes
+      - MUST be derived only once klaroConfig exists (in client geo mode that
+        is after klaro-geo.js has loaded)
 
   consentModeType:
     type: "string"
@@ -349,9 +351,16 @@ state_machine:
 php_integration:
   description: |
     PHP does not output useGTM or consentModeType directly. klaro-geo.js derives
-    them at load from window.klaroConsentData.gtmId and .consentModeType (see
+    them from window.klaroConsentData.gtmId and .consentModeType (see
     frontend-data.spec.yaml), unless window.klaroGeo.useGTM or
     window.klaroGeo.consentModeType was already set by the page.
+
+    consentModeType is derived when klaro-geo.js loads. useGTM is derived when
+    Klaro has a consent manager, because it also depends on the services in
+    window.klaroConfig. In server geo mode that is when klaro-geo.js loads; in
+    client geo mode it is after the geo lookup. Until then
+    window.klaroGeo.useGTM is undefined. It is always set before the first
+    'Klaro Consent Update' decision is made.
 
 # =============================================================================
 # USAGE EXAMPLES

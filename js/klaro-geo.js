@@ -32,20 +32,25 @@
   // GTM's consent mode handles whether tags actually fire based on consent state.
   // We flush when the consent event fires, regardless of what consent was given.
 
-  // Determine GTM mode from klaroConsentData (set by PHP) or klaroConfig services
-  // GTM mode is enabled if:
-  // 1. klaro_geo_gtm_id is set (standalone GTM), OR
-  // 2. google-tag-manager service exists in klaroConfig (GTM as a Klaro service)
-  if (typeof window.klaroGeo.useGTM === 'undefined') {
-      // Check for standalone GTM ID first
-      const hasGtmId = !!window.klaroConsentData.gtmId;
+  /**
+   * Work out GTM mode, unless the page set window.klaroGeo.useGTM itself.
+   * GTM mode is on if:
+   * 1. klaro_geo_gtm_id is set (standalone GTM), OR
+   * 2. google-tag-manager is a configured Klaro service
+   *
+   * Called once Klaro has a manager, because the services are in
+   * window.klaroConfig, and in client geo mode that does not exist until the
+   * geo lookup has returned (after this file has run).
+   */
+  function detectGtmMode() {
+      if (typeof window.klaroGeo.useGTM !== 'undefined') {
+          return;
+      }
 
-      // Check if google-tag-manager is a configured Klaro service. In client
-      // geo mode window.klaroConfig does not exist until the geo lookup returns.
-      const hasGtmService = !!window.klaroConfig &&
-                            window.klaroConfig.services.some(function(s) {
-                                return s.name === 'google-tag-manager';
-                            });
+      const hasGtmId = !!window.klaroConsentData.gtmId;
+      const hasGtmService = window.klaroConfig.services.some(function(s) {
+          return s.name === 'google-tag-manager';
+      });
 
       window.klaroGeo.useGTM = hasGtmId || hasGtmService;
       klaroGeoLog('GTM mode detection - hasGtmId=' + hasGtmId + ', hasGtmService=' + hasGtmService + ', useGTM=' + window.klaroGeo.useGTM);
@@ -407,7 +412,11 @@
       }
   }
 
+  // Runs once, when Klaro has a manager and so window.klaroConfig exists.
   function setupWatcher(manager) {
+      detectGtmMode();
+      setupMultiPurposeProtection(manager);
+
       // Push initial consent data
       pushConsentData(manager);
 
@@ -562,11 +571,10 @@
    * disables ALL services in that purpose, even if a service belongs to another still-active purpose.
    * This listener re-enables such services after Klaro processes the purpose toggle.
    */
-  function setupMultiPurposeProtection() {
-      if (!window.klaroConfig || !window.klaroConfig.groupByPurpose) return;
+  function setupMultiPurposeProtection(manager) {
+      if (!window.klaroConfig.groupByPurpose) return;
 
-      let services = window.klaroConfig.services || [];
-      let multiPurposeServices = services.filter(function(s) {
+      let multiPurposeServices = window.klaroConfig.services.filter(function(s) {
           return s.purposes && s.purposes.length > 1;
       });
       if (multiPurposeServices.length === 0) return;
@@ -579,10 +587,6 @@
 
           // After Klaro has processed (synchronously during bubble), fix multi-purpose services
           setTimeout(function() {
-              let manager;
-              try { manager = window.klaro.getManager(); } catch(err) { return; }
-              if (!manager) return;
-
               multiPurposeServices.forEach(function(service) {
                   if (!service.purposes.includes(purposeName)) return;
 
@@ -607,5 +611,4 @@
 
   // Initialize the watcher
   setupKlaroDataLayerWatcher();
-  setupMultiPurposeProtection();
 })();
