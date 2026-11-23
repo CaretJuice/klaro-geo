@@ -437,8 +437,12 @@ jQuery(document).ready(function($) {
         });
     }
 
-    // Autosave on country/fallback template dropdown change
-    $(document).on('change', '#klaro-country-settings-form select', function() {
+    // Autosave on country/fallback template dropdown change. Only those: the
+    // region dropdowns in the Manage Regions dialog are inside the same form
+    // and are saved by its own button. Autosaving on them posted the page's
+    // hidden copy of the old region overrides a second after the change, which
+    // put back an override the dialog had just removed.
+    $(document).on('change', '#klaro-country-settings-form select[name^="klaro_geo_country_settings"]', function() {
         let changedElement = this;
 
         // Clear any pending autosave

@@ -301,7 +301,35 @@ function updateOptionViaCli(optionName, value) {
   }
 }
 
+/**
+ * Read an option as WordPress returns it (false when it is not set).
+ * @param {string} name - Option name
+ * @returns {*}
+ */
+function readOption(name) {
+  return JSON.parse(wpCli(`eval 'echo json_encode(get_option("${name}"));'`));
+}
+
+/**
+ * Store an option exactly as given; false deletes it. Use with readOption()
+ * to put a site-wide option back the way a test found it.
+ * @param {string} name - Option name
+ * @param {*} value - The value to store
+ */
+function writeOption(name, value) {
+  if (value === false) {
+    wpCli(`eval 'delete_option("${name}");'`);
+    return;
+  }
+  wpCli(
+    `eval 'update_option("${name}", json_decode(file_get_contents("php://stdin"), true));'`,
+    { stdin: JSON.stringify(value) }
+  );
+}
+
 module.exports = {
+  readOption,
+  writeOption,
   WordPressHelper,
   wpCli,
   updateServiceSettingsViaCli,
