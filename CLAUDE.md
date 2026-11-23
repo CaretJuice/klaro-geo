@@ -52,9 +52,10 @@ When a rule matters, there is a test that fails if it is broken. Before changing
 | Template resolution: region, then country, then the fallback template; the key returned always exists | `ContractVerificationTest.php`, `tests/fixtures/geo-resolution-parity.json` (run against PHP and JS) |
 | `cookieDomain`: empty means auto-detect from the site URL with a leading dot; non-empty is used exactly | `ContractVerificationTest.php` |
 | Never give Klaro a global `required: true` (its Decline button then accepts everything); Required is resolved per service | `klaroGeoTemplateRequiredTest.php` |
-| Consent defaults and consent keys | `klaroGeoConsentModeTest.php`, `tests/js/test-consent-mode.js` |
+| Consent defaults and consent keys, including a child consent mode service being denied while its parent is | `klaroGeoConsentModeTest.php`, `tests/js/test-consent-mode.js` |
 | Which services GPC switches off by default | `klaroGeoGpcSensitivityTest.php`, `tests/js/test-gpc.js` |
-| Consent receipts: validation, when logging is enabled, storage | `klaroGeoConsentReceiptStorageTest.php` |
+| Consent receipts: validation, when logging is enabled, storage | `klaroGeoConsentReceiptStorageTest.php`, `tests/js/test-consent-receipts.js` |
+| Every fallback is logged | `klaroGeoFallbackLoggingTest.php` |
 | Consent queue | `tests/js/test-consent-queue.js` |
 
 Tests must call the plugin's real functions. Do not add a helper that re-implements production logic so a test can call it, and do not assert on data the test built itself. If production code is hard to test (for example an AJAX handler that exits), restructure it so the logic sits in a function that returns a value, and test that.
