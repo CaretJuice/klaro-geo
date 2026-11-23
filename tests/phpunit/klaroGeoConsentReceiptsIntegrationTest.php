@@ -36,7 +36,7 @@ class ConsentReceiptsIntegrationTest extends IgnoreDeprecatedTestCase {
     /**
      * Decode the window.klaroConsentData object from generated config content.
      *
-     * @param string $config_content Output of klaro_geo_generate_config_file().
+     * @param string $config_content Output of klaro_geo_frontend_inline_script().
      * @return array
      */
     private function extract_consent_data($config_content) {
@@ -77,7 +77,7 @@ class ConsentReceiptsIntegrationTest extends IgnoreDeprecatedTestCase {
         update_option('klaro_geo_gtm_id', 'GTM-TEST123');
         update_option('klaro_geo_consent_mode_type', 'advanced');
 
-        $data = $this->extract_consent_data(klaro_geo_generate_config_file());
+        $data = $this->extract_consent_data(klaro_geo_frontend_inline_script());
 
         delete_option('klaro_geo_gtm_id');
         delete_option('klaro_geo_consent_mode_type');
@@ -100,10 +100,10 @@ class ConsentReceiptsIntegrationTest extends IgnoreDeprecatedTestCase {
      */
     public function test_nonce_is_emitted_only_for_logged_in_users() {
         wp_set_current_user(0);
-        $anonymous = $this->extract_consent_data(klaro_geo_generate_config_file());
+        $anonymous = $this->extract_consent_data(klaro_geo_frontend_inline_script());
 
         wp_set_current_user(self::factory()->user->create(array('role' => 'subscriber')));
-        $logged_in = $this->extract_consent_data(klaro_geo_generate_config_file());
+        $logged_in = $this->extract_consent_data(klaro_geo_frontend_inline_script());
 
         $this->assertArrayNotHasKey('nonce', $anonymous);
         $this->assertSame(1, wp_verify_nonce($logged_in['nonce'], 'klaro_geo_consent_nonce'));
@@ -171,7 +171,7 @@ class ConsentReceiptsIntegrationTest extends IgnoreDeprecatedTestCase {
         update_option('klaro_geo_enable_consent_receipts', false);
         update_option('klaro_geo_consent_mode_type', 'advanced');
 
-        $data = $this->extract_consent_data(klaro_geo_generate_config_file());
+        $data = $this->extract_consent_data(klaro_geo_frontend_inline_script());
 
         delete_option('klaro_geo_consent_mode_type');
 

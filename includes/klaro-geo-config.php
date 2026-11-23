@@ -618,11 +618,12 @@ function klaro_geo_render_frontend_payload( array $frontend_payload, array $cons
 }
 
 /**
- * Generate the inline config content for the current request.
+ * The inline script that hands the frontend its data for the current request
+ * (the template payload and klaroConsentData). Nothing is written to disk.
  *
  * @return string JavaScript content for wp_add_inline_script.
  */
-function klaro_geo_generate_config_file() {
+function klaro_geo_frontend_inline_script() {
 	$frontend = klaro_geo_get_frontend_payload();
 	return klaro_geo_render_frontend_payload( $frontend['payload'], $frontend['consent_data'] );
 }

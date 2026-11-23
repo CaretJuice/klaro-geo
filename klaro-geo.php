@@ -319,7 +319,7 @@ function klaro_geo_enqueue_scripts() {
 		)
 	);
 
-	$klaro_config_content = klaro_geo_generate_config_file();
+	$klaro_config_content = klaro_geo_frontend_inline_script();
 
 	// The dataLayer event and consent key helpers. They only define
 	// window.KlaroGeoEvents, and every script below uses them.

@@ -63,7 +63,7 @@ class KlaroConfigTest extends WP_UnitTestCase {
         update_option('klaro_geo_analytics_purposes', json_encode(['analytics', 'functional']));
 
         // Generate the config content (returned as string since 0.3.5; no longer written to disk)
-        $config_content = klaro_geo_generate_config_file();
+        $config_content = klaro_geo_frontend_inline_script();
         $this->assertIsString($config_content, 'Config generation failed');
         $this->assertNotEmpty($config_content, 'Config content is empty');
 
@@ -101,7 +101,7 @@ class KlaroConfigTest extends WP_UnitTestCase {
         update_option('klaro_geo_ad_purposes', json_encode(['advertising', 'personalization']));
 
         // Generate the config content (returned as string since 0.3.5; no longer written to disk)
-        $config_content = klaro_geo_generate_config_file();
+        $config_content = klaro_geo_frontend_inline_script();
         $this->assertIsString($config_content, 'Config generation failed');
         $this->assertNotEmpty($config_content, 'Config content is empty');
 

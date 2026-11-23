@@ -129,10 +129,10 @@ class KlaroGeoClientGeoTest extends WP_UnitTestCase {
         update_option( 'klaro_geo_enable_consent_receipts', true );
 
         $this->mock_geoip_record( 'US', 'CA' );
-        $content_us = klaro_geo_generate_config_file();
+        $content_us = klaro_geo_frontend_inline_script();
 
         $this->mock_geoip_record( 'DE' );
-        $content_de = klaro_geo_generate_config_file();
+        $content_de = klaro_geo_frontend_inline_script();
 
         $this->assertSame(
             $content_us,
@@ -148,7 +148,7 @@ class KlaroGeoClientGeoTest extends WP_UnitTestCase {
         update_option( 'klaro_geo_geo_resolution_mode', 'server' );
 
         $this->mock_geoip_record( 'US', 'CA' );
-        $payload = $this->extract_client_payload( klaro_geo_generate_config_file() );
+        $payload = $this->extract_client_payload( klaro_geo_frontend_inline_script() );
 
         $this->assertSame( 'server', $payload['mode'] );
         $this->assertSame( 'US', $payload['resolved']['country'] );
@@ -170,7 +170,7 @@ class KlaroGeoClientGeoTest extends WP_UnitTestCase {
     public function test_default_mode_is_server() {
         delete_option( 'klaro_geo_geo_resolution_mode' );
         $this->mock_geoip_record( 'US' );
-        $payload = $this->extract_client_payload( klaro_geo_generate_config_file() );
+        $payload = $this->extract_client_payload( klaro_geo_frontend_inline_script() );
         $this->assertSame( 'server', $payload['mode'], 'Server mode must be the default' );
     }
 
@@ -181,7 +181,7 @@ class KlaroGeoClientGeoTest extends WP_UnitTestCase {
     public function test_generated_content_contains_no_logic() {
         foreach ( array( 'server', 'client' ) as $mode ) {
             update_option( 'klaro_geo_geo_resolution_mode', $mode );
-            $content = klaro_geo_generate_config_file();
+            $content = klaro_geo_frontend_inline_script();
 
             $this->assertStringNotContainsString( 'klaroConfigLoaded', $content, "$mode mode" );
             $this->assertStringNotContainsString( 'globalPrivacyControl', $content, "$mode mode" );
@@ -201,7 +201,7 @@ class KlaroGeoClientGeoTest extends WP_UnitTestCase {
         update_option( 'klaro_geo_templates', $templates );
         Klaro_Geo_Template_Settings::clear_instance_cache();
 
-        $content = klaro_geo_generate_config_file();
+        $content = klaro_geo_frontend_inline_script();
 
         $this->assertStringNotContainsString( '</script', $content );
     }
@@ -214,7 +214,7 @@ class KlaroGeoClientGeoTest extends WP_UnitTestCase {
         update_option( 'klaro_geo_geo_resolution_mode', 'client' );
         update_option( 'klaro_geo_enable_consent_receipts', true );
 
-        $content = klaro_geo_generate_config_file();
+        $content = klaro_geo_frontend_inline_script();
         $payload = $this->extract_client_payload( $content );
 
         $this->assertEquals( 'client', $payload['mode'] );
@@ -256,7 +256,7 @@ class KlaroGeoClientGeoTest extends WP_UnitTestCase {
         update_option( 'klaro_geo_client_geo_timeout_ms', 5000 );
         update_option( 'klaro_geo_client_geo_timezone_fallback', 0 );
 
-        $payload = $this->extract_client_payload( klaro_geo_generate_config_file() );
+        $payload = $this->extract_client_payload( klaro_geo_frontend_inline_script() );
         $this->assertEquals( 5000, $payload['timeoutMs'] );
         $this->assertFalse( $payload['timezoneFallback'] );
     }

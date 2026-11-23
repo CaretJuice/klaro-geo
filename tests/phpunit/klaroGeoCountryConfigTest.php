@@ -106,7 +106,7 @@ class CountryConfigTest extends WP_UnitTestCase {
         klaro_geo_debug_log("Set debug country to US in query vars");
 
         // Generate config content (returned as string since 0.3.5; no longer written to disk)
-        $config_content = klaro_geo_generate_config_file();
+        $config_content = klaro_geo_frontend_inline_script();
         $this->assertIsString($config_content, 'Config generation failed');
 
         // Parse the config content to get the service settings using a more robust method
@@ -208,7 +208,7 @@ class CountryConfigTest extends WP_UnitTestCase {
 
         // Generate config content (returned as string since 0.3.5; no longer written to disk)
         klaro_geo_debug_log("Generating config content...");
-        $config_content = klaro_geo_generate_config_file();
+        $config_content = klaro_geo_frontend_inline_script();
         $this->assertIsString($config_content, 'Config generation failed');
         $this->assertNotEmpty($config_content, 'Config content is empty');
         klaro_geo_debug_log("Config content length: " . strlen($config_content));

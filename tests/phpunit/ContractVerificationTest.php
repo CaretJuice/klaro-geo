@@ -214,7 +214,7 @@ class ContractVerificationTest extends WP_UnitTestCase {
      * Contract: If template cookieDomain is empty string '', it should trigger auto-detect
      *
      * This test verifies the template config, not the actual auto-detection
-     * (which happens in klaro_geo_generate_config_file)
+     * (which happens in klaro_geo_frontend_inline_script)
      *
      * @rule cookieDomain_handling
      */
