@@ -309,8 +309,6 @@ add_action( 'wp_ajax_klaro_geo_save_country_settings', 'klaro_geo_save_country_s
 function klaro_geo_save_region_settings_ajax() {
 	klaro_geo_verify_admin_ajax( 'klaro_geo_nonce' );
 
-	klaro_geo_debug_log( 'Region settings AJAX request received' );
-
     // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- JSON string cannot be pre-sanitized; sanitized via klaro_geo_sanitize_array after json_decode below.
 	$settings_json = isset( $_POST['settings'] ) ? wp_unslash( $_POST['settings'] ) : '';
 
@@ -327,7 +325,6 @@ function klaro_geo_save_region_settings_ajax() {
 	}
 
 	$settings = klaro_geo_sanitize_array( $settings );
-	klaro_geo_debug_log( 'Region settings received: ' . count( $settings ) . ' entries' );
 
 	// Use the new country settings class
 	$country_settings = Klaro_Geo_Country_Settings::get_instance();
@@ -335,11 +332,7 @@ function klaro_geo_save_region_settings_ajax() {
 	// Update regions from AJAX data
 	$country_settings->update_regions_from_ajax( $settings );
 
-	// Save the updated settings
-	$result = $country_settings->save();
-
-	// Debug log the result
-	klaro_geo_debug_log( 'Update option result: ' . ( $result ? 'true' : 'false' ) );
+	$country_settings->save();
 
 	wp_send_json_success(
 		[
@@ -361,12 +354,8 @@ function klaro_geo_get_regions() {
 		wp_send_json_error( [ 'message' => 'Country code is required' ] );
 	}
 
-	// Debug log
-	klaro_geo_debug_log( 'Getting regions for country: ' . $country . ', language: ' . $language );
-
 	// Load regions from CSV file
 	$regions_file = KLARO_GEO_PATH . 'subdivisions.csv';
-	klaro_geo_debug_log( 'Attempting to load regions from: ' . $regions_file );
 
 	$regions   = [];
 	$languages = [];
@@ -376,11 +365,7 @@ function klaro_geo_get_regions() {
 		$lines = explode( "\n", $csv_contents );
 
 		// Skip the header row
-		$header = ! empty( $lines ) ? str_getcsv( array_shift( $lines ) ) : array();
-		klaro_geo_debug_log( 'CSV Header: ' . wp_json_encode( $header ) );
-
-		$row_count   = 0;
-		$match_count = 0;
+		array_shift( $lines );
 
 		foreach ( $lines as $line ) {
 			$line = trim( $line );
@@ -388,19 +373,10 @@ function klaro_geo_get_regions() {
 				continue;
 			}
 			$data = str_getcsv( $line );
-			++$row_count;
-
-			// Debug first few rows to understand the structure
-			if ( $row_count <= 5 ) {
-				klaro_geo_debug_log( 'CSV Row ' . $row_count . ': ' . wp_json_encode( $data ) );
-			}
 
 			// The CSV format is: country_code, subdivision_code, subdivision_name, language_code, ...
 			// Check if this is a region for the requested country
 			if ( isset( $data[0] ) && $data[0] === $country && isset( $data[1] ) ) {
-				++$match_count;
-				klaro_geo_debug_log( 'Found match for country ' . $country . ': ' . wp_json_encode( $data ) );
-
 				// Extract the region code from the subdivision_code (e.g., "BE-WBR" -> "WBR")
 				$region_code = str_replace( $country . '-', '', $data[1] );
 
@@ -420,8 +396,6 @@ function klaro_geo_get_regions() {
 				}
 			}
 		}
-
-		klaro_geo_debug_log( 'Processed ' . $row_count . ' rows, found ' . $match_count . ' matches for country ' . $country );
 	}
 
 	// If no regions found, return an empty array
@@ -448,11 +422,6 @@ function klaro_geo_get_regions() {
 		$formatted_regions[ $code ] = $name;
 	}
 
-	// Debug log
-	klaro_geo_debug_log( 'Returning regions: ' . wp_json_encode( $formatted_regions ) );
-	klaro_geo_debug_log( 'Returning region settings: ' . wp_json_encode( $region_settings ) );
-	klaro_geo_debug_log( 'Returning languages: ' . wp_json_encode( $languages ) );
-
 	wp_send_json_success(
 		[
 			'regions'          => $formatted_regions,
@@ -470,17 +439,12 @@ function klaro_geo_save_visible_countries() {
 
 	$countries = isset( $_POST['countries'] ) ? array_map( 'sanitize_text_field', wp_unslash( $_POST['countries'] ) ) : [];
 
-	// Debug log
-	klaro_geo_debug_log( 'Saving visible countries: ' . wp_json_encode( $countries ) );
-
 	// Use the new country settings class
 	$country_settings = Klaro_Geo_Country_Settings::get_instance();
 
 	// Set and save visible countries
 	$country_settings->set_visible_countries( $countries );
-	$result = $country_settings->save_visible_countries();
-
-	klaro_geo_debug_log( 'Saved visible countries: ' . ( $result ? 'success' : 'failed' ) );
+	$country_settings->save_visible_countries();
 
 	wp_send_json_success();
 }

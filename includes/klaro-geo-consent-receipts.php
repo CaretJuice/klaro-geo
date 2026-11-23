@@ -411,8 +411,6 @@ function klaro_geo_store_consent_receipt( $raw, $user_id = 0 ) {
 		return new WP_Error( 'klaro_geo_storage_failed', 'Could not store consent receipt' );
 	}
 
-	klaro_geo_debug_log( 'Stored consent receipt ' . $receipt['receipt_id'] . ' (row ' . $wpdb->insert_id . ', source: ' . $receipt['template_source'] . ')' );
-
 	return (int) $wpdb->insert_id;
 }
 
@@ -690,14 +688,6 @@ function klaro_geo_render_consent_receipts_page() {
 
 	// Get receipts for current page
 	$receipts = klaro_geo_receipts_get_page( $per_page, $offset );
-
-	// Log query details
-	klaro_geo_debug_log( 'Consent Receipts Total Items: ' . $total_items );
-	klaro_geo_debug_log( 'Consent Receipts Per Page: ' . $per_page );
-	klaro_geo_debug_log( 'Consent Receipts Offset: ' . $offset );
-	klaro_geo_debug_log( 'Consent Receipts Page: ' . $page );
-	klaro_geo_debug_log( 'Consent Receipts Total Pages: ' . $total_pages );
-	klaro_geo_debug_log( 'Consent Receipts Results: ' . wp_json_encode( $receipts ) )
 
 	?>
 	<div class="wrap">

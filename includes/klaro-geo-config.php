@@ -302,7 +302,6 @@ function klaro_geo_build_template_payload( $template_key, $templates, $services 
 			if ( json_last_error() === JSON_ERROR_NONE && is_array( $decoded_translations ) ) {
 				// Use the decoded JSON translations
 				$klaro_config['translations'] = $decoded_translations;
-				klaro_geo_debug_log( 'Using translations from JSON field' );
 			} else {
 				// Fall back to the basic translations if JSON is invalid
 				$klaro_config['translations'] = $template_config['config']['translations'] ?? [];
@@ -311,7 +310,6 @@ function klaro_geo_build_template_payload( $template_key, $templates, $services 
 		} else {
 			// Use the basic translations
 			$klaro_config['translations'] = $template_config['config']['translations'] ?? [];
-			klaro_geo_debug_log( 'Using basic translations' );
 		}
 
 		// The templates admin page renders these checkboxes as checked when the
@@ -333,13 +331,6 @@ function klaro_geo_build_template_payload( $template_key, $templates, $services 
 				'; using the admin default (true). Re-save the template to store these explicitly.'
 			);
 		}
-
-		// Log applied template settings (compact)
-		klaro_geo_debug_log(
-			'Config applied: default=' . ( ( $klaro_config['default'] ?? false ) ? 'true' : 'false' ) .
-			', mustConsent=' . ( ( $klaro_config['mustConsent'] ?? false ) ? 'true' : 'false' ) .
-			', acceptAll=' . ( ( $klaro_config['acceptAll'] ?? false ) ? 'true' : 'false' )
-		);
 	} else {
 		// No usable template config (missing, or corrupt and dropped above):
 		// use the hardcoded default template's config, as the template
@@ -409,8 +400,6 @@ function klaro_geo_build_template_payload( $template_key, $templates, $services 
 	$consent_mode_services = $service_maps['consent_mode_services'];
 	$parent_child_map      = $service_maps['parent_child_map'];
 
-	klaro_geo_debug_log( 'Consent mode services detected: ' . implode( ', ', array_values( $consent_mode_services ) ) );
-
 	// Get template's default consent state (for inheritance)
 	$template_default_consent = isset( $template_config['config']['default'] ) && $template_config['config']['default'] ? true : false;
 
@@ -448,8 +437,6 @@ function klaro_geo_build_template_payload( $template_key, $templates, $services 
 			$dynamic_consent_defaults[ $consent_default['key'] ] = $consent_default['default'];
 		}
 	}
-
-	klaro_geo_debug_log( 'Generated consolidated consent defaults for ' . count( $dynamic_consent_defaults ) . ' keys' );
 
 	// Process each service
 	foreach ( $services as $service ) {
@@ -751,8 +738,6 @@ function klaro_geo_get_frontend_payload() {
 	$service_settings = Klaro_Geo_Service_Settings::get_instance();
 	$services         = $service_settings->get();
 
-	klaro_geo_debug_log( 'Services: ' . count( $services ) . ' services configured' );
-
 	// Get user location
 	$location        = klaro_geo_get_user_location();
 	$user_country    = $location['country'];
@@ -841,11 +826,6 @@ function klaro_geo_get_frontend_payload() {
 		)
 	);
 
-	klaro_geo_debug_log(
-		'Config generated: template=' . $template_to_use . ', services=' . count( $payload['config']['services'] ) .
-		', consentLogging=' . ( $payload['enable_consent_logging'] ? 'true' : 'false' )
-	);
-
 	return array(
 		'payload'      => $frontend_payload,
 		'consent_data' => $consent_data,
@@ -864,8 +844,6 @@ function klaro_geo_get_frontend_payload() {
  * @return array Same shape as klaro_geo_get_frontend_payload().
  */
 function klaro_geo_get_client_frontend_payload( $services ) {
-	klaro_geo_debug_log( 'Generating client-mode (cache-safe) config payload' );
-
 	$template_settings = Klaro_Geo_Template_Settings::get_instance();
 	$templates         = $template_settings->get();
 
@@ -969,11 +947,6 @@ function klaro_geo_get_client_frontend_payload( $services ) {
 		),
 		'templates'        => (object) $payload_templates,
 		'consentReceipts'  => (bool) get_option( 'klaro_geo_enable_consent_receipts', false ),
-	);
-
-	klaro_geo_debug_log(
-		'Client-mode config generated: templates=' . implode( ', ', array_keys( $payload_templates ) ) .
-		', default=' . $default_template . ', timeout=' . $timeout_ms . 'ms'
 	);
 
 	// The klaroConsentData base has empty template/geo fields; the client

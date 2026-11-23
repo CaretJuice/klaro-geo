@@ -127,16 +127,13 @@ function klaro_geo_templates_page() {
 	// Save template changes
 	if ( isset( $_POST['submit_template'] ) ) {
 		check_admin_referer( 'klaro_geo_template_nonce' );
-		klaro_geo_debug_log( 'Saving template changes...' );
 
 		$current_template = isset( $_POST['current_template'] ) ? sanitize_text_field( wp_unslash( $_POST['current_template'] ) ) : 'default';
-		klaro_geo_debug_log( 'Current template: ' . $current_template );
 
 		// Get the template configuration from POST data
         // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- template_config is a complex nested array; individual values are sanitized below
 		if ( isset( $_POST['template_config'] ) && is_array( $_POST['template_config'] ) ) {
 			$template_config = wp_unslash( $_POST['template_config'] ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized per-key below
-			klaro_geo_debug_log( 'Received template config with ' . count( $template_config ) . ' keys: ' . implode( ', ', array_keys( $template_config ) ) );
 
 			$existing_template = $template_settings->get_template( $current_template );
 			$translations      = klaro_geo_resolve_submitted_translations(
@@ -188,7 +185,6 @@ function klaro_geo_templates_page() {
 			if ( $template ) {
 				$template['plugin_settings'] = $plugin_settings;
 				$template_settings->set_template( $current_template, $template );
-				klaro_geo_debug_log( 'Updated plugin_settings for template: ' . $current_template );
 			}
 		} else {
 			// Set default plugin settings if not provided
@@ -1301,14 +1297,10 @@ function klaro_geo_save_translations_ajax() {
 		wp_send_json_error( array( 'message' => 'Template not found.' ) );
 	}
 
-	// Log the AJAX request
-	klaro_geo_debug_log( 'AJAX save translations request for template: ' . $template_id );
-
 	// Process the translations JSON
 	if ( isset( $_POST['translations_json'] ) && ! empty( $_POST['translations_json'] ) ) {
         // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- JSON string cannot be sanitized with sanitize_text_field; it is validated via json_decode below
 		$translations_json = wp_unslash( $_POST['translations_json'] );
-		klaro_geo_debug_log( 'Received translations JSON: ' . substr( $translations_json, 0, 500 ) . ( strlen( $translations_json ) > 500 ? '...' : '' ) );
 
 		try {
 			// Parse the JSON
@@ -1317,7 +1309,6 @@ function klaro_geo_save_translations_ajax() {
 			if ( json_last_error() === JSON_ERROR_NONE && is_array( $translations ) ) {
 				// Successfully parsed JSON — sanitize individual values before storage
 				$translations = klaro_geo_sanitize_translations( $translations );
-				klaro_geo_debug_log( 'Translations JSON parsed and sanitized successfully' );
 
 				// Get the template config
 				$config = $template_settings->get_template_config( $template_id );
@@ -1403,9 +1394,6 @@ function klaro_geo_delete_template_ajax() {
 
 		wp_send_json_error( array( 'message' => $error_message ) );
 	}
-
-	// Log the deletion
-	klaro_geo_debug_log( 'Deleting template: ' . $template_id );
 
 	// Remove the template
 	$template_settings->remove_template( $template_id );

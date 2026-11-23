@@ -214,7 +214,7 @@ The file `plan/to-do.md` tracks outstanding and completed work:
 To see the template selection flow, turn on "Enable debug logging" in the plugin's settings (option `klaro_geo_enable_debug_logging`) with `WP_DEBUG` true. PHP messages go to the WordPress debug log.
 
 Key log entries to look for:
-- "Available template keys in database"
-- "Template lookup result"
-- "cookieDomain from template config"
-- "Using explicit cookieDomain from template" vs "Auto-detecting cookieDomain"
+- "Template for <location>: <template>, source=<source>" (which template a location resolved to)
+- "Template lookup: ..." and "Templates available: ..." (whether it was found in the database)
+- "cookieDomain from template: ..." vs "cookieDomain auto-detected: ..."
+- anything starting "WARNING:" (a fallback was used)

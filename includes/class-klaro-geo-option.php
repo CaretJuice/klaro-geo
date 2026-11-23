@@ -139,9 +139,6 @@ class Klaro_Geo_Option {
 		$this->value       = $value;
 		$this->is_modified = false;
 
-		// Single compact log entry for the load operation
-		klaro_geo_debug_log( 'Loaded ' . $this->option_name . ' (' . count( $this->value ) . ' items)' );
-
 		return $this->value;
 	}
 
@@ -164,7 +161,6 @@ class Klaro_Geo_Option {
 
 		if ( $result ) {
 			$this->is_modified = false;
-			klaro_geo_debug_log( 'Saved ' . $this->option_name . ' (' . count( $this->value ) . ' items)' );
 		} else {
 			klaro_geo_debug_log( 'Failed to save ' . $this->option_name );
 		}

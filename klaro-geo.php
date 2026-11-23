@@ -151,8 +151,6 @@ function klaro_geo_migrate_gtm_consent_requirement() {
 
 			// Clear instance cache to ensure fresh data on next access
 			Klaro_Geo_Service_Settings::clear_instance_cache();
-
-			klaro_geo_debug_log( 'GTM service migration complete' );
 		} else {
 			klaro_geo_debug_log( 'GTM service does not match old defaults, skipping migration' );
 		}
@@ -243,7 +241,6 @@ function klaro_geo_init_consent_mode_services() {
 		$service_settings->save();
 		// Clear instance cache to ensure fresh data on next access
 		Klaro_Geo_Service_Settings::clear_instance_cache();
-		klaro_geo_debug_log( 'Consent mode services initialization complete' );
 	}
 }
 

@@ -281,7 +281,6 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
 		$template_settings   = Klaro_Geo_Template_Settings::get_instance();
 		$available_templates = $template_settings->get();
 		$available_keys      = array_keys( $available_templates );
-		klaro_geo_debug_log( 'Available template keys for validation: ' . implode( ', ', $available_keys ) );
 
 		// Get the default template and validate it exists
 		$default_template = isset( $submitted_settings['default_template'] ) ? $submitted_settings['default_template'] : 'default';
@@ -294,10 +293,6 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
 
 		// Get current settings to preserve region settings
 		$current_settings = $this->get();
-
-		// Log the submitted settings and current settings for debugging
-		klaro_geo_debug_log( 'Submitted settings: ' . wp_json_encode( $submitted_settings ) );
-		klaro_geo_debug_log( 'Current settings before update: ' . wp_json_encode( $current_settings ) );
 
 		// Create a new settings array with the default_template
 		$new_settings = array(
@@ -318,8 +313,6 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
 
 			// Check if regions are included in the submitted settings
 			if ( isset( $config['regions'] ) && is_array( $config['regions'] ) ) {
-				klaro_geo_debug_log( 'Found regions in submitted settings for country ' . $code . ': ' . wp_json_encode( $config['regions'] ) );
-
 				// Filter out empty regions
 				$config['regions'] = array_filter(
 					$config['regions'],
@@ -327,28 +320,17 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
 						return ! empty( $value ) && $value !== 'default' && $value !== 'inherit';
 					}
 				);
-
-				if ( ! empty( $config['regions'] ) ) {
-					klaro_geo_debug_log( 'After filtering, regions for country ' . $code . ': ' . wp_json_encode( $config['regions'] ) );
-				} else {
-					klaro_geo_debug_log( 'No valid regions found after filtering for country ' . $code );
-					// Keep an empty regions array for consistency
-					$config['regions'] = array();
-				}
 			} elseif ( isset( $current_settings[ $code ] ) && isset( $current_settings[ $code ]['regions'] ) ) {
 				$config['regions'] = $current_settings[ $code ]['regions'];
-				klaro_geo_debug_log( 'Preserving existing region settings for country ' . $code . ': ' . wp_json_encode( $config['regions'] ) );
 			} else {
 				// Ensure regions key exists
 				$config['regions'] = array();
-				klaro_geo_debug_log( 'No regions found for country ' . $code . ', creating empty array' );
 			}
 
 			// If the country uses the default template or inherits from fallback and has no regions, skip it
 			if ( isset( $config['template'] ) &&
 				( $config['template'] === $default_template || $config['template'] === 'inherit' ) &&
 				( ! isset( $config['regions'] ) || empty( $config['regions'] ) ) ) {
-				klaro_geo_debug_log( 'Skipping country ' . $code . ' (uses default template or inherits from fallback with no region overrides)' );
 				continue;
 			}
 
@@ -358,7 +340,6 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
 					klaro_geo_debug_log( 'WARNING: Country ' . $code . ' references non-existent template "' . $config['template'] . '". Available: ' . implode( ', ', $available_keys ) );
 					// Fall back to inherit (use fallback template)
 					$config['template'] = 'inherit';
-					klaro_geo_debug_log( 'Country ' . $code . ' template reset to "inherit"' );
 				}
 			}
 
@@ -375,14 +356,11 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
 			// If country is not in new settings but has region overrides, preserve it
 			if ( ! isset( $new_settings[ $code ] ) && isset( $config['regions'] ) && ! empty( $config['regions'] ) ) {
 				$new_settings[ $code ] = $config;
-				klaro_geo_debug_log( 'Preserving country ' . $code . ' with region overrides: ' . wp_json_encode( $config['regions'] ) );
 			}
 		}
 
 		// Replace the old settings with the new ones
 		$this->set( $new_settings );
-
-		klaro_geo_debug_log( 'Updated country settings from form: ' . wp_json_encode( $new_settings ) );
 
 		return $this;
 	}
@@ -394,12 +372,6 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
 	 * @return $this For method chaining
 	 */
 	public function update_regions_from_ajax( array $settings ) {
-		klaro_geo_debug_log( 'Updating regions from AJAX: ' . wp_json_encode( $settings ) );
-
-		// Get current settings to ensure we don't lose any data
-		$current_settings = $this->get();
-		klaro_geo_debug_log( 'Current settings before updating regions: ' . wp_json_encode( $current_settings ) );
-
 		// Update region settings for each country
 		foreach ( $settings as $country => $country_data ) {
 			// Get existing country settings or create new ones
@@ -416,9 +388,6 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
 				$country_settings['template'] = $this->get_default_template();
 			}
 
-			// Log the country settings before updating
-			klaro_geo_debug_log( 'Country settings before updating regions for ' . $country . ': ' . wp_json_encode( $country_settings ) );
-
 			// Check if regions is defined in the incoming data
 			if ( isset( $country_data['regions'] ) && is_array( $country_data['regions'] ) ) {
 				// Initialize regions array if it doesn't exist
@@ -431,11 +400,9 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
 					// Only save if the value is not "inherit" or "default" (use country default)
 					if ( $template !== 'inherit' && $template !== 'default' ) {
 						$country_settings['regions'][ $region_code ] = $template;
-						klaro_geo_debug_log( "Setting region {$region_code} to template {$template}" );
 					} elseif ( isset( $country_settings['regions'][ $region_code ] ) ) {
 						// If the value is "inherit" or "default", remove any existing override
 						unset( $country_settings['regions'][ $region_code ] );
-						klaro_geo_debug_log( "Removing region {$region_code} override (set to inherit from country)" );
 					}
 				}
 			}
@@ -443,22 +410,11 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
 			// Ensure regions key exists
 			if ( ! isset( $country_settings['regions'] ) ) {
 				$country_settings['regions'] = array();
-				klaro_geo_debug_log( "Creating empty regions array for country {$country}" );
-			} elseif ( empty( $country_settings['regions'] ) ) {
-				// We'll keep the empty regions array to ensure we don't lose region settings
-				klaro_geo_debug_log( "Empty regions array for country {$country}, but keeping it for consistency" );
 			}
 
 			// Update the country settings
 			$this->set_country( $country, $country_settings );
-
-			// Log the country settings after updating
-			klaro_geo_debug_log( 'Country settings after updating regions for ' . $country . ': ' . wp_json_encode( $country_settings ) );
 		}
-
-		// Get settings after updating all countries
-		$updated_settings = $this->get();
-		klaro_geo_debug_log( 'Settings after updating all regions: ' . wp_json_encode( $updated_settings ) );
 
 		return $this;
 	}
@@ -471,18 +427,10 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
 	 * @return array The effective settings for the location
 	 */
 	public function get_effective_settings( $location_code, $is_admin_override = false ) {
-		klaro_geo_debug_log( 'Getting effective settings for: ' . $location_code . ( $is_admin_override ? ' (admin override)' : '' ) );
-
 		// Split location code to check if it's a region request
 		$parts        = explode( '-', $location_code );
 		$country_code = $parts[0];
 		$region_code  = isset( $parts[1] ) ? $parts[1] : null;
-
-		// Load country settings (using class methods)
-		$geo_settings = $this->get();
-
-		// Log global settings only once per request (use summarized format)
-		klaro_geo_log_once( 'global_settings', 'Country settings: ' . count( $geo_settings ) . ' entries, default_template=' . ( $geo_settings['default_template'] ?? 'not set' ) );
 
 		// Get the default template
 		$default_template = $this->get_default_template();
@@ -498,17 +446,14 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
 			// If the country is not in the settings, it means it's using the default template
 			if ( ! $this->has_key( $country_code ) ) {
 				// Country is using default template
-				klaro_geo_debug_log( 'Country ' . $country_code . ' not found in settings, using default template' );
 				$effective_settings['template'] = $this->get_default_template();
 				$effective_settings['source']   = 'default';
 			} else {
 				// Country has specific settings
 				$country_settings = $this->get_country( $country_code );
-				klaro_geo_debug_log( 'Country ' . $country_code . ' found in settings' );
 
 				// Check if the country is set to inherit from fallback template
 				if ( isset( $country_settings['template'] ) && $country_settings['template'] === 'inherit' ) {
-					klaro_geo_debug_log( 'Country ' . $country_code . ' is set to inherit from fallback template' );
 					$effective_settings['template'] = $this->get_default_template();
 					$effective_settings['source']   = 'fallback';
 				} else {
@@ -519,16 +464,10 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
 				// Check for region override
 				if ( $region_code && isset( $country_settings['regions'] ) &&
 					isset( $country_settings['regions'][ $region_code ] ) ) {
-					klaro_geo_debug_log( 'Region ' . $region_code . ' found in settings' );
-
 					$region_template = $country_settings['regions'][ $region_code ];
 
-					// Check if region is set to inherit from country
-					if ( $region_template === 'inherit' ) {
-						klaro_geo_debug_log( 'Region ' . $region_code . ' is set to inherit from country template' );
-						// Keep the country template (already set above)
-						// No need to change anything as we're inheriting from country
-					} else {
+					// A region set to inherit keeps the country's template.
+					if ( 'inherit' !== $region_template ) {
 						$effective_settings['template'] = $region_template;
 						$effective_settings['source']   = 'region';
 					}
@@ -548,34 +487,15 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
 		// Allow filtering of templates
 		$templates = apply_filters( 'klaro_geo_templates', $templates );
 
-		// Log available templates for debugging
-		klaro_geo_debug_log( 'Available templates for validation: ' . implode( ', ', array_keys( $templates ) ) );
-
-		if ( isset( $templates[ $effective_settings['template'] ] ) ) {
-			klaro_geo_debug_log( 'Template "' . $effective_settings['template'] . '" found in database' );
-
-			// Log the default setting for this template
-			$template_config = isset( $templates[ $effective_settings['template'] ]['config'] ) ?
-				$templates[ $effective_settings['template'] ]['config'] : array();
-			$default_setting = isset( $template_config['default'] ) ?
-				( $template_config['default'] ? 'true' : 'false' ) : 'not set';
-			klaro_geo_debug_log( 'Template "' . $effective_settings['template'] . '" default setting: ' . $default_setting );
-
-			// Log cookieDomain for debugging the specific issue
-			$cookie_domain = isset( $template_config['cookieDomain'] ) ? $template_config['cookieDomain'] : '(not set)';
-			klaro_geo_debug_log( 'Template "' . $effective_settings['template'] . '" cookieDomain: "' . $cookie_domain . '"' );
-		} else {
-			klaro_geo_debug_log( 'WARNING: Template "' . $effective_settings['template'] . '" not found in templates!' );
-			klaro_geo_debug_log( 'Available templates: ' . implode( ', ', array_keys( $templates ) ) );
-
-			// Fall back to fallback template if the selected one doesn't exist
-			$fallback_template              = $this->get_default_template();
+		if ( ! isset( $templates[ $effective_settings['template'] ] ) ) {
+			// Fall back to the fallback template if the selected one doesn't exist
+			$fallback_template = $this->get_default_template();
+			klaro_geo_debug_log( 'WARNING: Template "' . $effective_settings['template'] . '" for ' . $location_code . ' not found in templates (available: ' . implode( ', ', array_keys( $templates ) ) . '); falling back to "' . $fallback_template . '"' );
 			$effective_settings['template'] = $fallback_template;
 			$effective_settings['source']   = 'fallback';
-			klaro_geo_debug_log( 'Falling back to fallback template: ' . $fallback_template );
 		}
 
-		klaro_geo_debug_log( 'Effective settings: template=' . ( $effective_settings['template'] ?? 'none' ) . ', source=' . ( $effective_settings['source'] ?? 'unknown' ) );
+		klaro_geo_debug_log( 'Template for ' . $location_code . ( $is_admin_override ? ' (admin override)' : '' ) . ': ' . $effective_settings['template'] . ', source=' . $effective_settings['source'] );
 		return $effective_settings;
 	}
 

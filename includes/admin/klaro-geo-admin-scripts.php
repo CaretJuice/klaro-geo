@@ -17,9 +17,6 @@ function klaro_geo_admin_scripts( $hook ) {
 		return;
 	}
 
-	// Debug log
-	klaro_geo_debug_log( 'Loading admin scripts for hook: ' . $hook );
-
 	// 1. Enqueue common admin styles
 	wp_enqueue_style(
 		'klaro-geo-admin',
@@ -103,7 +100,6 @@ function klaro_geo_admin_scripts( $hook ) {
 		);
 
 		wp_enqueue_script( 'klaro-geo-service-translations-js' );
-		klaro_geo_debug_log( 'Service translations script loaded' );
 	}
 
 	// Templates page
@@ -118,7 +114,6 @@ function klaro_geo_admin_scripts( $hook ) {
 		);
 
 		wp_enqueue_script( 'klaro-geo-templates-js' );
-		klaro_geo_debug_log( 'Templates script loaded' );
 	}
 }
 add_action( 'admin_enqueue_scripts', 'klaro_geo_admin_scripts' );

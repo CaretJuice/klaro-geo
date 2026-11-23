@@ -35,23 +35,11 @@ class Klaro_Geo_Template_Settings extends Klaro_Geo_Option {
 	public function __construct( $option_name = 'klaro_geo_templates', $default_value = array() ) {
 		parent::__construct( $option_name, $default_value );
 
-		// Debug log the initial value
-		klaro_geo_debug_log( 'Template Settings constructor - Initial value: ' . ( empty( $this->value ) ? 'empty' : 'not empty' ) . ' (count: ' . count( $this->value ) . ')' );
-
 		// If empty, initialize with default templates
 		if ( empty( $this->value ) ) {
-			klaro_geo_debug_log( 'Template Settings constructor - Initializing with default templates' );
+			klaro_geo_debug_log( 'No templates stored, using the default templates' );
 			$this->value       = $this->get_default_templates();
 			$this->is_modified = true;
-		} else {
-			// Log the templates that were loaded
-			$template_names = array_map(
-				function ( $template ) {
-					return isset( $template['name'] ) ? $template['name'] : 'unnamed';
-				},
-				$this->value
-			);
-			klaro_geo_debug_log( 'Template Settings constructor - Loaded templates: ' . implode( ', ', $template_names ) );
 		}
 	}
 
@@ -65,9 +53,6 @@ class Klaro_Geo_Template_Settings extends Klaro_Geo_Option {
 		// This ensures we have a single source of truth for template definitions
 		// Now get the templates from the global function
 		$templates = klaro_geo_get_default_templates();
-
-		// Log the templates we got
-		klaro_geo_debug_log( 'Got ' . count( $templates ) . ' default templates from global function' );
 
 		return $templates;
 	}
@@ -146,7 +131,6 @@ class Klaro_Geo_Template_Settings extends Klaro_Geo_Option {
 
 				// Preserve the existing translations
 				$config['translations'] = $template['config']['translations'];
-				klaro_geo_debug_log( 'Preserved existing translations for template ' . $template_key );
 			}
 
 			$template['config'] = $config;

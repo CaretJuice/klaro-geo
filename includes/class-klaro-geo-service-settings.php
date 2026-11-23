@@ -55,9 +55,6 @@ class Klaro_Geo_Service_Settings extends Klaro_Geo_Option {
 		// Now get the services from the global function
 		$services = klaro_geo_get_default_services();
 
-		// Log the services we got
-		klaro_geo_debug_log( 'Got ' . count( $services ) . ' default services from global function' );
-
 		return $services;
 	}
 

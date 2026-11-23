@@ -11,7 +11,6 @@ function klaro_geo_services_page_content() {
 	// Initialize the service settings class
 	$service_settings = Klaro_Geo_Service_Settings::get_instance();
 	$services         = $service_settings->get();
-	klaro_geo_debug_log( 'Services page content - ' . count( $services ) . ' services' );
 
 	// Scripts are now enqueued in klaro-geo-admin-scripts.php
 
@@ -41,8 +40,6 @@ function klaro_geo_services_page_content() {
 					echo "<tr><td colspan='8'>No services configured yet.</td></tr>"; // Updated colspan for the new advanced column
 				} else {
 					foreach ( $services as $index => $service ) {
-						klaro_geo_debug_log( 'Processing service in admin loop: ' . ( $service['name'] ?? 'unnamed' ) );
-
 						$name     = isset( $service['name'] ) ? $service['name'] : 'N/A';
 						$required = isset( $service['required'] ) ? ( $service['required'] ? 'Yes' : 'No' ) : 'N/A';
 						$default  = isset( $service['default'] ) ? ( $service['default'] ? 'Yes' : 'No' ) : 'N/A';
@@ -288,8 +285,6 @@ function klaro_geo_save_services() {
 	$service_settings = Klaro_Geo_Service_Settings::get_instance();
 	$service_settings->set( $services );
 	$service_settings->save();
-
-	klaro_geo_debug_log( 'Saved ' . count( $services ) . ' services' );
 
 	wp_send_json_success();
 }
