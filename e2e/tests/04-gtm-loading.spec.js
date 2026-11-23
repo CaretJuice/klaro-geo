@@ -105,7 +105,7 @@ test.describe('Google Tag Manager Loading', () => {
       route.fulfill({ status: 200, contentType: 'application/javascript', body: '' })
     );
 
-    // Clear browser cache to ensure fresh klaro-config.js is loaded
+    // Start without a stored consent choice
     await context.clearCookies();
 
     // Clear all cookies and localStorage after navigating to a page

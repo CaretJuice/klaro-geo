@@ -4,82 +4,21 @@ This directory contains all Docker-related files for the Klaro Geo plugin develo
 
 ## Contents
 
-- `docker-compose.yml` - Main Docker Compose configuration
-- `docker-entrypoint-test.sh` - Entrypoint script for the test container
+- `docker-compose.yml` - the PHPUnit runner (`wordpress_test`, `db_test`) and the dev site (`wordpress`, `db`)
+- `Dockerfile.test`, `docker-entrypoint-test.sh` - the PHPUnit runner image and its entrypoint
+- `docker-entrypoint-wordpress.sh` - the dev site's entrypoint
 - `php.ini` and `custom.ini` - PHP configuration for the containers
-- `test-logging.sh` - Script to test logging functionality
-- `copy-debug-log.sh` - Script to copy debug logs from the container
-- `debug-database.sh` - Script to debug database issues
-- `fix-npm-permissions.sh` - Script to fix npm permissions issues
-- `make-scripts-executable.sh` - Script to make all scripts executable
-- `logs/` - Directory for storing debug logs
+- `logs.sh`, `test-logging.sh`, `debug-database.sh`, `fix-npm-permissions.sh`, `rebuild-and-test.sh` - troubleshooting scripts
+- `logs/` - debug logs copied out of the containers
 
-## Getting Started
-
-For basic setup instructions, see the [main README.md](../readme.md) and [readme-dev.md](../readme-dev.md) files in the plugin root directory.
-
-### Making Scripts Executable
-
-To make all scripts executable at once, you can use the fix-permissions.sh script:
-
-```bash
-# Run this from the project root directory
-bash fix-permissions.sh
-```
-
-This will set the executable permission on all .sh files in the project.
-
-Alternatively, you can make individual scripts executable:
-
-```bash
-chmod +x run-tests.sh
-chmod +x docker/fix-npm-permissions.sh
-```
-
-## Running Tests
-
-Klaro Geo includes comprehensive test suites for both PHP and JavaScript code.
-
-### Standard PHP Tests
-
-To run the standard PHP tests:
+## Running tests
 
 ```bash
 cd docker
-docker compose run wordpress_test
+docker compose run --rm wordpress_test vendor/bin/phpunit
 ```
 
-Or use the convenience script from the plugin root:
-
-```bash
-chmod +x run-tests.sh
-./run-tests.sh
-```
-
-### JavaScript Tests
-
-To run the JavaScript tests:
-
-```bash
-chmod +x run-tests.sh
-./run-tests.sh js
-```
-
-If you encounter npm permissions issues, you can fix them with:
-
-```bash
-# If you've already made the script executable
-./docker/fix-npm-permissions.sh
-
-# Or run it directly with bash
-bash docker/fix-npm-permissions.sh
-```
-
-To run a specific JavaScript test file:
-
-```bash
-./run-tests.sh js test-file-name.js
-```
+Add `--filter ClassName` for one test class. JavaScript tests run on the host with `npx jest` from the repository root. See [readme-dev.md](../readme-dev.md) for the rest.
 
 ## Debugging
 
@@ -128,19 +67,12 @@ Klaro Geo provides several ways to write to the debug log:
 
 You can view the debug logs in several ways:
 
-1. **Using the copy-debug-log.sh script**:
-   ```bash
-   chmod +x copy-debug-log.sh
-   ./copy-debug-log.sh
-   ```
-   This copies the log to `logs/debug_test.log` in your host machine.
+1. **After tests complete**: the log is copied to `logs/debug_test.log` on your machine.
 
 2. **Directly from the container**:
    ```bash
    docker exec wordpress_test cat /var/www/html/wp-content/debug.log
    ```
-
-3. **After tests complete**: The log is automatically copied to the `logs` directory.
 
 ### Testing Logging Functionality
 

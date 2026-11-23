@@ -33,7 +33,7 @@ test.describe('Geo-Detection and Template Loading', () => {
     expect(configLoadedEvent).toBeTruthy();
 
     // Verify the dataLayer event structure exists
-    // Field name is klaroGeoConsentTemplate (not klaroGeoTemplateName) per klaro-config.js:175
+    // Field name is klaroGeoConsentTemplate (not klaroGeoTemplateName), see specs/datalayer-events.spec.yaml
     expect(configLoadedEvent).toHaveProperty('klaroGeoConsentTemplate');
     expect(configLoadedEvent.klaroGeoTemplateSource).toBeTruthy();
 

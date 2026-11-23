@@ -40,7 +40,6 @@ function wpCli(command, options = {}) {
 /**
  * Update Klaro service settings via WP-CLI (fast, no browser needed)
  * Uses wp eval to update the option directly via PHP
- * Also regenerates the klaro-config.js file
  * @param {string} serviceName - Service name (e.g., 'google-tag-manager')
  * @param {Object} settings - Settings to update (e.g., { required: false, default: false })
  * @returns {Object} - Result of the update
@@ -68,8 +67,6 @@ function updateServiceSettingsViaCli(serviceName, settings) {
       'update_option("klaro_geo_services", $services);',
       // Clear the service settings cache so the new values are used
       'if (class_exists("Klaro_Geo_Service_Settings")) { Klaro_Geo_Service_Settings::clear_instance_cache(); }',
-      // Regenerate the klaro-config.js file
-      'if (function_exists("klaro_geo_generate_config_file")) { klaro_geo_generate_config_file(); }',
       'echo "SUCCESS";'
     ].join(' ');
 
@@ -290,7 +287,7 @@ class WordPressHelper {
 }
 
 /**
- * Update a WordPress option via WP-CLI and regenerate klaro-config.js
+ * Update a WordPress option via WP-CLI
  * @param {string} optionName - Option name
  * @param {string} value - Option value
  * @returns {Object} - Result of the update
@@ -298,8 +295,6 @@ class WordPressHelper {
 function updateOptionViaCli(optionName, value) {
   try {
     wpCli(`option update ${optionName} "${value}"`);
-    // Regenerate config file to pick up the change
-    wpCli(`eval 'if (function_exists("klaro_geo_generate_config_file")) { klaro_geo_generate_config_file(); echo "OK"; }'`);
     return { success: true };
   } catch (error) {
     return { success: false, error: error.message };

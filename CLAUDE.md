@@ -211,10 +211,7 @@ The file `plan/to-do.md` tracks outstanding and completed work:
 
 ## Debug Logging
 
-Enable debug logging to see template selection flow:
-```php
-define('KLARO_GEO_DEBUG', true);
-```
+To see the template selection flow, turn on "Enable debug logging" in the plugin's settings (option `klaro_geo_enable_debug_logging`) with `WP_DEBUG` true. PHP messages go to the WordPress debug log.
 
 Key log entries to look for:
 - "Available template keys in database"

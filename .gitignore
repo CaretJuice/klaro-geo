@@ -35,7 +35,6 @@ vendor/
 composer.lock
 
 # WordPress Plugin Specific
-klaro-config.js
 klaro-geo.zip
 
 # Build and Distribution Files
