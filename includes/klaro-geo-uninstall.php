@@ -47,6 +47,7 @@ function klaro_geo_uninstall_option_names() {
 		// Global Privacy Control.
 		'klaro_geo_gpc_enabled',
 		'klaro_geo_gpc_well_known',
+		'klaro_geo_gpc_well_known_updated',
 
 		// Consent receipts. The receipts table is handled separately.
 		'klaro_geo_enable_consent_receipts',

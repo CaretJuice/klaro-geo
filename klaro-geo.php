@@ -815,9 +815,19 @@ function klaro_geo_gpc_json_body() {
 		return null;
 	}
 
+	// lastUpdate is the date the statement last changed, which is when the
+	// setting was last switched (klaro_geo_gpc_well_known_changed()). A site
+	// that switched it on before that date was recorded gets today's, once.
+	$last_update = get_option( 'klaro_geo_gpc_well_known_updated', '' );
+	if ( '' === $last_update ) {
+		$last_update = gmdate( 'Y-m-d' );
+		update_option( 'klaro_geo_gpc_well_known_updated', $last_update );
+		klaro_geo_debug_log( 'No date recorded for the GPC support statement; recorded today (' . $last_update . ')' );
+	}
+
 	return array(
 		'gpc'        => true,
-		'lastUpdate' => gmdate( 'Y-m-d' ),
+		'lastUpdate' => $last_update,
 	);
 }
 
@@ -843,14 +853,36 @@ function klaro_geo_gpc_template_redirect() {
 add_action( 'template_redirect', 'klaro_geo_gpc_template_redirect', 1 );
 
 /**
- * Flush rewrite rules when GPC well-known setting changes
+ * When the "Serve /.well-known/gpc.json" setting is switched on or off: record
+ * the date (the statement's lastUpdate) and flush the rewrite rules.
+ *
+ * Saving the settings page stores the checkbox again each time, as true where
+ * '1' was stored, so the values are compared as booleans: only a real switch
+ * counts.
+ *
+ * @param mixed $old_value The stored value.
+ * @param mixed $new_value The new value.
  */
-function klaro_geo_gpc_flush_rewrite_on_save( $old_value, $new_value ) {
-	if ( $old_value !== $new_value ) {
-		flush_rewrite_rules();
+function klaro_geo_gpc_well_known_changed( $old_value, $new_value ) {
+	if ( (bool) $old_value === (bool) $new_value ) {
+		return;
 	}
+
+	update_option( 'klaro_geo_gpc_well_known_updated', gmdate( 'Y-m-d' ) );
+	flush_rewrite_rules();
 }
-add_action( 'update_option_klaro_geo_gpc_well_known', 'klaro_geo_gpc_flush_rewrite_on_save', 10, 2 );
+add_action( 'update_option_klaro_geo_gpc_well_known', 'klaro_geo_gpc_well_known_changed', 10, 2 );
+
+/**
+ * The first time the setting is saved it is added, not updated.
+ *
+ * @param string $option The option name.
+ * @param mixed  $value  The value added.
+ */
+function klaro_geo_gpc_well_known_added( $option, $value ) {
+	klaro_geo_gpc_well_known_changed( false, $value );
+}
+add_action( 'add_option_klaro_geo_gpc_well_known', 'klaro_geo_gpc_well_known_added', 10, 2 );
 
 /**
  * Flush rewrite rules on activation to register the GPC endpoint

@@ -12,8 +12,15 @@
 
 class KlaroGeoGpcWellKnownTest extends WP_UnitTestCase {
 
+	public function set_up() {
+		parent::set_up();
+		delete_option( 'klaro_geo_gpc_well_known' );
+		delete_option( 'klaro_geo_gpc_well_known_updated' );
+	}
+
 	public function tear_down() {
 		delete_option( 'klaro_geo_gpc_well_known' );
+		delete_option( 'klaro_geo_gpc_well_known_updated' );
 		parent::tear_down();
 	}
 
@@ -52,7 +59,42 @@ class KlaroGeoGpcWellKnownTest extends WP_UnitTestCase {
 		$body = klaro_geo_gpc_json_body();
 
 		$this->assertTrue( $body['gpc'] );
-		$this->assertMatchesRegularExpression( '/^\d{4}-\d{2}-\d{2}$/', $body['lastUpdate'] );
+		$this->assertSame( gmdate( 'Y-m-d' ), $body['lastUpdate'] );
 		$this->assertSame( array( 'gpc', 'lastUpdate' ), array_keys( $body ) );
+	}
+
+	/**
+	 * lastUpdate is the date the statement last changed: the day the setting
+	 * was last switched, not the day of the request.
+	 */
+	public function test_last_update_is_the_day_the_setting_was_switched() {
+		update_option( 'klaro_geo_gpc_well_known', true );
+		$this->assertSame( gmdate( 'Y-m-d' ), get_option( 'klaro_geo_gpc_well_known_updated' ), 'Recorded when switched on' );
+
+		// Some time later: the recorded date is what is served.
+		update_option( 'klaro_geo_gpc_well_known_updated', '2025-03-14' );
+		$this->assertSame( '2025-03-14', klaro_geo_gpc_json_body()['lastUpdate'] );
+
+		// Saving the settings page again without switching it changes nothing.
+		// The page stores true where '1' is stored.
+		update_option( 'klaro_geo_gpc_well_known', '1' );
+		update_option( 'klaro_geo_gpc_well_known', true );
+		$this->assertSame( '2025-03-14', klaro_geo_gpc_json_body()['lastUpdate'] );
+
+		// Switching it off and on again is a change.
+		update_option( 'klaro_geo_gpc_well_known', false );
+		update_option( 'klaro_geo_gpc_well_known', true );
+		$this->assertSame( gmdate( 'Y-m-d' ), klaro_geo_gpc_json_body()['lastUpdate'] );
+	}
+
+	/**
+	 * A site that switched the setting on before the date was recorded.
+	 */
+	public function test_a_missing_date_is_recorded_once() {
+		update_option( 'klaro_geo_gpc_well_known', true );
+		delete_option( 'klaro_geo_gpc_well_known_updated' );
+
+		$this->assertSame( gmdate( 'Y-m-d' ), klaro_geo_gpc_json_body()['lastUpdate'] );
+		$this->assertSame( gmdate( 'Y-m-d' ), get_option( 'klaro_geo_gpc_well_known_updated' ) );
 	}
 }
