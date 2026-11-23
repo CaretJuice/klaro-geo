@@ -1,362 +1,42 @@
 /**
  * Klaro Geo Consent Button
  *
- * Implements a floating button to reopen the Klaro consent modal
- * and handles click events for elements with the open-klaro-modal class.
+ * Opens the Klaro consent modal when any element with the class
+ * open-klaro-modal is clicked (the shortcode button, a menu item, a theme's
+ * own link), and adds the floating button when it is enabled.
+ *
+ * Settings come from window.klaroGeo, which PHP prints before this script.
+ * The script is deferred and depends on klaro.js, so the document is parsed
+ * and Klaro is loaded when it runs. Styles are in css/klaro-consent-button.css.
  */
-
-(function($) {
+(function() {
     'use strict';
 
-    // Define default settings
-    let defaultSettings = {
-        enableFloatingButton: false,
-        floatingButtonText: 'Manage Consent',
-        floatingButtonTheme: 'light',
-        floatingButtonPosition: 'bottom-right',
-        debug: false
-    };
-
-    // Helper function to merge objects (replacement for jQuery's $.extend if not available)
-    function mergeObjects(target) {
-        if (target === undefined || target === null) {
-            target = {};
-        }
-
-        for (let i = 1; i < arguments.length; i++) {
-            let source = arguments[i];
-            if (source === undefined || source === null) {
-                continue;
-            }
-
-            for (let key in source) {
-                if (source.hasOwnProperty(key)) {
-                    target[key] = source[key];
-                }
-            }
-        }
-
-        return target;
-    }
-
-    let isInitialized = false;
-    let settings;
-    // Get settings from global object or use defaults
-    function getSettings() {
-        if (settings) { // Check if settings are already cached
-            if (settings.debug) {
-                klaroGeoLog('Returning cached klaroGeo settings:', settings);
-            }
-            return settings;
-        }
-
-        // Try to get settings from different possible locations
-        let rawSettings = typeof window.klaroGeo !== 'undefined' ? window.klaroGeo : null;
-
-        // Debug: log what we found
-        if (rawSettings && rawSettings.debug) {
-            klaroGeoLog('klaroGeo settings found:', rawSettings);
-        }
-
-        // If settings are found, merge with defaults
-        if (rawSettings) {
-            let mergedSettings = (typeof $.extend === 'function')
-                ? $.extend({}, defaultSettings, rawSettings)
-                : mergeObjects({}, defaultSettings, rawSettings);
-
-            // Debug: log merged settings
-            if (mergedSettings.debug) {
-                klaroGeoLog('klaroGeo merged settings:', mergedSettings);
-            }
-            settings = mergedSettings; // Cache the settings
-            return settings;
-        }
-
-        // Log warning and return defaults
-        klaroGeoWarn('klaroGeo settings not found, using defaults');
-        settings = defaultSettings; // Cache defaults as well
-        return defaultSettings;
-    }
-
-    // Initialize the consent button functionality
-    function init() {
-        if (isInitialized) {
-            if (settings && settings.debug) { // Use the cached settings
-                klaroGeoLog('init() already run, exiting.');
-            }
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.open-klaro-modal')) {
             return;
         }
-
-        settings = getSettings(); // Get settings only when init runs
-        if (!settings) return; // Prevent further execution if settings are not available
-
-        if (settings.debug) {
-            klaroGeoLog('Initializing Klaro Geo Consent Button, version:', settings.version);
-        }
-
-        // Create and append floating button if enabled in settings
-        if (settings.enableFloatingButton === true) {
-            // Check if button already exists to avoid duplicates
-            if ($('.klaro-floating-button').length === 0) {
-                if (settings.debug) {
-                    klaroGeoLog('Creating floating button with settings:', {
-                        text: settings.floatingButtonText,
-                        theme: settings.floatingButtonTheme,
-                        position: settings.floatingButtonPosition
-                    });
-                }
-                createFloatingButton(settings);
-            } else if (settings.debug) {
-                klaroGeoLog('Floating button already exists, skipping creation');
-            }
-        } else if (settings.debug) {
-            klaroGeoLog('Floating button is disabled in settings');
-        }
-        isInitialized = true;
-    }
-
-    // Function to check if Klaro is loaded
-    function isKlaroLoaded() {
-        return typeof window.klaro !== 'undefined' && typeof window.klaro.show === 'function';
-    }
-
-    // Initialize with Klaro check
-    function initWithKlaroCheck() {
-        klaroGeoLog('initWithKlaroCheck() called');
-        let settingsForCheck = typeof window.klaroGeo !== 'undefined' ? window.klaroGeo : null; // Only get raw settings for the debug log here
-
-        if (settingsForCheck && settingsForCheck.debug) {
-            klaroGeoLog('Checking if Klaro is loaded:', isKlaroLoaded());
-        }
-
-        if (isKlaroLoaded()) {
-            init();
-        } else {
-            if (settingsForCheck && settingsForCheck.debug) {
-                klaroGeoLog('Klaro not loaded yet, waiting...');
-            }
-            setTimeout(initWithKlaroCheck, 500);
-        }
-    }
-
-    // Function to handle clicks on open-klaro-modal elements
-    function handleKlaroModalClick(e) {
         e.preventDefault();
 
-        // Show Klaro modal if available
-        if (isKlaroLoaded()) {
+        // Klaro is a separate library; a site can dequeue or block it.
+        if (window.klaro && typeof window.klaro.show === 'function') {
             window.klaro.show();
         } else {
             klaroGeoError('Klaro is not initialized or show() function is missing.');
         }
-    }
-
-    // Start the initialization process
-    $(document).ready(function() {
-        // Register click handler for .open-klaro-modal elements
-        $(document).on('click', '.open-klaro-modal', handleKlaroModalClick);
-
-        // Then start checking for Klaro
-        initWithKlaroCheck();
     });
 
-    /**
-     * Creates and appends the floating consent button to the page
-     */
-    function createFloatingButton(settings) {
-        // Get settings
-        let buttonText = settings.floatingButtonText;
-        let buttonTheme = settings.floatingButtonTheme;
-        let buttonPosition = settings.floatingButtonPosition;
-
-        try {
-            // Create button with jQuery
-            let $button = $('<button>', {
-                'class': 'klaro-floating-button open-klaro-modal klaro-theme-' + buttonTheme + ' klaro-position-' + buttonPosition,
-                'text': buttonText,
-                'aria-label': buttonText
-            });
-
-            // Append to body
-            $('body').append($button);
-
-            // Add button styles if not already added
-            let hasStyles = false;
-            try {
-                hasStyles = $('#klaro-floating-button-styles').length > 0;
-            } catch (e) {
-                // If jQuery selector fails, check with native JS
-                hasStyles = document.getElementById('klaro-floating-button-styles') !== null;
-            }
-
-            if (!hasStyles) {
-                var css = `
-                    .klaro-floating-button {
-                        position: fixed;
-                        z-index: 1000;
-                        padding: 10px 15px;
-                        border-radius: 4px;
-                        cursor: pointer;
-                        font-size: 14px;
-                        border: none;
-                        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
-                        transition: all 0.2s ease;
-                    }
-
-                    .klaro-floating-button:hover {
-                        transform: translateY(-2px);
-                        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-                    }
-
-                    /* Button positions */
-                    .klaro-position-bottom-right {
-                        bottom: 20px;
-                        right: 20px;
-                    }
-
-                    .klaro-position-bottom-left {
-                        bottom: 20px;
-                        left: 20px;
-                    }
-
-                    .klaro-position-top-right {
-                        top: 20px;
-                        right: 20px;
-                    }
-
-                    .klaro-position-top-left {
-                        top: 20px;
-                        left: 20px;
-                    }
-
-                    /* Button themes */
-                    .klaro-theme-light {
-                        background-color: #f1f1f1;
-                        color: #333;
-                    }
-
-                    .klaro-theme-dark {
-                        background-color: #333;
-                        color: #fff;
-                    }
-
-                    .klaro-theme-blue {
-                        background-color: #1a73e8;
-                        color: #fff;
-                    }
-
-                    .klaro-theme-green {
-                        background-color: #0f9d58;
-                        color: #fff;
-                    }
-                `;
-
-                try {
-                    $('<style>', {
-                        id: 'klaro-floating-button-styles',
-                        type: 'text/css',
-                        html: css
-                    }).appendTo('head');
-                } catch (e) {
-                    // Fallback to native JS if jQuery fails
-                    var style = document.createElement('style');
-                    style.id = 'klaro-floating-button-styles';
-                    style.type = 'text/css';
-                    style.appendChild(document.createTextNode(css));
-                    document.head.appendChild(style);
-                }
-            }
-        } catch (e) {
-            // If jQuery methods fail, fall back to native JS
-            klaroGeoWarn('jQuery methods failed, falling back to native JS:', e);
-
-            // Create button with native JS
-            let button = document.createElement('button');
-            button.className = 'klaro-floating-button open-klaro-modal klaro-theme-' + buttonTheme + ' klaro-position-' + buttonPosition;
-            button.textContent = buttonText;
-            button.setAttribute('aria-label', buttonText);
-
-            // Append to body
-            document.body.appendChild(button);
-
-            // Add button styles if not already added
-            if (!document.getElementById('klaro-floating-button-styles')) {
-                var css = `
-                    .klaro-floating-button {
-                        position: fixed;
-                        z-index: 1000;
-                        padding: 10px 15px;
-                        border-radius: 4px;
-                        cursor: pointer;
-                        font-size: 14px;
-                        border: none;
-                        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
-                        transition: all 0.2s ease;
-                    }
-
-                    .klaro-floating-button:hover {
-                        transform: translateY(-2px);
-                        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-                    }
-
-                    /* Button positions */
-                    .klaro-position-bottom-right {
-                        bottom: 20px;
-                        right: 20px;
-                    }
-
-                    .klaro-position-bottom-left {
-                        bottom: 20px;
-                        left: 20px;
-                    }
-
-                    .klaro-position-top-right {
-                        top: 20px;
-                        right: 20px;
-                    }
-
-                    .klaro-position-top-left {
-                        top: 20px;
-                        left: 20px;
-                    }
-
-                    /* Button themes */
-                    .klaro-theme-light {
-                        background-color: #f1f1f1;
-                        color: #333;
-                    }
-
-                    .klaro-theme-dark {
-                        background-color: #333;
-                        color: #fff;
-                    }
-
-                    .klaro-theme-blue {
-                        background-color: #1a73e8;
-                        color: #fff;
-                    }
-
-                    .klaro-theme-green {
-                        background-color: #0f9d58;
-                        color: #fff;
-                    }
-                `;
-
-                var style = document.createElement('style');
-                style.id = 'klaro-floating-button-styles';
-                style.type = 'text/css';
-
-                if (style.styleSheet) {
-                    // For IE
-                    style.styleSheet.cssText = css;
-                } else {
-                    // For modern browsers
-                    style.appendChild(document.createTextNode(css));
-                }
-
-                document.head.appendChild(style);
-            }
-        }
+    var settings = window.klaroGeo;
+    if (settings.enableFloatingButton !== true) {
+        return;
     }
 
-})(jQuery);
+    var button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'klaro-floating-button open-klaro-modal' +
+        ' klaro-theme-' + settings.floatingButtonTheme +
+        ' klaro-position-' + settings.floatingButtonPosition;
+    button.textContent = settings.floatingButtonText;
+    button.setAttribute('aria-label', settings.floatingButtonText);
+    document.body.appendChild(button);
+})();

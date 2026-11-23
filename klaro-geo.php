@@ -430,27 +430,22 @@ function klaro_geo_enqueue_scripts() {
 	$button_theme           = get_option( 'klaro_geo_floating_button_theme', 'light' );
 	$button_position        = get_option( 'klaro_geo_floating_button_position', 'bottom-right' );
 
-	// Check if debug logging is enabled
-	$debug_enabled = get_option( 'klaro_geo_enable_debug_logging', false );
-
-	// Create settings array
+	// The button settings and the debug logging switch (read by
+	// js/klaro-geo-debug.js), merged into window.klaroGeo.
 	$button_settings = array(
 		'enableFloatingButton'   => (bool) $enable_floating_button,
 		'floatingButtonText'     => $button_text,
 		'floatingButtonTheme'    => $button_theme,
 		'floatingButtonPosition' => $button_position,
-		'debug'                  => defined( 'WP_DEBUG' ) && WP_DEBUG, // Kept for backward compatibility
-		'debugEnabled'           => (bool) $debug_enabled, // New debug logging control
-		'version'                => KLARO_GEO_VERSION,
+		'debugEnabled'           => (bool) get_option( 'klaro_geo_enable_debug_logging', false ),
 	);
 
-	// Enqueue the consent button script in footer with high priority to load after Klaro
+	// Depends on klaro.js so that window.klaro exists when it runs. It does
+	// not use jQuery.
 	wp_enqueue_script(
 		'klaro-geo-consent-button-js',
 		KLARO_GEO_URL . 'js/klaro-geo-consent-button.js',
-		// The script is written against jQuery and logs through the debug
-		// helper; both are declared so load order does not depend on luck.
-		array( 'jquery', 'klaro-geo-debug' ),
+		array( 'klaro-js', 'klaro-geo-debug' ),
 		KLARO_GEO_VERSION,
 		array(
 			'in_footer' => true,

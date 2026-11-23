@@ -45,6 +45,26 @@ class ConsentButtonTest extends WP_UnitTestCase {
     }
 
     /**
+     * The button script was the only frontend script that needed jQuery. A
+     * visitor's page must not load jQuery on the plugin's account.
+     */
+    public function test_frontend_scripts_do_not_need_jquery() {
+        wp_set_current_user(0);
+        do_action('wp_enqueue_scripts');
+
+        $scripts = wp_scripts();
+        $scripts->all_deps($scripts->queue);
+
+        $plugin_handles = array_filter($scripts->to_do, function ($handle) {
+            return 0 === strpos($handle, 'klaro');
+        });
+        $this->assertContains('klaro-geo-consent-button-js', $plugin_handles);
+        foreach ($plugin_handles as $handle) {
+            $this->assertNotContains('jquery', $scripts->registered[$handle]->deps, $handle . ' depends on jQuery');
+        }
+    }
+
+    /**
      * Test setting and retrieving the button text option
      */
     public function test_button_text_option() {
