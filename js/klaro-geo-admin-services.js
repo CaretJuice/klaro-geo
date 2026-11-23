@@ -46,8 +46,6 @@ jQuery(document).ready(function($) {
 
     // Function to load languages from templates
     function loadLanguagesFromTemplates() {
-        klaroGeoLog('Loading languages from templates...');
-
         // Extract all language codes from templates
         let languageCodes = new Set(['zz']); // Always include fallback
 
@@ -60,8 +58,6 @@ jQuery(document).ready(function($) {
                 });
             }
         });
-
-        klaroGeoLog('Found languages in templates:', Array.from(languageCodes));
 
         // Add tabs for each language
         languageCodes.forEach(function(langCode) {

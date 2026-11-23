@@ -6,8 +6,6 @@
 (function($) {
     // Wait for the DOM to be ready
     $(document).ready(function() {
-        klaroGeoLog('Klaro Geo Template Translations Tabs loaded');
-
         // Check if the page was just updated (after form submission)
         let urlParams = new URLSearchParams(window.location.search);
         let wasUpdated = urlParams.get('updated') === 'true';
@@ -17,11 +15,9 @@
             // If the page was just updated, also explicitly update the form from JSON
             // This ensures translations are loaded from the JSON editor
             if (wasUpdated && $('#translations_json_editor').length) {
-                klaroGeoLog('Page was updated, explicitly loading translations from JSON');
                 setTimeout(function() {
                     // Force update from JSON to ensure deleted languages are removed from tabs
-                    let result = updateFormFromJson();
-                    klaroGeoLog('Form updated from JSON:', result);
+                    updateFormFromJson();
 
                     // If we have a JSON editor, make sure the form matches the JSON
                     if ($('#translations_json_editor').length) {
@@ -29,7 +25,6 @@
                         try {
                             if (jsonText && jsonText.trim() !== '') {
                                 let translations = JSON.parse(jsonText);
-                                klaroGeoLog('Ensuring tabs match JSON data');
 
                                 // Check if any tabs exist for languages not in the JSON
                                 $('.translation-tab').each(function() {
@@ -70,11 +65,8 @@
         function addLanguageTab(langCode, langName) {
             // Check if this language already exists
             if ($("#tab-" + langCode).length > 0) {
-                klaroGeoLog('Tab already exists for language:', langCode);
                 return; // Tab already exists
             }
-
-            klaroGeoLog('Adding language tab:', langCode, langName);
 
             // Add new tab
             let newTab = $('<li><a href="#tab-' + langCode + '">' + langName + ' (' + langCode + ')</a></li>');
@@ -89,13 +81,6 @@
             let heading = newContent.find('h4:first');
             heading.text(langName + ' Translations (' + langCode + ')');
             heading.append(' <button type="button" class="button button-small delete-language-btn" data-lang="' + langCode + '">Delete Language</button>');
-
-            // Get the purposes from the page
-            let purposes = [];
-            $('#tab-zz h5').each(function() {
-                purposes.push($(this).text().toLowerCase());
-            });
-            klaroGeoLog('Found purposes for new tab:', purposes);
 
             // Update all input names and IDs to use the new language code
             newContent.find('input, textarea').each(function() {
@@ -137,12 +122,10 @@
             if (template.config.translations[langCode]) {
                 // Fill in the form fields with the translation values
                 let translations = template.config.translations[langCode];
-                klaroGeoLog('Setting translation values for language:', langCode, translations);
 
                 // Process each property in the translations
                 processTranslationObject(translations, langCode, '');
             } else {
-                klaroGeoLog('No existing translations found for language:', langCode);
                 // For new languages, we'll initialize with empty values
                 // The form fields are already cleared above
             }
@@ -169,7 +152,6 @@
                                   (prefix ? '[' + prefix + ']' : '') +
                                   '[' + key + ']"]';
 
-                    klaroGeoLog('Setting field:', selector, 'to value:', value);
                     $(selector).val(value);
                 }
             });
@@ -258,7 +240,6 @@
             // Don't try to fix escaping issues here - it's safer to let the browser handle it
             $('#translations_json_editor').val(jsonString);
 
-            klaroGeoLog('Updated JSON from form:', translations);
             return translations;
         }
 
@@ -328,8 +309,6 @@
             let langCode = $(this).data('lang');
 
             if (confirm('Are you sure you want to delete the ' + langCode + ' language?')) {
-                klaroGeoLog('Deleting language:', langCode);
-
                 // Make sure we're not removing the "Add Language" tab
                 // First, store a reference to the "Add Language" tab if it exists
                 let addLanguageTab = $("#tab-add");
@@ -360,7 +339,6 @@
                     let translations = JSON.parse(jsonText);
 
                     if (translations[langCode]) {
-                        klaroGeoLog('Removing language from JSON:', langCode);
                         delete translations[langCode];
 
                         // Update the JSON editor with the modified data
@@ -368,8 +346,6 @@
 
                         // Auto-save the changes
                         autoSaveTranslations('Language "' + langCode + '" deleted successfully');
-
-                        klaroGeoLog('Language successfully removed from JSON');
                     } else {
                         klaroGeoWarn('Language not found in JSON:', langCode);
                     }
@@ -529,8 +505,6 @@
 
         // AJAX function to save translations
         function saveTranslationsAjax(callback) {
-            klaroGeoLog('Saving translations via AJAX...');
-
             // First update the JSON from the form to ensure it's current
             updateJsonFromForm();
 
@@ -562,11 +536,7 @@
                 processData: false,
                 contentType: false,
                 success: function(response) {
-                    klaroGeoLog('AJAX save response:', response);
-
                     if (response.success) {
-                        klaroGeoLog('Translations saved successfully');
-
                         // If we have a new JSON from the server, update our editor
                         if (response.data && response.data.translations_json) {
                             $('#translations_json_editor').val(response.data.translations_json);

@@ -87,8 +87,6 @@ jQuery(document).ready(function($) {
             return $(this).val();
         }).get();
 
-        klaroGeoLog('Saving visible countries:', selectedCountries);
-
         $.ajax({
             url: klaroGeoAdmin.ajaxurl,
             type: 'POST',
@@ -99,7 +97,6 @@ jQuery(document).ready(function($) {
             },
             success: function(response) {
                 if (response.success) {
-                    klaroGeoLog('Successfully saved visible countries');
                     location.reload();
                 } else {
                     klaroGeoError('Failed to save country visibility:', response);
@@ -130,7 +127,6 @@ jQuery(document).ready(function($) {
                 nonce: klaroGeoAdmin.nonce
             },
             success: function(response) {
-                klaroGeoLog('AJAX response:', response);
                 if (response.success) {
                     var regionList = modal.find('.region-list');
                     // Set the country code as a data attribute
@@ -138,7 +134,6 @@ jQuery(document).ready(function($) {
 
                     // Add or update language selector if multiple languages are available
                     let languages = response.data.languages || [];
-                    klaroGeoLog('Languages:', languages);
 
                     if (languages.length > 1) {
                         let existingSelector = modal.find('.language-selector-container');
@@ -160,7 +155,6 @@ jQuery(document).ready(function($) {
                     }
 
                     let regions = response.data.regions || {};
-                    klaroGeoLog('Regions:', regions);
 
                     // Escape every value interpolated into the markup below
                     const esc = function(value) {
@@ -186,7 +180,6 @@ jQuery(document).ready(function($) {
                             html += '<td><select name="klaro_geo_region_settings[' + esc(countryCode) + '][' + esc(code) + '][template]" data-country="' + esc(countryCode) + '" data-region="' + esc(code) + '">';
                             html += '<option value="inherit">Use country template</option>';
                             let templates = window.klaroTemplates;
-                            klaroGeoLog('Available templates:', templates);
 
                             Object.keys(templates).forEach(function(key) {
                                 let template = templates[key];
@@ -229,11 +222,9 @@ jQuery(document).ready(function($) {
 
         // Get the form element
         var form = modal.find('.region-form');
-        klaroGeoLog('Found form:', form.length ? 'yes' : 'no');
 
         // Collect all region settings
         let selectElements = form.find('.region-template-select');
-        klaroGeoLog('Found ' + selectElements.length + ' select elements in form');
 
         if (selectElements.length === 0) {
             // Try a different selector if no elements found
@@ -253,8 +244,6 @@ jQuery(document).ready(function($) {
             let region = $select.data('region');
             let value = $select.val();
 
-            klaroGeoLog('Processing select - country:', country, 'region:', region, 'value:', value);
-
             if (country && region) {
                 // Initialize regions object if it doesn't exist
                 if (!regionSettings[country].regions) {
@@ -267,9 +256,6 @@ jQuery(document).ready(function($) {
             }
         });
 
-        // Log the collected settings
-        klaroGeoLog('Collected region settings:', regionSettings);
-
         // Check if we have any regions
         if (Object.keys(regionSettings[countryCode]).length === 0 ||
             !regionSettings[countryCode].regions ||
@@ -281,9 +267,6 @@ jQuery(document).ready(function($) {
         // Show saving message
         var form = modal.find('.region-form');
         form.find('.region-list').append('<p class="saving">Saving region settings...</p>');
-
-        // Debug log to see what's being sent
-        klaroGeoLog('Region settings to save:', regionSettings);
 
         // Make AJAX request to save region settings
         $.ajax({
@@ -298,9 +281,6 @@ jQuery(document).ready(function($) {
             },
             success: function(response) {
                 if (response.success) {
-                    // Log the response for debugging
-                    klaroGeoLog('Save regions response:', response);
-
                     // Show success message
                     var form = modal.find('.region-form');
                     form.find('.saving').removeClass('saving').addClass('success').text('Region settings saved successfully!');
@@ -356,8 +336,6 @@ jQuery(document).ready(function($) {
             },
             success: function(response) {
                 if (response.success) {
-                    klaroGeoLog('Country settings saved before opening region modal');
-
                     // Now show the modal and load regions
                     modal.show();
                     loadRegions(countryCode);
@@ -382,7 +360,6 @@ jQuery(document).ready(function($) {
     $(document).on('click', '.close-region-modal', function(e) {
         e.preventDefault(); // Prevent any default action
         e.stopPropagation(); // Stop event propagation
-        klaroGeoLog('Close region modal button clicked');
 
         // Just hide the modal without submitting anything
         $(this).closest('.klaro-modal').hide();
@@ -395,7 +372,6 @@ jQuery(document).ready(function($) {
     $(document).on('click', '.save-regions', function(e) {
         e.preventDefault(); // Prevent any default action
         let countryCode = $(this).data('country');
-        klaroGeoLog('Save regions button clicked for country:', countryCode);
         saveRegions(countryCode);
     });
 
@@ -442,8 +418,6 @@ jQuery(document).ready(function($) {
                             $(changedElement).removeClass('klaro-field-saved');
                         }, 1000);
                     }
-
-                    klaroGeoLog('Country settings autosaved successfully');
                 } else {
                     showAutosaveIndicator('error', 'Save failed: ' + (response.data || 'Unknown error'));
                     if (changedElement) {

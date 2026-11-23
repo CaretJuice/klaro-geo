@@ -70,7 +70,6 @@
 
       if (window.klaroGeo.consentConfirmed) {
           // Consent event already fired, push directly to dataLayer
-          klaroGeoLog('Consent Queue - pushing directly to dataLayer:', eventData.event || 'unknown event');
           window.dataLayer.push(eventData);
       } else {
           // Consent not yet confirmed, queue the event
@@ -79,8 +78,6 @@
               const dropped = window.klaroGeo.queue.shift();
               klaroGeoError('Consent queue limit reached (100). Dropping oldest event:', dropped.event || 'unknown');
           }
-          klaroGeoLog('Consent Queue - queuing event:', eventData.event || 'unknown event',
-                      '(queue size:', window.klaroGeo.queue.length + 1, ')');
           window.klaroGeo.queue.push(eventData);
       }
   };
@@ -118,7 +115,6 @@
           return;
       }
 
-      klaroGeoLog('Consent Queue - consent event received:', eventName);
       window.klaroGeo.consentConfirmed = true;
       flushConsentQueue();
   }
@@ -153,11 +149,6 @@
       };
 
   })();
-
-  // Process any events that were queued before this script loaded (stub pattern)
-  if (existingQueue.length > 0) {
-      klaroGeoLog('Consent Queue - found', existingQueue.length, 'pre-queued events from stub');
-  }
 
   // Set up a watcher for late-arriving stub events (in case inline scripts run after klaro-geo.js)
   // This handles the case where wp_footer priority ordering causes the stub to run after us
@@ -361,9 +352,6 @@
           formData.append('nonce', window.klaroConsentData.nonce);
       }
 
-      // Log the receipt data before sending
-      klaroGeoLog('Sending receipt data to server:', receipt);
-
       // Stringify the receipt data
       formData.append('receipt_data', JSON.stringify(receipt));
 
@@ -483,9 +471,6 @@
   }
 
   function updateGoogleConsentMode(manager, eventType, data) {
-      klaroGeoLog('Google consent mode update triggered by:', eventType,
-          'with data:', data ? (typeof data === 'object' ? 'consent object' : data) : 'no data');
-
       // Check for duplicate update if data is provided
       if (data && window.lastConsentUpdate &&
           JSON.stringify(window.lastConsentUpdate) === JSON.stringify(data)) {
