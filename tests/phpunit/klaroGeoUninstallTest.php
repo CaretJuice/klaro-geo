@@ -41,7 +41,6 @@ class KlaroGeoUninstallTest extends WP_UnitTestCase {
 	 */
 	public function test_every_registered_setting_is_removed() {
 		klaro_geo_register_main_settings();
-		klaro_geo_register_country_settings();
 
 		$registered = array_filter(
 			array_keys( get_registered_settings() ),

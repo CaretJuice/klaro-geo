@@ -74,6 +74,13 @@ function klaro_geo_country_settings_page_content() {
 	<div class="wrap">
 		<h1>Klaro Geo Country Settings</h1>
 
+		<?php // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Display-only flag set by the redirect after a save; no data is modified. ?>
+		<?php if ( isset( $_GET['updated'] ) ) : ?>
+		<div class="notice notice-success is-dismissible">
+			<p>Country settings saved.</p>
+		</div>
+		<?php endif; ?>
+
 		<?php if ( ! empty( $invalid_template_refs ) ) : ?>
 		<div class="notice notice-error">
 			<p><strong>Warning:</strong> The following settings reference templates that don't exist:</p>
@@ -93,8 +100,9 @@ function klaro_geo_country_settings_page_content() {
 		</div>
 		<?php endif; ?>
 
-		<form method="post" action="options.php" id="klaro-country-settings-form" onsubmit="return true;">
-			<?php settings_fields( 'klaro_geo_country_settings_group' ); ?>
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" id="klaro-country-settings-form">
+			<input type="hidden" name="action" value="klaro_geo_save_country_settings_form">
+			<?php wp_nonce_field( 'klaro_geo_country_settings_form' ); ?>
 
 			<table class="wp-list-table widefat fixed striped">
 				<thead>
@@ -256,53 +264,59 @@ function klaro_geo_country_settings_page_content() {
 	<?php
 }
 
-// Register settings for country settings
-function klaro_geo_register_country_settings() {
-	register_setting(
-		'klaro_geo_country_settings_group',
-		'klaro_geo_country_settings',
-		array(
-			'sanitize_callback' => function ( $input ) {
-				// Not map_deep(): that runs sanitize_text_field() over scalars of
-				// every type, so a boolean would be flattened to '1' or ''. The
-				// current structure is all strings, but this keeps a future
-				// boolean field from being silently corrupted.
-				return klaro_geo_sanitize_array( (array) $input );
-			},
-		)
-	);
-	register_setting(
-		'klaro_geo_country_settings_group',
-		'klaro_geo_visible_countries',
-		array(
-			'sanitize_callback' => function ( $input ) {
-				return array_map( 'sanitize_text_field', (array) $input );
-			},
-		)
-	);
-}
-add_action( 'admin_init', 'klaro_geo_register_country_settings' );
+/**
+ * Save the country settings form.
+ *
+ * The form's Save button and the autosave on the same page both submit the
+ * same fields, so both come through here: update_from_form() validates the
+ * template names and drops countries that only repeat the fallback template.
+ *
+ * @param mixed $submitted The submitted klaro_geo_country_settings value, unslashed.
+ * @return bool Whether the stored option changed.
+ */
+function klaro_geo_save_country_settings_form_data( $submitted ) {
+	$country_settings = Klaro_Geo_Country_Settings::get_instance();
+	$country_settings->update_from_form( klaro_geo_sanitize_array( (array) $submitted ) );
 
-// AJAX handler for saving country settings
+	return $country_settings->save();
+}
+
+// Handler for the form's Save button (admin-post.php)
+function klaro_geo_save_country_settings_form() {
+	check_admin_referer( 'klaro_geo_country_settings_form' );
+
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_die( 'You do not have permission to perform this action.', 403 );
+	}
+
+	// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Sanitized in klaro_geo_save_country_settings_form_data()
+	klaro_geo_save_country_settings_form_data( isset( $_POST['klaro_geo_country_settings'] ) ? wp_unslash( $_POST['klaro_geo_country_settings'] ) : array() );
+
+	// The form also holds the Manage Countries checkboxes. None checked posts no field.
+	$visible_countries = isset( $_POST['klaro_geo_visible_countries'] ) ? array_map( 'sanitize_text_field', (array) wp_unslash( $_POST['klaro_geo_visible_countries'] ) ) : array();
+	Klaro_Geo_Country_Settings::get_instance()->save_visible_countries( $visible_countries );
+
+	wp_safe_redirect(
+		add_query_arg(
+			array(
+				'page'    => 'klaro-geo-country',
+				'updated' => 'true',
+			),
+			admin_url( 'admin.php' )
+		)
+	);
+	exit;
+}
+add_action( 'admin_post_klaro_geo_save_country_settings_form', 'klaro_geo_save_country_settings_form' );
+
+// AJAX handler for the autosave of the same form
 function klaro_geo_save_country_settings() {
 	klaro_geo_verify_admin_ajax( 'klaro_geo_nonce' );
 
-	$raw_settings = isset( $_POST['settings'] ) ? wp_unslash( $_POST['settings'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Sanitized after parse_str below
+	$raw_settings = isset( $_POST['settings'] ) ? wp_unslash( $_POST['settings'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Sanitized in klaro_geo_save_country_settings_form_data()
 	parse_str( $raw_settings, $settings );
 
-	// Get the submitted settings
-	$submitted_settings = isset( $settings['klaro_geo_country_settings'] ) ? klaro_geo_sanitize_array( $settings['klaro_geo_country_settings'] ) : array();
-
-	// Use the new country settings class
-	$country_settings = Klaro_Geo_Country_Settings::get_instance();
-
-	// Update from form data
-	$country_settings->update_from_form( $submitted_settings );
-
-	// Save the updated settings
-	$result = $country_settings->save();
-
-	klaro_geo_debug_log( 'Saved optimized country settings as array from AJAX: ' . ( $result ? 'success' : 'failed' ) );
+	klaro_geo_save_country_settings_form_data( isset( $settings['klaro_geo_country_settings'] ) ? $settings['klaro_geo_country_settings'] : array() );
 
 	wp_send_json_success();
 }
