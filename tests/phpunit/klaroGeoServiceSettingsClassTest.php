@@ -81,6 +81,31 @@ class KlaroGeoServiceSettingsClassTest extends WP_UnitTestCase {
     }
 
     /**
+     * Code that reads services relies on name, purposes and cookies being
+     * there, so a stored service missing them is completed when it loads, and
+     * a service without a name is dropped.
+     */
+    public function test_services_are_in_the_validated_shape_as_soon_as_they_load() {
+        update_option($this->option_name, wp_json_encode(array(
+            array('name' => 'bare-service'),
+            array('purposes' => array('analytics')),
+            array('name' => 'odd-types', 'purposes' => 'analytics', 'cookies' => 'x', 'required' => 'true'),
+        )));
+
+        $settings = new Klaro_Geo_Service_Settings($this->option_name);
+        $services = $settings->get();
+
+        $this->assertSame(array('bare-service', 'odd-types'), array_column($services, 'name'));
+        foreach ($services as $service) {
+            $this->assertSame(array(), $service['purposes']);
+            $this->assertSame(array(), $service['cookies']);
+            $this->assertNotEmpty($service['translations']['zz']['title']);
+        }
+        $this->assertTrue($services[1]['required']);
+        $this->assertTrue($settings->is_modified(), 'The completed services are saved on the next save');
+    }
+
+    /**
      * Test getting default services
      */
     public function test_get_default_services() {

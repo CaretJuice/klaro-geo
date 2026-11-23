@@ -40,13 +40,11 @@ function klaro_geo_services_page_content() {
 					echo "<tr><td colspan='8'>No services configured yet.</td></tr>"; // Updated colspan for the new advanced column
 				} else {
 					foreach ( $services as $index => $service ) {
-						$name     = isset( $service['name'] ) ? $service['name'] : 'N/A';
+						$name     = $service['name'];
 						$required = isset( $service['required'] ) ? ( $service['required'] ? 'Yes' : 'No' ) : 'N/A';
 						$default  = isset( $service['default'] ) ? ( $service['default'] ? 'Yes' : 'No' ) : 'N/A';
 
-						// Handle purposes (ensure it's an array)
-						$purposes     = isset( $service['purposes'] ) ? $service['purposes'] : array();
-						$purposes_str = ! empty( $purposes ) && is_array( $purposes ) ? implode( ', ', $purposes ) : 'N/A';
+						$purposes_str = $service['purposes'] ? implode( ', ', $service['purposes'] ) : 'N/A';
 
 						// Handle advanced settings
 						$advanced = array();
@@ -61,10 +59,7 @@ function klaro_geo_services_page_content() {
 						}
 						$advanced_str = ! empty( $advanced ) ? implode( ', ', $advanced ) : 'None';
 
-						// Handle cookies
-						$cookies     = isset( $service['cookies'] ) ? $service['cookies'] : array();
-						$cookies_str = ! empty( $cookies ) && is_array( $cookies ) ?
-						json_encode( $cookies ) : 'N/A';
+						$cookies_str = $service['cookies'] ? wp_json_encode( $service['cookies'] ) : 'N/A';
 
 						echo '<tr>';
 						echo '<td>' . esc_html( $name ) . '</td>';

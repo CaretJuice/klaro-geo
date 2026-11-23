@@ -42,6 +42,15 @@ class Klaro_Geo_Service_Settings extends Klaro_Geo_Option {
 			$this->value       = $this->get_default_services();
 			$this->is_modified = true;
 		}
+
+		// Bring every service to the shape validate_services() describes, so
+		// code that reads services does not re-check it. A change is saved by
+		// klaro_geo_validate_services() on init.
+		$validated = $this->validate_services();
+		if ( $validated !== $this->value ) {
+			$this->value       = $validated;
+			$this->is_modified = true;
+		}
 	}
 
 	/**
@@ -148,7 +157,12 @@ class Klaro_Geo_Service_Settings extends Klaro_Geo_Option {
 	}
 
 	/**
-	 * Validate services
+	 * The services in the shape the rest of the plugin relies on: every
+	 * service has a name, 'purposes' and 'cookies' arrays, and a 'zz'
+	 * translation with a title and description; 'required' and 'default' are
+	 * booleans when set. A service without a name is dropped.
+	 *
+	 * Applied when the option is loaded and again before it is saved.
 	 *
 	 * @return array The validated services
 	 */

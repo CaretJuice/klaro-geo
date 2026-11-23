@@ -228,7 +228,7 @@
      */
     function fetchGeoViaAjax(geoAjax, timeoutMs) {
         return new Promise(function(resolve, reject) {
-            if (!geoAjax || !geoAjax.url || typeof window.fetch !== 'function') {
+            if (typeof window.fetch !== 'function') {
                 reject(new Error('fetch unavailable'));
                 return;
             }

@@ -29,11 +29,13 @@ class KlaroGeoGpcSensitivityTest extends WP_UnitTestCase {
 		return array(
 			array(
 				'name'     => 'analytics-tool',
+				'cookies' => array(),
 				'purposes' => array( 'analytics' ),
 				'required' => false,
 			),
 			array(
 				'name'     => 'ad-tool',
+				'cookies' => array(),
 				'purposes' => array( 'advertising' ),
 				'required' => false,
 			),

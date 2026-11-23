@@ -196,7 +196,7 @@ function klaro_geo_migrate_gtm_purpose() {
 	$service_settings = Klaro_Geo_Service_Settings::get_instance();
 	$gtm              = $service_settings->get_service( 'google-tag-manager' );
 
-	if ( $gtm && isset( $gtm['purposes'] ) && is_array( $gtm['purposes'] ) ) {
+	if ( $gtm ) {
 		$current = $gtm['purposes'];
 		sort( $current );
 		if ( array( 'advertising', 'analytics' ) === $current ) {
@@ -776,13 +776,12 @@ add_filter( 'query_vars', 'klaro_geo_register_query_vars' );
  */
 function klaro_geo_validate_services() {
 	$service_settings = Klaro_Geo_Service_Settings::get_instance();
-	$services         = $service_settings->validate_services();
 
 	if ( $service_settings->is_modified() ) {
 		$service_settings->save();
 	}
 
-	return $services;
+	return $service_settings->get();
 }
 
 // Add action to validate services on init

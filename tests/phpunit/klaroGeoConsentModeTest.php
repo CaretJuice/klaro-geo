@@ -21,6 +21,7 @@ class KlaroGeoConsentModeTest extends WP_UnitTestCase {
 		return array(
 			array(
 				'name'                    => 'analytics-storage',
+				'cookies' => array(),
 				'purposes'                => array( 'analytics' ),
 				'required'                => false,
 				'is_consent_mode_service' => true,
@@ -28,6 +29,7 @@ class KlaroGeoConsentModeTest extends WP_UnitTestCase {
 			),
 			array(
 				'name'     => 'google-ads',
+				'cookies' => array(),
 				'purposes' => array( 'advertising' ),
 				'required' => false,
 			),
@@ -182,6 +184,7 @@ class KlaroGeoConsentModeTest extends WP_UnitTestCase {
 		$services   = $this->services();
 		$services[] = array(
 			'name'                    => 'ad-user-data',
+			'cookies' => array(),
 			'is_consent_mode_service' => true,
 			'consent_mode_key'        => 'ad_user_data',
 			'parent_service'          => 'ad-storage',

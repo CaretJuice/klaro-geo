@@ -25,18 +25,21 @@ class TemplateRequiredTest extends WP_UnitTestCase {
 		return array(
 			array(
 				'name'     => 'google-tag-manager',
+				'cookies' => array(),
 				'purposes' => array( 'infrastructure' ),
 				'required' => null,
 				'default'  => false,
 			),
 			array(
 				'name'     => 'google-analytics',
+				'cookies' => array(),
 				'purposes' => array( 'analytics' ),
 				'required' => false,
 				'default'  => false,
 			),
 			array(
 				'name'     => 'security',
+				'cookies' => array(),
 				'purposes' => array( 'functional' ),
 				'required' => true,
 			),

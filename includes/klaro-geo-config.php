@@ -180,7 +180,8 @@ function klaro_geo_apply_purpose_defaults( array &$klaro_config, $template_to_us
  *
  * @param string $template_key The requested template key.
  * @param array  $templates    All templates from the database.
- * @param array  $services     The configured services.
+ * @param array  $services     The configured services, as Klaro_Geo_Service_Settings
+ *                             provides them (each has a name, purposes and cookies).
  * @return array Payload with keys:
  *               'template_key'           string  Template actually used (after fallbacks).
  *               'template_source_override' string|null 'fallback'|'hardcoded-fallback' when the requested key was unavailable.
@@ -431,19 +432,16 @@ function klaro_geo_build_template_payload( $template_key, $templates, $services 
 	// Add dynamic service consent keys for ALL services
 	// Respects: required services → granted, service override → explicit default, otherwise → template default
 	foreach ( $services as $service ) {
-		$service_name = $service['name'] ?? '';
-		if ( ! empty( $service_name ) ) {
-			$consent_default                                         = klaro_geo_service_consent_default( $service, $template_default_consent, $template_required );
-			$dynamic_consent_defaults[ $consent_default['key'] ] = $consent_default['default'];
-		}
+		$consent_default                                     = klaro_geo_service_consent_default( $service, $template_default_consent, $template_required );
+		$dynamic_consent_defaults[ $consent_default['key'] ] = $consent_default['default'];
 	}
 
 	// Process each service
 	foreach ( $services as $service ) {
 		$service_config = array(
-			'name'      => $service['name'] ?? 'undefined',
-			'purposes'  => $service['purposes'] ?? $service['service_purposes'] ?? array( 'analytics' ),
-			'cookies'   => isset( $service['cookies'] ) ? $service['cookies'] : array(),
+			'name'     => $service['name'],
+			'purposes' => $service['purposes'],
+			'cookies'  => $service['cookies'],
 		);
 
 		// Always emit required per service, resolving "Use Global Setting" against
@@ -487,21 +485,20 @@ function klaro_geo_build_template_payload( $template_key, $templates, $services 
 
 		// Compute GPC sensitivity: explicit per-service > template purposes > auto-detect
 		if ( $gpc_enabled ) {
-			$service_purposes = $service['purposes'] ?? array();
 			if ( isset( $service['gpc_sensitive'] ) && $service['gpc_sensitive'] === true ) {
 				$service_config['gpc_sensitive'] = true;
 			} elseif ( isset( $service['gpc_sensitive'] ) && $service['gpc_sensitive'] === false ) {
 				$service_config['gpc_sensitive'] = false;
 			} else {
 				// Auto-detect: check if any service purpose matches gpc_purposes
-				$is_sensitive                    = ! empty( array_intersect( $service_purposes, $gpc_purposes ) );
+				$is_sensitive                    = ! empty( array_intersect( $service['purposes'], $gpc_purposes ) );
 				$service_config['gpc_sensitive'] = $is_sensitive;
 			}
 		}
 
 		// Skip hidden services
 		if ( isset( $service['hidden'] ) && $service['hidden'] === true ) {
-			klaro_geo_debug_log( 'Skipping hidden service: ' . ( $service['name'] ?? 'unknown' ) );
+			klaro_geo_debug_log( 'Skipping hidden service: ' . $service['name'] );
 			continue;
 		}
 
