@@ -32,11 +32,13 @@ class Klaro_Geo_Service_Settings extends Klaro_Geo_Option {
 	 * @param string $option_name The option name in the WordPress database
 	 * @param array  $default_value Default value if option doesn't exist
 	 */
-	public function __construct( $option_name = 'klaro_geo_services', $default_value = '[]' ) {
+	public function __construct( $option_name = 'klaro_geo_services', $default_value = array() ) {
 		parent::__construct( $option_name, $default_value );
 
-		// If empty, initialize with default services
-		if ( empty( $this->value ) ) {
+		// Nothing stored, or not a list of services: use the defaults. This is
+		// the one place that decides it, so callers do not re-check the shape.
+		if ( ! isset( $this->value[0]['name'] ) ) {
+			klaro_geo_debug_log( 'Stored services are empty or invalid, using the default services' );
 			$this->value       = $this->get_default_services();
 			$this->is_modified = true;
 		}

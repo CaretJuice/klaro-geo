@@ -226,30 +226,17 @@ function klaro_geo_init_consent_mode_services() {
 	// Get service settings instance
 	$service_settings = Klaro_Geo_Service_Settings::get_instance();
 
-	// Check if consent mode services already exist
-	$consent_mode_service_names = array(
-		'analytics-storage',
-		'ad-storage',
-		'ad-user-data',
-		'ad-personalization',
-	);
+	$needs_update = false;
 
-	$needs_update               = false;
-	$klaro_geo_default_services = klaro_geo_get_default_services();
-
-	foreach ( $consent_mode_service_names as $service_name ) {
-		$existing = $service_settings->get_service( $service_name );
-		if ( ! $existing ) {
-			// Find the service in defaults
-			foreach ( $klaro_geo_default_services as $default_service ) {
-				if ( isset( $default_service['name'] ) && $default_service['name'] === $service_name ) {
-					klaro_geo_debug_log( 'Adding consent mode service: ' . $service_name );
-					$service_settings->set_service( $service_name, $default_service );
-					$needs_update = true;
-					break;
-				}
-			}
+	// The consent mode services are the default services flagged as such.
+	foreach ( klaro_geo_get_default_services() as $default_service ) {
+		if ( empty( $default_service['is_consent_mode_service'] ) || $service_settings->get_service( $default_service['name'] ) ) {
+			continue;
 		}
+
+		klaro_geo_debug_log( 'Adding consent mode service: ' . $default_service['name'] );
+		$service_settings->set_service( $default_service['name'], $default_service );
+		$needs_update = true;
 	}
 
 	if ( $needs_update ) {
@@ -786,42 +773,21 @@ function klaro_geo_register_query_vars( $vars ) {
 add_filter( 'query_vars', 'klaro_geo_register_query_vars' );
 
 
+/**
+ * Validate the stored services and save them if validation changed anything
+ * (including the default services replacing an empty or invalid option, see
+ * Klaro_Geo_Service_Settings::__construct()).
+ *
+ * @return array The validated services.
+ */
 function klaro_geo_validate_services() {
-	static $is_validating = false;
-
-	// Prevent recursive validation
-	if ( $is_validating ) {
-		klaro_geo_debug_log( 'Preventing recursive validation' );
-		return klaro_geo_get_default_services();
-	}
-
-	$is_validating = true;
-
-	// Use the service settings class to get and validate services
 	$service_settings = Klaro_Geo_Service_Settings::get_instance();
-	$services         = $service_settings->get();
+	$services         = $service_settings->validate_services();
 
-	// Validate that services is an array with expected structure
-	if ( empty( $services ) || ! is_array( $services ) || ! isset( $services[0]['name'] ) ) {
-		klaro_geo_debug_log( 'Services has invalid structure, using defaults' );
-		$services = $service_settings->get_default_services();
-
-		// Update the services using the service settings class
-		$service_settings->set( $services );
+	if ( $service_settings->is_modified() ) {
 		$service_settings->save();
-	} else {
-		// Validate each service using the class's validate_services method
-		$services = $service_settings->validate_services();
-
-		// If validation changed anything, save the changes
-		if ( $service_settings->is_modified() ) {
-			$service_settings->save();
-		}
 	}
 
-	$is_validating = false;
-
-	// Return services array
 	return $services;
 }
 

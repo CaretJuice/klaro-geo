@@ -65,6 +65,22 @@ class KlaroGeoServiceSettingsClassTest extends WP_UnitTestCase {
     }
 
     /**
+     * A stored value that is not a list of services (including a string that
+     * is not JSON, which used to be a fatal error) is replaced by the defaults.
+     */
+    public function test_stored_value_that_is_not_a_list_of_services_falls_back_to_defaults() {
+        $defaults = klaro_geo_get_default_services();
+
+        foreach (array('not json', '{"name":"not-a-list"}', '[{"title":"no name"}]', '[]') as $stored) {
+            update_option($this->option_name, $stored);
+            $settings = new Klaro_Geo_Service_Settings($this->option_name);
+
+            $this->assertSame($defaults, $settings->get(), 'Stored: ' . $stored);
+            $this->assertTrue($settings->is_modified(), 'The defaults are saved on the next save');
+        }
+    }
+
+    /**
      * Test getting default services
      */
     public function test_get_default_services() {

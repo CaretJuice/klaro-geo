@@ -751,14 +751,6 @@ function klaro_geo_get_frontend_payload() {
 	$service_settings = Klaro_Geo_Service_Settings::get_instance();
 	$services         = $service_settings->get();
 
-	if ( empty( $services ) || ! is_array( $services ) || ! isset( $services[0]['name'] ) ) {
-		klaro_geo_debug_log( 'Invalid or empty services, using default' );
-		$services = $service_settings->get_default_services();
-		// Update the services using the service settings class
-		$service_settings->set( $services );
-		$service_settings->save();
-	}
-
 	klaro_geo_debug_log( 'Services: ' . count( $services ) . ' services configured' );
 
 	// Get user location
