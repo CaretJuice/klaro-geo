@@ -93,7 +93,14 @@
             consentMode[consentModeKey] = isGranted ? 'granted' : 'denied';
         });
 
-        // Enforce parent-child dependencies
+        // Add dynamic service consent keys for ALL services
+        Object.keys(consents).forEach(function(serviceName) {
+            let dynamicKey = getServiceConsentKey(serviceName);
+            consentMode[dynamicKey] = consents[serviceName] === true ? 'granted' : 'denied';
+        });
+
+        // Enforce parent-child dependencies. This comes last: the loop above
+        // writes a child's own consent under the same key.
         // If parent is denied, children must also be denied
         Object.keys(parentChildMap).forEach(function(parentName) {
             let children = parentChildMap[parentName];
@@ -109,12 +116,6 @@
                     });
                 });
             }
-        });
-
-        // Add dynamic service consent keys for ALL services
-        Object.keys(consents).forEach(function(serviceName) {
-            let dynamicKey = getServiceConsentKey(serviceName);
-            consentMode[dynamicKey] = consents[serviceName] === true ? 'granted' : 'denied';
         });
 
         return consentMode;

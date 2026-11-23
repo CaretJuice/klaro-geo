@@ -85,4 +85,38 @@ function loadBootstrap() {
     return api;
 }
 
-module.exports = { setUpPage: setUpPage, loadBootstrap: loadBootstrap };
+/**
+ * Load js/klaro-geo.js on a page where Klaro already has a manager, as in
+ * server geo mode, and return the manager and the callbacks the script
+ * registered with manager.watch().
+ *
+ * @param {Object} options
+ * @param {Array}  options.services    klaroConfig.services.
+ * @param {Object} options.consents    The manager's consents (service name => boolean).
+ * @param {Object} options.consentData Overrides for window.klaroConsentData.
+ * @param {Object} options.klaroGeo    Overrides for window.klaroGeo.
+ * @param {Object} options.config      Other klaroConfig keys.
+ * @returns {{manager: Object, watch: Object}}
+ */
+function loadConsentScript(options) {
+    options = options || {};
+    setUpPage(options.consentData, options.klaroGeo);
+    window.lastConsentUpdate = null;
+    window.klaroConfig = Object.assign({ services: options.services || [] }, options.config);
+
+    const loaded = { manager: null, watch: null };
+    loaded.manager = {
+        consents: options.consents || {},
+        confirmed: false,
+        watch: jest.fn(function(callbacks) { loaded.watch = callbacks; }),
+        updateConsent: jest.fn()
+    };
+    window.klaro = { getManager: jest.fn(function() { return loaded.manager; }) };
+
+    jest.resetModules();
+    require('../../../js/klaro-geo-events.js');
+    require('../../../js/klaro-geo.js');
+    return loaded;
+}
+
+module.exports = { setUpPage: setUpPage, loadBootstrap: loadBootstrap, loadConsentScript: loadConsentScript };

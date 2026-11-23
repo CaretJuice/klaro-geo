@@ -331,9 +331,22 @@ function klaro_geo_build_template_payload( $template_key, $templates, $services 
 
 	// Add dynamic service consent keys for ALL services
 	// Respects: required services → granted, service override → explicit default, otherwise → template default
+	$consent_keys = array();
 	foreach ( $services as $service ) {
 		$consent_default                                     = klaro_geo_service_consent_default( $service, $template_default_consent, $template_required );
 		$dynamic_consent_defaults[ $consent_default['key'] ] = $consent_default['default'];
+		$consent_keys[ $service['name'] ]                    = $consent_default['key'];
+	}
+
+	// A child consent mode service is denied while its parent is not granted,
+	// as in KlaroGeoEvents.buildConsentMode() (specs/frontend-data.spec.yaml).
+	foreach ( $parent_child_map as $parent => $children ) {
+		$parent_granted = isset( $consent_keys[ $parent ] ) && 'granted' === $dynamic_consent_defaults[ $consent_keys[ $parent ] ];
+		if ( ! $parent_granted ) {
+			foreach ( $children as $child ) {
+				$dynamic_consent_defaults[ $consent_keys[ $child ] ] = 'denied';
+			}
+		}
 	}
 
 	// Process each service

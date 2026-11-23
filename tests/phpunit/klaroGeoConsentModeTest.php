@@ -181,6 +181,41 @@ class KlaroGeoConsentModeTest extends WP_UnitTestCase {
 		$this->assertSame( 'true', $settings['gtag_settings']['url_passthrough'] );
 	}
 
+	/**
+	 * A child consent mode service is denied while its parent is not granted,
+	 * in the defaults as in the updates the browser sends.
+	 */
+	public function test_child_consent_mode_service_is_denied_while_its_parent_is() {
+		$services = array(
+			array(
+				'name'                    => 'ad-storage',
+				'cookies'                 => array(),
+				'purposes'                => array( 'advertising' ),
+				'is_consent_mode_service' => true,
+				'consent_mode_key'        => 'ad_storage',
+				'default'                 => false,
+			),
+			array(
+				'name'                    => 'ad-user-data',
+				'cookies'                 => array(),
+				'purposes'                => array( 'advertising' ),
+				'is_consent_mode_service' => true,
+				'consent_mode_key'        => 'ad_user_data',
+				'parent_service'          => 'ad-storage',
+				'default'                 => true,
+			),
+		);
+
+		$denied_parent = $this->payload( $this->template(), $services )['consent_defaults'];
+		$this->assertSame( 'denied', $denied_parent['ad_storage'] );
+		$this->assertSame( 'denied', $denied_parent['ad_user_data'], 'The child has its own default of granted, but the parent is denied' );
+
+		$services[0]['default'] = true;
+		$granted_parent         = $this->payload( $this->template(), $services )['consent_defaults'];
+		$this->assertSame( 'granted', $granted_parent['ad_storage'] );
+		$this->assertSame( 'granted', $granted_parent['ad_user_data'] );
+	}
+
 	public function test_consent_mode_service_maps() {
 		$services   = $this->services();
 		$services[] = array(
