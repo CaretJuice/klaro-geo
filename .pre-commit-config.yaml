@@ -14,3 +14,9 @@ repos:
         language: script
         pass_filenames: false
         files: ^(klaro-geo\.php|uninstall\.php|includes/|js/)
+      - id: phpstan
+        name: PHPStan (needs `composer install`)
+        entry: vendor/bin/phpstan analyse --no-progress --memory-limit=1G
+        language: system
+        pass_filenames: false
+        files: ^(klaro-geo\.php|uninstall\.php|includes/|phpstan\.neon\.dist)

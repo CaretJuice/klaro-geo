@@ -1,0 +1,35 @@
+# The checks that need no WordPress: the same ones pre-commit runs, plus Jest.
+# PHPUnit and the Playwright suite need the Docker stacks and are not run here yet.
+name: Checks
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  php:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer
+          coverage: none
+      - run: composer install --no-interaction --no-progress
+      - name: Banned patterns
+        run: bin/check-banned-patterns.sh
+      - name: PHPStan
+        run: vendor/bin/phpstan analyse --no-progress --memory-limit=1G
+
+  js:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install --no-audit --no-fund
+      - name: Jest
+        run: npx jest
