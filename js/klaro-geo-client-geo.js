@@ -417,6 +417,10 @@
             }
         }
 
+        // Effective value: the global receipts setting AND the template's own
+        // setting. A template's setting means nothing while receipts are off.
+        var consentLoggingEnabled = payload.consentReceipts === true && !!template.enableConsentLogging;
+
         // ----- klaroConsentData (consent receipts + GTM mode detection) -----
         // Server mode: PHP emitted it complete. Client mode: fill the template
         // and geo fields PHP had to leave empty.
@@ -426,8 +430,7 @@
             window.klaroConsentData.detectedCountry = geo.country || '';
             window.klaroConsentData.detectedRegion = geo.region || '';
             window.klaroConsentData.adminOverride = false;
-            // Effective value: the global receipts setting AND the template's own setting
-            window.klaroConsentData.enableConsentLogging = payload.consentReceipts === true && !!template.enableConsentLogging;
+            window.klaroConsentData.enableConsentLogging = consentLoggingEnabled;
             if (template.templateSettings) {
                 window.klaroConsentData.templateSettings = {
                     consentModalTitle: template.templateSettings.consentModalTitle,
@@ -478,7 +481,7 @@
             'klaroGeoResolutionMode': isServerMode ? 'server' : 'client',
             'klaroGeoGeoSource': geo.source,
             'klaroGeoGeoLatencyMs': (typeof geo.latencyMs === 'number') ? geo.latencyMs : null,
-            'klaroGeoEnableConsentLogging': !!template.enableConsentLogging,
+            'klaroGeoEnableConsentLogging': consentLoggingEnabled,
             'klaroGeoGPCDetected': gpc.detected,
             'klaroGeoGPCEnabled': gpc.enabled,
             'klaroGeoGPCAffectedServices': gpc.affectedServices

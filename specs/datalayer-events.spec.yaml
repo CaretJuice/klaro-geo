@@ -42,7 +42,7 @@ events:
       klaroGeoResolutionMode: "string - 'server' | 'client'"
       klaroGeoGeoSource: "string - 'server' | 'debug' (server mode); 'geoip-ajax' | 'timezone' | 'fallback' (client mode)"
       klaroGeoGeoLatencyMs: "integer|null - null in server mode"
-      klaroGeoEnableConsentLogging: "boolean - the template's consent logging setting"
+      klaroGeoEnableConsentLogging: "boolean - whether receipts are recorded on this page: the global consent receipts setting AND the template's setting (equals klaroConsentData.enableConsentLogging)"
       klaroGeoGPCDetected: "boolean - navigator.globalPrivacyControl was true and GPC is enabled"
       klaroGeoGPCEnabled: "boolean - GPC handling enabled for this template"
       klaroGeoGPCAffectedServices: "array - services whose default was set to false by GPC"
@@ -139,6 +139,14 @@ consumers:
     consentMode). Check it still parses after any change here.
 
 breaking_changes:
+  - plugin_version: "next after 0.3.7"
+    change: "klaroGeoEnableConsentLogging in klaroConfigLoaded is false whenever consent receipts are disabled globally"
+    reason: |
+      It reported the template's own setting, so it could be true on a site
+      that records no receipts. It now matches
+      klaroConsentData.enableConsentLogging.
+    migration: "None needed unless a tag relied on the template's setting while receipts were off"
+
   - plugin_version: "next after 0.3.7"
     change: "generateConsentReceipt also fires for a GPC opt-out with no saved choice; klaroGeoConsentReceiptType added"
     reason: |

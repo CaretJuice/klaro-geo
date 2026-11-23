@@ -495,6 +495,25 @@ describe('Server mode (template resolved by PHP)', function() {
         }));
     });
 
+    test('klaroGeoEnableConsentLogging is false when receipts are disabled globally, whatever the template says', function() {
+        const payload = serverPayload();
+        payload.consentReceipts = false;
+        expect(payload.templates.relaxed.enableConsentLogging).toBe(true);
+
+        applyServer(payload);
+
+        expect(configLoaded()[0].klaroGeoEnableConsentLogging).toBe(false);
+    });
+
+    test('klaroGeoEnableConsentLogging is false when the template has logging off', function() {
+        const payload = serverPayload();
+        payload.templates.relaxed.enableConsentLogging = false;
+
+        applyServer(payload);
+
+        expect(configLoaded()[0].klaroGeoEnableConsentLogging).toBe(false);
+    });
+
     test('admin debug override is reported', function() {
         applyServer(serverPayload({ adminOverride: true, geoSource: 'debug' }));
 
