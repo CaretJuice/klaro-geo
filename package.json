@@ -6,8 +6,6 @@
     "scripts": {
         "test": "jest",
         "test:watch": "jest --watch",
-        "test:klaro-geo": "jest tests/js/test-klaro-geo.js",
-        "test:klaro-geo-comprehensive": "jest tests/js/test-klaro-geo-comprehensive.js",
         "test:coverage": "jest --coverage",
         "e2e:install": "npx playwright install chromium firefox",
         "e2e:docker:up": "docker compose -f docker-compose.e2e.yml up -d",
@@ -43,8 +41,7 @@
         ],
         "testPathIgnorePatterns": [
             "/node_modules/",
-            "/tests/js/setup.js",
-            "/tests/js/run-tests.js"
+            "/tests/js/setup.js"
         ],
         "transform": {
             "^.+\\.js$": "babel-jest"
