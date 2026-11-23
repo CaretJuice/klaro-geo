@@ -60,14 +60,6 @@ window.klaroGeoAdminUi = {
 };
 
 jQuery(document).ready(function($) {
-    // Ensure klaroGeoAdmin is available
-    if (typeof klaroGeoAdmin === 'undefined') {
-        klaroGeoError('klaroGeoAdmin not defined');
-        return;
-    }
-
-    // Debug log
-    klaroGeoLog('klaroGeoAdmin loaded:', klaroGeoAdmin);
 
     // ===== COUNTRY MANAGEMENT =====
 

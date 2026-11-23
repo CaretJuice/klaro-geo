@@ -304,26 +304,16 @@
      */
     function applyResolution(payload, geo) {
         var isServerMode = payload.mode === 'server';
-        var resolved = payload.resolved || {};
+        // payload.resolved exists in server mode only. Either way the template
+        // named is in payload.templates: PHP ships the one it resolved, and
+        // resolveEffectiveTemplate() only returns a key that was shipped (the
+        // fallback template always is).
         var resolution = isServerMode
-            ? { template: resolved.template, source: resolved.templateSource }
+            ? { template: payload.resolved.template, source: payload.resolved.templateSource }
             : resolveEffectiveTemplate(payload.rules, payload.templates, geo.country, geo.region);
         var templateKey = resolution.template;
         var templateSource = resolution.source;
         var template = payload.templates[templateKey];
-
-        if (!template) {
-            // Terminal safety net: ship-time guarantees include the default
-            // template, but never leave the page without a consent manager.
-            var keys = Object.keys(payload.templates || {});
-            if (keys.length === 0) {
-                klaroGeoError('Payload contains no templates; Klaro not initialized');
-                return;
-            }
-            templateKey = keys[0];
-            templateSource = 'fallback';
-            template = payload.templates[templateKey];
-        }
 
         klaroGeoLog('Klaro Geo: applying template', {
             mode: payload.mode,
@@ -341,30 +331,23 @@
         var gpc = { detected: false, enabled: !!template.gpcEnabled, affectedServices: [] };
         if (gpc.enabled && navigator.globalPrivacyControl === true) {
             gpc.detected = true;
-            if (config && config.services) {
-                for (var i = 0; i < config.services.length; i++) {
-                    var svc = config.services[i];
-                    if (svc.gpc_sensitive && !svc.required) {
-                        svc.default = false;
-                        gpc.affectedServices.push(svc.name);
-                    }
+            for (var i = 0; i < config.services.length; i++) {
+                var svc = config.services[i];
+                if (svc.gpc_sensitive && !svc.required) {
+                    svc.default = false;
+                    gpc.affectedServices.push(svc.name);
                 }
             }
         }
-        window.klaroGeoGPC = gpc;
-        window.klaroGeo = window.klaroGeo || {};
         window.klaroGeo.gpc = gpc;
 
         // ----- Consent mode update -----
-        window.dataLayer = window.dataLayer || [];
-        window.gtag = window.gtag || function() { window.dataLayer.push(arguments); };
-
-        var selectedDefaults = template.consentDefaults || {};
-        var gtagSettings = template.gtagSettings || {};
+        var selectedDefaults = template.consentDefaults;
+        var gtagSettings = template.gtagSettings;
 
         // GPC-sensitive services are denied, whatever the template defaults say.
         var gpcDenied = {};
-        if (gpc.detected && config && config.services) {
+        if (gpc.detected) {
             for (var j = 0; j < config.services.length; j++) {
                 var gpcSvc = config.services[j];
                 if (gpcSvc.gpc_sensitive) {
@@ -421,32 +404,30 @@
         // ----- klaroConsentData (consent receipts + GTM mode detection) -----
         // Server mode: PHP emitted it complete. Client mode: fill the template
         // and geo fields PHP had to leave empty.
-        if (!isServerMode && window.klaroConsentData) {
+        if (!isServerMode) {
             window.klaroConsentData.templateName = templateKey;
             window.klaroConsentData.templateSource = templateSource;
             window.klaroConsentData.detectedCountry = geo.country || '';
             window.klaroConsentData.detectedRegion = geo.region || '';
             window.klaroConsentData.adminOverride = false;
             window.klaroConsentData.enableConsentLogging = consentLoggingEnabled;
-            if (template.templateSettings) {
-                window.klaroConsentData.templateSettings = {
-                    consentModalTitle: template.templateSettings.consentModalTitle,
-                    consentModalDescription: template.templateSettings.consentModalDescription,
-                    acceptAllText: template.templateSettings.acceptAllText,
-                    declineAllText: template.templateSettings.declineAllText,
-                    defaultConsent: template.templateSettings.defaultConsent,
-                    requiredConsent: template.templateSettings.requiredConsent,
-                    config: {
-                        consent_mode_settings: {
-                            consent_defaults: selectedDefaults,
-                            gtag_settings: {
-                                ads_data_redaction: gtagSettings.ads_data_redaction === 'true',
-                                url_passthrough: gtagSettings.url_passthrough === 'true'
-                            }
+            window.klaroConsentData.templateSettings = {
+                consentModalTitle: template.templateSettings.consentModalTitle,
+                consentModalDescription: template.templateSettings.consentModalDescription,
+                acceptAllText: template.templateSettings.acceptAllText,
+                declineAllText: template.templateSettings.declineAllText,
+                defaultConsent: template.templateSettings.defaultConsent,
+                requiredConsent: template.templateSettings.requiredConsent,
+                config: {
+                    consent_mode_settings: {
+                        consent_defaults: selectedDefaults,
+                        gtag_settings: {
+                            ads_data_redaction: gtagSettings.ads_data_redaction === 'true',
+                            url_passthrough: gtagSettings.url_passthrough === 'true'
                         }
                     }
-                };
-            }
+                }
+            };
         }
 
         // ----- klaroConfigLoaded dataLayer event (after resolution, once) -----
@@ -468,7 +449,7 @@
             'klaroGeoTemplateSource': templateSource,
             'klaroGeoDetectedCountry': geo.country || null,
             'klaroGeoDetectedRegion': geo.region || null,
-            'klaroGeoAdminOverride': isServerMode ? resolved.adminOverride === true : false,
+            'klaroGeoAdminOverride': isServerMode && payload.resolved.adminOverride,
             'klaroGeoResolutionMode': isServerMode ? 'server' : 'client',
             'klaroGeoGeoSource': geo.source,
             'klaroGeoGeoLatencyMs': (typeof geo.latencyMs === 'number') ? geo.latencyMs : null,
@@ -480,9 +461,10 @@
 
         // Add the consent receipt ID if available and active consent data exists
         if (latestReceipt) {
-            var storageName = (config && (config.storageName || config.cookieName)) || 'klaro';
+            // 'klaro' is Klaro's own default when neither name is configured.
+            var storageName = config.storageName || config.cookieName || 'klaro';
             var hasActiveConsent = false;
-            if (config && config.storageMethod === 'localStorage') {
+            if (config.storageMethod === 'localStorage') {
                 hasActiveConsent = window.localStorage.getItem(storageName) !== null;
             } else {
                 hasActiveConsent = document.cookie.split(';').some(function(c) {
@@ -521,7 +503,7 @@
     function resolveAndApply(payload) {
         var start = nowMs();
 
-        return fetchGeoViaAjax(payload.geoAjax, payload.timeoutMs || 2500)
+        return fetchGeoViaAjax(payload.geoAjax, payload.timeoutMs)
             .then(function(geo) {
                 return {
                     country: geo.country,
@@ -577,25 +559,18 @@
         TZ_COUNTRY: TZ_COUNTRY
     };
 
+    // PHP prints the payload in front of this script on every page.
     var payload = window.klaroGeoTemplatePayload;
-    if (payload && payload.mode === 'client') {
-        payload._internal = api;
-        // deferStart is a test hook: unit tests drive resolveAndApply() directly.
-        if (!payload.deferStart) {
-            payload.resolution = resolveAndApply(payload);
-        }
-    } else if (payload && payload.mode === 'server') {
+    if (payload.mode === 'client') {
+        resolveAndApply(payload);
+    } else {
         // PHP resolved the template; apply it now, before klaro.js loads.
-        try {
-            applyResolution(payload, {
-                country: (payload.resolved && payload.resolved.country) || '',
-                region: (payload.resolved && payload.resolved.region) || '',
-                source: (payload.resolved && payload.resolved.geoSource) || 'server',
-                latencyMs: null
-            });
-        } catch (err) {
-            klaroGeoError('Could not apply the consent template:', err);
-        }
+        applyResolution(payload, {
+            country: payload.resolved.country,
+            region: payload.resolved.region,
+            source: payload.resolved.geoSource,
+            latencyMs: null
+        });
     }
 
     // CommonJS export for unit tests (jsdom)

@@ -63,7 +63,7 @@
         // The template being edited, as PHP shipped it.
         function getCurrentTemplate() {
             let currentTemplate = $('#template_selector').val() || $('#current_template').val();
-            return (klaroGeoTemplates.templates || {})[currentTemplate] || null;
+            return klaroGeoTemplates.templates[currentTemplate] || null;
         }
 
         // Function to add a language tab
@@ -575,26 +575,17 @@
                             updateFormFromJson();
                         }
 
-                        // Call the callback if provided
-                        if (typeof callback === 'function') {
-                            callback(true, response);
-                        }
+                        callback(true, response);
                     } else {
                         klaroGeoError('Error saving translations:', response.data ? response.data.message : 'Unknown error');
 
-                        // Call the callback if provided
-                        if (typeof callback === 'function') {
-                            callback(false, response);
-                        }
+                        callback(false, response);
                     }
                 },
                 error: function(xhr, status, error) {
                     klaroGeoError('AJAX error:', status, error);
 
-                    // Call the callback if provided
-                    if (typeof callback === 'function') {
-                        callback(false, { success: false, data: { message: error } });
-                    }
+                    callback(false, { success: false, data: { message: error } });
                 }
             });
         }
@@ -629,9 +620,7 @@
         // ===== Template selector, deletion and creation =====
 
         // Template page URL from PHP (passed via klaroGeoTemplates)
-        let templatePageUrl = (typeof klaroGeoTemplates !== 'undefined' && klaroGeoTemplates.templatePageUrl)
-            ? klaroGeoTemplates.templatePageUrl
-            : '';
+        let templatePageUrl = klaroGeoTemplates.templatePageUrl;
 
         // Handle template selection change
         $('#template_selector').on('change', function() {

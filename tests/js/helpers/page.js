@@ -42,4 +42,47 @@ function setUpPage(consentData, klaroGeo) {
     }, consentData);
 }
 
-module.exports = { setUpPage: setUpPage };
+/**
+ * Load js/klaro-geo-bootstrap.js and return the functions it exports.
+ *
+ * The script starts itself from window.klaroGeoTemplatePayload when it loads,
+ * as on a page, so a payload has to be there: here a server-mode one with a
+ * single empty template. Tests then call the exported functions with their
+ * own payloads.
+ */
+function loadBootstrap() {
+    setUpPage();
+    window.klaroGeoTemplatePayload = {
+        mode: 'server',
+        resolved: {
+            template: 'default',
+            templateSource: 'fallback',
+            country: '',
+            region: '',
+            geoSource: 'server',
+            adminOverride: false
+        },
+        rules: { defaultTemplate: 'default' },
+        templates: {
+            'default': {
+                config: { services: [] },
+                consentDefaults: {},
+                gtagSettings: { ads_data_redaction: 'false', url_passthrough: 'false' },
+                enableConsentLogging: false,
+                gpcEnabled: false,
+                templateSettings: {}
+            }
+        },
+        consentReceipts: false
+    };
+
+    // Loaded first, as on the page: the bootstrap uses window.KlaroGeoEvents.
+    require('../../../js/klaro-geo-events.js');
+    const api = require('../../../js/klaro-geo-bootstrap.js');
+
+    delete window.klaroGeoTemplatePayload;
+    delete window.klaroConfig;
+    return api;
+}
+
+module.exports = { setUpPage: setUpPage, loadBootstrap: loadBootstrap };

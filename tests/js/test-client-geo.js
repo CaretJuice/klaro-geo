@@ -8,9 +8,8 @@
  * Spec: specs/client-side-geo.spec.yaml
  */
 
-// Loaded first, as on the page: the resolver uses window.KlaroGeoEvents.
-require('../../js/klaro-geo-events.js');
-const clientGeo = require('../../js/klaro-geo-bootstrap.js');
+const { setUpPage, loadBootstrap } = require('./helpers/page.js');
+const clientGeo = loadBootstrap();
 const parityFixture = require('../fixtures/geo-resolution-parity.json');
 
 // Build a rules object + candidate templates map from the shared fixture
@@ -172,13 +171,9 @@ describe('Resolution fallback chain', function() {
     let dtfSpy;
 
     beforeEach(function() {
-        window.dataLayer = [];
-        window.gtag = jest.fn();
+        setUpPage();
         window.klaro = { setup: jest.fn() };
-        window.klaroGeo = {};
-        window.klaroConsentData = { detectedCountry: '', detectedRegion: '', templateName: '' };
         delete window.klaroConfig;
-        delete window.klaroGeoGPC;
         Object.defineProperty(navigator, 'globalPrivacyControl', {
             value: undefined,
             writable: true,
@@ -193,7 +188,6 @@ describe('Resolution fallback chain', function() {
         delete window.klaro;
         delete window.klaroConfig;
         delete window.klaroConsentData;
-        delete window.klaroGeoGPC;
         if (dtfSpy) {
             dtfSpy.mockRestore();
             dtfSpy = null;
@@ -353,8 +347,8 @@ describe('Resolution fallback chain', function() {
         const payload = makePayload();
         await clientGeo.resolveAndApply(payload);
 
-        expect(window.klaroGeoGPC.detected).toBe(true);
-        expect(window.klaroGeoGPC.affectedServices).toContain('google-analytics');
+        expect(window.klaroGeo.gpc.detected).toBe(true);
+        expect(window.klaroGeo.gpc.affectedServices).toContain('google-analytics');
         expect(window.klaroConfig.services[0].default).toBe(false);
 
         // GPC forces denied even though the relaxed template granted by default
@@ -380,8 +374,8 @@ describe('Resolution fallback chain', function() {
 
         await clientGeo.resolveAndApply(makePayload());
 
-        expect(window.klaroGeoGPC.detected).toBe(false);
-        expect(window.klaroGeoGPC.enabled).toBe(false);
+        expect(window.klaroGeo.gpc.detected).toBe(false);
+        expect(window.klaroGeo.gpc.enabled).toBe(false);
     });
 
     test('Klaro not loaded yet → config set, setup deferred to auto-init', async function() {
@@ -444,12 +438,9 @@ describe('Server mode (template resolved by PHP)', function() {
     }
 
     beforeEach(function() {
-        window.dataLayer = [];
-        window.gtag = jest.fn();
+        setUpPage();
         window.klaro = { setup: jest.fn() };
-        window.klaroGeo = {};
         delete window.klaroConfig;
-        delete window.klaroGeoGPC;
         Object.defineProperty(navigator, 'globalPrivacyControl', {
             value: undefined,
             writable: true,
@@ -464,7 +455,6 @@ describe('Server mode (template resolved by PHP)', function() {
         delete window.klaro;
         delete window.klaroConfig;
         delete window.klaroConsentData;
-        delete window.klaroGeoGPC;
         jest.clearAllMocks();
     });
 

@@ -6,9 +6,8 @@
  * does to service defaults, the consent state and the dataLayer.
  */
 
-// Loaded first, as on the page: the resolver uses window.KlaroGeoEvents.
-require('../../js/klaro-geo-events.js');
-const clientGeo = require('../../js/klaro-geo-bootstrap.js');
+const { setUpPage, loadBootstrap } = require('./helpers/page.js');
+const clientGeo = loadBootstrap();
 
 describe('GPC', function() {
     function setGpcSignal(value) {
@@ -24,7 +23,7 @@ describe('GPC', function() {
      *
      * @param {Array}   services   Services for klaroConfig.
      * @param {boolean} gpcEnabled Whether GPC is enabled for the template.
-     * @returns {Object} window.klaroGeoGPC
+     * @returns {Object} window.klaroGeo.gpc
      */
     function apply(services, gpcEnabled) {
         const payload = {
@@ -51,7 +50,7 @@ describe('GPC', function() {
             consentReceipts: false
         };
         clientGeo.applyResolution(payload, { country: 'US', region: '', source: 'server', latencyMs: null });
-        return window.klaroGeoGPC;
+        return window.klaroGeo.gpc;
     }
 
     function consentUpdates() {
@@ -67,11 +66,8 @@ describe('GPC', function() {
     }
 
     beforeEach(function() {
-        window.dataLayer = [];
-        window.gtag = jest.fn();
-        window.klaroGeo = {};
+        setUpPage();
         window.klaro = { setup: jest.fn() };
-        delete window.klaroGeoGPC;
         delete window.klaroConfig;
         window.localStorage.clear();
         setGpcSignal(undefined);
@@ -79,7 +75,6 @@ describe('GPC', function() {
 
     afterEach(function() {
         delete window.klaroGeo;
-        delete window.klaroGeoGPC;
         delete window.klaroConfig;
         delete window.klaro;
         jest.clearAllMocks();
