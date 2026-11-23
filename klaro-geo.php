@@ -805,6 +805,23 @@ function klaro_geo_gpc_query_vars( $vars ) {
 add_filter( 'query_vars', 'klaro_geo_gpc_query_vars' );
 
 /**
+ * What /.well-known/gpc.json answers with: the GPC support statement, or null
+ * when the "Serve /.well-known/gpc.json" setting is off (a 404).
+ *
+ * @return array|null
+ */
+function klaro_geo_gpc_json_body() {
+	if ( ! get_option( 'klaro_geo_gpc_well_known', false ) ) {
+		return null;
+	}
+
+	return array(
+		'gpc'        => true,
+		'lastUpdate' => gmdate( 'Y-m-d' ),
+	);
+}
+
+/**
  * Serve /.well-known/gpc.json response
  */
 function klaro_geo_gpc_template_redirect() {
@@ -812,19 +829,15 @@ function klaro_geo_gpc_template_redirect() {
 		return;
 	}
 
-	if ( ! get_option( 'klaro_geo_gpc_well_known', false ) ) {
+	$body = klaro_geo_gpc_json_body();
+	if ( null === $body ) {
 		status_header( 404 );
 		exit;
 	}
 
 	header( 'Content-Type: application/json' );
 	header( 'Cache-Control: public, max-age=86400' );
-	echo wp_json_encode(
-		array(
-			'gpc'        => true,
-			'lastUpdate' => gmdate( 'Y-m-d' ),
-		)
-	);
+	echo wp_json_encode( $body );
 	exit;
 }
 add_action( 'template_redirect', 'klaro_geo_gpc_template_redirect', 1 );
