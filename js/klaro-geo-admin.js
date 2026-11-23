@@ -1,6 +1,64 @@
 /**
  * Consolidated admin functionality for Klaro Geo
  */
+
+/**
+ * Helpers shared by the admin page scripts, which all load after this one.
+ */
+window.klaroGeoAdminUi = {
+    /**
+     * English name of a language code, 'Custom' when it is not a known one.
+     */
+    languageName: function(langCode) {
+        const names = {
+            'en': 'English',
+            'de': 'German',
+            'fr': 'French',
+            'es': 'Spanish',
+            'it': 'Italian',
+            'nl': 'Dutch',
+            'pt': 'Portuguese',
+            'sv': 'Swedish',
+            'no': 'Norwegian',
+            'da': 'Danish',
+            'fi': 'Finnish',
+            'pl': 'Polish',
+            'ru': 'Russian',
+            'ja': 'Japanese',
+            'zh': 'Chinese',
+            'ar': 'Arabic'
+        };
+        return names[langCode] || 'Custom';
+    },
+
+    /**
+     * Show a message in the top right corner, replacing any message showing.
+     * 'success' and 'error' messages remove themselves; a 'saving' message
+     * stays until the caller removes the returned element or shows another.
+     *
+     * @param {string} type 'saving' | 'success' | 'error'
+     * @param {string} message Shown as text.
+     * @returns {jQuery} The message element.
+     */
+    showIndicator: function(type, message) {
+        const $ = jQuery;
+        $('.klaro-autosave-indicator').remove();
+
+        const indicator = $('<div>').addClass('klaro-autosave-indicator klaro-autosave-' + type).text(message);
+        $('body').append(indicator);
+
+        if (type !== 'saving') {
+            setTimeout(function() {
+                indicator.fadeOut(300, function() {
+                    $(this).remove();
+                });
+            }, type === 'error' ? 3000 : 2000);
+        }
+
+        return indicator;
+    }
+};
+
 jQuery(document).ready(function($) {
     // Ensure klaroGeoAdmin is available
     if (typeof klaroGeoAdmin === 'undefined') {
@@ -351,72 +409,11 @@ jQuery(document).ready(function($) {
 
     // ===== AUTOSAVE FUNCTIONALITY =====
 
-    // Add CSS for autosave indicators
-    $('<style>')
-        .text(`
-            .klaro-autosave-indicator {
-                position: fixed;
-                top: 50px;
-                right: 20px;
-                padding: 10px 15px;
-                border-radius: 4px;
-                z-index: 9999;
-                font-weight: bold;
-                box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-                transition: opacity 0.3s ease;
-            }
-            .klaro-autosave-saving {
-                background-color: #f8f9fa;
-                border: 1px solid #dee2e6;
-                color: #495057;
-            }
-            .klaro-autosave-success {
-                background-color: #d4edda;
-                border: 1px solid #c3e6cb;
-                color: #155724;
-            }
-            .klaro-autosave-error {
-                background-color: #f8d7da;
-                border: 1px solid #f5c6cb;
-                color: #721c24;
-            }
-            .klaro-field-saving {
-                opacity: 0.7;
-                pointer-events: none;
-            }
-            .klaro-field-saved {
-                animation: klaro-highlight-saved 1s ease;
-            }
-            @keyframes klaro-highlight-saved {
-                0% { background-color: #d4edda; }
-                100% { background-color: transparent; }
-            }
-        `)
-        .appendTo('head');
-
     // Autosave timer reference
     let autosaveTimer = null;
     let autosaveDelay = 1000; // 1 second debounce
 
-    // Function to show autosave indicator
-    function showAutosaveIndicator(type, message) {
-        // Remove any existing indicators
-        $('.klaro-autosave-indicator').remove();
-
-        let indicator = $('<div class="klaro-autosave-indicator klaro-autosave-' + type + '">' + message + '</div>');
-        $('body').append(indicator);
-
-        // Auto-remove success/error indicators after delay
-        if (type !== 'saving') {
-            setTimeout(function() {
-                indicator.fadeOut(300, function() {
-                    $(this).remove();
-                });
-            }, type === 'error' ? 3000 : 2000);
-        }
-
-        return indicator;
-    }
+    const showAutosaveIndicator = klaroGeoAdminUi.showIndicator;
 
     // Function to autosave country settings
     function autosaveCountrySettings(changedElement) {

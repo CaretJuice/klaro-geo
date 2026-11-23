@@ -12,22 +12,6 @@ jQuery(document).ready(function($) {
         $('#service_required').val('global');
         $('#service_default').val('global');
 
-    // Function to get language name from code
-    function getLanguageName(langCode) {
-        let langName;
-        switch(langCode) {
-            case 'en': langName = 'English'; break;
-            case 'de': langName = 'German'; break;
-            case 'fr': langName = 'French'; break;
-            case 'es': langName = 'Spanish'; break;
-            case 'it': langName = 'Italian'; break;
-            case 'nl': langName = 'Dutch'; break;
-            case 'pt': langName = 'Portuguese'; break;
-            default: langName = 'Custom'; break;
-        }
-        return langName;
-    }
-
     // Function to add language tab for service translations
     function addLanguageTab(langCode) {
         // Check if this language already exists
@@ -35,7 +19,7 @@ jQuery(document).ready(function($) {
             return; // Tab already exists
         }
 
-        let langName = getLanguageName(langCode);
+        let langName = klaroGeoAdminUi.languageName(langCode);
 
         // Add new tab
         let newTab = $('<li><a href="#service-tab-' + langCode + '">' + langName + ' (' + langCode + ')</a></li>');
@@ -259,20 +243,6 @@ jQuery(document).ready(function($) {
                 // Set the values for this language
                 $('#service_translations_' + langCode + '_title').val(langTranslation.title || '');
                 $('#service_translations_' + langCode + '_description').val(langTranslation.description || '');
-
-                // Set nested values if they exist
-                if (langTranslation.optOut) {
-                    $('#service_translations_' + langCode + '_optOut_title').val(langTranslation.optOut.title || '(opt-out)');
-                    $('#service_translations_' + langCode + '_optOut_description').val(langTranslation.optOut.description || 'This services is loaded by default (but you can opt out)');
-                }
-
-                if (langTranslation.required) {
-                    $('#service_translations_' + langCode + '_required_title').val(langTranslation.required.title || '(always required)');
-                    $('#service_translations_' + langCode + '_required_description').val(langTranslation.required.description || 'This services is always required');
-                }
-
-                $('#service_translations_' + langCode + '_purpose').val(langTranslation.purpose || 'purpose');
-                $('#service_translations_' + langCode + '_purposes').val(langTranslation.purposes || 'purposes');
             });
         }
 
@@ -411,44 +381,6 @@ jQuery(document).ready(function($) {
             if (title || description) {
                 langTranslation.title = title;
                 langTranslation.description = description;
-                hasTranslations = true;
-            }
-
-            // Get opt-out fields
-            let optOutTitle = $('#service_translations_' + langCode + '_optOut_title').val();
-            let optOutDescription = $('#service_translations_' + langCode + '_optOut_description').val();
-
-            if (optOutTitle || optOutDescription) {
-                langTranslation.optOut = {
-                    title: optOutTitle,
-                    description: optOutDescription
-                };
-                hasTranslations = true;
-            }
-
-            // Get required fields
-            let requiredTitle = $('#service_translations_' + langCode + '_required_title').val();
-            let requiredDescription = $('#service_translations_' + langCode + '_required_description').val();
-
-            if (requiredTitle || requiredDescription) {
-                langTranslation.required = {
-                    title: requiredTitle,
-                    description: requiredDescription
-                };
-                hasTranslations = true;
-            }
-
-            // Get purpose fields
-            let purpose = $('#service_translations_' + langCode + '_purpose').val();
-            let purposes = $('#service_translations_' + langCode + '_purposes').val();
-
-            if (purpose) {
-                langTranslation.purpose = purpose;
-                hasTranslations = true;
-            }
-
-            if (purposes) {
-                langTranslation.purposes = purposes;
                 hasTranslations = true;
             }
 

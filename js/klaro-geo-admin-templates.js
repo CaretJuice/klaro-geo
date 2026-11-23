@@ -60,30 +60,6 @@
             }
         }, wasUpdated ? 600 : 300);
 
-        // Function to get language name from code
-        function getLanguageName(langCode) {
-            let langNames = {
-                'en': 'English',
-                'de': 'German',
-                'fr': 'French',
-                'es': 'Spanish',
-                'it': 'Italian',
-                'nl': 'Dutch',
-                'pt': 'Portuguese',
-                'sv': 'Swedish',
-                'no': 'Norwegian',
-                'da': 'Danish',
-                'fi': 'Finnish',
-                'pl': 'Polish',
-                'ru': 'Russian',
-                'ja': 'Japanese',
-                'zh': 'Chinese',
-                'ar': 'Arabic'
-            };
-
-            return langNames[langCode] || 'Custom';
-        }
-
         // The template being edited, as PHP shipped it.
         function getCurrentTemplate() {
             let currentTemplate = $('#template_selector').val() || $('#current_template').val();
@@ -322,7 +298,7 @@
 
                     // Add tab if it doesn't exist
                     if (!$("#tab-" + langCode).length) {
-                        let langName = getLanguageName(langCode);
+                        let langName = klaroGeoAdminUi.languageName(langCode);
                         addLanguageTab(langCode, langName);
                     }
                 });
@@ -420,7 +396,7 @@
             }
 
             // Get language name
-            let langName = getLanguageName(langCode);
+            let langName = klaroGeoAdminUi.languageName(langCode);
 
             // Add the new language tab
             addLanguageTab(langCode, langName);
@@ -501,34 +477,14 @@
         });
 
         $('#update_form_from_json').click(function() {
-            let result = updateFormFromJson();
-            if (result) {
-                // Show a success message
-                let successIndicator = $('<div class="klaro-success-indicator">Form updated from JSON successfully</div>');
-                $('body').append(successIndicator);
-
-                // Remove the success indicator after 2 seconds
-                setTimeout(function() {
-                    successIndicator.fadeOut(500, function() {
-                        $(this).remove();
-                    });
-                }, 2000);
+            if (updateFormFromJson()) {
+                klaroGeoAdminUi.showIndicator('success', 'Form updated from JSON successfully');
             }
         });
 
         $('#update_json_from_form').click(function() {
-            let translations = updateJsonFromForm();
-
-            // Show a success message
-            let successIndicator = $('<div class="klaro-success-indicator">JSON updated from form successfully</div>');
-            $('body').append(successIndicator);
-
-            // Remove the success indicator after 2 seconds
-            setTimeout(function() {
-                successIndicator.fadeOut(500, function() {
-                    $(this).remove();
-                });
-            }, 2000);
+            updateJsonFromForm();
+            klaroGeoAdminUi.showIndicator('success', 'JSON updated from form successfully');
         });
 
         // Set up auto-save when users exit translation fields
@@ -540,7 +496,7 @@
                 updateJsonFromForm();
 
                 // Auto-save the translations
-                autoSaveTranslations('Translations saved automatically', null, true); // true = quiet mode
+                autoSaveTranslations('Translations saved automatically', true); // true = quiet mode
             }, 1500); // Wait 1.5 seconds after the last field change
         });
 
@@ -550,87 +506,22 @@
             clearTimeout(window.translationJsonAutoSaveTimer);
             window.translationJsonAutoSaveTimer = setTimeout(function() {
                 // Auto-save the translations
-                autoSaveTranslations('JSON saved automatically', null, true); // true = quiet mode
+                autoSaveTranslations('JSON saved automatically', true); // true = quiet mode
             }, 1500); // Wait 1.5 seconds after the last edit
         });
 
-        // Update JSON before form submission
+        // The server reads the JSON editor before the per-language fields, so
+        // bring the editor in step with the fields before the form is submitted
+        // (this is what removes a deleted language). With no language fields
+        // in the form, the editor is submitted as it was. The server decides
+        // what to store when neither holds translations.
         $('form').on('submit', function() {
-            klaroGeoLog('Form is being submitted, updating JSON from form...');
+            let editor = $('#translations_json_editor');
+            let editorJson = editor.val();
 
-            try {
-                // First, check if we have a JSON editor
-                if ($('#translations_json_editor').length) {
-                    // Get the current JSON from the editor
-                    let jsonText = $('#translations_json_editor').val();
-                    let currentTranslations = {};
-
-                    try {
-                        // Parse the current JSON
-                        if (jsonText && jsonText.trim() !== '') {
-                            currentTranslations = JSON.parse(jsonText);
-                            klaroGeoLog('Current translations from JSON editor:', currentTranslations);
-                        }
-                    } catch (e) {
-                        klaroGeoError('Error parsing current JSON:', e);
-                    }
-
-                    // Now update the JSON from the form
-                    // This will ensure any deleted languages are properly removed
-                    let translations = updateJsonFromForm();
-
-                    // Debug log the translations being submitted
-                    klaroGeoLog('Translations being submitted:', translations);
-
-                    // Check if translations are empty
-                    if (!translations || Object.keys(translations).length === 0) {
-                        klaroGeoError('No translations found in form!');
-
-                        // If we have current translations, use those
-                        if (currentTranslations && Object.keys(currentTranslations).length > 0) {
-                            klaroGeoLog('Using current translations from JSON editor');
-                            // No need to update the JSON editor as it already has these values
-                        } else {
-                            klaroGeoError('No translations found in JSON editor either!');
-
-                            // Set a default JSON value to prevent syntax errors
-                            $('#translations_json_editor').val(JSON.stringify({
-                                "zz": {
-                                    "consentModal": {
-                                        "title": "Privacy Settings",
-                                        "description": "Here you can assess and customize the services that we'd like to use on this website."
-                                    },
-                                    "acceptAll": "Accept all",
-                                    "decline": "I decline",
-                                    "close": "Close"
-                                }
-                            }, null, 2));
-                        }
-                    } else {
-                        // We have translations from the form, update the JSON editor
-                        $('#translations_json_editor').val(JSON.stringify(translations, null, 2));
-                    }
-                } else {
-                    klaroGeoLog('No JSON editor found, skipping JSON update');
-                }
-
-            } catch (e) {
-                klaroGeoError('Error updating JSON from form:', e);
-
-                // Set a default JSON value to prevent syntax errors if we have a JSON editor
-                if ($('#translations_json_editor').length) {
-                    $('#translations_json_editor').val(JSON.stringify({
-                        "zz": {
-                            "consentModal": {
-                                "title": "Privacy Settings",
-                                "description": "Here you can assess and customize the services that we'd like to use on this website."
-                            },
-                            "acceptAll": "Accept all",
-                            "decline": "I decline",
-                            "close": "Close"
-                        }
-                    }, null, 2));
-                }
+            if (Object.keys(updateJsonFromForm()).length === 0) {
+                klaroGeoWarn('No translations found in the form, submitting the JSON editor as it was');
+                editor.val(editorJson);
             }
 
             return true;
@@ -708,123 +599,32 @@
             });
         }
 
-        // Function to auto-save translations with visual feedback
-        function autoSaveTranslations(message, callback, quietMode) {
-            // If in quiet mode, don't show the saving indicator
-            let savingIndicator;
-            if (!quietMode) {
-                // Show a saving indicator
-                savingIndicator = $('<div class="klaro-saving-indicator">Saving translations...</div>');
-                $('body').append(savingIndicator);
-            }
+        // Save the translations and show the result. In quiet mode a success is
+        // shown only as a tick in the admin bar; errors are always shown.
+        function autoSaveTranslations(message, quietMode) {
+            let savingIndicator = quietMode ? null : klaroGeoAdminUi.showIndicator('saving', 'Saving translations...');
 
-            // Save the translations
             saveTranslationsAjax(function(success, response) {
-                // Remove the saving indicator if it exists
                 if (savingIndicator) {
                     savingIndicator.remove();
                 }
 
-                if (success) {
-                    if (!quietMode) {
-                        // Show a success message
-                        let successIndicator = $('<div class="klaro-success-indicator">' + (message || 'Translations saved successfully') + '</div>');
-                        $('body').append(successIndicator);
-
-                        // Remove the success indicator after 2 seconds
-                        setTimeout(function() {
-                            successIndicator.fadeOut(500, function() {
-                                $(this).remove();
-
-                                // Call the callback if provided
-                                if (typeof callback === 'function') {
-                                    callback(true, response);
-                                }
-                            });
-                        }, 2000);
-                    } else {
-                        // In quiet mode, just call the callback if provided
-                        if (typeof callback === 'function') {
-                            callback(true, response);
-                        }
-
-                        // Show a small indicator in the admin bar
-                        let adminBar = $('#wpadminbar');
-                        if (adminBar.length) {
-                            let miniIndicator = $('<div class="klaro-mini-indicator">✓</div>');
-                            adminBar.append(miniIndicator);
-                            setTimeout(function() {
-                                miniIndicator.fadeOut(300, function() {
-                                    $(this).remove();
-                                });
-                            }, 1000);
-                        }
-                    }
-                } else {
-                    // Always show errors, even in quiet mode
+                if (!success) {
                     let errorMessage = response.data && response.data.message ? response.data.message : 'Error saving translations';
-                    let errorIndicator = $('<div class="klaro-error-indicator">Error: ' + errorMessage + '</div>');
-                    $('body').append(errorIndicator);
-
-                    // Remove the error indicator after 3 seconds
+                    klaroGeoAdminUi.showIndicator('error', 'Error: ' + errorMessage);
+                } else if (!quietMode) {
+                    klaroGeoAdminUi.showIndicator('success', message);
+                } else {
+                    let miniIndicator = $('<div class="klaro-mini-indicator">✓</div>');
+                    $('#wpadminbar').append(miniIndicator);
                     setTimeout(function() {
-                        errorIndicator.fadeOut(500, function() {
+                        miniIndicator.fadeOut(300, function() {
                             $(this).remove();
-
-                            // Call the callback if provided
-                            if (typeof callback === 'function') {
-                                callback(false, response);
-                            }
                         });
-                    }, 3000);
+                    }, 1000);
                 }
             });
         }
-
-        // Add CSS for the indicators
-        $('<style>')
-            .text(`
-                .klaro-saving-indicator, .klaro-success-indicator, .klaro-error-indicator {
-                    position: fixed;
-                    top: 50px;
-                    right: 20px;
-                    padding: 10px 15px;
-                    border-radius: 4px;
-                    z-index: 9999;
-                    font-weight: bold;
-                    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-                }
-                .klaro-saving-indicator {
-                    background-color: #f8f9fa;
-                    border: 1px solid #dee2e6;
-                    color: #495057;
-                }
-                .klaro-success-indicator {
-                    background-color: #d4edda;
-                    border: 1px solid #c3e6cb;
-                    color: #155724;
-                }
-                .klaro-error-indicator {
-                    background-color: #f8d7da;
-                    border: 1px solid #f5c6cb;
-                    color: #721c24;
-                }
-                .klaro-mini-indicator {
-                    position: absolute;
-                    top: 5px;
-                    right: 20px;
-                    background-color: #28a745;
-                    color: white;
-                    border-radius: 50%;
-                    width: 16px;
-                    height: 16px;
-                    text-align: center;
-                    line-height: 16px;
-                    font-size: 10px;
-                    z-index: 99999;
-                }
-            `)
-            .appendTo('head');
 
         // ===== Template selector, deletion and creation =====
 
@@ -915,7 +715,7 @@
             let translations = (template && template.config && template.config.translations) || {};
             Object.keys(translations).forEach(function(langCode) {
                 if (langCode !== 'zz') {
-                    addLanguageTab(langCode, getLanguageName(langCode));
+                    addLanguageTab(langCode, klaroGeoAdminUi.languageName(langCode));
                 }
             });
 
