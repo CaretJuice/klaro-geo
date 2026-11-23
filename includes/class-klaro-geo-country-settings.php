@@ -214,12 +214,7 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
 	 * @param array $countries The countries to set
 	 * @return $this For method chaining
 	 */
-	public function set_visible_countries( $countries ) {
-		if ( ! is_array( $countries ) ) {
-			klaro_geo_debug_log( 'Invalid value for visible countries, must be an array' );
-			return $this;
-		}
-
+	public function set_visible_countries( array $countries ) {
 		$this->visible_countries = $countries;
 
 		return $this;
@@ -281,12 +276,7 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
 	 * @param array $submitted_settings The submitted settings
 	 * @return $this For method chaining
 	 */
-	public function update_from_form( $submitted_settings ) {
-		if ( ! is_array( $submitted_settings ) ) {
-			klaro_geo_debug_log( 'Invalid submitted settings, must be an array' );
-			return $this;
-		}
-
+	public function update_from_form( array $submitted_settings ) {
 		// Get available templates for validation
 		$template_settings   = Klaro_Geo_Template_Settings::get_instance();
 		$available_templates = $template_settings->get();
@@ -298,7 +288,7 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
 		if ( ! empty( $available_keys ) && ! in_array( $default_template, $available_keys ) && $default_template !== 'inherit' ) {
 			klaro_geo_debug_log( 'WARNING: Default template "' . $default_template . '" does not exist in templates database. Available: ' . implode( ', ', $available_keys ) );
 			// Fall back to first available template or 'default'
-			$default_template = in_array( 'default', $available_keys ) ? 'default' : ( isset( $available_keys[0] ) ? $available_keys[0] : 'default' );
+			$default_template = in_array( 'default', $available_keys ) ? 'default' : $available_keys[0];
 			klaro_geo_debug_log( 'Falling back to template: ' . $default_template );
 		}
 
@@ -403,12 +393,7 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
 	 * @param array $settings The region settings
 	 * @return $this For method chaining
 	 */
-	public function update_regions_from_ajax( $settings ) {
-		if ( ! is_array( $settings ) ) {
-			klaro_geo_debug_log( 'Invalid region settings, must be an array' );
-			return $this;
-		}
-
+	public function update_regions_from_ajax( array $settings ) {
 		klaro_geo_debug_log( 'Updating regions from AJAX: ' . wp_json_encode( $settings ) );
 
 		// Get current settings to ensure we don't lose any data

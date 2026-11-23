@@ -177,11 +177,11 @@ class Klaro_Geo_Service_Settings extends Klaro_Geo_Option {
 			// Handle required and default settings
 			// If value is null, it means "inherit from template"
 			// If value is set, ensure it's a boolean
-			if ( isset( $service['required'] ) && $service['required'] !== null ) {
+			if ( isset( $service['required'] ) ) {
 				$service['required'] = filter_var( $service['required'], FILTER_VALIDATE_BOOLEAN );
 			}
 
-			if ( isset( $service['default'] ) && $service['default'] !== null ) {
+			if ( isset( $service['default'] ) ) {
 				$service['default'] = filter_var( $service['default'], FILTER_VALIDATE_BOOLEAN );
 			}
 

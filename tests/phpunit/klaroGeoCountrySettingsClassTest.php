@@ -135,11 +135,6 @@ class KlaroGeoCountrySettingsClassTest extends WP_UnitTestCase {
         // Check that visible countries were saved to database
         $this->assertEquals($new_countries, get_option($this->visible_countries_option));
 
-        // Test setting invalid value (should not change)
-        $settings->set_visible_countries('not_an_array');
-
-        // Check that visible countries were not changed
-        $this->assertEquals($new_countries, $settings->get_visible_countries());
     }
 
     /**
@@ -260,9 +255,6 @@ class KlaroGeoCountrySettingsClassTest extends WP_UnitTestCase {
         $fr = $settings->get_country('FR');
         $this->assertEquals('default', $fr['template']);
         $this->assertEquals('strict', $fr['regions']['PAR']);
-
-        // Test with invalid data (should not error)
-        $settings->update_from_form('not_an_array');
     }
 
     /**
@@ -302,9 +294,6 @@ class KlaroGeoCountrySettingsClassTest extends WP_UnitTestCase {
         $ca = $settings->get_country('CA');
         $this->assertEquals('strict', $ca['regions']['ON']);
         $this->assertFalse(isset($ca['regions']['QC'])); // Inherit should be removed
-
-        // Test with invalid data (should not error)
-        $settings->update_regions_from_ajax('not_an_array');
     }
 
     // NOTE: test_get_effective_settings and test_fallback_template_inheritance

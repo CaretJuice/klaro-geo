@@ -42,7 +42,7 @@ function klaro_geo_get_default_purposes_string() {
  */
 function klaro_geo_get_purposes() {
 	$purposes = array_map( 'trim', explode( ',', (string) get_option( 'klaro_geo_purposes', klaro_geo_get_default_purposes_string() ) ) );
-	return array_values( array_filter( $purposes, 'strlen' ) );
+	return array_values( array_diff( $purposes, array( '' ) ) );
 }
 
 /**

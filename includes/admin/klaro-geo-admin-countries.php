@@ -48,10 +48,9 @@ function klaro_geo_country_settings_page_content() {
 	$invalid_template_refs   = array();
 	$available_template_keys = array_keys( $templates );
 
-	if ( ! empty( $geo_settings ) && is_array( $geo_settings ) ) {
+	if ( $geo_settings ) {
 		// Check default_template
-		if ( isset( $geo_settings['default_template'] ) &&
-			! empty( $geo_settings['default_template'] ) &&
+		if ( ! empty( $geo_settings['default_template'] ) &&
 			! in_array( $geo_settings['default_template'], $available_template_keys ) ) {
 			$invalid_template_refs['Fallback Template'] = $geo_settings['default_template'];
 		}
@@ -317,7 +316,6 @@ function klaro_geo_save_region_settings_ajax() {
 
 	if ( empty( $settings_json ) ) {
 		wp_send_json_error( [ 'message' => 'No settings provided' ] );
-		return;
 	}
 
 	// Decode and sanitize the JSON string
@@ -326,7 +324,6 @@ function klaro_geo_save_region_settings_ajax() {
 	// Check if JSON decoding was successful
 	if ( json_last_error() !== JSON_ERROR_NONE ) {
 		wp_send_json_error( [ 'message' => 'Invalid JSON: ' . json_last_error_msg() ] );
-		return;
 	}
 
 	$settings = klaro_geo_sanitize_array( $settings );
@@ -362,7 +359,6 @@ function klaro_geo_get_regions() {
 
 	if ( empty( $country ) ) {
 		wp_send_json_error( [ 'message' => 'Country code is required' ] );
-		return;
 	}
 
 	// Debug log
@@ -439,7 +435,6 @@ function klaro_geo_get_regions() {
 				'settings'         => [],
 			]
 		);
-		return;
 	}
 
 	// Existing region settings for this country

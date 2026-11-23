@@ -14,8 +14,16 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Class Klaro_Geo_Option
  *
  * Base class for handling JSON objects stored in WordPress options
+ *
+ * @phpstan-consistent-constructor
  */
 class Klaro_Geo_Option {
+	/**
+	 * The option a subclass stores, used by get_instance() when no name is
+	 * given. The base class has none: pass a name.
+	 */
+	const OPTION_NAME = '';
+
 	/**
 	 * The option name in the WordPress database
 	 *
@@ -225,12 +233,7 @@ class Klaro_Geo_Option {
 	 * @param array $value The new value
 	 * @return $this For method chaining
 	 */
-	public function set( $value ) {
-		if ( ! is_array( $value ) ) {
-			klaro_geo_debug_log( 'Invalid value for ' . $this->option_name . ', must be an array' );
-			return $this;
-		}
-
+	public function set( array $value ) {
 		if ( $this->value !== $value ) {
 			$this->value       = $value;
 			$this->is_modified = true;

@@ -23,6 +23,8 @@ function klaro_geo_receipts_table_name() {
 
 /**
  * Check if the consent receipts table exists.
+ *
+ * @phpstan-impure The answer changes when the table is created or dropped.
  */
 function klaro_geo_receipts_table_exists() {
 	global $wpdb;
@@ -334,7 +336,7 @@ function klaro_geo_is_consent_logging_enabled( $template_name ) {
 	}
 
 	$template = Klaro_Geo_Template_Settings::get_instance()->get_template( $template_name );
-	if ( is_array( $template ) && isset( $template['plugin_settings']['enable_consent_logging'] ) ) {
+	if ( isset( $template['plugin_settings']['enable_consent_logging'] ) ) {
 		return (bool) $template['plugin_settings']['enable_consent_logging'];
 	}
 
@@ -684,7 +686,7 @@ function klaro_geo_render_consent_receipts_page() {
 
 	// Get total count
 	$total_items = klaro_geo_receipts_count();
-	$total_pages = ceil( $total_items / $per_page );
+	$total_pages = (int) ceil( $total_items / $per_page );
 
 	// Get receipts for current page
 	$receipts = klaro_geo_receipts_get_page( $per_page, $offset );

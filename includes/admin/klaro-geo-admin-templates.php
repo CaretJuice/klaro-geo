@@ -1199,7 +1199,6 @@ function klaro_geo_create_template() {
 
 	if ( ! isset( $_POST['template_name'] ) || ! isset( $_POST['inherit_from'] ) ) {
 		wp_send_json_error( array( 'message' => 'Missing required fields.' ) );
-		return;
 	}
 	$template_name = sanitize_text_field( wp_unslash( $_POST['template_name'] ) );
 	$inherit_from  = sanitize_text_field( wp_unslash( $_POST['inherit_from'] ) );
@@ -1218,7 +1217,6 @@ function klaro_geo_create_template() {
 					'message' => 'A template with this name already exists. Please choose a different name.',
 				)
 			);
-			return;
 		}
 	}
 
@@ -1238,7 +1236,6 @@ function klaro_geo_create_template() {
 				'message' => 'Selected template to copy from does not exist.',
 			)
 		);
-		return;
 	}
 
 	// Get the template to inherit from
@@ -1250,7 +1247,6 @@ function klaro_geo_create_template() {
 				'message' => 'Error retrieving template to copy from.',
 			)
 		);
-		return;
 	}
 
 	// Copy settings from inherited template
@@ -1291,7 +1287,6 @@ function klaro_geo_save_translations_ajax() {
 	// Check if we have a template ID
 	if ( ! isset( $_POST['template_id'] ) || empty( $_POST['template_id'] ) ) {
 		wp_send_json_error( array( 'message' => 'No template ID provided.' ) );
-		return;
 	}
 
 	// Get the template ID
@@ -1304,7 +1299,6 @@ function klaro_geo_save_translations_ajax() {
 	$template = $template_settings->get_template( $template_id );
 	if ( ! $template ) {
 		wp_send_json_error( array( 'message' => 'Template not found.' ) );
-		return;
 	}
 
 	// Log the AJAX request
@@ -1370,7 +1364,6 @@ function klaro_geo_delete_template_ajax() {
 	// Get the template ID
 	if ( ! isset( $_POST['template_id'] ) || empty( $_POST['template_id'] ) ) {
 		wp_send_json_error( array( 'message' => 'No template ID provided.' ) );
-		return;
 	}
 
 	$template_id = sanitize_text_field( wp_unslash( $_POST['template_id'] ) );
@@ -1378,7 +1371,6 @@ function klaro_geo_delete_template_ajax() {
 	// Don't allow deleting the default template
 	if ( $template_id === 'default' ) {
 		wp_send_json_error( array( 'message' => 'The default template cannot be deleted.' ) );
-		return;
 	}
 
 	// Initialize the template settings class
@@ -1388,20 +1380,18 @@ function klaro_geo_delete_template_ajax() {
 	$template = $template_settings->get_template( $template_id );
 	if ( ! $template ) {
 		wp_send_json_error( array( 'message' => 'Template not found.' ) );
-		return;
 	}
 
 	// Check if the template is in use by any countries
-	$country_settings         = get_option( 'klaro_geo_country_settings', array() );
+	$country_settings         = Klaro_Geo_Country_Settings::get_instance()->get();
 	$template_in_use          = false;
 	$countries_using_template = array();
 
-	if ( is_array( $country_settings ) ) {
-		foreach ( $country_settings as $country_code => $country_data ) {
-			if ( isset( $country_data['template'] ) && $country_data['template'] === $template_id ) {
-				$template_in_use            = true;
-				$countries_using_template[] = $country_code;
-			}
+	foreach ( $country_settings as $country_code => $country_data ) {
+		// The fallback template entry is a string, not a country.
+		if ( is_array( $country_data ) && isset( $country_data['template'] ) && $country_data['template'] === $template_id ) {
+			$template_in_use            = true;
+			$countries_using_template[] = $country_code;
 		}
 	}
 
@@ -1412,7 +1402,6 @@ function klaro_geo_delete_template_ajax() {
 		$error_message .= 'Please assign a different template to these countries in Country Settings before deleting this template.';
 
 		wp_send_json_error( array( 'message' => $error_message ) );
-		return;
 	}
 
 	// Log the deletion

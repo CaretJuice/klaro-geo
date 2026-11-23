@@ -185,7 +185,7 @@ function klaro_geo_migrate_gtm_purpose() {
 	// A stored purpose list predates 'infrastructure'; add it after 'functional'.
 	$stored_purposes = get_option( 'klaro_geo_purposes', false );
 	if ( false !== $stored_purposes ) {
-		$purposes = array_values( array_filter( array_map( 'trim', explode( ',', (string) $stored_purposes ) ), 'strlen' ) );
+		$purposes = klaro_geo_get_purposes();
 		if ( ! in_array( 'infrastructure', $purposes, true ) ) {
 			$functional_at = array_search( 'functional', $purposes, true );
 			$insert_at     = ( false === $functional_at ) ? 0 : $functional_at + 1;

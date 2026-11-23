@@ -465,7 +465,7 @@ function klaro_geo_build_template_payload( $template_key, $templates, $services 
 
 		// default is only emitted when explicit; Klaro falls back to config.default
 		// for the rest, which inherits correctly.
-		if ( isset( $service['default'] ) && $service['default'] !== null ) {
+		if ( isset( $service['default'] ) ) {
 			$service_config['default'] = filter_var( $service['default'], FILTER_VALIDATE_BOOLEAN );
 		}
 
@@ -871,9 +871,6 @@ function klaro_geo_get_client_frontend_payload( $services ) {
 
 	$country_settings_class = Klaro_Geo_Country_Settings::get_instance();
 	$geo_settings           = $country_settings_class->get();
-	if ( ! is_array( $geo_settings ) ) {
-		$geo_settings = array();
-	}
 
 	$default_template = $country_settings_class->get_default_template();
 	if ( empty( $default_template ) ) {
@@ -881,9 +878,6 @@ function klaro_geo_get_client_frontend_payload( $services ) {
 	}
 
 	$visible_countries = $country_settings_class->load_visible_countries();
-	if ( ! is_array( $visible_countries ) ) {
-		$visible_countries = array();
-	}
 
 	// Build the rules map and collect candidate template keys
 	$rules_countries = array();
@@ -905,7 +899,7 @@ function klaro_geo_get_client_frontend_payload( $services ) {
 			}
 		}
 
-		if ( isset( $value['regions'] ) && is_array( $value['regions'] ) ) {
+		if ( isset( $value['regions'] ) ) {
 			$regions = array();
 			foreach ( $value['regions'] as $region_code => $region_template ) {
 				$regions[ $region_code ] = $region_template;
@@ -944,12 +938,6 @@ function klaro_geo_get_client_frontend_payload( $services ) {
 		if ( $candidate_key === $default_template ) {
 			$default_payload = $payload;
 		}
-	}
-
-	// Defensive: the loop above always includes the default template, but never ship without one
-	if ( $default_payload === null ) {
-		$default_payload                        = klaro_geo_build_template_payload( $default_template, $templates, $services );
-		$payload_templates[ $default_template ] = klaro_geo_frontend_template_entry( $default_payload );
 	}
 
 	// Head consent defaults come from the fallback template (cache-safe: same for
