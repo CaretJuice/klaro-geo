@@ -8,7 +8,6 @@ This directory contains all Docker-related files for the Klaro Geo plugin develo
 - `Dockerfile.test`, `docker-entrypoint-test.sh` - the PHPUnit runner image and its entrypoint
 - `docker-entrypoint-wordpress.sh` - the dev site's entrypoint
 - `php.ini` and `custom.ini` - PHP configuration for the containers
-- `logs.sh`, `test-logging.sh`, `debug-database.sh`, `fix-npm-permissions.sh`, `rebuild-and-test.sh` - troubleshooting scripts
 - `logs/` - debug logs copied out of the containers
 
 ## Running tests
@@ -74,17 +73,6 @@ You can view the debug logs in several ways:
    docker exec wordpress_test cat /var/www/html/wp-content/debug.log
    ```
 
-### Testing Logging Functionality
-
-To verify that logging is working correctly:
-
-```bash
-chmod +x docker/test-logging.sh
-./docker/test-logging.sh
-```
-
-This script tests various logging methods and displays the results.
-
 ### Troubleshooting Logging Issues
 
 If logging is not working:
@@ -112,17 +100,6 @@ If logging is not working:
 ## Database
 
 PHPUnit tests use the real test database provided by the `db_test` service. Tests that need the consent receipts table create it once per test class with `klaro_geo_create_consent_receipts_table()`.
-
-### Debugging Database Issues
-
-If you're having issues with the database, use the debug script:
-
-```bash
-chmod +x docker/debug-database.sh
-./docker/debug-database.sh
-```
-
-This script tests database connectivity and displays configuration information.
 
 ## Additional Resources
 
