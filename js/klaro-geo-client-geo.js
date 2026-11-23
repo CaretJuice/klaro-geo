@@ -203,10 +203,6 @@
                 if (region && countrySettings.regions &&
                     typeof countrySettings.regions[region] !== 'undefined') {
                     var regionTemplate = countrySettings.regions[region];
-                    // Normalized server-side, but tolerate the object form too
-                    if (regionTemplate && typeof regionTemplate === 'object') {
-                        regionTemplate = regionTemplate.template || '';
-                    }
                     if (regionTemplate !== 'inherit') {
                         template = regionTemplate;
                         source = 'region';

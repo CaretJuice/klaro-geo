@@ -915,12 +915,7 @@ function klaro_geo_get_client_frontend_payload( $services ) {
 
 		if ( isset( $value['regions'] ) && is_array( $value['regions'] ) ) {
 			$regions = array();
-			foreach ( $value['regions'] as $region_code => $region_data ) {
-				// Normalize both formats: array with 'template' key or direct string value
-				$region_template = is_array( $region_data )
-					? ( $region_data['template'] ?? '' )
-					: $region_data;
-
+			foreach ( $value['regions'] as $region_code => $region_template ) {
 				$regions[ $region_code ] = $region_template;
 				if ( $region_template !== 'inherit' && $region_template !== '' ) {
 					$candidate_keys[] = $region_template;

@@ -140,12 +140,8 @@ function klaro_geo_country_settings_page_content() {
 						continue;
 					}
 					$name = $countries[ $code ];
-					// Check if we have settings for this country in the new format
 					if ( isset( $geo_settings[ $code ] ) && is_array( $geo_settings[ $code ] ) ) {
 						$country_config = $geo_settings[ $code ];
-					} elseif ( isset( $geo_settings['countries'][ $code ] ) ) {
-						// Check if we have settings in the legacy format
-						$country_config = $geo_settings['countries'][ $code ];
 					} else {
 						// Default settings if nothing is found
 						$country_config = array(
@@ -171,10 +167,9 @@ function klaro_geo_country_settings_page_content() {
 
 								<?php
 								// Add hidden fields for region settings
-								if ( isset( $country_config['regions'] ) && is_array( $country_config['regions'] ) ) {
-									foreach ( $country_config['regions'] as $region_code => $template ) {
-										echo '<input type="hidden" name="klaro_geo_country_settings[' . esc_attr( $code ) . '][regions][' . esc_attr( $region_code ) . ']" value="' . esc_attr( $template ) . '">';
-									}
+								$country_regions = isset( $country_config['regions'] ) ? $country_config['regions'] : array();
+								foreach ( $country_regions as $region_code => $template ) {
+									echo '<input type="hidden" name="klaro_geo_country_settings[' . esc_attr( $code ) . '][regions][' . esc_attr( $region_code ) . ']" value="' . esc_attr( $template ) . '">';
 								}
 								?>
 							</td>
@@ -183,20 +178,9 @@ function klaro_geo_country_settings_page_content() {
 								// Display regions with overrides
 								$regions_with_overrides = array();
 
-								// Check if we have regions in the new nested format
-								if ( isset( $country_config['regions'] ) && is_array( $country_config['regions'] ) ) {
-									foreach ( $country_config['regions'] as $region_code => $template ) {
-										if ( ! empty( $template ) && $template !== 'default' ) {
-											$regions_with_overrides[] = $region_code;
-										}
-									}
-								} else {
-									// Check for regions in the old flat format
-									foreach ( $country_config as $key => $value ) {
-										// Skip the template key as it's not a region
-										if ( $key !== 'template' && $key !== 'regions' && ! empty( $value ) && $value !== 'default' ) {
-											$regions_with_overrides[] = $key;
-										}
+								foreach ( $country_regions as $region_code => $template ) {
+									if ( ! empty( $template ) && $template !== 'default' ) {
+										$regions_with_overrides[] = $region_code;
 									}
 								}
 
@@ -458,33 +442,9 @@ function klaro_geo_get_regions() {
 		return;
 	}
 
-	// Get existing region settings
-	$country_settings = get_option( 'klaro_geo_country_settings', [] );
-	$region_settings  = [];
-
-	// Debug log the country settings
-	klaro_geo_debug_log( 'Country settings: ' . wp_json_encode( $country_settings ) );
-
-	// Check if we have settings for this country
-	if ( isset( $country_settings[ $country ] ) ) {
-		// Check if we have regions in the new nested format
-		if ( isset( $country_settings[ $country ]['regions'] ) && is_array( $country_settings[ $country ]['regions'] ) ) {
-			$region_settings = $country_settings[ $country ]['regions'];
-			klaro_geo_debug_log( 'Found region settings in nested format: ' . wp_json_encode( $region_settings ) );
-		} else {
-			// Extract all keys that are not 'template' or 'regions' as region settings (old flat format)
-			foreach ( $country_settings[ $country ] as $key => $value ) {
-				if ( $key !== 'template' && $key !== 'regions' ) {
-					$region_settings[ $key ] = $value;
-				}
-			}
-			klaro_geo_debug_log( 'Found region settings in flat format: ' . wp_json_encode( $region_settings ) );
-		}
-	} elseif ( isset( $country_settings['countries'] ) && isset( $country_settings['countries'][ $country ] ) && isset( $country_settings['countries'][ $country ]['regions'] ) ) {
-		// Check if we have settings in the legacy format
-		$region_settings = $country_settings['countries'][ $country ]['regions'];
-		klaro_geo_debug_log( 'Found region settings in legacy format: ' . wp_json_encode( $region_settings ) );
-	}
+	// Existing region settings for this country
+	$country_config  = Klaro_Geo_Country_Settings::get_instance()->get_country( $country );
+	$region_settings = isset( $country_config['regions'] ) ? $country_config['regions'] : array();
 
 	// Convert regions to the format expected by the JavaScript
 	$formatted_regions = [];

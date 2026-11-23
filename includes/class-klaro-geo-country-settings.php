@@ -104,6 +104,72 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
 	}
 
 	/**
+	 * Load the option and bring every country entry to one shape:
+	 * array( 'template' => string, 'regions' => array( region code => template key ) ).
+	 *
+	 * Earlier versions stored a region's template directly on the country
+	 * ( 'US' => array( 'template' => 'x', 'CA' => 'y' ) ) or as
+	 * array( 'template' => 'y' ). This is the one place those are read, so
+	 * everything after it can rely on the shape above.
+	 *
+	 * @return array The option value
+	 */
+	public function load() {
+		parent::load();
+
+		foreach ( $this->value as $code => $config ) {
+			if ( ! is_array( $config ) ) {
+				continue;
+			}
+
+			$normalized = self::normalize_country( $config );
+			if ( $normalized !== $config ) {
+				klaro_geo_debug_log( 'Country ' . $code . ' is stored in an old region format, read as: ' . wp_json_encode( $normalized ) );
+				$this->value[ $code ] = $normalized;
+			}
+		}
+
+		return $this->value;
+	}
+
+	/**
+	 * One country entry in the shape described in load().
+	 *
+	 * @param array $config The stored entry.
+	 * @return array
+	 */
+	private static function normalize_country( array $config ) {
+		$regions = isset( $config['regions'] ) && is_array( $config['regions'] ) ? $config['regions'] : array();
+		foreach ( $regions as $region_code => $region ) {
+			if ( is_array( $region ) ) {
+				$regions[ $region_code ] = isset( $region['template'] ) ? $region['template'] : '';
+			}
+		}
+
+		$normalized = array();
+		foreach ( $config as $key => $value ) {
+			if ( 'template' === $key || 'regions' === $key ) {
+				continue;
+			}
+			if ( is_string( $value ) ) {
+				// Old flat format: a region code directly on the country.
+				$regions[ $key ] = $value;
+			} else {
+				$normalized[ $key ] = $value;
+			}
+		}
+
+		if ( isset( $config['template'] ) ) {
+			$normalized = array( 'template' => $config['template'] ) + $normalized;
+		}
+		if ( isset( $config['regions'] ) || ! empty( $regions ) ) {
+			$normalized['regions'] = $regions;
+		}
+
+		return $normalized;
+	}
+
+	/**
 	 * Load visible countries from the database
 	 *
 	 * @return array The visible countries
@@ -332,7 +398,6 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
 	}
 
 	/**
-	 * Possibly delete this
 	 * Update region settings from AJAX data
 	 *
 	 * @param array $settings The region settings
@@ -386,26 +451,6 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
 						// If the value is "inherit" or "default", remove any existing override
 						unset( $country_settings['regions'][ $region_code ] );
 						klaro_geo_debug_log( "Removing region {$region_code} override (set to inherit from country)" );
-					}
-				}
-			} else {
-				// Process legacy format where regions are directly in the country_data
-				foreach ( $country_data as $key => $value ) {
-					if ( $key !== 'template' && $key !== 'regions' ) {
-						// Initialize regions array if it doesn't exist
-						if ( ! isset( $country_settings['regions'] ) ) {
-							$country_settings['regions'] = array();
-						}
-
-						// Only save if the value is not "inherit" or "default" (use country default)
-						if ( $value !== 'inherit' && $value !== 'default' ) {
-							$country_settings['regions'][ $key ] = $value;
-							klaro_geo_debug_log( "Setting region {$key} to template {$value} (legacy format)" );
-						} elseif ( isset( $country_settings['regions'][ $key ] ) ) {
-							// If the value is "inherit" or "default", remove any existing override
-							unset( $country_settings['regions'][ $key ] );
-							klaro_geo_debug_log( "Removing region {$key} override (set to inherit from country) (legacy format)" );
-						}
 					}
 				}
 			}
@@ -491,13 +536,7 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
 					isset( $country_settings['regions'][ $region_code ] ) ) {
 					klaro_geo_debug_log( 'Region ' . $region_code . ' found in settings' );
 
-					// Get the region template value
-					$region_template = '';
-					if ( is_array( $country_settings['regions'][ $region_code ] ) && isset( $country_settings['regions'][ $region_code ]['template'] ) ) {
-						$region_template = $country_settings['regions'][ $region_code ]['template'];
-					} else {
-						$region_template = $country_settings['regions'][ $region_code ];
-					}
+					$region_template = $country_settings['regions'][ $region_code ];
 
 					// Check if region is set to inherit from country
 					if ( $region_template === 'inherit' ) {

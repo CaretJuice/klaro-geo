@@ -83,6 +83,53 @@ class KlaroGeoCountrySettingsFormSaveTest extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Region formats stored by earlier versions are read into the current
+	 * shape when the option is loaded, so resolution still honours them.
+	 */
+	public function test_old_region_formats_are_normalized_on_load() {
+		update_option(
+			'klaro_geo_country_settings',
+			array(
+				'default_template' => 'default',
+				'US'               => array(
+					'template' => 'default',
+					'CA'       => 'strict',
+				),
+				'CA'               => array(
+					'template' => 'default',
+					'regions'  => array( 'QC' => array( 'template' => 'strict' ) ),
+				),
+				'DE'               => array(
+					'template' => 'strict',
+					'regions'  => array( 'BY' => 'default' ),
+				),
+			)
+		);
+		Klaro_Geo_Country_Settings::clear_instance_cache();
+		$settings = Klaro_Geo_Country_Settings::get_instance();
+
+		$this->assertSame(
+			array(
+				'template' => 'default',
+				'regions'  => array( 'CA' => 'strict' ),
+			),
+			$settings->get_country( 'US' )
+		);
+		$this->assertSame( array( 'QC' => 'strict' ), $settings->get_country( 'CA' )['regions'] );
+		$this->assertSame(
+			array(
+				'template' => 'strict',
+				'regions'  => array( 'BY' => 'default' ),
+			),
+			$settings->get_country( 'DE' ),
+			'The current shape is left as it is'
+		);
+
+		$this->assertSame( 'strict', $settings->get_effective_settings( 'US-CA' )['template'] );
+		$this->assertSame( 'strict', $settings->get_effective_settings( 'CA-QC' )['template'] );
+	}
+
+	/**
 	 * The Save button must not post to options.php, which would store the
 	 * option without going through update_from_form().
 	 */
