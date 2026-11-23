@@ -68,7 +68,7 @@ Data is untrusted in the places below. It is validated there, once, and trusted 
 | Boundary | Checked by | After that |
 |----------|------------|------------|
 | `$_GET` / `$_POST` / AJAX request bodies | the sanitize functions (`klaro_geo_sanitize_receipt()`, `klaro_geo_sanitize_services()`, and so on) | Typed and trusted |
-| Options read from the database | the `Klaro_Geo_Option` classes, which fall back and log when a value is corrupt | Always an array of the documented shape |
+| Options read from the database | the `Klaro_Geo_Option` classes, when they load: `validate_services()`, `normalize_template()` and the country `load()` fall back and log when a value is corrupt | Always an array of the documented shape. Tests that hand services or templates straight to a builder pass them through the same functions |
 | `window.klaroConsentData` and the template payload, in JavaScript | PHP builds them; `specs/frontend-data.spec.yaml` is the contract | Read fields directly |
 | Things the plugin does not control: geoip-detect, `window.klaro` before it loads, `navigator.globalPrivacyControl`, `localStorage`, `fetch` | the one function that touches each | Callers do not re-check |
 

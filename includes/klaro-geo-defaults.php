@@ -319,3 +319,27 @@ function klaro_geo_get_default_services() {
 		],
 	];
 }
+
+/**
+ * The config a template gets when its stored config cannot be used (missing,
+ * or not an array): the built-in default template's config, made to fail
+ * closed. Nothing is granted by default and nothing is undeclinable.
+ *
+ * acceptAll comes from the built-in config (true): without it the notice's
+ * "That's ok" button saves the default consents, which declines every service.
+ *
+ * @return array
+ */
+function klaro_geo_get_fail_closed_template_config() {
+	$config = klaro_geo_get_default_templates()['default']['config'];
+
+	$config['default']                   = false;
+	$config['required']                  = false;
+	$config['noAutoLoad']                = false;
+	$config['showDescriptionEmptyStore'] = true;
+	$config['autoFocus']                 = false;
+	$config['showNoticeTitle']           = false;
+	$config['cookiePath']                = '/';
+
+	return $config;
+}

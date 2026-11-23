@@ -4,6 +4,10 @@
  *
  * A template whose 'config' is not an array must not be iterated.
  *
+ * Templates are brought to one shape when they are loaded
+ * (Klaro_Geo_Template_Settings::normalize_template()), so the tests pass their
+ * templates through it, as loading does, before building the payload.
+ *
  * Production logged this 247 times in a single debug.log:
  *   foreach() argument must be of type array|object, string given
  *     in includes/klaro-geo-config.php
@@ -29,9 +33,12 @@ class CorruptTemplateConfigTest extends WP_UnitTestCase {
 		$services         = $service_settings->get_default_services();
 
 		$templates = array(
-			'default' => array(
-				'name'   => 'Default Template',
-				'config' => $config,
+			'default' => Klaro_Geo_Template_Settings::normalize_template(
+				'default',
+				array(
+					'name'   => 'Default Template',
+					'config' => $config,
+				)
 			),
 		);
 
@@ -77,15 +84,19 @@ class CorruptTemplateConfigTest extends WP_UnitTestCase {
 		$service_settings = Klaro_Geo_Service_Settings::get_instance();
 		$services         = $service_settings->get_default_services();
 
-		$templates = array(
-			'default' => array(
-				'name'   => 'Default Template',
-				'config' => array( 'default' => false ),
-			),
-			'strict'  => array(
-				'name'   => 'Strict Opt-In',
-				'config' => '',
-			),
+		// As stored: read through the settings class, like a page load.
+		update_option(
+			'klaro_geo_templates',
+			array(
+				'default' => array(
+					'name'   => 'Default Template',
+					'config' => array( 'default' => false ),
+				),
+				'strict'  => array(
+					'name'   => 'Strict Opt-In',
+					'config' => '',
+				),
+			)
 		);
 
 		// klaro_geo_debug_log() writes straight to error_log(), so redirect it.
@@ -94,8 +105,11 @@ class CorruptTemplateConfigTest extends WP_UnitTestCase {
 		ini_set( 'error_log', $log_file );
 
 		try {
+			Klaro_Geo_Template_Settings::clear_instance_cache();
+			$templates = Klaro_Geo_Template_Settings::get_instance()->get();
 			klaro_geo_build_template_payload( 'strict', $templates, $services );
 		} finally {
+			Klaro_Geo_Template_Settings::clear_instance_cache();
 			ini_set( 'error_log', $previous_log );
 		}
 
@@ -112,6 +126,70 @@ class CorruptTemplateConfigTest extends WP_UnitTestCase {
 			$logged,
 			'The warning must name the offending template'
 		);
+	}
+
+	/**
+	 * Loading brings every stored template to one shape, whatever was stored,
+	 * and does not write the repaired value back by itself.
+	 */
+	public function test_stored_templates_are_normalized_when_loaded() {
+		$stored = array(
+			'not-an-array'      => 'corrupted',
+			'no-config'         => array( 'name' => 'No config' ),
+			'legacy-json'       => array(
+				'config' => array(
+					'default'           => true,
+					'translations'      => array( 'zz' => array( 'acceptAll' => 'from the array' ) ),
+					'translations_json' => '{"zz":{"acceptAll":"from the JSON"}}',
+				),
+			),
+			'bad-plugin-values' => array(
+				'config'          => array(
+					'default'      => true,
+					'translations' => 'not an array',
+				),
+				'plugin_settings' => array(
+					'gpc_enabled'  => false,
+					'gpc_purposes' => 'advertising',
+				),
+			),
+		);
+		update_option( 'klaro_geo_templates', $stored );
+		Klaro_Geo_Template_Settings::clear_instance_cache();
+		$settings  = Klaro_Geo_Template_Settings::get_instance();
+		$templates = $settings->get();
+
+		foreach ( $templates as $key => $template ) {
+			$this->assertIsString( $template['name'], $key );
+			$this->assertIsArray( $template['config']['translations']['zz']['purposes'], $key );
+			foreach ( klaro_geo_get_admin_true_by_default_keys() as $admin_key ) {
+				$this->assertArrayHasKey( $admin_key, $template['config'], "$key: $admin_key" );
+			}
+		}
+
+		// Unusable configs fail closed.
+		$this->assertFalse( $templates['not-an-array']['config']['default'] );
+		$this->assertFalse( $templates['no-config']['config']['default'] );
+		$this->assertSame( 'not-an-array', $templates['not-an-array']['name'], 'A missing name is the key' );
+
+		// The JSON string older versions stored wins over the array, and is not kept.
+		$this->assertSame( 'from the JSON', $templates['legacy-json']['config']['translations']['zz']['acceptAll'] );
+		$this->assertArrayNotHasKey( 'translations_json', $templates['legacy-json']['config'] );
+		$this->assertTrue( $templates['legacy-json']['config']['default'], 'A usable config keeps its values' );
+
+		// A GPC purpose list that is not a list is dropped; the rest is kept.
+		$this->assertArrayNotHasKey( 'gpc_purposes', $templates['bad-plugin-values']['plugin_settings'] );
+		$this->assertFalse( $templates['bad-plugin-values']['plugin_settings']['gpc_enabled'] );
+
+		// Every one of them builds a config, and nothing was written back.
+		$services = Klaro_Geo_Service_Settings::get_instance()->get();
+		foreach ( array_keys( $templates ) as $key ) {
+			$this->assertNotEmpty( klaro_geo_build_template_payload( $key, $templates, $services )['config']['services'], $key );
+		}
+		$this->assertFalse( $settings->is_modified() );
+		$this->assertSame( $stored, get_option( 'klaro_geo_templates' ) );
+
+		Klaro_Geo_Template_Settings::clear_instance_cache();
 	}
 
 	/**

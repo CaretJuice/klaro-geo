@@ -44,9 +44,10 @@ class KlaroGeoConsentModeTest extends WP_UnitTestCase {
 	 * @return array
 	 */
 	private function payload( array $template, $services = null ) {
+		// Templates reach the builder in the shape loading gives them.
 		return klaro_geo_build_template_payload(
 			'test',
-			array( 'test' => $template ),
+			array( 'test' => Klaro_Geo_Template_Settings::normalize_template( 'test', $template ) ),
 			null === $services ? $this->services() : $services
 		);
 	}

@@ -141,16 +141,6 @@ function klaro_geo_apply_purpose_defaults( array &$klaro_config, $template_to_us
 	$purposes = klaro_geo_get_purposes();
 	$defaults = klaro_geo_get_default_purpose_translations();
 
-	if ( ! isset( $klaro_config['translations'] ) || ! is_array( $klaro_config['translations'] ) ) {
-		$klaro_config['translations'] = array();
-	}
-	if ( ! isset( $klaro_config['translations']['zz'] ) || ! is_array( $klaro_config['translations']['zz'] ) ) {
-		$klaro_config['translations']['zz'] = array();
-	}
-	if ( ! isset( $klaro_config['translations']['zz']['purposes'] ) || ! is_array( $klaro_config['translations']['zz']['purposes'] ) ) {
-		$klaro_config['translations']['zz']['purposes'] = array();
-	}
-
 	$filled = array();
 	foreach ( $purposes as $purpose ) {
 		if ( isset( $defaults[ $purpose ] ) && empty( $klaro_config['translations']['zz']['purposes'][ $purpose ] ) ) {
@@ -179,7 +169,7 @@ function klaro_geo_apply_purpose_defaults( array &$klaro_config, $template_to_us
  * generation (once per candidate template).
  *
  * @param string $template_key The requested template key.
- * @param array  $templates    All templates from the database.
+ * @param array  $templates    All templates, as Klaro_Geo_Template_Settings provides them.
  * @param array  $services     The configured services, as Klaro_Geo_Service_Settings
  *                             provides them (each has a name, purposes and cookies).
  * @return array Payload with keys:
@@ -214,7 +204,7 @@ function klaro_geo_build_template_payload( $template_key, $templates, $services 
 		$template_to_use          = 'default';
 		$template_source_override = 'fallback';
 	} else {
-		$template_config        = klaro_geo_get_default_templates()['default'];
+		$template_config        = Klaro_Geo_Template_Settings::normalize_template( 'default', klaro_geo_get_default_templates()['default'] );
 		$template_source_detail = 'fallback to hardcoded defaults (neither "' . $original_template_requested . '" nor "default" found in database)';
 		klaro_geo_debug_log( 'WARNING: Neither requested template "' . $original_template_requested . '" nor "default" found in database, using hardcoded defaults' );
 		// Update variables so metadata reflects actual template used
@@ -258,100 +248,10 @@ function klaro_geo_build_template_payload( $template_key, $templates, $services 
 		', purposes=' . implode( ',', $gpc_purposes )
 	);
 
-	$klaro_config = array();
-
-	// A template whose config is not an array cannot be copied. Production has
-	// been seen storing a string here, and foreach() over a string copies
-	// nothing while still skipping the defaults branch below -- leaving
-	// klaroConfig with no 'default' or 'required' at all. Drop the bad value so
-	// the hardcoded defaults apply, and say loudly which template is corrupt.
-	if ( isset( $template_config['config'] ) && ! is_array( $template_config['config'] ) ) {
-		klaro_geo_debug_log(
-			'WARNING: Template "' . $template_to_use . '" has a config that is not an array (type: ' .
-			gettype( $template_config['config'] ) . '), falling back to hardcoded defaults. ' .
-			'Re-save this template in Klaro Geo > Templates to rebuild it. Value starts: ' .
-			substr( (string) wp_json_encode( $template_config['config'] ), 0, 200 )
-		);
-		unset( $template_config['config'] );
-	}
-
-	// Apply template configuration
-	if ( isset( $template_config['config'] ) ) {
-		// Copy all config values
-		foreach ( $template_config['config'] as $key => $value ) {
-			// Skip translations for now, we'll handle them separately
-			if ( $key === 'translations' || $key === 'translations_json' ) {
-				continue;
-			}
-
-			// Clean up consent_mode_settings - remove legacy initialization_code
-			// The initialization code is now generated dynamically with custom service consent keys
-			if ( $key === 'consent_mode_settings' && is_array( $value ) ) {
-				unset( $value['initialization_code'] );
-				unset( $value['initialize_consent_mode'] ); // Also remove legacy toggle
-			}
-
-			// Copy the value directly to klaroConfig
-			$klaro_config[ $key ] = $value;
-		}
-
-		// Handle translations - prioritize translations_json if it exists and is valid
-		if ( isset( $template_config['config']['translations_json'] ) ) {
-			$translations_json    = $template_config['config']['translations_json'];
-			$decoded_translations = json_decode( $translations_json, true );
-
-			if ( json_last_error() === JSON_ERROR_NONE && is_array( $decoded_translations ) ) {
-				// Use the decoded JSON translations
-				$klaro_config['translations'] = $decoded_translations;
-			} else {
-				// Fall back to the basic translations if JSON is invalid
-				$klaro_config['translations'] = $template_config['config']['translations'] ?? [];
-				klaro_geo_debug_log( 'Invalid translations JSON, using basic translations' );
-			}
-		} else {
-			// Use the basic translations
-			$klaro_config['translations'] = $template_config['config']['translations'] ?? [];
-		}
-
-		// The templates admin page renders these checkboxes as checked when the
-		// stored config does not set them, but Klaro reads a missing key as
-		// false. Without this backfill the admin shows a setting as on while the
-		// site behaves as if it were off. acceptAll is the costly one: when it is
-		// not true, the notice's "That's ok" button saves the default consents
-		// (usually everything declined) instead of accepting all services.
-		$backfilled = array();
-		foreach ( klaro_geo_get_admin_true_by_default_keys() as $key ) {
-			if ( ! array_key_exists( $key, $klaro_config ) ) {
-				$klaro_config[ $key ] = true;
-				$backfilled[]         = $key;
-			}
-		}
-		if ( ! empty( $backfilled ) ) {
-			klaro_geo_debug_log(
-				'Template "' . $template_to_use . '" config is missing ' . implode( ', ', $backfilled ) .
-				'; using the admin default (true). Re-save the template to store these explicitly.'
-			);
-		}
-	} else {
-		// No usable template config (missing, or corrupt and dropped above):
-		// use the hardcoded default template's config, as the template
-		// priority rules require. The previous minimal key list omitted
-		// acceptAll, which made the notice's "That's ok" button decline
-		// every service.
-		$hardcoded    = klaro_geo_get_default_templates();
-		$klaro_config = $hardcoded['default']['config'];
-
-		// Fail closed regardless of what the hardcoded defaults say.
-		$klaro_config['default']                   = false;
-		$klaro_config['required']                  = false;
-		$klaro_config['noAutoLoad']                = false;
-		$klaro_config['showDescriptionEmptyStore'] = true;
-		$klaro_config['autoFocus']                 = false;
-		$klaro_config['showNoticeTitle']           = false;
-		$klaro_config['cookiePath']                = '/';
-
-		klaro_geo_debug_log( 'Template "' . $template_to_use . '" has no usable config; using hardcoded default template config' );
-	}
+	// The template's config is Klaro's config, apart from what is added below.
+	// Its shape is settled when templates are loaded
+	// (Klaro_Geo_Template_Settings::normalize_template()).
+	$klaro_config = $template_config['config'];
 
 	klaro_geo_apply_purpose_defaults( $klaro_config, $template_to_use );
 

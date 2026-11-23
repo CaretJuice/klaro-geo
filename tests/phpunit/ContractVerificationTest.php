@@ -532,7 +532,8 @@ class ContractVerificationTest extends WP_UnitTestCase {
     }
 
     /**
-     * Contract: Template without 'config' key is handled
+     * Contract: a template stored without a 'config' key is given the
+     * fail-closed default config when it is loaded
      *
      * @edge_case Template exists but has no 'config' key
      */
@@ -548,8 +549,9 @@ class ContractVerificationTest extends WP_UnitTestCase {
         $fresh_settings = new Klaro_Geo_Template_Settings();
         $config = $fresh_settings->get_template_config('malformed');
 
-        // Should return null for missing config, not throw
-        $this->assertNull($config,
-            'get_template_config should return null for template without config');
+        $this->assertSame(klaro_geo_get_fail_closed_template_config()['translations'], $config['translations']);
+        $this->assertFalse($config['default'], 'Nothing is granted by default');
+        $this->assertFalse($config['required'], 'Nothing is undeclinable');
+        $this->assertTrue($config['acceptAll']);
     }
 }
