@@ -8,6 +8,8 @@
  * Spec: specs/client-side-geo.spec.yaml
  */
 
+// Loaded first, as on the page: the resolver uses window.KlaroGeoEvents.
+require('../../js/klaro-geo-events.js');
 const clientGeo = require('../../js/klaro-geo-client-geo.js');
 const parityFixture = require('../fixtures/geo-resolution-parity.json');
 

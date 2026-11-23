@@ -6,6 +6,8 @@
  * does to service defaults, the consent state and the dataLayer.
  */
 
+// Loaded first, as on the page: the resolver uses window.KlaroGeoEvents.
+require('../../js/klaro-geo-events.js');
 const clientGeo = require('../../js/klaro-geo-client-geo.js');
 
 describe('GPC', function() {
@@ -153,6 +155,8 @@ describe('GPC', function() {
     });
 
     describe('consent mode', function() {
+        // A consent mode service is denied under its consent_mode_key only; it
+        // has no *_consent key (specs/frontend-data.spec.yaml).
         test('denies the keys of gpc_sensitive services', function() {
             setGpcSignal(true);
             apply([
@@ -165,7 +169,6 @@ describe('GPC', function() {
             expect(updates).toHaveLength(1);
             expect(updates[0][2]).toEqual({
                 ad_storage: 'denied',
-                ad_storage_consent: 'denied',
                 facebook_pixel_consent: 'denied'
             });
         });

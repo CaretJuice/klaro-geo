@@ -333,6 +333,10 @@
 
         var config = template.config;
 
+        // Exposed before anything else uses it: KlaroGeoEvents reads the
+        // services from window.klaroConfig to work out consent keys.
+        window.klaroConfig = config;
+
         // ----- GPC: switch off gpc_sensitive services by default -----
         var gpc = { detected: false, enabled: !!template.gpcEnabled, affectedServices: [] };
         if (gpc.enabled && navigator.globalPrivacyControl === true) {
@@ -364,10 +368,7 @@
             for (var j = 0; j < config.services.length; j++) {
                 var gpcSvc = config.services[j];
                 if (gpcSvc.gpc_sensitive) {
-                    if (gpcSvc.is_consent_mode_service && gpcSvc.consent_mode_key) {
-                        gpcDenied[gpcSvc.consent_mode_key] = 'denied';
-                    }
-                    gpcDenied[gpcSvc.name.replace(/-/g, '_') + '_consent'] = 'denied';
+                    gpcDenied[window.KlaroGeoEvents.getServiceConsentKey(gpcSvc.name)] = 'denied';
                 }
             }
         }
@@ -448,9 +449,6 @@
             }
         }
 
-        // ----- Expose the selected config -----
-        window.klaroConfig = config;
-
         // ----- klaroConfigLoaded dataLayer event (after resolution, once) -----
         var latestReceipt = null;
         try {
@@ -465,10 +463,7 @@
             klaroGeoError('Error retrieving latest consent receipt:', e);
         }
 
-        var configLoadedData = {
-            'event': 'Klaro Event',
-            'eventSource': 'klaro-geo',
-            'klaroEventName': 'klaroConfigLoaded',
+        var configLoadedData = window.KlaroGeoEvents.createKlaroGeoEvent('klaroConfigLoaded', {
             'klaroGeoConsentTemplate': templateKey,
             'klaroGeoTemplateSource': templateSource,
             'klaroGeoDetectedCountry': geo.country || null,
@@ -481,7 +476,7 @@
             'klaroGeoGPCDetected': gpc.detected,
             'klaroGeoGPCEnabled': gpc.enabled,
             'klaroGeoGPCAffectedServices': gpc.affectedServices
-        };
+        });
 
         // Add the consent receipt ID if available and active consent data exists
         if (latestReceipt) {
@@ -502,12 +497,9 @@
         window.dataLayer.push(configLoadedData);
 
         if (gpc.detected) {
-            window.dataLayer.push({
-                'event': 'Klaro Event',
-                'eventSource': 'klaro-geo',
-                'klaroEventName': 'gpcDetected',
+            window.dataLayer.push(window.KlaroGeoEvents.createKlaroGeoEvent('gpcDetected', {
                 'klaroGeoGPCAffectedServices': gpc.affectedServices
-            });
+            }));
         }
 
         // ----- Initialize Klaro -----

@@ -324,6 +324,19 @@ function klaro_geo_enqueue_scripts() {
 
 	$klaro_config_content = klaro_geo_generate_config_file();
 
+	// The dataLayer event and consent key helpers. They only define
+	// window.KlaroGeoEvents, and every script below uses them.
+	wp_enqueue_script(
+		'klaro-geo-events-js',
+		plugins_url( 'js/klaro-geo-events.js', __FILE__ ),
+		array( 'klaro-geo-debug' ),
+		KLARO_GEO_VERSION,
+		array(
+			'strategy'  => 'defer',
+			'in_footer' => true,
+		)
+	);
+
 	// The bootstrap applies the template payload and starts Klaro, in both geo
 	// resolution modes. It must run before klaro.js: it sets window.klaroConfig,
 	// which klaro.js auto-initializes from (in client mode, if klaro.js loads
@@ -331,7 +344,7 @@ function klaro_geo_enqueue_scripts() {
 	wp_enqueue_script(
 		'klaro-geo-client-geo-js',
 		plugins_url( 'js/klaro-geo-client-geo.js', __FILE__ ),
-		array( 'klaro-geo-debug' ),
+		array( 'klaro-geo-debug', 'klaro-geo-events-js' ),
 		KLARO_GEO_VERSION,
 		array(
 			'strategy'  => 'defer',
@@ -364,17 +377,6 @@ function klaro_geo_enqueue_scripts() {
 
 	// Event factory and consent-mode mapping. Loaded before klaro-geo.js, which
 	// calls into it.
-	wp_enqueue_script(
-		'klaro-geo-events-js',
-		plugins_url( 'js/klaro-geo-events.js', __FILE__ ),
-		array( 'klaro-geo-debug' ),
-		KLARO_GEO_VERSION,
-		array(
-			'strategy'  => 'defer',
-			'in_footer' => true,
-		)
-	);
-
 	wp_enqueue_script(
 		'klaro-geo-js',
 		plugins_url( 'js/klaro-geo.js', __FILE__ ),
