@@ -57,27 +57,14 @@ add_action( 'admin_menu', 'klaro_geo_admin_menu' );
 
 // Activation function
 function klaro_geo_activate() {
-	// Set up the default services using the service settings class
-	$service_settings = Klaro_Geo_Service_Settings::get_instance();
-
-	// Check if services already exist
-	$existing_services = $service_settings->get();
-
-	// Only set default services if they don't already exist
-	if ( empty( $existing_services ) ) {
-		// Set default services only on first activation
-		$service_settings->set( $service_settings->get_default_services() );
-		$service_settings->save();
-	}
-
-	// Set up the default templates using the template settings class
-	$template_settings = Klaro_Geo_Template_Settings::get_instance();
-	$default_templates = $template_settings->get_default_templates();
-
-	// Only set default templates if they don't already exist
-	if ( empty( $template_settings->get() ) ) {
-		$template_settings->set( $default_templates );
-		$template_settings->save();
+	// Store the default services and templates on first activation. With
+	// nothing stored, each settings class hands out its defaults and reports
+	// itself as modified; get() is therefore never empty, and checking it (as
+	// this function used to) meant the default templates were never stored.
+	foreach ( array( Klaro_Geo_Service_Settings::get_instance(), Klaro_Geo_Template_Settings::get_instance() ) as $settings ) {
+		if ( $settings->is_modified() ) {
+			$settings->save();
+		}
 	}
 
 	// Floating button settings
