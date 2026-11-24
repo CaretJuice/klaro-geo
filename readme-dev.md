@@ -38,7 +38,7 @@ Your checkout is mounted as the plugin, read-only, so edits are live without a r
 ## Running tests
 
 ```bash
-# PHP (add --filter ClassName for one test class); needs `composer install` once
+# PHP (add --filter ClassName for one test class)
 bin/phpunit.sh
 
 # JavaScript, from the repository root, on the host
@@ -57,7 +57,7 @@ The PHP test bootstrap turns the plugin's debug logging on. The log of the last 
 After `composer install`:
 
 ```bash
-vendor/bin/phpcs                       # WordPress coding standards, PHP 7.2 / WordPress 6.6 compatibility
+vendor/bin/phpcs                       # WordPress coding standards, PHP 7.2 / WordPress 5.7 compatibility
 vendor/bin/phpcbf                      # fixes what phpcs can fix automatically
 vendor/bin/phpstan analyse             # type checks
 bin/check-banned-patterns.sh           # patterns this project has ruled out (see CLAUDE.md)

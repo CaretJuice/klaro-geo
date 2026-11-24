@@ -1,7 +1,7 @@
 === Klaro Geo ===
 Contributors: caretjuice
 Tags: consent, gdpr, ccpa, geolocation, privacy
-Requires at least: 6.6
+Requires at least: 5.7
 Tested up to: 7.1
 Requires PHP: 7.2
 Stable tag: 0.3.7
@@ -121,6 +121,7 @@ This is standard GTM behavior. Data sent to Google depends on your GTM container
 * Fixed: Google Tag Manager belonged to both the Analytics and Advertising purposes, so enabling one purpose made the other look enabled and a click on it switched it off; GTM now has its own Site Infrastructure purpose (existing installs are migrated)
 * Fixed: a template's Required setting made Decline accept every service; it now applies per service to services set to "Use Global Setting", so Google Tag Manager can be required in some templates and consent-gated in others
 * Changed: the default Google Tag Manager service inherits Required from each template
+* Changed: the plugin now supports WordPress 5.7 and later (it required 6.6). PHP 7.2 remains the minimum. Both are tested on every change
 * Fixed: activating the plugin on a new site did not store the default templates; they were only handed out on each read
 * Security: IPv6 addresses written in a shortened form were stored whole with consent receipts instead of being cut to their /48, and each one had its own receipt rate limit; every form is now anonymized, and the rate limit counts the network
 * Security: a consent receipt's time is now the server's, and the Klaro config is no longer taken from the browser. A receipt naming a template that does not exist is refused
