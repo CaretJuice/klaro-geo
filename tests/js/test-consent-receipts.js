@@ -65,7 +65,7 @@ describe('Consent receipt', function() {
         delete window.klaroGeo;
     });
 
-    test('holds the choices as booleans, the template, the location and the config', function() {
+    test('holds the choices as booleans, the template and the location', function() {
         const loaded = load();
         save(loaded);
 
@@ -79,7 +79,8 @@ describe('Consent receipt', function() {
         expect(receipt.country_code).toBe('CA');
         expect(receipt.region_code).toBe('BC');
         expect(receipt.admin_override).toBe(false);
-        expect(receipt.klaro_config).toEqual({ services: SERVICES });
+        // The server stores its own copy of the Klaro config with the receipt.
+        expect(receipt).not.toHaveProperty('klaro_config');
     });
 
     test('is posted to the receipt action at the URL PHP gave', function() {

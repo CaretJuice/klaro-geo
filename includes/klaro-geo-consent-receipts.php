@@ -231,6 +231,10 @@ function klaro_geo_drop_consent_receipts_table_on_deactivate() {
  * without a nonce. Only the shapes below are accepted; nothing is stored as
  * submitted.
  *
+ * Two things a browser may send are ignored on purpose, because the server
+ * knows them better: the time (a submitted timestamp could back-date a consent
+ * record) and the Klaro config (see klaro_geo_store_consent_receipt()).
+ *
  * @param mixed $raw The decoded receipt.
  * @return array|WP_Error Sanitized receipt, or an error describing the rejection.
  */
@@ -275,18 +279,14 @@ function klaro_geo_sanitize_receipt( $raw ) {
 		$template_source = ( $admin_override ? 'admin-override' : 'geo-match' ) . ' ' . ( '' !== $region_code ? 'region' : 'country' );
 	}
 
-	$timestamp = isset( $raw['timestamp'] ) && is_numeric( $raw['timestamp'] ) ? absint( $raw['timestamp'] ) : 0;
-
 	$receipt = array(
 		'receipt_id'            => $receipt_id,
-		'timestamp'             => $timestamp > 0 ? $timestamp : time(),
 		'consent_choices'       => $consent_choices,
 		'template_name'         => $text( 'template_name', 100 ),
 		'template_source'       => $template_source,
 		'country_code'          => $text( 'country_code', 10 ),
 		'region_code'           => $region_code,
 		'admin_override'        => $admin_override,
-		'klaro_config'          => null,
 		// Global Privacy Control: whether the browser reported the signal, and
 		// the services the plugin switched off by default because of it.
 		'gpc_signal'            => isset( $raw['gpc_signal'] ) && true === $raw['gpc_signal'],
@@ -303,17 +303,6 @@ function klaro_geo_sanitize_receipt( $raw ) {
 			if ( '' !== $service_name && strlen( $service_name ) <= 100 ) {
 				$receipt['gpc_affected_services'][] = $service_name;
 			}
-		}
-	}
-
-	// The Klaro config snapshot is optional. Strings are stripped of markup, and a
-	// snapshot too large to store whole is dropped rather than cut mid-JSON.
-	if ( isset( $raw['klaro_config'] ) && is_array( $raw['klaro_config'] ) ) {
-		$config_json = wp_json_encode( klaro_geo_sanitize_array( $raw['klaro_config'] ) );
-		if ( false !== $config_json && strlen( $config_json ) <= 65000 ) {
-			$receipt['klaro_config'] = $config_json;
-		} else {
-			klaro_geo_debug_log( 'klaro_config snapshot dropped from receipt ' . $receipt_id . ' (too large or not encodable)' );
 		}
 	}
 
@@ -362,6 +351,15 @@ function klaro_geo_store_consent_receipt( $raw, $user_id = 0 ) {
 		return $receipt;
 	}
 
+	// The template must be one that exists: its config is stored with the
+	// receipt, and a made-up name would otherwise be recorded as if a visitor
+	// had been shown it.
+	$templates = Klaro_Geo_Template_Settings::get_instance()->get();
+	if ( ! isset( $templates[ $receipt['template_name'] ] ) ) {
+		klaro_geo_debug_log( 'Consent receipt ' . $receipt['receipt_id'] . ' refused: unknown template "' . $receipt['template_name'] . '"' );
+		return new WP_Error( 'klaro_geo_unknown_template', 'Unknown template' );
+	}
+
 	if ( ! klaro_geo_is_consent_logging_enabled( $receipt['template_name'] ) ) {
 		return new WP_Error( 'klaro_geo_logging_disabled', 'Consent logging is disabled' );
 	}
@@ -377,7 +375,7 @@ function klaro_geo_store_consent_receipt( $raw, $user_id = 0 ) {
 		'receipt_id'      => $receipt['receipt_id'],
 		'user_id'         => $user_id ? $user_id : null,
 		'ip_address'      => klaro_geo_get_anonymized_ip(),
-		'timestamp'       => gmdate( 'Y-m-d H:i:s', $receipt['timestamp'] ),
+		'timestamp'       => gmdate( 'Y-m-d H:i:s' ),
 		'consent_data'    => wp_json_encode( $receipt['consent_choices'] ),
 		'template_name'   => $receipt['template_name'],
 		'template_source' => $receipt['template_source'],
@@ -392,9 +390,12 @@ function klaro_geo_store_consent_receipt( $raw, $user_id = 0 ) {
 	$data['gpc_affected_services'] = wp_json_encode( $receipt['gpc_affected_services'] );
 	$data['receipt_type']          = $receipt['receipt_type'];
 
-	if ( null !== $receipt['klaro_config'] ) {
-		$data['klaro_config'] = $receipt['klaro_config'];
-	}
+	// The Klaro config the template gives visitors, built here rather than
+	// taken from the request: a submitted copy is up to 65 KB of text chosen by
+	// whoever sent it. It is the config before Global Privacy Control is
+	// applied in the browser; gpc_affected_services records that part.
+	$payload              = klaro_geo_build_template_payload( $receipt['template_name'], $templates, Klaro_Geo_Service_Settings::get_instance()->get() );
+	$data['klaro_config'] = wp_json_encode( $payload['config'] );
 
 	global $wpdb;
 	$inserted = klaro_geo_receipts_insert( $data );
@@ -423,21 +424,65 @@ function klaro_geo_request_has_gpc_header() {
 	return isset( $_SERVER['HTTP_SEC_GPC'] ) && '1' === trim( sanitize_text_field( wp_unslash( $_SERVER['HTTP_SEC_GPC'] ) ) );
 }
 
-// Get an anonymized IP address for privacy
+/**
+ * Anonymize an IP address: an IPv4 address keeps its first three octets (/24),
+ * an IPv6 address its first 48 bits.
+ *
+ * The address is masked as bytes, not as text. IPv6 has many spellings
+ * ("2001:db8::1", "2001:db8:0:0:0:0:0:1") and a pattern that expects one of
+ * them leaves the others whole. An IPv4 address written as IPv6
+ * ("::ffff:203.0.113.7") is treated as the IPv4 address it is.
+ *
+ * @param string $ip The address.
+ * @return string The anonymized address, or '' when $ip is not an IP address.
+ */
+function klaro_geo_anonymize_ip( $ip ) {
+	if ( ! filter_var( $ip, FILTER_VALIDATE_IP ) ) {
+		return '';
+	}
+
+	$packed = inet_pton( $ip );
+
+	if ( 16 === strlen( $packed ) && 0 === strpos( $packed, str_repeat( "\0", 10 ) . "\xff\xff" ) ) {
+		$packed = substr( $packed, 12 );
+	}
+
+	if ( 4 === strlen( $packed ) ) {
+		return inet_ntop( substr( $packed, 0, 3 ) . "\0" );
+	}
+
+	return inet_ntop( substr( $packed, 0, 6 ) . str_repeat( "\0", 10 ) );
+}
+
+/**
+ * The anonymized IP address of the current request. It is stored with a
+ * receipt and is what the receipt rate limit counts by.
+ *
+ * @return string
+ */
 function klaro_geo_get_anonymized_ip() {
 	$ip = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ?? '' ) );
 
-	// If IPv4, anonymize the last octet
-	if ( filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
-		return preg_replace( '/\.\d+$/', '.0', $ip );
+	/**
+	 * Filters the visitor's IP address before it is anonymized.
+	 *
+	 * REMOTE_ADDR is the address that connected to the web server. Behind a
+	 * reverse proxy or CDN that is the proxy, so every visitor shares one
+	 * address and one rate limit. A site in that position, whose server does
+	 * not already restore the visitor's address, returns it here from the
+	 * header its proxy sets. Only trust a header the proxy overwrites: one a
+	 * visitor can send lets them pick their own rate limit bucket.
+	 *
+	 * @param string $ip REMOTE_ADDR.
+	 */
+	$ip = apply_filters( 'klaro_geo_client_ip', $ip );
+
+	$anonymized = klaro_geo_anonymize_ip( is_string( $ip ) ? trim( $ip ) : '' );
+	if ( '' === $anonymized ) {
+		klaro_geo_log_once( 'client_ip_invalid', 'WARNING: The request has no valid IP address; the receipt is stored without one and shares a rate limit with other such requests' );
 	}
 
-	// If IPv6, anonymize the last 80 bits (last 20 hex chars)
-	if ( filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6 ) ) {
-		return preg_replace( '/:[0-9a-f]{1,4}(:[0-9a-f]{1,4}){4}$/i', ':0:0:0:0:0', $ip );
-	}
-
-	return $ip;
+	return $anonymized;
 }
 
 // Get a coarse user agent string for privacy (avoids fingerprinting)
@@ -496,8 +541,9 @@ function klaro_geo_get_coarse_user_agent() {
 }
 
 /**
- * Largest receipt request body accepted, in bytes. A receipt with a full
- * klaro_config snapshot is far smaller; anything bigger is not a receipt.
+ * Largest receipt request body accepted, in bytes. A receipt is far smaller,
+ * even one sent by an older cached copy of klaro-geo.js, which included a copy
+ * of the Klaro config; anything bigger is not a receipt.
  */
 define( 'KLARO_GEO_RECEIPT_MAX_BYTES', 200000 );
 
@@ -507,7 +553,8 @@ define( 'KLARO_GEO_RECEIPT_MAX_BYTES', 200000 );
  *
  * The endpoint is public, so without a limit a script could fill the receipts
  * table. Requests are counted per anonymized IP (the same /24 or /48 the
- * receipt records) in a transient. A visitor saves consent a handful of times
+ * receipt records, see klaro_geo_get_anonymized_ip() for sites behind a
+ * proxy) in a transient. A visitor saves consent a handful of times
  * at most; the default of 30 per 5 minutes leaves room for many visitors
  * behind one address.
  *

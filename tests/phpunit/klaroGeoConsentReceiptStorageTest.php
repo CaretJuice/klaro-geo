@@ -103,7 +103,54 @@ class KlaroGeoConsentReceiptStorageTest extends WP_UnitTestCase {
 		$this->assertSame( '192.168.1.0', klaro_geo_get_anonymized_ip() );
 
 		$_SERVER['REMOTE_ADDR'] = '2001:0db8:85a3:0000:0000:8a2e:0370:7334';
-		$this->assertSame( '2001:0db8:85a3:0:0:0:0:0', klaro_geo_get_anonymized_ip() );
+		$this->assertSame( '2001:db8:85a3::', klaro_geo_get_anonymized_ip() );
+	}
+
+	/**
+	 * An IPv6 address has many spellings. Every one of them is cut to its /48;
+	 * the shortened forms used to be stored whole.
+	 *
+	 * @dataProvider ipv6_spellings
+	 */
+	public function test_ipv6_is_anonymized_however_it_is_written( $address, $expected ) {
+		$_SERVER['REMOTE_ADDR'] = $address;
+		$this->assertSame( $expected, klaro_geo_get_anonymized_ip() );
+	}
+
+	public function ipv6_spellings() {
+		return array(
+			'full'                 => array( '2a02:1234:5678:9abc:1122:3344:5566:7788', '2a02:1234:5678::' ),
+			'zeros in the middle'  => array( '2001:db8:1:2::abcd', '2001:db8:1::' ),
+			'short'                => array( '2001:db8::1', '2001:db8::' ),
+			'zeros near the end'   => array( '2001:db8:aaaa:bbbb:1::2', '2001:db8:aaaa::' ),
+			'upper case'           => array( '2001:DB8:AAAA:BBBB:1::2', '2001:db8:aaaa::' ),
+			'IPv4 written as IPv6' => array( '::ffff:203.0.113.77', '203.0.113.0' ),
+		);
+	}
+
+	public function test_a_value_that_is_not_an_ip_address_is_not_stored() {
+		$_SERVER['REMOTE_ADDR'] = 'not-an-address';
+		$this->assertSame( '', klaro_geo_get_anonymized_ip() );
+
+		unset( $_SERVER['REMOTE_ADDR'] );
+		$this->assertSame( '', klaro_geo_get_anonymized_ip() );
+	}
+
+	/**
+	 * A site behind a proxy supplies the visitor's address with a filter; it is
+	 * anonymized like any other.
+	 */
+	public function test_client_ip_filter_replaces_the_proxy_address() {
+		$_SERVER['REMOTE_ADDR'] = '10.0.0.5';
+		$from_proxy_header      = function () {
+			return '198.51.100.77';
+		};
+		add_filter( 'klaro_geo_client_ip', $from_proxy_header );
+
+		$this->assertSame( '198.51.100.0', klaro_geo_get_anonymized_ip() );
+
+		remove_filter( 'klaro_geo_client_ip', $from_proxy_header );
+		$this->assertSame( '10.0.0.0', klaro_geo_get_anonymized_ip() );
 	}
 
 	public function test_valid_receipt_is_stored() {
@@ -121,8 +168,56 @@ class KlaroGeoConsentReceiptStorageTest extends WP_UnitTestCase {
 		$this->assertSame( 'US', $row->country_code );
 		$this->assertSame( 'CA', $row->region_code );
 		$this->assertSame( '203.0.113.0', $row->ip_address );
-		$this->assertSame( gmdate( 'Y-m-d H:i:s', 1795000000 ), $row->timestamp );
+		$this->assertEqualsWithDelta( time(), strtotime( $row->timestamp . ' UTC' ), 5, 'The time recorded is the server\'s' );
 		$this->assertSame( $receipt['consent_choices'], json_decode( $row->consent_data, true ) );
+	}
+
+	/**
+	 * The time of a consent record is when the server received it. A time
+	 * sent by the browser could back-date the record, or be one the database
+	 * cannot store.
+	 *
+	 * @dataProvider submitted_timestamps
+	 */
+	public function test_submitted_timestamp_is_ignored( $timestamp ) {
+		$receipt = $this->receipt( array( 'timestamp' => $timestamp ) );
+
+		$this->assertIsInt( klaro_geo_store_consent_receipt( $receipt ) );
+
+		$row = $this->stored( $receipt['receipt_id'] );
+		$this->assertEqualsWithDelta( time(), strtotime( $row->timestamp . ' UTC' ), 5 );
+	}
+
+	public function submitted_timestamps() {
+		return array(
+			'in the past'         => array( 946684800 ),
+			'in the future'       => array( 4102444800 ),
+			'past the year 9999'  => array( '99999999999999999999' ),
+			'not a number'        => array( 'not-a-number' ),
+		);
+	}
+
+	/**
+	 * The template named must exist. Anything else is a receipt for a banner
+	 * no visitor was shown.
+	 *
+	 * @dataProvider unknown_template_names
+	 */
+	public function test_receipt_for_an_unknown_template_is_refused( $template_name ) {
+		$before  = $this->count_rows();
+		$refused = klaro_geo_store_consent_receipt( $this->receipt( array( 'template_name' => $template_name ) ) );
+
+		$this->assertWPError( $refused );
+		$this->assertSame( 'klaro_geo_unknown_template', $refused->get_error_code() );
+		$this->assertSame( $before, $this->count_rows() );
+	}
+
+	public function unknown_template_names() {
+		return array(
+			'made up' => array( 'no_such_template' ),
+			'empty'   => array( '' ),
+			'array'   => array( array( 'default' ) ),
+		);
 	}
 
 	public function test_template_source_is_normalized() {
@@ -244,8 +339,6 @@ class KlaroGeoConsentReceiptStorageTest extends WP_UnitTestCase {
 			)
 		);
 
-		// The template name no longer matches a stored template, so the template
-		// lookup finds nothing and the global setting applies.
 		$this->assertIsInt( klaro_geo_store_consent_receipt( $receipt ) );
 
 		$row = $this->stored( $receipt['receipt_id'] );
@@ -257,49 +350,46 @@ class KlaroGeoConsentReceiptStorageTest extends WP_UnitTestCase {
 		$receipt = $this->receipt(
 			array(
 				'template_source' => array( 'admin-override' ),
-				'template_name'   => array( 'default' ),
 				'country_code'    => null,
-				'timestamp'       => 'not-a-number',
+				'timestamp'       => array( 1795000000 ),
 			)
 		);
 
 		$this->assertIsInt( klaro_geo_store_consent_receipt( $receipt ) );
 
 		$row = $this->stored( $receipt['receipt_id'] );
-		$this->assertSame( '', $row->template_name );
+		$this->assertSame( '', $row->country_code );
 		$this->assertSame( 'geo-match region', $row->template_source );
-		$this->assertGreaterThan( strtotime( '2020-01-01' ), strtotime( $row->timestamp ), 'A missing timestamp falls back to now' );
 	}
 
-	public function test_klaro_config_snapshot_is_sanitized() {
+	/**
+	 * The Klaro config stored with a receipt is the one the server gives
+	 * visitors for that template. A copy sent with the receipt is not stored:
+	 * it would be tens of kilobytes chosen by whoever sent the request.
+	 */
+	public function test_klaro_config_snapshot_is_built_by_the_server() {
 		$receipt = $this->receipt(
 			array(
 				'klaro_config' => array(
-					'mustConsent' => true,
-					'services'    => array(
-						array( 'name' => 'ga</pre><img src=x onerror=alert(1)>' ),
-					),
+					'injected' => str_repeat( 'a', 60000 ),
+					'services' => array( array( 'name' => 'ga</pre><img src=x onerror=alert(1)>' ) ),
 				),
 			)
 		);
 
 		$this->assertIsInt( klaro_geo_store_consent_receipt( $receipt ) );
 
-		$row = $this->stored( $receipt['receipt_id'] );
-		$this->assertStringNotContainsString( '<', $row->klaro_config );
-		$config = json_decode( $row->klaro_config, true );
-		$this->assertTrue( $config['mustConsent'] );
-		$this->assertSame( 'ga', $config['services'][0]['name'] );
-	}
-
-	public function test_oversized_klaro_config_is_dropped_not_truncated() {
-		$receipt = $this->receipt(
-			array( 'klaro_config' => array( 'blob' => str_repeat( 'a', 70000 ) ) )
+		$row      = $this->stored( $receipt['receipt_id'] );
+		$expected = klaro_geo_build_template_payload(
+			'default',
+			Klaro_Geo_Template_Settings::get_instance()->get(),
+			Klaro_Geo_Service_Settings::get_instance()->get()
 		);
 
-		$this->assertIsInt( klaro_geo_store_consent_receipt( $receipt ) );
-
-		$this->assertNull( $this->stored( $receipt['receipt_id'] )->klaro_config );
+		$this->assertStringNotContainsString( 'injected', $row->klaro_config );
+		$this->assertStringNotContainsString( 'onerror', $row->klaro_config );
+		$this->assertSame( wp_json_encode( $expected['config'] ), $row->klaro_config );
+		$this->assertNotEmpty( json_decode( $row->klaro_config, true )['services'] );
 	}
 
 	/**
@@ -440,6 +530,30 @@ class KlaroGeoConsentReceiptStorageTest extends WP_UnitTestCase {
 		// The same /24 shares one counter (IPs are anonymized before counting)
 		$_SERVER['REMOTE_ADDR'] = '198.51.100.200';
 		$this->assertTrue( klaro_geo_receipt_rate_limit_exceeded() );
+
+		remove_filter( 'klaro_geo_receipt_rate_limit', $limit );
+	}
+
+	/**
+	 * One IPv6 network is one bucket, however its addresses are written. The
+	 * shortened forms used to be counted one address at a time, so a single
+	 * machine had as many buckets as it has addresses.
+	 */
+	public function test_rate_limit_counts_an_ipv6_network_as_one_address() {
+		$limit = function () {
+			return 2;
+		};
+		add_filter( 'klaro_geo_receipt_rate_limit', $limit );
+
+		$_SERVER['REMOTE_ADDR'] = '2001:db8:77::1';
+		$this->assertFalse( klaro_geo_receipt_rate_limit_exceeded() );
+		$_SERVER['REMOTE_ADDR'] = '2001:db8:77::2';
+		$this->assertFalse( klaro_geo_receipt_rate_limit_exceeded() );
+		$_SERVER['REMOTE_ADDR'] = '2001:db8:77:5::abcd';
+		$this->assertTrue( klaro_geo_receipt_rate_limit_exceeded(), 'A third address in the same /48 is over the limit' );
+
+		$_SERVER['REMOTE_ADDR'] = '2001:db8:78::1';
+		$this->assertFalse( klaro_geo_receipt_rate_limit_exceeded(), 'Another network has its own count' );
 
 		remove_filter( 'klaro_geo_receipt_rate_limit', $limit );
 	}

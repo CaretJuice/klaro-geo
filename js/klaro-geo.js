@@ -261,7 +261,6 @@
           region_code: window.klaroConsentData.detectedRegion || null,
           admin_override: window.klaroConsentData.adminOverride === true,
           template_settings: window.klaroConsentData.templateSettings || {},
-          klaro_config: window.klaroConfig || null,
           gpc_signal: navigator.globalPrivacyControl === true,
           gpc_affected_services: gpc.affectedServices.slice()
       };
