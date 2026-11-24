@@ -18,15 +18,16 @@ This plugin gives you a lot of control over how consent is managed and tracked a
 - **Google Consent Mode v2**: Support for Google's basic and advanced consent mode.
 - **Simplified GTM Consent Triggers**: Custom Consent Mode consent keys allow for a cleaner triggering of consented services in Google Tag Manager.
 - **Fallback Templates**: Use strict fallback templates to prevent accidental violations of local law.
-- **Granular Consent Receipts**: Automatically generates consent receipts stored in browser local storage for user reference if enabled. Optionally configure specific templates to archive these receipts in your WordPress database, allowing you to retain records only for jurisdictions that require it while blocking storage for others.
+- **Granular Consent Receipts**: When enabled, each consent choice is recorded as a receipt in your WordPress database, with a copy kept in the visitor's browser. Consent logging can be switched off per template, so you keep records only for the jurisdictions that require them; a template with logging off produces no receipts at all.
 - **Consent Buttons**: Add a floating button or integrate with WordPress menus to allow users to easily access consent settings.
 - **Global Privacy Control (GPC)**: Detects the `navigator.globalPrivacyControl` browser signal and automatically adjusts consent defaults for affected services. Configurable per-template and per-service.
-- **Bidirectional Data Layer Integration**: A full-duplex integration that listens for dataLayer events to trigger plugin actions, forwards native Klaro events to the dataLayer, and dispatches its own enhanced consent status events.
+- **Data Layer Integration**: Forwards Klaro's own events to the dataLayer and pushes its own consent status events, so tag managers and analytics can react. A consent-aware queue (`klaroGeo.push`) holds your events until consent state is set.
+- **Cache-Safe Geo Resolution**: On hosts with full-page caching, the visitor's browser can resolve the location and pick the template, so a cached page never serves one visitor's banner to another. See [Client-Side Geo Resolution](#client-side-geo-resolution).
 - **Admin Debug Tools**: Test different geolocation scenarios directly from the admin bar.
 
 ## Requirements
 
-- Tested on WordPress 6.3 and 6.4 (earlier versions may work but are untested)
+- WordPress 5.7 or later and PHP 7.2 or later. The test suites run on both the oldest supported versions and the current ones.
 - [GeoIP Detection](https://wordpress.org/plugins/geoip-detect/) plugin (for geolocation features to work)
 
 ## Installation
@@ -63,9 +64,11 @@ Please follow the steps below in order to ensure a smooth setup and avoid having
 
 Navigate to **Klaro Geo > Klaro Geo** to configure the general plugin settings:
 - **Klaro Geo Settings**: 
-  - Enabled Consent Receipts: Toggle to save receipt number and Klaro Config to browser local storage and the WordPress database
-  - Klaro JS Version: Set the Klaro script version (changing this may not work as expected, this plugin has been tested with 0.7)
-  - Klaro Script Variant: Choose between standard Klaro script or the no-CSS variant
+  - Enable Consent Receipts: Record consent choices as receipts in the WordPress database, with a copy in the visitor's browser (see [Consent Receipts](#consent-receipts))
+- **Geo Resolution**:
+  - Geo Resolution Mode: Server-side (default) or Client-side (cache-safe). Use Client-side on any host with full-page caching; see [Client-Side Geo Resolution](#client-side-geo-resolution)
+  - Client Geo Lookup Timeout (ms): How long the browser waits for the location lookup before falling back. Client-side mode only
+  - Timezone Fallback: When the lookup fails, infer the country from the browser's timezone. Client-side mode only
 - **Google Tag Manager**:
   - Google Tag Manager ID: Enter your Google Tag Manager container ID (e.g., GTM-XXXXXX)
   - Consent Mode Type: Choose between Basic and Advanced consent mode (see [Basic vs Advanced Consent Mode](#basic-vs-advanced-consent-mode) below)
@@ -78,6 +81,7 @@ Navigate to **Klaro Geo > Klaro Geo** to configure the general plugin settings:
   - Shortcode: Instructions on how to use a shortcode to add a link that opens the Klaro service management modal into your WordPress pages
 - **Purposes**:
   - Purposes (comma-separated): List of purposes by which you want to group your tags
+- **Global Privacy Control (GPC)**: see [Global Privacy Control](#global-privacy-control-gpc)
 - **Data Layer Settings**:
   - Suppress Individual Klaro Consent Event dataLayer Pushes: Klaro sends a "consents" event every time an individual consent toggle is changed in the consent banner. These don't take effect until the user saves their choices, at which point the plugin sends a consolidated event. Klaro Geo is configured to forward Klaro events to the dataLayer. Enabling this setting (recommended) suppresses the individual toggle events, which can pollute the dataLayer when users toggle multiple settings. Disable this only if you need to track individual consent toggle interactions within the banner.
 
@@ -151,14 +155,14 @@ This allows you to create language specific to a legal jurisdiction, for example
 
 Set your fallback template, assign templates to countries and override country templates with region templates.
 
-Navigate to **Klaro Geo > Countries** to assign templates to specific locations:
+Navigate to **Klaro Geo > Country Settings** to assign templates to specific locations:
 
 1. Assign a template to the Fallback Template row.
 2. From the dropdown menu in the template column of your chosen country's row, select a template.
 3. Select `Manage Regions` to override country settings in specified regions as desired.
 4. Select `Hide` to remove a country from the Klaro Geo Country Settings table as desired.
 5. Select `Show/Hide Countries` to add and remove countries from the Klaro Geo Country Settings table as desired.
-6. Select `Save Changes` to apply your changes.
+6. Changes to a template dropdown are saved as you make them; `Save` stores the whole form.
 
 ### Services
 Manage services that should show in the consent modal.
@@ -174,7 +178,7 @@ It should be possible to use this plugin to manage other inline scripts without 
 
 Klaro Geo adds a `Klaro Consent Update` dataLayer push whenever consent is updated with custom consent keys as well as an `acceptedServices` array containing the names of services that are currently accepted.
 
-![standard and custom consent keys in Google Tag Manager](assets/custom_consent_keys.png)
+![standard and custom consent keys in Google Tag Manager](assets/custom-consent-keys.png)
 
 Use custom consent keys with GTM's **"Require additional consent for tag to fire"** to gate any tag on a specific service's consent (e.g., add `facebook_consent` to a Facebook Pixel tag). Alternatively, use the `Klaro Consent Update` event with a Data Layer Variable trigger condition (e.g., `consentMode.facebook_consent` equals `granted`). The `acceptedServices` array is for use in situations where Google Consent Mode is not applicable (like when using a tag manager other than Google Tag Manager).
 
@@ -187,7 +191,7 @@ Each service gets the following settings that Klaro consumes and uses:
 - Name: The name of the service as it will appear in the acceptedServices array in lowercase with spaces replaced with hyphens.
 - Required: Display the service but do not allow visitors to turn off the service. Overrides the template-level setting of the same name. 
 
-**Functional service warning**: Setting a purpose to 'functional' or 'security' or some other purpose that does not require consent does not mean the service is automatically loaded. You need to set each functional service's `Required` field here to "Yes" in order to automatically load the service.
+**Functional service warning**: Setting a purpose to 'functional' or 'security' or some other purpose that does not require consent does not mean the service is automatically loaded. A service loads without consent only when it is required: set its `Required` field here to "Yes", or leave it on "Use Global Setting" and enable **Required** on the templates where it should be required.
 - Default: Load this service by default before the consent banner is interacted with. Overrides the template-level setting of the same name.
 - Purpose: Select the purpose(s) associated with this service. The list of purposes is managed on the main settings page at **Klaro Geo > Klaro Geo > Purposes (comma-separated)**. It is best to decide on your list of purposes before you start assigning them here.
 - Advanced Settings: Manage additional Klaro settings for the service (these have not been tested with the plugin).
@@ -240,13 +244,13 @@ Manage the following service-specific translation fields here:
 - Title: This is the human-readable name of the service. It should be populated automatically in title-case from the service name.
 - Description: A brief description of what the service does.
 
-## Consent Receipts
+### Consent Receipts Page
 
-The Consent Receipts page lets you browse the consent receipts logged in Wordpress. 
+**Klaro Geo > Consent Receipts** lets you browse the consent receipts stored in WordPress. See [Consent Receipts](#consent-receipts) for what a receipt holds.
 
-Consent receipts need to be enabled under **Klaro Geo > Enable Consent Receipts** for you to view data here.
+Consent receipts need to be enabled under **Klaro Geo > Klaro Geo > Enable Consent Receipts** for you to see data here.
 
-You will only see data from countries / regions with a template that enables consent logging under **Templates > select desired template > Enable Consent Logging**.
+You will only see receipts from countries and regions whose template has **Enable Consent Logging** on (**Templates > select the template > Plugin Settings**).
 
 ## Adding Consent Buttons
 
@@ -287,6 +291,15 @@ Examples:
 [klaro_consent_button]
 [klaro_consent_button text="Privacy Settings" style="link"]
 [klaro_consent_button class="button button-primary" text="Cookie Settings"]
+```
+
+### Embedding the Consent Manager in a Page
+
+The `[klaro_embedded]` shortcode places the consent manager inside a page, such as your privacy notice, instead of showing it as a popup. It needs **Embedded Mode** enabled on the template the visitor gets.
+
+```
+[klaro_embedded]
+[klaro_embedded id="my-consent" class="my-class" style="min-height: 400px;"]
 ```
 
 ### Floating Button
@@ -337,11 +350,11 @@ For setup instructions, see the [GTM Template README](gtm-template/README.md).
 The plugin will automatically:
 - Add the GTM script to your site's header (with Klaro gating in Basic mode, or ungated in Advanced mode)
 - Add the GTM noscript iframe to your site's body
-- Configure consent callbacks to manage GTM's consent mode
+- Set Google Consent Mode defaults and update them as visitors make their choices
 
 ### Basic vs Advanced Consent Mode
 
-Klaro Geo supports two consent mode types that control how Google Tag Manager interacts with the consent banner. Both modes use Google Consent Mode v2 and the Klaro Geo GTM community template.
+Klaro Geo supports two consent mode types that control how Google Tag Manager interacts with the consent banner. Both modes use Google Consent Mode v2, which the plugin sets up itself; no GTM template is needed.
 
 #### Basic Consent Mode (Default)
 
@@ -350,7 +363,7 @@ In Basic mode, **GTM is completely blocked until the user consents** to the `goo
 **How it works:**
 1. The GTM script tag is rendered with `type="text/plain"` and `data-name="google-tag-manager"`, which prevents execution
 2. When the user grants consent to the `google-tag-manager` service, Klaro changes the type to `text/javascript`, which triggers GTM to load
-3. The GTM community template sets consent defaults and then updates consent state based on the user's choices
+3. GTM picks up the consent defaults the plugin set in the `<head>` and the updates it sends as the visitor chooses
 4. Tags fire according to their consent requirements
 
 **The Site Infrastructure purpose:** the `google-tag-manager` service sits in its own **Site Infrastructure** purpose. A visitor who enables Analytics or Advertising but not Site Infrastructure has consented to those services but not to GTM, so in Basic mode none of the tags GTM would load can run. **Accept all** covers Site Infrastructure. GTM deliberately has a single purpose: Klaro shows a purpose as on whenever any of its services is on, so a service shared between two purposes makes the other purpose look enabled and a click on it turns it off instead of on. Keep each service in one purpose when Group by Purpose is enabled.
@@ -370,7 +383,7 @@ In Advanced mode, **GTM loads immediately** (without Klaro gating) but all conse
 
 **How it works:**
 1. The GTM script tag is rendered as a normal `<script>` tag (no Klaro `type="text/plain"` gating)
-2. GTM loads immediately on page load, but the community template sets all consent signals to `denied`
+2. GTM loads immediately on page load, with every consent signal set to `denied` by the plugin's defaults
 3. GA4 sends cookieless pings (if configured) while consent is denied, enabling behavioral modeling
 4. When the user interacts with the Klaro consent banner, consent state is updated
 5. After consent is granted, full tracking begins with cookies
@@ -387,7 +400,7 @@ In Advanced mode, **GTM loads immediately** (without Klaro gating) but all conse
 **Important notes for Advanced mode:**
 - The `google-tag-manager` service still appears in the Klaro consent dialog. Users can still toggle it off, which affects the consent state of your tags.
 - `Klaro Consent Update` events are pushed on initial page load (they are not skipped like in Basic mode where GTM hasn't loaded yet).
-- The GTM community template is optional but still recommended for advanced use cases like first-page attribution.
+- The optional [Consent Gate Variable](#gtm-consent-gate-variable-optional) is useful here for redacting values while consent is denied.
 
 #### Side-by-Side Comparison
 
@@ -437,7 +450,7 @@ Google tags can fire on `All Pages` since by the time GTM loads and `All Pages` 
 | Phase | What happens |
 |-------|-------------|
 | Page load (before consent) | GTM is not loaded. Nothing happens. |
-| User grants consent | Klaro unblocks GTM. GTM loads, community template sets consent, `All Pages` fires. Tags fire with full tracking. |
+| User grants consent | Klaro unblocks GTM. GTM loads with the consent state the plugin has set, `All Pages` fires. Tags fire with full tracking. |
 | Returning visitor with cookie | Klaro reads cookie and immediately unblocks GTM. Same as above. |
 
 ##### Non-Google Tags (Facebook Pixel, LinkedIn Insight, etc.)
@@ -499,19 +512,29 @@ Klaro Geo adds two dataLayer pushes: 'Klaro Event' and 'Klaro Consent Update'.
 This event is fired when Klaro fires internal events as well as when Klaro Geo fires internal events. They are useful for debugging and adding consent data as Data Layer variables.
 
 These events can include the following parameters:
-- `event: "Klaro Event"`: Hard-coded value for all of these events
-- `eventSource: "klaro|klaro-geo"`: Indicates whether the event Klaro Geo or was forwarded from Klaro
-- `klaroEventName: "klaroConfigLoaded|initialConsents|consents|saveConsents|applyConsents|generateConsentReceipt"`: The name of the event. This is the `manager.name` value for Klaro events.
-- `klaroEventData: {google-tag-manager: true, google-analytics: true}`: An object containing the names and consent settings for all services currently set by Klaro.
-- `acceptedServices: ["google-tag-manager", "google-analytics"]` (initialConsents and saveConsents only): An array of service names that are currently accepted.
-- `klaroConfig: {version: "1", ...}`: The complete Klaro configuration object.
-- `klaroGeoConsentTemplate: "Default"` (klaroConfigLoaded only): The name of the assigned template
-- `klaroGeoTemplateSource: "default|fallback|admin-override|geo-match"` (klaroConfigLoaded only): The source rule that assigned this template.
-- `klaroGeoDetectedCountry: "US"` (klaroConfigLoaded only): The detected country
-- `klaroGeoDetectedRegion: "US-CA"` (klaroConfigLoaded only): The detected region
-- `klaroGeoAdminOverride: false` (klaroConfigLoaded only): Whether the admin override was applied to the location detection rules
-- `klaroGeoEnableConsentLogging: true|false` (klaroConfigLoaded and generateConsentReceipt): Whether consent receipt logging is enabled for the current template/country
-- `klaroGeoConsentReceipt: {...}` (klaroConfigLoaded and generateConsentReceipt): The complete consent receipt object if available. For klaroConfigLoaded, this will be the most recent consent receipt stored in localStorage, if one exists.
+- `event: "Klaro Event"`: The same for all of these events
+- `eventSource: "klaro" | "klaro-geo"`: Whether the event was forwarded from Klaro or generated by Klaro Geo
+- `klaroEventName`: The name of the event: `klaroConfigLoaded`, `gpcDetected`, `initialConsents`, `saveConsents`, `applyConsents`, `generateConsentReceipt`, and `consents` when individual toggle events are not suppressed
+- `klaroEventData: {google-tag-manager: true, google-analytics: true}` (events forwarded from Klaro): The data Klaro passed with the event; for `initialConsents`, the consent state of every service
+- `acceptedServices: ["google-tag-manager", "google-analytics"]` (events forwarded from Klaro): The names of the services currently accepted
+
+`klaroConfigLoaded` is pushed once per page, when the template has been chosen:
+- `klaroGeoConsentTemplate: "strict"`: The key of the template in use
+- `klaroGeoTemplateSource: "country" | "region" | "default" | "fallback" | "hardcoded-fallback"`: The rule that chose the template
+- `klaroGeoDetectedCountry: "US"`: The detected country, or null
+- `klaroGeoDetectedRegion: "CA"`: The detected region, without the country, or null
+- `klaroGeoAdminOverride: false`: Whether an administrator's debug location was applied
+- `klaroGeoResolutionMode: "server" | "client"`: Where the location was resolved
+- `klaroGeoGeoSource`: `server` or `debug` in server mode; `geoip-ajax`, `timezone` or `fallback` in client mode
+- `klaroGeoGeoLatencyMs`: How long the browser's lookup took, in client mode; null in server mode
+- `klaroGeoEnableConsentLogging: true | false`: Whether receipts are recorded on this page (the global setting and the template's setting)
+- `klaroGeoGPCDetected`, `klaroGeoGPCEnabled`, `klaroGeoGPCAffectedServices`: see [Global Privacy Control](#datalayer-events)
+- `klaroGeoConsentReceiptId: "receipt_..."`: The ID of the visitor's latest receipt, when their browser holds one and a stored consent exists
+
+`generateConsentReceipt` is pushed when a receipt is created:
+- `klaroGeoConsentReceipt: "receipt_..."`: The receipt's ID
+- `klaroGeoConsentReceiptType: "choice" | "gpc"`: A choice the visitor saved, or a Global Privacy Control opt-out recorded without one
+- `klaroGeoTemplateSource`, `klaroGeoAdminOverride`, `klaroGeoEnableConsentLogging`: as above
 
 #### Klaro Consent Update
 
@@ -522,13 +545,14 @@ Parameters:
 - `consent_trigger: "initialConsents|saveConsents"`: The Klaro event that triggered this
 - `consentMode: {...}`: Complete consent mode object (includes all standard + custom consent keys)
 - `acceptedServices: [...]`: Array of accepted service names
+- `gpcActive: true|false`: Whether a Global Privacy Control signal was applied on this page
 
 **Event Flow**:
 1. Plugin calls `gtag('consent', 'update', ...)` with consent data
 2. Plugin pushes `Klaro Consent Update` to dataLayer
 3. Your tags trigger on `Klaro Consent Update` (consent is set)
 
-It is expected that you will create a Data Layer Variable named `acceptedServices` and then use "Data Layer Variable contains google-analytics" to trigger the Google Analytics tag, for example. Note that the names of Klaro services are lowercased and hyphenated when set in acceptedServices.
+Most setups do not need to read these fields: gate each tag with its consent key under **Require additional consent for tag to fire** (see [Configuring Tag Triggers in GTM](#configuring-tag-triggers-in-gtm)). `acceptedServices` is there for Trigger Groups and for tag managers without consent mode: create a Data Layer Variable named `acceptedServices` and use, for example, "contains google-analytics". Service names in it are lowercase and hyphenated.
 
 #### Dynamic Consent Keys
 
@@ -560,8 +584,8 @@ Alternatively, create a **Data Layer Variable** (e.g., `consentMode.facebook_con
   'ad_user_data': 'denied',
   'ad_personalization': 'denied',
   'google_analytics_consent': 'granted',
-  'piwik_consent': 'granted',       // custom - use via DLV
-  'facebook_consent': 'denied'      // custom - use via DLV
+  'piwik_consent': 'granted',       // custom consent key
+  'facebook_consent': 'denied'      // custom consent key
 }
 ```
 
@@ -570,7 +594,7 @@ Alternatively, create a **Data Layer Variable** (e.g., `consentMode.facebook_con
 The dataLayer format follows Google Tag Manager conventions but can be read by other tag managers (Tealium, Adobe Launch, etc.). The `Klaro Consent Update` event is pushed directly by the plugin (no GTM template required), so it works with any tag manager or even without one:
 - `consentMode`: Object with all consent keys (both Google standard and dynamic service keys)
 - `acceptedServices`: Array of service names with granted consent
-- `triggerEvent`: Either `'initialConsents'` or `'saveConsents'`
+- `consent_trigger`: Either `'initialConsents'` or `'saveConsents'`
 
 #### Consent Queue (klaroGeo.push)
 
@@ -616,7 +640,7 @@ The queue always waits for the `Klaro Consent Update` event before flushing, reg
 
 **Note:** The queue ensures events reach the dataLayer after consent state is set. GTM's consent mode then determines whether tags fire based on the actual consent granted. This is a timing mechanism, not a consent enforcement mechanism.
 
-### How It Works
+### How the Consent Flow Works
 
 Klaro Geo uses Klaro's native consent management to control consent state. The flow differs based on the consent mode type.
 
@@ -648,15 +672,40 @@ The GeoIP Detection plugin lets you select different IP databases. In testing, t
 
 For this reason, we recommend using strict fallback templates. 
 
-In addition, it is recommended that you test one of the paid, commercial services supported by the plugin. Klaro Geo pushes a `Klaro Config Loaded` event to the datalayer that includes the following fields useful for evaluating the performance of the plugin and IP detection:
- 
-- `klaro_geo_consent_template`: The ID of the detected template
-- `klaro_geo_template_source`: The rule used to determine the template
-- `klaro_geo_detected_country`: The detected country
-- `klaro_geo_detected_region`: The detected region
-- `klaro_geo_admin_override`: Whether the admin override was applied to the location detection rules
+In addition, it is recommended that you test one of the paid, commercial services supported by the plugin. Klaro Geo pushes a `klaroConfigLoaded` event to the dataLayer on every page, with fields useful for evaluating the plugin and the IP detection:
+
+- `klaroGeoConsentTemplate`: The key of the template in use
+- `klaroGeoTemplateSource`: The rule that chose the template
+- `klaroGeoDetectedCountry`: The detected country
+- `klaroGeoDetectedRegion`: The detected region
+- `klaroGeoAdminOverride`: Whether an administrator's debug location was applied
+- `klaroGeoGeoSource`: Where the location came from
+
+See [Klaro Event](#klaro-event) for the full list.
 
 Geo detection is optional. If disabled, the fallback template will always be shown regardless of user location. You will still be able to assign templates to countries and regions, it just won't do anything until the GeoIP Detection plugin is installed and configured.
+
+### Client-Side Geo Resolution
+
+By default the location is detected, and the template chosen, while WordPress renders the page. That is wrong on a host with full-page caching (WP Engine, Kinsta, LiteSpeed, Cloudflare APO and others): the cached page carries the location and banner of whichever visitor it was first rendered for, and everyone after them gets the same one.
+
+**Client-side** mode (**Klaro Geo > Klaro Geo > Geo Resolution**) fixes this. The page carries your location rules and every template they can lead to, and is the same for every visitor, so it is safe to cache. The visitor's browser then asks the GeoIP Detection plugin where it is and picks the template before the banner appears.
+
+To use it:
+
+1. In the GeoIP Detection plugin's settings, turn on **Enable AJAX endpoint**. Klaro Geo shows a warning on its admin pages if client-side mode is on and the endpoint is not.
+2. Set **Geo Resolution Mode** to **Client-side (cache-safe)**.
+
+If the lookup fails or takes longer than **Client Geo Lookup Timeout**, the browser falls back in this order:
+
+1. **Timezone Fallback** (on by default): the country is inferred from the browser's timezone. No region is known, so region rules do not apply.
+2. The fallback template.
+
+Things to know:
+
+- Until the lookup returns, Google Consent Mode uses the fallback template's defaults; once the template is chosen, the plugin updates them. Use a strict fallback template so nothing is granted in that window.
+- `klaroConfigLoaded` reports how the location was found in `klaroGeoGeoSource` (`geoip-ajax`, `timezone` or `fallback`) and how long it took in `klaroGeoGeoLatencyMs`.
+- An administrator using the debug location menu always gets server-side resolution for that page view.
 
 ### Geo Regions
 
@@ -676,7 +725,7 @@ Please note that browser privacy safeguards, like Apple's Privacy Relay, make re
 
 ## Global Privacy Control (GPC)
 
-[Global Privacy Control](https://globalprivacycontrol.org/) (GPC) is a browser-level signal that communicates a user's intent to opt out of the sale or sharing of their personal information. It is sent via the `navigator.globalPrivacyControl` JavaScript property (and the `Sec-GPC` HTTP header, though this plugin only uses the JS property). GPC is recognized under several privacy laws, including the California Consumer Privacy Act (CCPA/CPRA) and Colorado Privacy Act.
+[Global Privacy Control](https://globalprivacycontrol.org/) (GPC) is a browser-level signal that communicates a user's intent to opt out of the sale or sharing of their personal information. It is sent via the `navigator.globalPrivacyControl` JavaScript property (and the `Sec-GPC` HTTP header; the plugin acts on the JavaScript property, and also records the header on consent receipts). GPC is recognized under several privacy laws, including the California Consumer Privacy Act (CCPA/CPRA) and Colorado Privacy Act.
 
 The open-source Klaro library does not natively support GPC. Klaro Geo adds GPC detection and integrates it with the existing template and geo system, giving admins fine-grained control over how GPC affects consent defaults.
 
@@ -771,7 +820,7 @@ A dedicated `gpcDetected` event is also fired when GPC is active:
 
 The `Klaro Consent Update` event includes a `gpcActive` field indicating whether GPC was detected for the session.
 
-### Consent Receipts
+### GPC on Consent Receipts
 
 Every consent receipt records GPC as it stood when the visitor saved their choice:
 
@@ -800,7 +849,7 @@ When enabled in global settings, the plugin serves a JSON response at `/.well-kn
 }
 ```
 
-This endpoint signals to browsers and automated tools that your site respects GPC. The `lastUpdate` field reflects the current date. After enabling this setting, you may need to flush your permalink settings (**Settings > Permalinks > Save Changes**) for the rewrite rule to take effect.
+This endpoint signals to browsers and automated tools that your site respects GPC. The `lastUpdate` field is the date the setting was last switched on or off. The address needs pretty permalinks (any **Settings > Permalinks** structure other than Plain); the plugin registers it when the setting is changed.
 
 ### Testing GPC
 
@@ -834,19 +883,37 @@ This granular control allows you to retain consent receipts where they are legal
 
 1. When a user makes consent choices (or, once per browser, when a Global Privacy Control signal opts them out without a choice), a receipt is generated containing:
    - Unique receipt ID (randomly generated, not derived from device characteristics)
-   - Timestamp
+   - The time, as recorded by your server when the receipt arrived
    - User's consent choices for each service
-   - Template used and source (e.g., geo-match, fallback)
+   - Template used and how it was chosen (e.g., geo-match country, fallback)
    - User's detected country and region
    - Whether the browser sent a Global Privacy Control signal, and the services switched off because of it
    - Coarse browser/OS identification (e.g., "Chrome/macOS", "Safari Mobile/iOS" — not the full User Agent string)
-   - Anonymized IP address (last octet zeroed for IPv4)
+   - Anonymized IP address (the last part removed: IPv4 keeps its first three numbers, IPv6 its first 48 bits)
+   - The version of the consent banner the visitor was shown (see below)
 
 2. Receipts are stored in two locations:
-   - **Client-side**: In the user's browser localStorage (limited to last 10 receipts)
-   - **Server-side**: In the WordPress database (if server-side logging is enabled)
+   - **Server-side**: In the WordPress database
+   - **Client-side**: In the user's browser localStorage (limited to last 10 receipts). A receipt for a Global Privacy Control opt-out is not kept in the browser.
 
-3. Receipts are also pushed to the dataLayer for integration with analytics tools.
+   Both need consent receipts enabled globally and consent logging enabled on the visitor's template. Where either is off, no receipt is created.
+
+3. The receipt's ID is pushed to the dataLayer (the `generateConsentReceipt` event) for integration with analytics tools. The receipt itself is not.
+
+### What the Visitor Was Shown
+
+A consent record means little without the wording the visitor agreed to. The Klaro configuration (the consent text in every language, and the services with their purposes) is stored once for each version of each template, and every receipt refers to the version in force by a hash. Editing a template or a service creates a new version; earlier receipts keep pointing at the old one.
+
+The page carries the hash and the receipt sends it back, so a receipt from a cached page refers to the wording that page actually showed. The receipt's detail view under **Klaro Geo > Consent Receipts** shows the result as **Config check**:
+
+- **Verified**: the browser reported a version this site served for that template.
+- **Mismatch**: the browser reported a version this site never served. The receipt is kept, but it did not come from an unaltered page of your site.
+- **Not reported**: the browser sent no version (for example a script cached from before this was added). The version in force when the receipt arrived is shown.
+- **Not recorded**: the receipt was stored by an earlier version of the plugin and holds its own copy of the configuration.
+
+### What the Endpoint Accepts
+
+Receipts are submitted by visitors' browsers, logged in or not, so the endpoint that stores them is public and treats everything it receives as untrusted: it accepts only the expected fields, stores consent choices as yes/no values, refuses a receipt naming a template that does not exist, and limits how many receipts one network can submit (30 per 5 minutes by default).
 
 ### Enabling/Disabling Consent Receipts
 
@@ -859,7 +926,20 @@ Administrators can view stored consent receipts under **Klaro Geo > Consent Rece
 
 ### Passing Consent Receipt Numbers to Analytics Tools
 
-The consent receipt number is passed to the dataLayer via a `consentReceiptNumber` property. This allows you to track consent receipts in your analytics tool of choice to facilitate deletion requests by receipt number.
+The receipt ID reaches the dataLayer in two places: as `klaroGeoConsentReceipt` on the `generateConsentReceipt` event when a receipt is created, and as `klaroGeoConsentReceiptId` on `klaroConfigLoaded` on later pages while the visitor's browser still holds the receipt. Create a Data Layer Variable for either to record the ID in your analytics tool, which lets you find a visitor's receipt for a deletion request.
+
+## Developer Filters
+
+- `klaro_geo_client_ip`: the visitor's IP address before it is anonymized. If your site is behind a reverse proxy or CDN and every receipt shows the same address, return the visitor's address from the header your proxy sets. Only trust a header the proxy overwrites.
+- `klaro_geo_receipt_rate_limit`: how many receipts one anonymized address may submit per window. Default 30; return 0 to disable the limit.
+- `klaro_geo_receipt_rate_limit_window`: the length of that window in seconds. Default 300.
+
+```php
+// Behind Cloudflare, when the host does not restore the visitor's address:
+add_filter( 'klaro_geo_client_ip', function ( $ip ) {
+	return isset( $_SERVER['HTTP_CF_CONNECTING_IP'] ) ? $_SERVER['HTTP_CF_CONNECTING_IP'] : $ip;
+} );
+```
 
 ## Support and Contributions
 
