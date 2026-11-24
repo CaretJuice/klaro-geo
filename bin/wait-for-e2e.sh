@@ -10,7 +10,11 @@ container="klaro-geo-wordpress-e2e"
 timeout_seconds="${1:-240}"
 
 for ((waited = 0; waited < timeout_seconds; waited += 3)); do
-	if docker logs "$container" 2>&1 | grep -q "E2E Environment Ready"; then
+	# Read the whole log before searching it. `docker logs | grep -q` can make
+	# docker fail with SIGPIPE when grep stops at the first match, and with
+	# pipefail that reads as "not ready" once the log is long.
+	logs="$(docker logs "$container" 2>&1 || true)"
+	if grep -q "E2E Environment Ready" <<<"$logs"; then
 		exit 0
 	fi
 	sleep 3
