@@ -521,6 +521,9 @@ function klaro_geo_build_consent_data( array $payload, array $services, array $r
 		'adminOverride'          => ! empty( $resolved['adminOverride'] ),
 		'consentReceipts'        => $receipts_enabled,
 		'enableConsentLogging'   => $receipts_enabled && $payload['enable_consent_logging'],
+		// Names the Klaro config this page carries; a receipt sends it back
+		// (klaro_geo_consent_config_version()).
+		'configHash'             => klaro_geo_consent_config_version( $payload )['hash'],
 		'consentMode'            => 'v2',
 		'suppressConsentsEvents' => (bool) get_option( 'klaro_geo_suppress_consents_events', true ),
 		'consentModeServices'    => (object) $service_maps['consent_mode_services'],
@@ -587,6 +590,7 @@ function klaro_geo_frontend_template_entry( array $payload ) {
 		'enableConsentLogging' => $payload['enable_consent_logging'],
 		'gpcEnabled'           => $payload['gpc_enabled'],
 		'templateSettings'     => $payload['template_settings_block'],
+		'configHash'           => klaro_geo_consent_config_version( $payload )['hash'],
 	);
 }
 
@@ -694,6 +698,7 @@ function klaro_geo_get_frontend_payload() {
 
 	// Build the full payload for the resolved template
 	$payload = klaro_geo_build_template_payload( $template_to_use, $templates, $services );
+	klaro_geo_remember_consent_config( $payload );
 
 	// Update metadata when the builder had to fall back
 	$template_to_use = $payload['template_key'];
@@ -821,6 +826,7 @@ function klaro_geo_get_client_frontend_payload( $services ) {
 		}
 
 		$payload = klaro_geo_build_template_payload( $candidate_key, $templates, $services );
+		klaro_geo_remember_consent_config( $payload );
 
 		$payload_templates[ $candidate_key ] = klaro_geo_frontend_template_entry( $payload );
 

@@ -411,6 +411,7 @@
             window.klaroConsentData.detectedRegion = geo.region || '';
             window.klaroConsentData.adminOverride = false;
             window.klaroConsentData.enableConsentLogging = consentLoggingEnabled;
+            window.klaroConsentData.configHash = template.configHash;
             window.klaroConsentData.templateSettings = {
                 consentModalTitle: template.templateSettings.consentModalTitle,
                 consentModalDescription: template.templateSettings.consentModalDescription,

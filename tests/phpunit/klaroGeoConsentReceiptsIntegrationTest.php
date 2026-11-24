@@ -114,12 +114,12 @@ class ConsentReceiptsIntegrationTest extends IgnoreDeprecatedTestCase {
      * AND consent logging enabled on the template.
      */
     public function test_enable_consent_logging_is_the_effective_value() {
-        $payload = array(
-            'enable_consent_logging'  => true,
-            'consent_defaults'        => array(),
-            'gtag_settings'           => array('ads_data_redaction' => 'true', 'url_passthrough' => 'false'),
-            'template_settings_block' => array(),
+        $payload = klaro_geo_build_template_payload(
+            'default',
+            Klaro_Geo_Template_Settings::get_instance()->get(),
+            Klaro_Geo_Service_Settings::get_instance()->get()
         );
+        $payload['enable_consent_logging'] = true;
 
         update_option('klaro_geo_enable_consent_receipts', true);
         $this->assertTrue(klaro_geo_build_consent_data($payload, array())['enableConsentLogging'], 'global on + template on');

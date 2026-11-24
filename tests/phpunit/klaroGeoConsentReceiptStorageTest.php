@@ -93,7 +93,7 @@ class KlaroGeoConsentReceiptStorageTest extends WP_UnitTestCase {
 		$table   = klaro_geo_receipts_table_name();
 		$columns = wp_list_pluck( $wpdb->get_results( "DESCRIBE $table" ), 'Field' );
 
-		foreach ( array( 'id', 'receipt_id', 'user_id', 'ip_address', 'timestamp', 'consent_data', 'template_name', 'template_source', 'country_code', 'region_code', 'user_agent', 'klaro_config', 'gpc_signal', 'gpc_affected_services', 'receipt_type' ) as $column ) {
+		foreach ( array( 'id', 'receipt_id', 'user_id', 'ip_address', 'timestamp', 'consent_data', 'template_name', 'template_source', 'country_code', 'region_code', 'user_agent', 'klaro_config', 'gpc_signal', 'gpc_affected_services', 'receipt_type', 'config_hash', 'config_status' ) as $column ) {
 			$this->assertContains( $column, $columns );
 		}
 	}
@@ -363,33 +363,183 @@ class KlaroGeoConsentReceiptStorageTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The Klaro config stored with a receipt is the one the server gives
-	 * visitors for that template. A copy sent with the receipt is not stored:
-	 * it would be tens of kilobytes chosen by whoever sent the request.
+	 * The config version a template has now, as the page would carry it.
+	 *
+	 * @return array { hash, json }
 	 */
-	public function test_klaro_config_snapshot_is_built_by_the_server() {
+	private function current_config( $template_name = 'default' ) {
+		return klaro_geo_consent_config_version(
+			klaro_geo_build_template_payload(
+				$template_name,
+				Klaro_Geo_Template_Settings::get_instance()->get(),
+				Klaro_Geo_Service_Settings::get_instance()->get()
+			)
+		);
+	}
+
+	private function count_configs() {
+		global $wpdb;
+		$table = klaro_geo_consent_configs_table_name();
+		return (int) $wpdb->get_var( "SELECT COUNT(*) FROM $table" );
+	}
+
+	/**
+	 * Change the default template's consent text, as an edit on the Templates
+	 * page would.
+	 */
+	private function edit_default_template( $title ) {
+		$templates = get_option( 'klaro_geo_templates' );
+		$templates['default']['config']['translations']['zz']['consentModal']['title'] = $title;
+		update_option( 'klaro_geo_templates', $templates );
+		Klaro_Geo_Template_Settings::clear_instance_cache();
+	}
+
+	/**
+	 * A receipt refers to the Klaro config by hash. The config itself is
+	 * stored once, by the server, and nothing a browser sends as a config is
+	 * stored at all.
+	 */
+	public function test_receipt_refers_to_the_config_the_server_holds() {
+		$current = $this->current_config();
 		$receipt = $this->receipt(
 			array(
-				'klaro_config' => array(
-					'injected' => str_repeat( 'a', 60000 ),
-					'services' => array( array( 'name' => 'ga</pre><img src=x onerror=alert(1)>' ) ),
-				),
+				'config_hash'  => $current['hash'],
+				'klaro_config' => array( 'injected' => str_repeat( 'a', 60000 ) ),
 			)
 		);
 
 		$this->assertIsInt( klaro_geo_store_consent_receipt( $receipt ) );
 
-		$row      = $this->stored( $receipt['receipt_id'] );
-		$expected = klaro_geo_build_template_payload(
-			'default',
-			Klaro_Geo_Template_Settings::get_instance()->get(),
-			Klaro_Geo_Service_Settings::get_instance()->get()
+		$row = $this->stored( $receipt['receipt_id'] );
+		$this->assertNull( $row->klaro_config, 'No copy of the config in the receipt row' );
+		$this->assertSame( $current['hash'], $row->config_hash );
+		$this->assertSame( 'matched', $row->config_status );
+
+		$config = klaro_geo_get_consent_config( $row->config_hash );
+		$this->assertSame( 'default', $config->template_name );
+		$this->assertSame( $current['json'], $config->config );
+		$this->assertStringNotContainsString( 'injected', $config->config );
+		$this->assertNotEmpty( json_decode( $config->config, true )['services'], 'The config holds what the visitor was asked' );
+	}
+
+	public function test_config_is_stored_once_however_many_receipts_refer_to_it() {
+		$current = $this->current_config();
+		$before  = $this->count_configs();
+
+		for ( $i = 0; $i < 3; $i++ ) {
+			$this->assertIsInt( klaro_geo_store_consent_receipt( $this->receipt( array( 'config_hash' => $current['hash'] ) ) ) );
+		}
+
+		$this->assertSame( $before + 1, $this->count_configs() );
+	}
+
+	/**
+	 * Rendering a page stores the config version it carries. A receipt from
+	 * that page, sent after the template has been edited (the page was
+	 * cached), refers to the wording the visitor saw, not the new one.
+	 */
+	public function test_receipt_from_a_cached_page_refers_to_the_config_that_page_carried() {
+		$rendered = klaro_geo_get_frontend_payload();
+		$on_page  = $rendered['consent_data']['configHash'];
+		$this->assertSame( $this->current_config()['hash'], $on_page );
+		$this->assertSame( $on_page, $rendered['payload']['templates']['default']['configHash'] );
+		$this->assertNotNull( klaro_geo_get_consent_config( $on_page ), 'Stored when the page was rendered' );
+
+		$this->edit_default_template( 'New wording' );
+		$this->assertNotSame( $on_page, $this->current_config()['hash'] );
+
+		$receipt = $this->receipt( array( 'config_hash' => $on_page ) );
+		$this->assertIsInt( klaro_geo_store_consent_receipt( $receipt ) );
+
+		$row = $this->stored( $receipt['receipt_id'] );
+		$this->assertSame( $on_page, $row->config_hash );
+		$this->assertSame( 'matched', $row->config_status );
+		$this->assertStringNotContainsString( 'New wording', klaro_geo_receipt_for_display( $row )->klaro_config );
+	}
+
+	public function test_rendering_a_page_writes_a_config_only_when_it_has_changed() {
+		klaro_geo_get_frontend_payload();
+		$after_first = $this->count_configs();
+		klaro_geo_get_frontend_payload();
+		$this->assertSame( $after_first, $this->count_configs() );
+
+		$this->edit_default_template( 'Changed' );
+		klaro_geo_get_frontend_payload();
+		$this->assertSame( $after_first + 1, $this->count_configs() );
+	}
+
+	public function test_no_config_is_stored_while_receipts_are_off() {
+		update_option( 'klaro_geo_enable_consent_receipts', false );
+		$before = $this->count_configs();
+
+		klaro_geo_get_frontend_payload();
+
+		$this->assertSame( $before, $this->count_configs() );
+	}
+
+	/**
+	 * A hash this site never issued for the template means no page of this
+	 * site produced the receipt as it stands. It is kept, and marked.
+	 *
+	 * @dataProvider hashes_not_served_for_the_default_template
+	 */
+	public function test_receipt_reporting_a_config_never_served_is_marked( $hash_of ) {
+		$current = $this->current_config();
+		$hash    = 'another template' === $hash_of ? $this->current_config( 'no_logging' )['hash'] : str_repeat( 'ab', 32 );
+		if ( 'another template' === $hash_of ) {
+			klaro_geo_store_consent_config( 'no_logging', $this->current_config( 'no_logging' ) );
+		}
+
+		$receipt = $this->receipt( array( 'config_hash' => $hash ) );
+		$this->assertIsInt( klaro_geo_store_consent_receipt( $receipt ) );
+
+		$row = $this->stored( $receipt['receipt_id'] );
+		$this->assertSame( 'mismatch', $row->config_status );
+		$this->assertSame( $current['hash'], $row->config_hash, 'It refers to the config in force when it arrived' );
+		$this->assertStringStartsWith( 'MISMATCH', klaro_geo_receipt_config_status_label( $row ) );
+	}
+
+	public function hashes_not_served_for_the_default_template() {
+		return array(
+			'made up'                    => array( 'made up' ),
+			'issued for another template' => array( 'another template' ),
+		);
+	}
+
+	/**
+	 * @dataProvider values_that_are_not_a_hash
+	 */
+	public function test_receipt_without_a_usable_hash_refers_to_the_current_config( $overrides ) {
+		$receipt = $this->receipt( $overrides );
+		$this->assertIsInt( klaro_geo_store_consent_receipt( $receipt ) );
+
+		$row = $this->stored( $receipt['receipt_id'] );
+		$this->assertSame( 'not-sent', $row->config_status );
+		$this->assertSame( $this->current_config()['hash'], $row->config_hash );
+		$this->assertNotNull( klaro_geo_get_consent_config( $row->config_hash ) );
+	}
+
+	public function values_that_are_not_a_hash() {
+		return array(
+			'none sent'  => array( array() ),
+			'not hex'    => array( array( 'config_hash' => str_repeat( 'zz', 32 ) ) ),
+			'too short'  => array( array( 'config_hash' => 'abc123' ) ),
+			'upper case' => array( array( 'config_hash' => str_repeat( 'AB', 32 ) ) ),
+			'an array'   => array( array( 'config_hash' => array( str_repeat( 'ab', 32 ) ) ) ),
+			'markup'     => array( array( 'config_hash' => '<script>alert(1)</script>' ) ),
+		);
+	}
+
+	public function test_a_receipt_stored_before_config_versions_shows_its_own_copy() {
+		$old = (object) array(
+			'receipt_id'   => 'receipt_old',
+			'klaro_config' => '{"old":true}',
 		);
 
-		$this->assertStringNotContainsString( 'injected', $row->klaro_config );
-		$this->assertStringNotContainsString( 'onerror', $row->klaro_config );
-		$this->assertSame( wp_json_encode( $expected['config'] ), $row->klaro_config );
-		$this->assertNotEmpty( json_decode( $row->klaro_config, true )['services'] );
+		$shown = klaro_geo_receipt_for_display( $old );
+
+		$this->assertSame( '{"old":true}', $shown->klaro_config );
+		$this->assertStringStartsWith( 'Not recorded', $shown->config_label );
 	}
 
 	/**

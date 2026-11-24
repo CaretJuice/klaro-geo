@@ -111,7 +111,9 @@ class KlaroGeoUninstallTest extends WP_UnitTestCase {
 
 		klaro_geo_uninstall();
 
-		$this->assertCount( 1, $this->drops );
+		// The receipts, and the Klaro configs they refer to.
+		$this->assertCount( 2, $this->drops );
 		$this->assertStringContainsString( $wpdb->prefix . 'klaro_geo_consent_receipts', $this->drops[0] );
+		$this->assertStringContainsString( $wpdb->prefix . 'klaro_geo_consent_configs', $this->drops[1] );
 	}
 }

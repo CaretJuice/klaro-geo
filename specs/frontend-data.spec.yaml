@@ -21,6 +21,7 @@ klaro_consent_data:
     - "ajaxUrl is present ONLY when consent receipts are enabled globally"
     - "nonce is present ONLY when consent receipts are enabled AND the visitor is logged in. Pages for anonymous visitors carry no nonce, so a cached page holds nothing that expires"
     - "The receipt endpoint MUST accept a request with no nonce or an invalid one. JS sends the nonce when it has one; PHP uses it only to decide whether the receipt is recorded against the logged-in user (klaro_geo_receipt_user_id())"
+    - "configHash names the Klaro config the page carries for the template: sha256 of the template key, a newline and the config's JSON (klaro_geo_consent_config_version()). JS sends it back unchanged as config_hash in a consent receipt; PHP accepts it only when it is a hash PHP itself stored for that template, and never takes the config from the browser. In client geo mode PHP emits the fallback template's hash and the resolver replaces it with the selected template's (the template entry's configHash)"
     - "In client geo mode the template and geo fields are emitted empty and filled by the resolver before Klaro initializes"
     - "Frontend scripts read settings from this object, not from dataLayer events"
   fields:
@@ -33,6 +34,7 @@ klaro_consent_data:
     adminOverride: "bool"
     consentReceipts: "bool - global consent receipts setting"
     enableConsentLogging: "bool - effective value, see rules"
+    configHash: "string - 64 hex characters, see rules"
     consentMode: "string - always 'v2'"
     suppressConsentsEvents: "bool"
     consentModeServices: "object - consent_mode_key => service name"

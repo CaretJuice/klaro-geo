@@ -22,15 +22,43 @@ function klaro_geo_receipts_table_name() {
 }
 
 /**
+ * Get the name of the table that holds each distinct Klaro config receipts
+ * refer to (see klaro_geo_consent_config_version()).
+ */
+function klaro_geo_consent_configs_table_name() {
+	global $wpdb;
+	return $wpdb->prefix . 'klaro_geo_consent_configs';
+}
+
+/**
+ * Check if one of the plugin's tables exists.
+ *
+ * @param string $table_name From klaro_geo_receipts_table_name() or
+ *                           klaro_geo_consent_configs_table_name().
+ * @phpstan-impure The answer changes when the table is created or dropped.
+ */
+function klaro_geo_db_table_exists( $table_name ) {
+	global $wpdb;
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Table existence check; table name from $wpdb->prefix is trusted.
+	return $wpdb->get_var( "SHOW TABLES LIKE '$table_name'" ) === $table_name;
+}
+
+/**
  * Check if the consent receipts table exists.
  *
  * @phpstan-impure The answer changes when the table is created or dropped.
  */
 function klaro_geo_receipts_table_exists() {
-	global $wpdb;
-	$table_name = klaro_geo_receipts_table_name();
-	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Table existence check; table name from $wpdb->prefix is trusted.
-	return $wpdb->get_var( "SHOW TABLES LIKE '$table_name'" ) === $table_name;
+	return klaro_geo_db_table_exists( klaro_geo_receipts_table_name() );
+}
+
+/**
+ * Check if the consent configs table exists.
+ *
+ * @phpstan-impure The answer changes when the table is created or dropped.
+ */
+function klaro_geo_consent_configs_table_exists() {
+	return klaro_geo_db_table_exists( klaro_geo_consent_configs_table_name() );
 }
 
 /**
@@ -119,18 +147,20 @@ function klaro_geo_receipts_exists( $receipt_id ) {
  * klaro_geo_consent_receipts_db_version. Raise it when a column is added and
  * add the column to klaro_geo_upgrade_consent_receipts_table().
  */
-define( 'KLARO_GEO_RECEIPTS_DB_VERSION', '1.2' );
+define( 'KLARO_GEO_RECEIPTS_DB_VERSION', '1.3' );
 
 /**
- * Create the receipts table, or bring an existing one up to the current
- * schema. Runs on activation, when the stored schema version is behind (see
+ * Create the receipts table and the consent configs table, or bring existing
+ * ones up to the current schema. Runs on activation, when the stored schema version is behind (see
  * klaro_geo_upgrade_consent_receipts_table()) and when an insert fails.
  *
  * Columns added after 1.0 are listed in $added. Receipts stored before a
  * column existed keep NULL in it: for gpc_signal that means "not recorded",
- * which is not the same as "no signal".
+ * which is not the same as "no signal". Receipts stored before 1.3 hold their
+ * own copy of the Klaro config in klaro_config and have no config_hash; later
+ * ones refer to a row of the consent configs table instead.
  *
- * @return bool Whether the table exists with the current schema.
+ * @return bool Whether both tables exist with the current schema.
  */
 function klaro_geo_create_consent_receipts_table() {
 	global $wpdb;
@@ -142,7 +172,11 @@ function klaro_geo_create_consent_receipts_table() {
 		'gpc_signal'            => 'tinyint(1) DEFAULT NULL',       // 1.1
 		'gpc_affected_services' => 'text DEFAULT NULL',             // 1.1
 		'receipt_type'          => 'varchar(20) DEFAULT NULL',      // 1.2
+		'config_hash'           => 'char(64) DEFAULT NULL',         // 1.3
+		'config_status'         => 'varchar(20) DEFAULT NULL',      // 1.3
 	);
+
+	require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
 	if ( ! klaro_geo_receipts_table_exists() ) {
 		$added_sql = '';
@@ -150,7 +184,6 @@ function klaro_geo_create_consent_receipts_table() {
 			$added_sql .= "$column $definition,\n";
 		}
 
-		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta(
 			"CREATE TABLE $table_name (
 			id bigint(20) NOT NULL AUTO_INCREMENT,
@@ -189,6 +222,26 @@ function klaro_geo_create_consent_receipts_table() {
 		}
 	}
 
+	if ( ! klaro_geo_consent_configs_table_exists() ) {
+		$configs_table = klaro_geo_consent_configs_table_name();
+		dbDelta(
+			"CREATE TABLE $configs_table (
+			id bigint(20) NOT NULL AUTO_INCREMENT,
+			config_hash char(64) NOT NULL,
+			template_name varchar(100) NOT NULL,
+			config longtext NOT NULL,
+			first_seen datetime NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY config_hash (config_hash)
+			) " . $wpdb->get_charset_collate()
+		);
+
+		if ( ! klaro_geo_consent_configs_table_exists() ) {
+			klaro_geo_debug_log( "Could not create $configs_table: " . $wpdb->last_error );
+			return false;
+		}
+	}
+
 	update_option( 'klaro_geo_consent_receipts_db_version', KLARO_GEO_RECEIPTS_DB_VERSION );
 	return true;
 }
@@ -207,14 +260,134 @@ function klaro_geo_upgrade_consent_receipts_table() {
 }
 add_action( 'init', 'klaro_geo_upgrade_consent_receipts_table' );
 
-// Drop the consent receipts table and forget its schema version.
+// Drop the consent receipts table and the configs its receipts refer to, and
+// forget the schema version.
 function klaro_geo_drop_consent_receipts_table() {
 	global $wpdb;
-	$table_name = klaro_geo_receipts_table_name();
 
-	// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange -- DDL statement; table name from $wpdb->prefix is trusted and cannot be parameterized.
-	$wpdb->query( "DROP TABLE IF EXISTS $table_name" );
+	foreach ( array( klaro_geo_receipts_table_name(), klaro_geo_consent_configs_table_name() ) as $table_name ) {
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange -- DDL statement; table name from $wpdb->prefix is trusted and cannot be parameterized.
+		$wpdb->query( "DROP TABLE IF EXISTS $table_name" );
+	}
 	delete_option( 'klaro_geo_consent_receipts_db_version' );
+	delete_option( 'klaro_geo_consent_config_hashes' );
+}
+
+/**
+ * The version of the Klaro config a template gives visitors: its JSON and a
+ * hash that names it.
+ *
+ * The config holds what a visitor was asked: the consent text in every
+ * language and the services with their purposes. A receipt needs it to mean
+ * anything, but it is the same for every visitor until someone edits the
+ * template or the services, so it is stored once per version (the consent
+ * configs table) and each receipt refers to it by hash.
+ *
+ * The page carries the hash (configHash, specs/frontend-data.spec.yaml) and
+ * the receipt sends it back. That ties a receipt to the config its page was
+ * rendered with, even when the page came from a cache and the template has
+ * been edited since.
+ *
+ * The template key is part of the hash, so a hash issued for one template
+ * cannot be passed off as another's.
+ *
+ * @param array $payload A payload from klaro_geo_build_template_payload().
+ * @return array { hash: string (64 hex characters), json: string }
+ */
+function klaro_geo_consent_config_version( array $payload ) {
+	$json = wp_json_encode( $payload['config'] );
+
+	return array(
+		'hash' => hash( 'sha256', $payload['template_key'] . "\n" . $json ),
+		'json' => $json,
+	);
+}
+
+/**
+ * Store a config version, unless it is stored already.
+ *
+ * @param string $template_name Template key the config belongs to.
+ * @param array  $version       From klaro_geo_consent_config_version().
+ * @return bool Whether the version is in the table.
+ */
+function klaro_geo_store_consent_config( $template_name, array $version ) {
+	global $wpdb;
+	$table_name = klaro_geo_consent_configs_table_name();
+
+	$insert = function () use ( $wpdb, $table_name, $template_name, $version ) {
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom table insert; IGNORE leaves a version that is already stored as it is.
+		return $wpdb->query(
+			$wpdb->prepare(
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name from $wpdb->prefix is trusted.
+				"INSERT IGNORE INTO $table_name (config_hash, template_name, config, first_seen) VALUES (%s, %s, %s, %s)",
+				$version['hash'],
+				$template_name,
+				$version['json'],
+				gmdate( 'Y-m-d H:i:s' )
+			)
+		);
+	};
+
+	$inserted = $insert();
+	if ( false === $inserted ) {
+		klaro_geo_debug_log( 'Consent config insert failed (' . $wpdb->last_error . '); creating or upgrading the tables and retrying' );
+		$inserted = klaro_geo_create_consent_receipts_table() ? $insert() : false;
+	}
+
+	if ( false === $inserted ) {
+		klaro_geo_debug_log( 'Database error when storing consent config ' . $version['hash'] . ': ' . $wpdb->last_error );
+		return false;
+	}
+
+	return true;
+}
+
+/**
+ * Get a stored config version by its hash.
+ *
+ * @param string $hash The config hash.
+ * @return object|null Row with config_hash, template_name, config, first_seen.
+ */
+function klaro_geo_get_consent_config( $hash ) {
+	global $wpdb;
+	$table_name = klaro_geo_consent_configs_table_name();
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Single row lookup on custom table.
+	return $wpdb->get_row(
+		$wpdb->prepare(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name from $wpdb->prefix is trusted.
+			"SELECT * FROM $table_name WHERE config_hash = %s",
+			$hash
+		)
+	);
+}
+
+/**
+ * Store the config version a page is being rendered with, so a receipt from
+ * that page can refer to it however long the page sits in a cache.
+ *
+ * Called for every template a page carries. The hashes already stored are
+ * kept in an autoloaded option, so a page view costs no query and the table
+ * is written to only when a template's config has changed.
+ *
+ * @param array $payload A payload from klaro_geo_build_template_payload().
+ */
+function klaro_geo_remember_consent_config( array $payload ) {
+	if ( ! get_option( 'klaro_geo_enable_consent_receipts', false ) ) {
+		return;
+	}
+
+	$version = klaro_geo_consent_config_version( $payload );
+	$known   = (array) get_option( 'klaro_geo_consent_config_hashes', array() );
+	$key     = $payload['template_key'];
+
+	if ( isset( $known[ $key ] ) && $known[ $key ] === $version['hash'] ) {
+		return;
+	}
+
+	if ( klaro_geo_store_consent_config( $key, $version ) ) {
+		$known[ $key ] = $version['hash'];
+		update_option( 'klaro_geo_consent_config_hashes', $known );
+	}
 }
 
 // On deactivation the table is dropped only when "Remove all plugin settings when deactivating" is on.
@@ -233,7 +406,8 @@ function klaro_geo_drop_consent_receipts_table_on_deactivate() {
  *
  * Two things a browser may send are ignored on purpose, because the server
  * knows them better: the time (a submitted timestamp could back-date a consent
- * record) and the Klaro config (see klaro_geo_store_consent_receipt()).
+ * record) and the Klaro config itself (the receipt names a version of it by
+ * hash, see klaro_geo_resolve_receipt_config()).
  *
  * @param mixed $raw The decoded receipt.
  * @return array|WP_Error Sanitized receipt, or an error describing the rejection.
@@ -287,6 +461,9 @@ function klaro_geo_sanitize_receipt( $raw ) {
 		'country_code'          => $text( 'country_code', 10 ),
 		'region_code'           => $region_code,
 		'admin_override'        => $admin_override,
+		// The config version the page was rendered with, or '' when the page
+		// did not say (a copy of klaro-geo.js cached from before it did).
+		'config_hash'           => isset( $raw['config_hash'] ) && is_string( $raw['config_hash'] ) && preg_match( '/^[a-f0-9]{64}$/', $raw['config_hash'] ) ? $raw['config_hash'] : '',
 		// Global Privacy Control: whether the browser reported the signal, and
 		// the services the plugin switched off by default because of it.
 		'gpc_signal'            => isset( $raw['gpc_signal'] ) && true === $raw['gpc_signal'],
@@ -351,8 +528,8 @@ function klaro_geo_store_consent_receipt( $raw, $user_id = 0 ) {
 		return $receipt;
 	}
 
-	// The template must be one that exists: its config is stored with the
-	// receipt, and a made-up name would otherwise be recorded as if a visitor
+	// The template must be one that exists: the receipt refers to its config,
+	// and a made-up name would otherwise be recorded as if a visitor
 	// had been shown it.
 	$templates = Klaro_Geo_Template_Settings::get_instance()->get();
 	if ( ! isset( $templates[ $receipt['template_name'] ] ) ) {
@@ -390,12 +567,9 @@ function klaro_geo_store_consent_receipt( $raw, $user_id = 0 ) {
 	$data['gpc_affected_services'] = wp_json_encode( $receipt['gpc_affected_services'] );
 	$data['receipt_type']          = $receipt['receipt_type'];
 
-	// The Klaro config the template gives visitors, built here rather than
-	// taken from the request: a submitted copy is up to 65 KB of text chosen by
-	// whoever sent it. It is the config before Global Privacy Control is
-	// applied in the browser; gpc_affected_services records that part.
-	$payload              = klaro_geo_build_template_payload( $receipt['template_name'], $templates, Klaro_Geo_Service_Settings::get_instance()->get() );
-	$data['klaro_config'] = wp_json_encode( $payload['config'] );
+	$config                = klaro_geo_resolve_receipt_config( $receipt, $templates );
+	$data['config_hash']   = $config['hash'];
+	$data['config_status'] = $config['status'];
 
 	global $wpdb;
 	$inserted = klaro_geo_receipts_insert( $data );
@@ -413,6 +587,61 @@ function klaro_geo_store_consent_receipt( $raw, $user_id = 0 ) {
 	}
 
 	return (int) $wpdb->insert_id;
+}
+
+/**
+ * Decide which config version a receipt refers to, and whether the browser's
+ * account of it checks out.
+ *
+ * The config is never taken from the request; only a hash is, and only a hash
+ * this site issued for the same template is accepted:
+ *
+ * - 'matched': the hash names a version this site served for the template,
+ *   the current one or an earlier one (a cached page). The receipt refers to it.
+ * - 'mismatch': the hash names nothing this site served for the template. No
+ *   page of this site produced such a receipt, so it was altered or made up.
+ *   It is stored, marked, and refers to the current version.
+ * - 'not-sent': no hash came with the receipt. It refers to the current version.
+ *
+ * The config is the one before Global Privacy Control is applied in the
+ * browser; gpc_affected_services records that part.
+ *
+ * @param array $receipt   A receipt from klaro_geo_sanitize_receipt(), for a template that exists.
+ * @param array $templates All templates.
+ * @return array { hash: string, status: 'matched'|'mismatch'|'not-sent' }
+ */
+function klaro_geo_resolve_receipt_config( array $receipt, array $templates ) {
+	$template_name = $receipt['template_name'];
+	$submitted     = $receipt['config_hash'];
+
+	if ( '' !== $submitted ) {
+		$stored = klaro_geo_get_consent_config( $submitted );
+		if ( $stored && $stored->template_name === $template_name ) {
+			return array(
+				'hash'   => $submitted,
+				'status' => 'matched',
+			);
+		}
+	}
+
+	$current = klaro_geo_consent_config_version(
+		klaro_geo_build_template_payload( $template_name, $templates, Klaro_Geo_Service_Settings::get_instance()->get() )
+	);
+	klaro_geo_store_consent_config( $template_name, $current );
+
+	if ( '' === $submitted ) {
+		$status = 'not-sent';
+	} elseif ( $submitted === $current['hash'] ) {
+		$status = 'matched';
+	} else {
+		$status = 'mismatch';
+		klaro_geo_debug_log( 'Consent receipt ' . $receipt['receipt_id'] . ' reports config ' . $submitted . ', which this site did not serve for template "' . $template_name . '"; marked as a mismatch' );
+	}
+
+	return array(
+		'hash'   => $current['hash'],
+		'status' => $status,
+	);
 }
 
 /**
@@ -716,6 +945,50 @@ function klaro_geo_receipt_type_label( $receipt ) {
 	return 'Visitor saved a choice';
 }
 
+/**
+ * What the check of a stored receipt's config found, for an administrator
+ * (see klaro_geo_resolve_receipt_config()).
+ *
+ * @param object $receipt A row from the receipts table.
+ * @return string
+ */
+function klaro_geo_receipt_config_status_label( $receipt ) {
+	$labels = array(
+		'matched'  => 'Verified: the browser reported the config this site served',
+		'mismatch' => 'MISMATCH: the browser reported a config this site never served for this template. The config shown is the one in force when the receipt arrived',
+		'not-sent' => 'Not reported by the browser. The config shown is the one in force when the receipt arrived',
+	);
+
+	if ( isset( $receipt->config_status, $labels[ $receipt->config_status ] ) ) {
+		return $labels[ $receipt->config_status ];
+	}
+	return 'Not recorded (the receipt holds its own copy of the config)';
+}
+
+/**
+ * A stored receipt as the admin page shows it: the row, the labels, and the
+ * Klaro config it refers to in place of the hash.
+ *
+ * @param object $receipt A row from the receipts table.
+ * @return object
+ */
+function klaro_geo_receipt_for_display( $receipt ) {
+	$receipt->gpc_label    = klaro_geo_receipt_gpc_label( $receipt );
+	$receipt->type_label   = klaro_geo_receipt_type_label( $receipt );
+	$receipt->config_label = klaro_geo_receipt_config_status_label( $receipt );
+
+	if ( ! empty( $receipt->config_hash ) ) {
+		$config = klaro_geo_get_consent_config( $receipt->config_hash );
+		if ( $config ) {
+			$receipt->klaro_config = $config->config;
+		} else {
+			klaro_geo_debug_log( 'WARNING: Receipt ' . $receipt->receipt_id . ' refers to config ' . $receipt->config_hash . ', which is not in the consent configs table' );
+		}
+	}
+
+	return $receipt;
+}
+
 // Render the consent receipts admin page
 function klaro_geo_render_consent_receipts_page() {
 	// Check user capabilities
@@ -854,6 +1127,10 @@ function klaro_geo_render_consent_receipts_page() {
 			$receipt_js .= "            addRow('Switched off by GPC:', pretty(receipt.gpc_affected_services), true);\n";
 			$receipt_js .= "          }\n";
 			$receipt_js .= "          addRow('Consent Choices:', pretty(receipt.consent_data), true);\n";
+			$receipt_js .= "          addRow('Config check:', receipt.config_label);\n";
+			$receipt_js .= "          if (receipt.config_hash) {\n";
+			$receipt_js .= "            addRow('Config version:', receipt.config_hash);\n";
+			$receipt_js .= "          }\n";
 			$receipt_js .= "          if (receipt.klaro_config) {\n";
 			$receipt_js .= "            addRow('Klaro Config:', pretty(receipt.klaro_config), true);\n";
 			$receipt_js .= "          }\n";
@@ -889,9 +1166,7 @@ function klaro_geo_ajax_get_receipt_details() {
 	$receipt = klaro_geo_receipts_get_by_id( $receipt_id );
 
 	if ( $receipt ) {
-		$receipt->gpc_label  = klaro_geo_receipt_gpc_label( $receipt );
-		$receipt->type_label = klaro_geo_receipt_type_label( $receipt );
-		wp_send_json_success( $receipt );
+		wp_send_json_success( klaro_geo_receipt_for_display( $receipt ) );
 	} else {
 		wp_send_json_error( 'Receipt not found' );
 	}

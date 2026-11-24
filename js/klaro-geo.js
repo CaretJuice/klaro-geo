@@ -261,6 +261,9 @@
           region_code: window.klaroConsentData.detectedRegion || null,
           admin_override: window.klaroConsentData.adminOverride === true,
           template_settings: window.klaroConsentData.templateSettings || {},
+          // Names the Klaro config this page was rendered with. The server
+          // holds the config itself and checks the name against it.
+          config_hash: window.klaroConsentData.configHash,
           gpc_signal: navigator.globalPrivacyControl === true,
           gpc_affected_services: gpc.affectedServices.slice()
       };

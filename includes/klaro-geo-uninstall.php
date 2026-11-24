@@ -52,6 +52,7 @@ function klaro_geo_uninstall_option_names() {
 		// Consent receipts. The receipts table is handled separately.
 		'klaro_geo_enable_consent_receipts',
 		'klaro_geo_consent_receipts_db_version',
+		'klaro_geo_consent_config_hashes',
 		'klaro_geo_delete_receipts_on_uninstall',
 
 		// Floating button.
@@ -136,9 +137,12 @@ function klaro_geo_uninstall_site() {
 	);
 
 	if ( $delete_receipts ) {
-		$table_name = $wpdb->prefix . 'klaro_geo_consent_receipts';
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.SchemaChange, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- DDL statement; table name from $wpdb->prefix is trusted and cannot be parameterized.
-		$wpdb->query( "DROP TABLE IF EXISTS $table_name" );
+		// The receipts, and the Klaro configs they refer to.
+		foreach ( array( 'klaro_geo_consent_receipts', 'klaro_geo_consent_configs' ) as $table ) {
+			$table_name = $wpdb->prefix . $table;
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.SchemaChange, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- DDL statement; table name from $wpdb->prefix is trusted and cannot be parameterized.
+			$wpdb->query( "DROP TABLE IF EXISTS $table_name" );
+		}
 	}
 }
 

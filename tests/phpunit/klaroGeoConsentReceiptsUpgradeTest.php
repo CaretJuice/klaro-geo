@@ -15,7 +15,8 @@ class KlaroGeoConsentReceiptsUpgradeTest extends WP_UnitTestCase {
 		global $wpdb;
 		klaro_geo_create_consent_receipts_table();
 		$table = klaro_geo_receipts_table_name();
-		$wpdb->query( "ALTER TABLE $table DROP COLUMN gpc_signal, DROP COLUMN gpc_affected_services, DROP COLUMN receipt_type" );
+		$wpdb->query( "ALTER TABLE $table DROP COLUMN gpc_signal, DROP COLUMN gpc_affected_services, DROP COLUMN receipt_type, DROP COLUMN config_hash, DROP COLUMN config_status" );
+		$wpdb->query( 'DROP TABLE ' . klaro_geo_consent_configs_table_name() );
 		update_option( 'klaro_geo_consent_receipts_db_version', '1.0' );
 		update_option( 'klaro_geo_enable_consent_receipts', true );
 	}
@@ -27,6 +28,17 @@ class KlaroGeoConsentReceiptsUpgradeTest extends WP_UnitTestCase {
 		klaro_geo_drop_consent_receipts_table();
 		delete_option( 'klaro_geo_consent_receipts_db_version' );
 		delete_option( 'klaro_geo_enable_consent_receipts' );
+	}
+
+	/**
+	 * WP_UnitTestCase rewrites CREATE and DROP TABLE into their TEMPORARY
+	 * forms, and a temporary table is invisible to the check that the upgrade
+	 * worked. These tests need the real tables created and dropped.
+	 */
+	public function set_up() {
+		parent::set_up();
+		remove_filter( 'query', array( $this, '_create_temporary_tables' ) );
+		remove_filter( 'query', array( $this, '_drop_temporary_tables' ) );
 	}
 
 	private function receipt( $id ) {
@@ -67,9 +79,10 @@ class KlaroGeoConsentReceiptsUpgradeTest extends WP_UnitTestCase {
 
 		klaro_geo_upgrade_consent_receipts_table();
 
-		foreach ( array( 'gpc_signal', 'gpc_affected_services', 'receipt_type' ) as $column ) {
+		foreach ( array( 'gpc_signal', 'gpc_affected_services', 'receipt_type', 'config_hash', 'config_status' ) as $column ) {
 			$this->assertTrue( klaro_geo_receipts_column_exists( $column ), $column );
 		}
+		$this->assertTrue( klaro_geo_consent_configs_table_exists() );
 		$this->assertSame( KLARO_GEO_RECEIPTS_DB_VERSION, get_option( 'klaro_geo_consent_receipts_db_version' ) );
 
 		// A receipt from before the upgrade says "not recorded", not "no signal".
@@ -77,6 +90,8 @@ class KlaroGeoConsentReceiptsUpgradeTest extends WP_UnitTestCase {
 		$this->assertNull( $old->gpc_signal );
 		$this->assertSame( 'Not recorded', klaro_geo_receipt_gpc_label( $old ) );
 		$this->assertSame( 'Visitor saved a choice', klaro_geo_receipt_type_label( $old ) );
+		$this->assertNull( $old->config_hash );
+		$this->assertStringStartsWith( 'Not recorded', klaro_geo_receipt_config_status_label( $old ) );
 	}
 
 	/**
@@ -98,10 +113,6 @@ class KlaroGeoConsentReceiptsUpgradeTest extends WP_UnitTestCase {
 		$this->assertSame( '1', (string) $row->gpc_signal );
 		$this->assertSame( array( 'google-ads' ), json_decode( $row->gpc_affected_services, true ) );
 
-		// WP_UnitTestCase rewrites CREATE and DROP TABLE into their TEMPORARY
-		// forms. This case needs the real table gone and really recreated.
-		remove_filter( 'query', array( $this, '_create_temporary_tables' ) );
-		remove_filter( 'query', array( $this, '_drop_temporary_tables' ) );
 		$wpdb->query( "DROP TABLE $table" );
 		$this->assertFalse( klaro_geo_receipts_table_exists() );
 		$suppress = $wpdb->suppress_errors( true );

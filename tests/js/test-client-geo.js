@@ -59,6 +59,7 @@ function makePayload(overrides) {
                 gtagSettings: { ads_data_redaction: 'true', url_passthrough: 'false' },
                 enableConsentLogging: true,
                 gpcEnabled: true,
+                configHash: 'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
                 templateSettings: { consentModalTitle: 'Privacy', consentModalDescription: '', acceptAllText: 'Accept', declineAllText: 'Decline', defaultConsent: false, requiredConsent: false }
             },
             'relaxed': {
@@ -67,6 +68,7 @@ function makePayload(overrides) {
                 gtagSettings: { ads_data_redaction: 'true', url_passthrough: 'true' },
                 enableConsentLogging: true,
                 gpcEnabled: true,
+                configHash: 'rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr',
                 templateSettings: { consentModalTitle: 'Privacy', consentModalDescription: '', acceptAllText: 'Accept', declineAllText: 'Decline', defaultConsent: true, requiredConsent: false }
             },
             'strict': {
@@ -75,6 +77,7 @@ function makePayload(overrides) {
                 gtagSettings: { ads_data_redaction: 'true', url_passthrough: 'false' },
                 enableConsentLogging: true,
                 gpcEnabled: false,
+                configHash: '5555555555555555555555555555555555555555555555555555555555555555',
                 templateSettings: { consentModalTitle: 'Privacy', consentModalDescription: '', acceptAllText: 'Accept', declineAllText: 'Decline', defaultConsent: false, requiredConsent: false }
             }
         }
@@ -243,6 +246,8 @@ describe('Resolution fallback chain', function() {
         expect(window.klaroConsentData.detectedRegion).toBe('BC');
         expect(window.klaroConsentData.templateName).toBe('strict');
         expect(window.klaroConsentData.templateSource).toBe('country');
+        // The selected template's config version, for the consent receipt.
+        expect(window.klaroConsentData.configHash).toBe(payload.templates.strict.configHash);
     });
 
     test('enableConsentLogging is the effective value: global receipts setting AND template setting', async function() {

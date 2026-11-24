@@ -25,6 +25,7 @@ describe('Consent receipt', function() {
                 templateSource: 'country',
                 detectedCountry: 'CA',
                 detectedRegion: 'BC',
+                configHash: 'c0ffee'.repeat(10) + 'beef',
                 ajaxUrl: 'https://example.test/wp-admin/admin-ajax.php'
             }, consentData)
         });
@@ -79,7 +80,9 @@ describe('Consent receipt', function() {
         expect(receipt.country_code).toBe('CA');
         expect(receipt.region_code).toBe('BC');
         expect(receipt.admin_override).toBe(false);
-        // The server stores its own copy of the Klaro config with the receipt.
+        // The config is named by the hash the page carries; the server holds
+        // the config itself.
+        expect(receipt.config_hash).toBe('c0ffee'.repeat(10) + 'beef');
         expect(receipt).not.toHaveProperty('klaro_config');
     });
 
