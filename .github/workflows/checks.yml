@@ -81,7 +81,10 @@ jobs:
 
   e2e:
     name: Playwright and Plugin Check
-    runs-on: ubuntu-latest
+    # Not ubuntu-latest: Playwright installs system packages for a named Ubuntu
+    # release and refuses one it does not know. Move this forward when the
+    # Playwright in package-lock.json supports the newer release.
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -108,14 +111,17 @@ jobs:
       - name: Site log
         if: failure()
         run: |
-          docker logs klaro-geo-site --tail 100
+          docker logs klaro-geo-site --tail 100 || true
           docker exec klaro-geo-site sh -c 'tail -n 200 wp-content/debug.log' || true
 
   # The browser suite on the oldest supported pair. PHPUnit cannot see how old
   # WordPress versions load and order the scripts; this can.
   e2e-oldest:
     name: Playwright (oldest supported)
-    runs-on: ubuntu-latest
+    # Not ubuntu-latest: Playwright installs system packages for a named Ubuntu
+    # release and refuses one it does not know. Move this forward when the
+    # Playwright in package-lock.json supports the newer release.
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       WP_VERSION: 5.7.22
