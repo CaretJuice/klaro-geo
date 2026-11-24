@@ -1112,8 +1112,11 @@ function klaro_geo_render_consent_receipts_page() {
 			$receipt_js .= "          var table = $('<table class=\"wp-list-table widefat fixed\"></table>');\n";
 			$receipt_js .= "          var addRow = function(label, value, preformatted) {\n";
 			$receipt_js .= "            var cell = $('<td></td>');\n";
-			$receipt_js .= "            if (preformatted) { cell.append($('<pre></pre>').text(value)); } else { cell.text(value); }\n";
-			$receipt_js .= "            table.append($('<tr></tr>').append($('<th></th>').text(label)).append(cell));\n";
+			// Long values (the config's consent text, a hash) wrap inside the pane
+			// instead of running out of it.
+			$receipt_js .= "            cell.css({ overflowWrap: 'anywhere' });\n";
+			$receipt_js .= "            if (preformatted) { cell.append($('<pre></pre>').css({ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', margin: 0 }).text(value)); } else { cell.text(value); }\n";
+			$receipt_js .= "            table.append($('<tr></tr>').append($('<th></th>').css({ width: '170px' }).text(label)).append(cell));\n";
 			$receipt_js .= "          };\n";
 			$receipt_js .= "          addRow('Receipt ID:', receipt.receipt_id);\n";
 			$receipt_js .= "          addRow('Date & Time:', receipt.timestamp);\n";
@@ -1121,6 +1124,8 @@ function klaro_geo_render_consent_receipts_page() {
 			$receipt_js .= "          addRow('Source:', receipt.template_source);\n";
 			$receipt_js .= "          addRow('Country:', receipt.country_code || 'N/A');\n";
 			$receipt_js .= "          addRow('Region:', receipt.region_code || 'N/A');\n";
+			$receipt_js .= "          addRow('IP address (anonymized):', receipt.ip_address || 'Not recorded');\n";
+			$receipt_js .= "          addRow('Browser:', receipt.user_agent || 'Not recorded');\n";
 			$receipt_js .= "          addRow('Recorded when:', receipt.type_label);\n";
 			$receipt_js .= "          addRow('GPC signal:', receipt.gpc_label);\n";
 			$receipt_js .= "          if (receipt.gpc_affected_services) {\n";

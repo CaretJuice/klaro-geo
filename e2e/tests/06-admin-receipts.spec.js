@@ -58,4 +58,30 @@ test.describe('Consent receipts admin page', () => {
     await page.waitForTimeout(500);
     expect(await page.evaluate(() => window.__klaroReceiptXss)).toBeUndefined();
   });
+
+  test('a stored receipt shows where it came from and its config, wrapped inside the pane', async ({ page }) => {
+    // Stored the way the public endpoint stores it, so the config comes from
+    // the consent configs table, by the receipt's hash.
+    const id = 'e2e_details_receipt';
+    wpCli(`eval '$_SERVER["REMOTE_ADDR"] = "203.0.113.77"; $_SERVER["HTTP_USER_AGENT"] = "Mozilla/5.0 (X11; Linux x86_64) Chrome/130.0 Safari/537.36"; klaro_geo_store_consent_receipt(array("receipt_id" => "${id}", "consent_choices" => array("google-analytics" => true), "template_name" => "default", "template_source" => "fallback"));'`);
+
+    const wp = new WordPressHelper(page);
+    await wp.login();
+    await page.goto('/wp-admin/admin.php?page=klaro-geo-consent-receipts');
+    await page.locator('tr', { hasText: id }).locator('.view-receipt').click();
+
+    const details = page.locator('#receipt-details');
+    await expect(details).toContainText('203.0.113.0');
+    await expect(details).toContainText('Chrome/Linux');
+    await expect(details.locator('tr', { hasText: 'Config version:' })).toContainText(/[a-f0-9]{64}/);
+    // The config holds the consent text, which is one long line of JSON.
+    await expect(details.locator('tr', { hasText: 'Klaro Config:' })).toContainText('consentModal');
+
+    const overflowing = await details.locator('pre, td').evaluateAll(
+      elements => elements.filter(element => element.scrollWidth > element.clientWidth + 1).length
+    );
+    expect(overflowing).toBe(0);
+
+    wpCli(`eval 'global $wpdb; $wpdb->delete($wpdb->prefix . "klaro_geo_consent_receipts", array("receipt_id" => "${id}"));'`);
+  });
 });
