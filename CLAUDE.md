@@ -125,6 +125,8 @@ All WordPress environments for this plugin live in this repo; there are no share
 **Tests:**
 - PHP: `cd docker && docker compose run --rm wordpress_test vendor/bin/phpunit` (add `--filter ClassName` for one test class). The bootstrap turns the plugin's debug logging on; its output lands in `docker/logs/debug_test.log`, not in the terminal.
 - JS: `npx jest` from the repo root, on the host (no container needed).
+- Static checks, on the host after `composer install`: `vendor/bin/phpcs` (WordPress coding standards and PHP 7.2 / WordPress 6.6 compatibility, `phpcs.xml.dist`; `vendor/bin/phpcbf` fixes what it can), `vendor/bin/phpstan analyse`, `bin/check-banned-patterns.sh`. pre-commit runs all three, and so does CI. The Yoda condition rule is switched off on purpose.
+- Plugin Check (what WordPress.org's reviewers run): `npm run plugin-check` builds the release directory and checks it in the E2E site. It fails on any error or warning, and CI runs it. An admin AJAX handler needs the `phpcs:disable` / `phpcs:enable` for `WordPress.Security.NonceVerification.Missing` around its body, with the reason, because the check cannot see that `klaro_geo_verify_admin_ajax()` verifies the nonce.
 - E2E: `npm run e2e:setup` (starts the E2E stack and waits), `npm run e2e:test`, then `npm run e2e:docker:down`. The suite runs with one worker because the tests share one site and change its options; do not turn parallelism back on. A full run takes about two and a half minutes.
 
 **E2E site** (preferred for anything that needs a running WordPress):
@@ -150,7 +152,7 @@ caretjuice.com is the only live install of this plugin. It also runs the traffic
 1. Read the tests for the area you are changing (see "Business rules live in tests").
 2. If the change touches the dataLayer, the consent keys, `klaroConsentData`, `window.klaroGeo.push()` or template resolution, read the matching spec and update it in the same commit.
 3. If it changes dataLayer events or consent keys, check `client/presets/klaro-geo.js` in the traffic-diagnostics repo still parses them.
-4. Run the PHP and JS suites before committing. Run the E2E suite for anything that changes frontend behaviour.
+4. Run the PHP and JS suites before committing. Run the E2E suite for anything that changes frontend behaviour or an admin page. pre-commit runs PHPCS, PHPStan and the banned-pattern check.
 
 ## Commit Workflow
 

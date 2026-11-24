@@ -54,6 +54,20 @@ npm run e2e:docker:down
 
 The PHP test bootstrap turns the plugin's debug logging on. The log is written to `docker/logs/debug_test.log`, not to the terminal. More on the E2E tests is in `e2e/README.md`.
 
+## Static checks
+
+After `composer install`:
+
+```bash
+vendor/bin/phpcs                       # WordPress coding standards, PHP 7.2 / WordPress 6.6 compatibility
+vendor/bin/phpcbf                      # fixes what phpcs can fix automatically
+vendor/bin/phpstan analyse             # type checks
+bin/check-banned-patterns.sh           # patterns this project has ruled out (see CLAUDE.md)
+npm run plugin-check                   # WordPress.org's Plugin Check, run on the build output
+```
+
+pre-commit runs the first three on commits that change PHP. CI runs them too, and runs Plugin Check, PHPUnit, Jest and the Playwright suite (`.github/workflows/checks.yml`).
+
 ## Debug logging
 
 Log in PHP with `klaro_geo_debug_log()` and in JavaScript with `klaroGeoLog()`, `klaroGeoWarn()` and `klaroGeoError()`. Both follow the plugin's "Enable debug logging" setting; PHP logging also needs `WP_DEBUG` to be true, and writes to the WordPress debug log.
@@ -64,7 +78,7 @@ Log in PHP with `klaro_geo_debug_log()` and in JavaScript with `klaroGeoLog()`, 
 ./build-plugin.sh
 ```
 
-It reads the version from the plugin header and writes `klaro-geo-<version>.zip` with the production files only. Run all three test suites first, and update the version in `klaro-geo.php` and `readme.txt`.
+It reads the version from the plugin header and writes `klaro-geo-<version>.zip` with the production files only. Run all three test suites and `npm run plugin-check` first, and update the version in `klaro-geo.php` and `readme.txt` (`Tested up to` lives in `readme.txt` only, and must be the current WordPress release).
 
 ## How the Code Is Kept Honest
 

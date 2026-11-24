@@ -1,5 +1,6 @@
-# The checks that need no WordPress: the same ones pre-commit runs, plus Jest.
-# PHPUnit and the Playwright suite need the Docker stacks and are not run here yet.
+# Local and CI run the same checks. pre-commit runs the first four on every
+# commit that touches the files they cover; this runs them on every push to
+# master and every pull request, and adds the suites that need WordPress.
 name: Checks
 
 on:
@@ -8,7 +9,8 @@ on:
   pull_request:
 
 jobs:
-  php:
+  static:
+    name: Banned patterns, PHPCS, PHPStan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,10 +22,13 @@ jobs:
       - run: composer install --no-interaction --no-progress
       - name: Banned patterns
         run: bin/check-banned-patterns.sh
+      - name: PHPCS
+        run: vendor/bin/phpcs
       - name: PHPStan
         run: vendor/bin/phpstan analyse --no-progress --memory-limit=1G
 
-  js:
+  jest:
+    name: Jest
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -31,5 +36,46 @@ jobs:
         with:
           node-version: '20'
       - run: npm install --no-audit --no-fund
-      - name: Jest
-        run: npx jest
+      - run: npx jest
+
+  phpunit:
+    name: PHPUnit
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: PHPUnit
+        working-directory: docker
+        run: |
+          docker compose build wordpress_test
+          docker compose run --rm -T wordpress_test vendor/bin/phpunit
+
+  e2e:
+    name: Playwright and Plugin Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium firefox
+      - name: Start the E2E site
+        run: npm run e2e:setup
+      - name: Playwright
+        run: npm run e2e:test
+      - name: Plugin Check on the build output
+        run: bin/plugin-check.sh
+      - name: Keep the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            e2e-report
+            test-results
+          retention-days: 7
+      - name: E2E site log
+        if: failure()
+        run: docker logs klaro-geo-wordpress-e2e --tail 100

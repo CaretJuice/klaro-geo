@@ -20,3 +20,9 @@ repos:
         language: system
         pass_filenames: false
         files: ^(klaro-geo\.php|uninstall\.php|includes/|phpstan\.neon\.dist)
+      - id: phpcs
+        name: PHPCS, WordPress coding standards (needs `composer install`)
+        entry: vendor/bin/phpcs
+        language: system
+        pass_filenames: false
+        files: ^(klaro-geo\.php|uninstall\.php|includes/|phpcs\.xml\.dist)
