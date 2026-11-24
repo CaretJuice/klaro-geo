@@ -726,7 +726,7 @@ function klaro_geo_templates_page() {
 								if ( empty( $purpose ) ) {
 									continue;
 								}
-								$checked = in_array( $purpose, $gpc_purposes ) ? 'checked' : '';
+								$checked = in_array( $purpose, $gpc_purposes, true ) ? 'checked' : '';
 								echo '<label style="margin-right: 15px;"><input type="checkbox" name="plugin_settings[gpc_purposes][]" value="' . esc_attr( $purpose ) . '" ' . esc_attr( $checked ) . '> ' . esc_html( ucfirst( $purpose ) ) . '</label>';
 							}
 							?>
@@ -1158,7 +1158,7 @@ function klaro_geo_templates_page() {
 					<?php
 					if ( isset( $current_config['translations'] ) ) {
 						// Use JSON_PRETTY_PRINT, JSON_UNESCAPED_UNICODE, and JSON_UNESCAPED_SLASHES for better formatting
-						$json = json_encode(
+						$json = wp_json_encode(
 							$current_config['translations'],
 							JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
 						);
@@ -1320,7 +1320,7 @@ function klaro_geo_save_translations_ajax() {
 				wp_send_json_success(
 					array(
 						'message'           => 'Translations saved successfully.',
-						'translations_json' => json_encode( $translations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ),
+						'translations_json' => wp_json_encode( $translations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ),
 					)
 				);
 			} else {

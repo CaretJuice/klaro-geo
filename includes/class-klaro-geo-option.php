@@ -181,15 +181,15 @@ class Klaro_Geo_Option {
 	 * Get a specific key from the option
 	 *
 	 * @param string $key The key to get
-	 * @param mixed  $default Default value if key doesn't exist
+	 * @param mixed  $default_value Default value if key doesn't exist
 	 * @return mixed The value of the key
 	 */
-	public function get_key( $key, $default = null ) {
+	public function get_key( $key, $default_value = null ) {
 		if ( isset( $this->value[ $key ] ) ) {
 			return $this->value[ $key ];
 		}
 
-		return $default;
+		return $default_value;
 	}
 
 	/**

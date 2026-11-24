@@ -253,10 +253,10 @@ function klaro_geo_register_main_settings() {
 	register_setting(
 		'klaro_geo_templates_group',
 		'klaro_geo_templates',
-		[
+		array(
 			'sanitize_callback' => function ( $input ) {
 				if ( ! is_array( $input ) ) {
-					return [];
+					return array();
 				}
 				// Each template holds nested 'config' and 'plugin_settings'
 				// arrays. Mapping sanitize_text_field() over a template flattens
@@ -264,14 +264,14 @@ function klaro_geo_register_main_settings() {
 				// template carries, so recurse instead.
 				return klaro_geo_sanitize_array( $input );
 			},
-		]
+		)
 	);
 
 	// Purposes
 	register_setting(
 		'klaro_geo_settings_group',
 		'klaro_geo_purposes',
-		[
+		array(
 			'type'              => 'string',
 			'default'           => klaro_geo_get_default_purposes_string(),
 			'sanitize_callback' => function ( $input ) {
@@ -283,25 +283,25 @@ function klaro_geo_register_main_settings() {
 				$purposes = array_map( 'sanitize_text_field', $purposes );
 				return implode( ',', $purposes );
 			},
-		]
+		)
 	);
 
 	// Geo resolution settings (cache-safe client mode)
 	register_setting(
 		'klaro_geo_settings_group',
 		'klaro_geo_geo_resolution_mode',
-		[
+		array(
 			'type'              => 'string',
 			'default'           => 'server',
 			'sanitize_callback' => function ( $input ) {
-				return in_array( $input, [ 'server', 'client' ], true ) ? $input : 'server';
+				return in_array( $input, array( 'server', 'client' ), true ) ? $input : 'server';
 			},
-		]
+		)
 	);
 	register_setting(
 		'klaro_geo_settings_group',
 		'klaro_geo_client_geo_timeout_ms',
-		[
+		array(
 			'type'              => 'integer',
 			'default'           => 2500,
 			'sanitize_callback' => function ( $input ) {
@@ -311,25 +311,25 @@ function klaro_geo_register_main_settings() {
 				}
 				return min( max( $value, 500 ), 30000 );
 			},
-		]
+		)
 	);
 	register_setting(
 		'klaro_geo_settings_group',
 		'klaro_geo_client_geo_timezone_fallback',
-		[
+		array(
 			'type'              => 'boolean',
 			'default'           => true,
 			'sanitize_callback' => function ( $input ) {
 				return empty( $input ) ? 0 : 1;
 			},
-		]
+		)
 	);
 
 	// GTM settings
 	register_setting(
 		'klaro_geo_settings_group',
 		'klaro_geo_gtm_id',
-		[
+		array(
 			'type'              => 'string',
 			'sanitize_callback' => function ( $input ) {
 				// Validate GTM ID format (GTM-XXXXXX)
@@ -338,145 +338,145 @@ function klaro_geo_register_main_settings() {
 				}
 				return '';
 			},
-		]
+		)
 	);
 	register_setting(
 		'klaro_geo_settings_group',
 		'klaro_geo_consent_mode_type',
-		[
+		array(
 			'type'              => 'string',
 			'default'           => 'basic',
 			'sanitize_callback' => function ( $input ) {
-				return in_array( $input, [ 'basic', 'advanced' ] ) ? $input : 'basic';
+				return in_array( $input, array( 'basic', 'advanced' ), true ) ? $input : 'basic';
 			},
-		]
+		)
 	);
 
 	// Other settings
 	register_setting(
 		'klaro_geo_settings_group',
 		'klaro_geo_debug_countries',
-		[
+		array(
 			'type'              => 'array',
 			// An empty or unusable list falls back to the defaults when read
 			// (klaro_geo_get_debug_locations()).
 			'sanitize_callback' => 'klaro_geo_normalize_location_codes',
-		]
+		)
 	);
 	register_setting(
 		'klaro_geo_settings_group',
 		'klaro_geo_enable_consent_receipts',
-		[
+		array(
 			'type'              => 'boolean',
 			'default'           => false,
 			'sanitize_callback' => 'rest_sanitize_boolean',
-		]
+		)
 	);
 	register_setting(
 		'klaro_geo_settings_group',
 		'klaro_geo_cleanup_on_deactivate',
-		[
+		array(
 			'type'              => 'boolean',
 			'default'           => false,
 			'sanitize_callback' => 'rest_sanitize_boolean',
-		]
+		)
 	);
 	register_setting(
 		'klaro_geo_settings_group',
 		'klaro_geo_delete_receipts_on_uninstall',
-		[
+		array(
 			'type'              => 'boolean',
 			'default'           => false,
 			'sanitize_callback' => 'rest_sanitize_boolean',
-		]
+		)
 	);
 	register_setting(
 		'klaro_geo_settings_group',
 		'klaro_geo_enable_debug_logging',
-		[
+		array(
 			'type'              => 'boolean',
 			'default'           => false,
 			'sanitize_callback' => 'rest_sanitize_boolean',
-		]
+		)
 	);
 
 	// GPC settings
 	register_setting(
 		'klaro_geo_settings_group',
 		'klaro_geo_gpc_enabled',
-		[
+		array(
 			'type'              => 'boolean',
 			'default'           => true,
 			'sanitize_callback' => 'rest_sanitize_boolean',
-		]
+		)
 	);
 	register_setting(
 		'klaro_geo_settings_group',
 		'klaro_geo_gpc_well_known',
-		[
+		array(
 			'type'              => 'boolean',
 			'default'           => false,
 			'sanitize_callback' => 'rest_sanitize_boolean',
-		]
+		)
 	);
 
 	// DataLayer settings
 	register_setting(
 		'klaro_geo_settings_group',
 		'klaro_geo_suppress_consents_events',
-		[
+		array(
 			'type'              => 'boolean',
 			'default'           => true,
 			'sanitize_callback' => 'rest_sanitize_boolean',
-		]
+		)
 	);
 
 	// Button settings
 	register_setting(
 		'klaro_geo_settings_group',
 		'klaro_geo_enable_floating_button',
-		[
+		array(
 			'type'              => 'boolean',
 			'default'           => false,
 			'sanitize_callback' => 'rest_sanitize_boolean',
-		]
+		)
 	);
 
 	// Floating button settings
 	register_setting(
 		'klaro_geo_settings_group',
 		'klaro_geo_floating_button_text',
-		[
+		array(
 			'type'              => 'string',
 			'default'           => 'Manage Consent',
 			'sanitize_callback' => 'sanitize_text_field',
-		]
+		)
 	);
 	register_setting(
 		'klaro_geo_settings_group',
 		'klaro_geo_floating_button_theme',
-		[
+		array(
 			'type'              => 'string',
 			'default'           => 'light',
 			'sanitize_callback' => function ( $input ) {
 				// Validate button theme
-				$valid_themes = [ 'light', 'dark', 'blue', 'green' ];
-				return in_array( $input, $valid_themes ) ? $input : 'light';
+				$valid_themes = array( 'light', 'dark', 'blue', 'green' );
+				return in_array( $input, $valid_themes, true ) ? $input : 'light';
 			},
-		]
+		)
 	);
 	register_setting(
 		'klaro_geo_settings_group',
 		'klaro_geo_floating_button_position',
-		[
+		array(
 			'type'              => 'string',
 			'default'           => 'bottom-right',
 			'sanitize_callback' => function ( $input ) {
 				// Validate button position
-				$valid_positions = [ 'bottom-right', 'bottom-left', 'top-right', 'top-left' ];
-				return in_array( $input, $valid_positions ) ? $input : 'bottom-right';
+				$valid_positions = array( 'bottom-right', 'bottom-left', 'top-right', 'top-left' );
+				return in_array( $input, $valid_positions, true ) ? $input : 'bottom-right';
 			},
-		]
+		)
 	);
 }
 add_action( 'admin_init', 'klaro_geo_register_main_settings' );

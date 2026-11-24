@@ -6,13 +6,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // Country settings page content
 function klaro_geo_country_settings_page_content() {
-	$geo_settings = Klaro_Geo_Country_Settings::get_instance()->get();
+	$geo_settings      = Klaro_Geo_Country_Settings::get_instance()->get();
 	$visible_countries = Klaro_Geo_Country_Settings::get_instance()->get_visible_countries();
 
 	// Load country codes from CSV file
-	$csv_file  = dirname( dirname( plugin_dir_path( __FILE__ ) ) ) . '/countries.csv';
-	$countries = array();
-	$csv_contents = file_get_contents( $csv_file );
+	$csv_file     = dirname( dirname( plugin_dir_path( __FILE__ ) ) ) . '/countries.csv';
+	$countries    = array();
+	$csv_contents = file_get_contents( $csv_file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Reads countries.csv, a file shipped with the plugin; it is not a URL.
 	if ( false !== $csv_contents ) {
 		$lines = explode( "\n", $csv_contents );
 		foreach ( $lines as $line ) {
@@ -33,7 +33,7 @@ function klaro_geo_country_settings_page_content() {
 	// Sort visible countries alphabetically
 	$sorted_visible_countries = array();
 	foreach ( $countries as $code => $name ) {
-		if ( in_array( $code, $visible_countries ) ) {
+		if ( in_array( $code, $visible_countries, true ) ) {
 			$sorted_visible_countries[] = $code;
 		}
 	}
@@ -45,13 +45,14 @@ function klaro_geo_country_settings_page_content() {
 	$has_default_template = isset( $templates['default'] );
 
 	// Check for invalid template references in country settings
-	$invalid_template_refs   = array();
-	$available_template_keys = array_keys( $templates );
+	$invalid_template_refs = array();
+	// Template keys are array keys, so a template named "2024" has the integer key 2024.
+	$available_template_keys = array_map( 'strval', array_keys( $templates ) );
 
 	if ( $geo_settings ) {
 		// Check default_template
 		if ( ! empty( $geo_settings['default_template'] ) &&
-			! in_array( $geo_settings['default_template'], $available_template_keys ) ) {
+			! in_array( $geo_settings['default_template'], $available_template_keys, true ) ) {
 			$invalid_template_refs['Fallback Template'] = $geo_settings['default_template'];
 		}
 
@@ -62,7 +63,7 @@ function klaro_geo_country_settings_page_content() {
 			}
 			if ( is_array( $config ) && isset( $config['template'] ) &&
 				$config['template'] !== 'inherit' &&
-				! in_array( $config['template'], $available_template_keys ) ) {
+				! in_array( $config['template'], $available_template_keys, true ) ) {
 				$country_name = isset( $countries[ $code ] ) ? $countries[ $code ] : $code;
 				$invalid_template_refs[ $country_name . ' (' . $code . ')' ] = $config['template'];
 			}
@@ -229,7 +230,7 @@ function klaro_geo_country_settings_page_content() {
 									<input type="checkbox"
 											name="klaro_geo_visible_countries[]"
 											value="<?php echo esc_attr( $code ); ?>"
-											<?php checked( in_array( $code, $visible_countries ) ); ?>>
+											<?php checked( in_array( $code, $visible_countries, true ) ); ?>>
 									<?php echo esc_html( $code . ' - ' . $name ); ?>
 								</label>
 							</div>
@@ -313,7 +314,7 @@ function klaro_geo_save_region_settings_ajax() {
 	$settings_json = isset( $_POST['settings'] ) ? wp_unslash( $_POST['settings'] ) : '';
 
 	if ( empty( $settings_json ) ) {
-		wp_send_json_error( [ 'message' => 'No settings provided' ] );
+		wp_send_json_error( array( 'message' => 'No settings provided' ) );
 	}
 
 	// Decode and sanitize the JSON string
@@ -321,7 +322,7 @@ function klaro_geo_save_region_settings_ajax() {
 
 	// Check if JSON decoding was successful
 	if ( json_last_error() !== JSON_ERROR_NONE ) {
-		wp_send_json_error( [ 'message' => 'Invalid JSON: ' . json_last_error_msg() ] );
+		wp_send_json_error( array( 'message' => 'Invalid JSON: ' . json_last_error_msg() ) );
 	}
 
 	$settings = klaro_geo_sanitize_array( $settings );
@@ -335,10 +336,10 @@ function klaro_geo_save_region_settings_ajax() {
 	$country_settings->save();
 
 	wp_send_json_success(
-		[
+		array(
 			'message'  => 'Region settings saved successfully',
 			'settings' => $settings,
-		]
+		)
 	);
 }
 add_action( 'wp_ajax_klaro_geo_save_region_settings', 'klaro_geo_save_region_settings_ajax' );
@@ -351,16 +352,16 @@ function klaro_geo_get_regions() {
 	$language = isset( $_POST['language'] ) ? sanitize_text_field( wp_unslash( $_POST['language'] ) ) : '';
 
 	if ( empty( $country ) ) {
-		wp_send_json_error( [ 'message' => 'Country code is required' ] );
+		wp_send_json_error( array( 'message' => 'Country code is required' ) );
 	}
 
 	// Load regions from CSV file
 	$regions_file = KLARO_GEO_PATH . 'subdivisions.csv';
 
-	$regions   = [];
-	$languages = [];
+	$regions   = array();
+	$languages = array();
 
-	$csv_contents = file_exists( $regions_file ) ? file_get_contents( $regions_file ) : false;
+	$csv_contents = file_exists( $regions_file ) ? file_get_contents( $regions_file ) : false; // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Reads subdivisions.csv, a file shipped with the plugin; it is not a URL.
 	if ( false !== $csv_contents ) {
 		$lines = explode( "\n", $csv_contents );
 
@@ -402,12 +403,12 @@ function klaro_geo_get_regions() {
 	if ( empty( $regions ) ) {
 		klaro_geo_debug_log( 'No regions found for country: ' . $country );
 		wp_send_json_success(
-			[
-				'regions'          => [],
-				'languages'        => [],
+			array(
+				'regions'          => array(),
+				'languages'        => array(),
 				'current_language' => $language,
-				'settings'         => [],
-			]
+				'settings'         => array(),
+			)
 		);
 	}
 
@@ -416,19 +417,19 @@ function klaro_geo_get_regions() {
 	$region_settings = isset( $country_config['regions'] ) ? $country_config['regions'] : array();
 
 	// Convert regions to the format expected by the JavaScript
-	$formatted_regions = [];
+	$formatted_regions = array();
 	foreach ( $regions as $code => $name ) {
 		// For the JavaScript, we need to provide the regions in a key-value format
 		$formatted_regions[ $code ] = $name;
 	}
 
 	wp_send_json_success(
-		[
+		array(
 			'regions'          => $formatted_regions,
 			'languages'        => $languages,
 			'current_language' => $language,
 			'settings'         => $region_settings,
-		]
+		)
 	);
 }
 add_action( 'wp_ajax_klaro_geo_get_regions', 'klaro_geo_get_regions' );
@@ -437,7 +438,7 @@ add_action( 'wp_ajax_klaro_geo_get_regions', 'klaro_geo_get_regions' );
 function klaro_geo_save_visible_countries() {
 	klaro_geo_verify_admin_ajax( 'klaro_geo_nonce' );
 
-	$countries = isset( $_POST['countries'] ) ? array_map( 'sanitize_text_field', wp_unslash( $_POST['countries'] ) ) : [];
+	$countries = isset( $_POST['countries'] ) ? array_map( 'sanitize_text_field', wp_unslash( $_POST['countries'] ) ) : array();
 
 	// Use the new country settings class
 	$country_settings = Klaro_Geo_Country_Settings::get_instance();

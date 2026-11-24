@@ -38,7 +38,7 @@ function klaro_geo_debug_log( $message ) {
 		}
 
 		// Write to the standard error_log (which will go to the configured WP_DEBUG_LOG location)
-		error_log( $formatted_message );
+		error_log( $formatted_message ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- This is the plugin's debug log; it writes only when WP_DEBUG and the plugin's debug setting are both on.
 	}
 }
 
@@ -101,11 +101,11 @@ function klaro_geo_sanitize_deep( $value, $coerce_booleans = false ) {
  * Handles boolean string conversion and applies sanitize_text_field to strings.
  * Use immediately after json_decode() to sanitize decoded data.
  *
- * @param array $array The array to sanitize.
+ * @param array $value The array to sanitize.
  * @return array The sanitized array.
  */
-function klaro_geo_sanitize_array( $array ) {
-	return klaro_geo_sanitize_deep( $array, true );
+function klaro_geo_sanitize_array( $value ) {
+	return klaro_geo_sanitize_deep( $value, true );
 }
 
 /**
@@ -136,7 +136,7 @@ function klaro_geo_migrate_gtm_consent_requirement() {
 		// Only migrate if it matches old defaults exactly
 		$is_old_config = (
 			isset( $gtm['required'] ) && $gtm['required'] === true &&
-			isset( $gtm['purposes'] ) && $gtm['purposes'] === [ 'functional' ]
+			isset( $gtm['purposes'] ) && $gtm['purposes'] === array( 'functional' )
 		);
 
 		if ( $is_old_config ) {
@@ -144,7 +144,7 @@ function klaro_geo_migrate_gtm_consent_requirement() {
 
 			$gtm['required'] = false;
 			$gtm['default']  = false;
-			$gtm['purposes'] = [ 'analytics', 'advertising' ];
+			$gtm['purposes'] = array( 'analytics', 'advertising' );
 
 			$service_settings->set_service( 'google-tag-manager', $gtm );
 			$service_settings->save();
@@ -275,7 +275,7 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/class-klaro-geo-service-set
 require_once plugin_dir_path( __FILE__ ) . 'includes/klaro-geo-config.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/klaro-geo-settings.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/klaro-geo-consent-receipts.php';
-require_once plugin_dir_path( __FILE__ ) . 'includes/klaro-geo-consent-button.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-klaro-geo-consent-menu-button.php';
 
 // The consent receipts table check is now handled in includes/klaro-geo-consent-receipts.php
 
@@ -387,14 +387,14 @@ function klaro_geo_enqueue_scripts() {
 
 	add_filter(
 		'script_loader_tag',
-		function ( $tag, $handle, $src ) {
+		function ( $tag, $handle ) {
 			if ( 'klaro-js' === $handle ) {
 				$tag = str_replace( '<script', '<script data-config="klaroConfig"', $tag );
 			}
 			return $tag;
 		},
 		10,
-		3
+		2
 	);
 
 	// The admin bar debug-geo menu is only rendered for administrators, so only

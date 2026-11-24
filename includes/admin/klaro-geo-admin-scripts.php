@@ -95,7 +95,7 @@ function klaro_geo_admin_scripts( $hook ) {
 			array(
 				'nonce'    => wp_create_nonce( 'klaro_geo_nonce' ),
 				'purposes' => $purposes,
-				'services' => $services ? $services : [],
+				'services' => $services ? $services : array(),
 			)
 		);
 

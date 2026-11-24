@@ -257,5 +257,4 @@ class Klaro_Geo_Service_Settings extends Klaro_Geo_Option {
 
 		return parent::save();
 	}
-
 }

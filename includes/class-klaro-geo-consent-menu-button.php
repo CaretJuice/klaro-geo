@@ -9,7 +9,7 @@ defined( 'ABSPATH' ) || die( 'No script kiddies please!' );
 /**
  * Add Klaro Consent Button to WordPress menu and provide shortcode
  */
-class Klaro_Consent_Menu_Button {
+class Klaro_Geo_Consent_Menu_Button {
 	/**
 	 * Initialize the class
 	 */
@@ -67,7 +67,7 @@ class Klaro_Consent_Menu_Button {
 			array(
 				'text'  => get_option( 'klaro_geo_floating_button_text', __( 'Manage Consent', 'klaro-geo' ) ),
 				'class' => '',
-				'style' => 'button', // 'button' or 'link'
+				'style' => 'button', // Either button or link.
 			),
 			$atts
 		);
@@ -75,7 +75,7 @@ class Klaro_Consent_Menu_Button {
 		// Sanitize attributes
 		$text  = esc_html( $atts['text'] );
 		$class = sanitize_html_class( $atts['class'] );
-		$style = in_array( $atts['style'], array( 'button', 'link' ) ) ? $atts['style'] : 'button';
+		$style = in_array( $atts['style'], array( 'button', 'link' ), true ) ? $atts['style'] : 'button';
 
 		// Build the HTML
 		if ( $style === 'link' ) {
@@ -97,4 +97,4 @@ class Klaro_Consent_Menu_Button {
 }
 
 // Initialize the class
-Klaro_Consent_Menu_Button::init();
+Klaro_Geo_Consent_Menu_Button::init();

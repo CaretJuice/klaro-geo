@@ -38,7 +38,7 @@ class Klaro_Geo_Template_Settings extends Klaro_Geo_Option {
 		// If empty, initialize with default templates
 		if ( empty( $this->value ) ) {
 			klaro_geo_debug_log( 'No templates stored, using the default templates' );
-			$this->value       = array();
+			$this->value = array();
 			foreach ( $this->get_default_templates() as $key => $template ) {
 				$this->value[ $key ] = self::normalize_template( $key, $template );
 			}
@@ -264,5 +264,4 @@ class Klaro_Geo_Template_Settings extends Klaro_Geo_Option {
 
 		return $this->set_template( $template_key, $template );
 	}
-
 }

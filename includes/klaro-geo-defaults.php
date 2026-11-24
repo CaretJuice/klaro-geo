@@ -82,54 +82,54 @@ function klaro_geo_get_default_purpose_translations() {
  * @return array
  */
 function klaro_geo_get_default_translations() {
-	return [
-		'zz' => [
+	return array(
+		'zz' => array(
 			'privacyPolicyUrl' => '/privacy-policy/',
-			'consentModal'     => [
+			'consentModal'     => array(
 				'title'       => 'Privacy Settings',
 				'description' => 'Here you can assess and customize the services that we\'d like to use on this website. You\'re in charge! Enable or disable services as you see fit.',
-			],
-			'consentNotice'    => [
+			),
+			'consentNotice'    => array(
 				'title'             => 'Privacy Settings',
 				'changeDescription' => 'There were changes since your last visit, please update your consent.',
 				'description'       => 'We use cookies and similar technologies to provide certain features, enhance the user experience and deliver content that is relevant to your interests.',
 				'learnMore'         => 'Learn more',
-			],
+			),
 			'acceptAll'        => 'Accept all',
 			'acceptSelected'   => 'Accept selected',
 			'decline'          => 'I decline',
 			'close'            => 'Close',
 			'purposes'         => klaro_geo_get_default_purpose_translations(),
-			'purposeItem'      => [
+			'purposeItem'      => array(
 				'service'  => 'service',
 				'services' => 'services',
-			],
-			'service'          => [
-				'disableAll'        => [
+			),
+			'service'          => array(
+				'disableAll'        => array(
 					'title'       => 'Enable or disable all services',
 					'description' => 'Use this switch to enable or disable all services.',
-				],
-				'optOut'            => [
+				),
+				'optOut'            => array(
 					'title'       => '(opt-out)',
 					'description' => 'This services is loaded by default (but you can opt out)',
-				],
-				'required'          => [
+				),
+				'required'          => array(
 					'title'       => '(always required)',
 					'description' => 'This services is always required',
-				],
+				),
 				'purpose'           => 'purpose',
 				'purposes'          => 'purposes',
-				'contextualConsent' => [
+				'contextualConsent' => array(
 					'description'  => 'Would you like to consent to {title}?',
 					'acceptOnce'   => 'Yes',
 					'acceptAlways' => 'Always',
-				],
-			],
+				),
+			),
 			'ok'               => 'OK',
 			'save'             => 'Save',
 			'poweredBy'        => 'Realized with Klaro!',
-		],
-	];
+		),
+	);
 }
 
 /**
@@ -141,16 +141,16 @@ function klaro_geo_get_default_translations() {
  * @return array The default templates
  */
 function klaro_geo_get_default_templates() {
-	$opt_in = [
+	$opt_in = array(
 		'version'                => 1,
 		'elementID'              => 'klaro',
-		'styling'                => [
-			'theme' => [
+		'styling'                => array(
+			'theme' => array(
 				'color'    => 'light',
 				'position' => 'top',
 				'width'    => 'wide',
-			],
-		],
+			),
+		),
 		'htmlTexts'              => true,
 		'embedded'               => false,
 		'groupByPurpose'         => true,
@@ -167,35 +167,35 @@ function klaro_geo_get_default_templates() {
 		'disablePoweredBy'       => true,
 		'consent_mode'           => 'none',
 		'translations'           => klaro_geo_get_default_translations(),
-	];
+	);
 
 	$opt_out = array_merge(
 		$opt_in,
-		[
+		array(
 			'default'        => true,
 			'mustConsent'    => false,
 			'hideDeclineAll' => true,
 			'noticeAsModal'  => false,
-		]
+		)
 	);
 
-	return [
-		'default' => [
+	return array(
+		'default' => array(
 			'name'        => 'Default Template',
 			'description' => 'The default template used when no location-specific template is found',
 			'config'      => $opt_in,
-		],
-		'strict'  => [
+		),
+		'strict'  => array(
 			'name'        => 'Strict Opt-In',
 			'description' => 'Requires explicit consent for all services (opt-in)',
 			'config'      => $opt_in,
-		],
-		'relaxed' => [
+		),
+		'relaxed' => array(
 			'name'        => 'Relaxed Opt-Out',
 			'description' => 'Assumes consent for all services (opt-out)',
 			'config'      => $opt_out,
-		],
-	];
+		),
+	);
 }
 
 /**
@@ -205,119 +205,119 @@ function klaro_geo_get_default_templates() {
  */
 function klaro_geo_get_default_services() {
 	// Define the default services
-	return [
-		[
+	return array(
+		array(
 			'name'         => 'google-tag-manager',
 			'title'        => 'Google Tag Manager',
 			// Use Global Setting: each template's Required decides, so GTM can be
 			// required in most regions and consent-gated where the law calls for it.
 			'required'     => null,
-			'purposes'     => [ 'infrastructure' ],
+			'purposes'     => array( 'infrastructure' ),
 			'default'      => false,
-			'cookies'      => [],
-			'translations' => [
-				'zz' => [
+			'cookies'      => array(),
+			'translations' => array(
+				'zz' => array(
 					'title'       => 'Google Tag Manager',
 					'description' => 'Google Tag Manager is a tag management system that allows you to quickly and easily update tracking codes and related code fragments collectively known as tags on your website or mobile app.',
-				],
-			],
-		],
-		[
+				),
+			),
+		),
+		array(
 			'name'         => 'google-analytics',
 			'title'        => 'Google Analytics',
 			'required'     => false,
-			'purposes'     => [ 'analytics' ],
+			'purposes'     => array( 'analytics' ),
 			'default'      => false,
-			'cookies'      => [],
-			'translations' => [
-				'zz' => [
+			'cookies'      => array(),
+			'translations' => array(
+				'zz' => array(
 					'title'       => 'Google Analytics',
 					'description' => 'Google Analytics is a web analytics service that tracks and reports website traffic to help you understand how visitors interact with your website.',
-				],
-			],
-		],
-		[
+				),
+			),
+		),
+		array(
 			'name'         => 'google-ads',
 			'title'        => 'Google Ads',
 			'required'     => false,
-			'purposes'     => [ 'advertising' ],
+			'purposes'     => array( 'advertising' ),
 			'default'      => false,
-			'cookies'      => [],
-			'translations' => [
-				'zz' => [
+			'cookies'      => array(),
+			'translations' => array(
+				'zz' => array(
 					'title'       => 'Google Ads',
 					'description' => 'Google Ads is an online advertising platform developed by Google, where advertisers pay to display brief advertisements, service offerings, product listings, and video content to web users.',
-				],
-			],
-		],
+				),
+			),
+		),
 		// Consent Mode Services - these control Google Consent Mode signals
-		[
+		array(
 			'name'                    => 'analytics-storage',
 			'title'                   => 'Analytics Storage',
 			'required'                => false,
-			'purposes'                => [ 'analytics' ],
+			'purposes'                => array( 'analytics' ),
 			'default'                 => false,
-			'cookies'                 => [],
+			'cookies'                 => array(),
 			'is_consent_mode_service' => true,
 			'consent_mode_key'        => 'analytics_storage',
-			'translations'            => [
-				'zz' => [
+			'translations'            => array(
+				'zz' => array(
 					'title'       => 'Analytics Storage',
 					'description' => 'Enables storage (such as cookies) related to analytics, e.g., visit duration. This controls the analytics_storage consent signal.',
-				],
-			],
-		],
-		[
+				),
+			),
+		),
+		array(
 			'name'                    => 'ad-storage',
 			'title'                   => 'Advertising Storage',
 			'required'                => false,
-			'purposes'                => [ 'advertising' ],
+			'purposes'                => array( 'advertising' ),
 			'default'                 => false,
-			'cookies'                 => [],
+			'cookies'                 => array(),
 			'is_consent_mode_service' => true,
 			'consent_mode_key'        => 'ad_storage',
-			'translations'            => [
-				'zz' => [
+			'translations'            => array(
+				'zz' => array(
 					'title'       => 'Advertising Storage',
 					'description' => 'Enables storage (such as cookies) related to advertising. This controls the ad_storage consent signal.',
-				],
-			],
-		],
-		[
+				),
+			),
+		),
+		array(
 			'name'                    => 'ad-user-data',
 			'title'                   => 'Ad User Data',
 			'required'                => false,
-			'purposes'                => [ 'advertising' ],
+			'purposes'                => array( 'advertising' ),
 			'default'                 => false,
-			'cookies'                 => [],
+			'cookies'                 => array(),
 			'is_consent_mode_service' => true,
 			'consent_mode_key'        => 'ad_user_data',
 			'parent_service'          => 'ad-storage',
-			'translations'            => [
-				'zz' => [
+			'translations'            => array(
+				'zz' => array(
 					'title'       => 'Ad User Data',
 					'description' => 'Controls whether user data can be sent to Google for advertising purposes. This controls the ad_user_data consent signal.',
-				],
-			],
-		],
-		[
+				),
+			),
+		),
+		array(
 			'name'                    => 'ad-personalization',
 			'title'                   => 'Ad Personalization',
 			'required'                => false,
-			'purposes'                => [ 'advertising' ],
+			'purposes'                => array( 'advertising' ),
 			'default'                 => false,
-			'cookies'                 => [],
+			'cookies'                 => array(),
 			'is_consent_mode_service' => true,
 			'consent_mode_key'        => 'ad_personalization',
 			'parent_service'          => 'ad-storage',
-			'translations'            => [
-				'zz' => [
+			'translations'            => array(
+				'zz' => array(
 					'title'       => 'Ad Personalization',
 					'description' => 'Controls whether personalized advertising is enabled. This controls the ad_personalization consent signal.',
-				],
-			],
-		],
-	];
+				),
+			),
+		),
+	);
 }
 
 /**

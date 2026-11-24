@@ -280,14 +280,15 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
 		// Get available templates for validation
 		$template_settings   = Klaro_Geo_Template_Settings::get_instance();
 		$available_templates = $template_settings->get();
-		$available_keys      = array_keys( $available_templates );
+		// Template keys are array keys, so a template named "2024" has the integer key 2024.
+		$available_keys = array_map( 'strval', array_keys( $available_templates ) );
 
 		// Get the default template and validate it exists
 		$default_template = isset( $submitted_settings['default_template'] ) ? $submitted_settings['default_template'] : 'default';
-		if ( ! empty( $available_keys ) && ! in_array( $default_template, $available_keys ) && $default_template !== 'inherit' ) {
+		if ( ! empty( $available_keys ) && ! in_array( $default_template, $available_keys, true ) && $default_template !== 'inherit' ) {
 			klaro_geo_debug_log( 'WARNING: Default template "' . $default_template . '" does not exist in templates database. Available: ' . implode( ', ', $available_keys ) );
 			// Fall back to first available template or 'default'
-			$default_template = in_array( 'default', $available_keys ) ? 'default' : $available_keys[0];
+			$default_template = in_array( 'default', $available_keys, true ) ? 'default' : $available_keys[0];
 			klaro_geo_debug_log( 'Falling back to template: ' . $default_template );
 		}
 
@@ -336,7 +337,7 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
 
 			// Validate country template exists (if not 'inherit')
 			if ( isset( $config['template'] ) && $config['template'] !== 'inherit' && ! empty( $available_keys ) ) {
-				if ( ! in_array( $config['template'], $available_keys ) ) {
+				if ( ! in_array( $config['template'], $available_keys, true ) ) {
 					klaro_geo_debug_log( 'WARNING: Country ' . $code . ' references non-existent template "' . $config['template'] . '". Available: ' . implode( ', ', $available_keys ) );
 					// Fall back to inherit (use fallback template)
 					$config['template'] = 'inherit';
@@ -437,12 +438,12 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
 
 		// Default settings
 		$effective_settings = array(
-			'template'          => $default_template, // Use the default template from settings
-			'source'            => 'default', // Track where the template came from
+			'template' => $default_template, // Use the default template from settings
+			'source'   => 'default', // Track where the template came from
 		);
 
 		// Check if the country is in the visible countries list
-		if ( in_array( $country_code, $this->visible_countries ) ) {
+		if ( in_array( $country_code, $this->visible_countries, true ) ) {
 			// If the country is not in the settings, it means it's using the default template
 			if ( ! $this->has_key( $country_code ) ) {
 				// Country is using default template
@@ -498,5 +499,4 @@ class Klaro_Geo_Country_Settings extends Klaro_Geo_Option {
 		klaro_geo_debug_log( 'Template for ' . $location_code . ( $is_admin_override ? ' (admin override)' : '' ) . ': ' . $effective_settings['template'] . ', source=' . $effective_settings['source'] );
 		return $effective_settings;
 	}
-
 }

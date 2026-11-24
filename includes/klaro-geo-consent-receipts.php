@@ -278,15 +278,15 @@ function klaro_geo_sanitize_receipt( $raw ) {
 	$timestamp = isset( $raw['timestamp'] ) && is_numeric( $raw['timestamp'] ) ? absint( $raw['timestamp'] ) : 0;
 
 	$receipt = array(
-		'receipt_id'      => $receipt_id,
-		'timestamp'       => $timestamp > 0 ? $timestamp : time(),
-		'consent_choices' => $consent_choices,
-		'template_name'   => $text( 'template_name', 100 ),
-		'template_source' => $template_source,
-		'country_code'    => $text( 'country_code', 10 ),
-		'region_code'     => $region_code,
-		'admin_override'  => $admin_override,
-		'klaro_config'    => null,
+		'receipt_id'            => $receipt_id,
+		'timestamp'             => $timestamp > 0 ? $timestamp : time(),
+		'consent_choices'       => $consent_choices,
+		'template_name'         => $text( 'template_name', 100 ),
+		'template_source'       => $template_source,
+		'country_code'          => $text( 'country_code', 10 ),
+		'region_code'           => $region_code,
+		'admin_override'        => $admin_override,
+		'klaro_config'          => null,
 		// Global Privacy Control: whether the browser reported the signal, and
 		// the services the plugin switched off by default because of it.
 		'gpc_signal'            => isset( $raw['gpc_signal'] ) && true === $raw['gpc_signal'],
@@ -786,41 +786,41 @@ function klaro_geo_render_consent_receipts_page() {
 			$receipt_js   .= "          var receipt = response.data;\n";
 			// Every value is inserted as text. Receipts are submitted by anonymous
 			// visitors, so nothing from one may ever be parsed as HTML here.
-			$receipt_js   .= "          var pretty = function(json) {\n";
-			$receipt_js   .= "            try { return JSON.stringify(JSON.parse(json), null, 2); } catch (e) { return String(json); }\n";
-			$receipt_js   .= "          };\n";
-			$receipt_js   .= "          var table = $('<table class=\"wp-list-table widefat fixed\"></table>');\n";
-			$receipt_js   .= "          var addRow = function(label, value, preformatted) {\n";
-			$receipt_js   .= "            var cell = $('<td></td>');\n";
-			$receipt_js   .= "            if (preformatted) { cell.append($('<pre></pre>').text(value)); } else { cell.text(value); }\n";
-			$receipt_js   .= "            table.append($('<tr></tr>').append($('<th></th>').text(label)).append(cell));\n";
-			$receipt_js   .= "          };\n";
-			$receipt_js   .= "          addRow('Receipt ID:', receipt.receipt_id);\n";
-			$receipt_js   .= "          addRow('Date & Time:', receipt.timestamp);\n";
-			$receipt_js   .= "          addRow('Template:', receipt.template_name);\n";
-			$receipt_js   .= "          addRow('Source:', receipt.template_source);\n";
-			$receipt_js   .= "          addRow('Country:', receipt.country_code || 'N/A');\n";
-			$receipt_js   .= "          addRow('Region:', receipt.region_code || 'N/A');\n";
-			$receipt_js   .= "          addRow('Recorded when:', receipt.type_label);\n";
-			$receipt_js   .= "          addRow('GPC signal:', receipt.gpc_label);\n";
-			$receipt_js   .= "          if (receipt.gpc_affected_services) {\n";
-			$receipt_js   .= "            addRow('Switched off by GPC:', pretty(receipt.gpc_affected_services), true);\n";
-			$receipt_js   .= "          }\n";
-			$receipt_js   .= "          addRow('Consent Choices:', pretty(receipt.consent_data), true);\n";
-			$receipt_js   .= "          if (receipt.klaro_config) {\n";
-			$receipt_js   .= "            addRow('Klaro Config:', pretty(receipt.klaro_config), true);\n";
-			$receipt_js   .= "          }\n";
-			$receipt_js   .= "          $('#receipt-details').empty().append(table);\n";
-			$receipt_js   .= "          $('#receipt-modal').show();\n";
-			$receipt_js   .= "        }\n";
-			$receipt_js   .= "      }\n";
-			$receipt_js   .= "    });\n";
-			$receipt_js   .= "  });\n";
-			$receipt_js   .= "  $('#close-modal').on('click', function() { $('#receipt-modal').hide(); });\n";
-			$receipt_js   .= "  $(window).on('click', function(event) {\n";
-			$receipt_js   .= "    if ($(event.target).is('#receipt-modal')) { $('#receipt-modal').hide(); }\n";
-			$receipt_js   .= "  });\n";
-			$receipt_js   .= "});\n";
+			$receipt_js .= "          var pretty = function(json) {\n";
+			$receipt_js .= "            try { return JSON.stringify(JSON.parse(json), null, 2); } catch (e) { return String(json); }\n";
+			$receipt_js .= "          };\n";
+			$receipt_js .= "          var table = $('<table class=\"wp-list-table widefat fixed\"></table>');\n";
+			$receipt_js .= "          var addRow = function(label, value, preformatted) {\n";
+			$receipt_js .= "            var cell = $('<td></td>');\n";
+			$receipt_js .= "            if (preformatted) { cell.append($('<pre></pre>').text(value)); } else { cell.text(value); }\n";
+			$receipt_js .= "            table.append($('<tr></tr>').append($('<th></th>').text(label)).append(cell));\n";
+			$receipt_js .= "          };\n";
+			$receipt_js .= "          addRow('Receipt ID:', receipt.receipt_id);\n";
+			$receipt_js .= "          addRow('Date & Time:', receipt.timestamp);\n";
+			$receipt_js .= "          addRow('Template:', receipt.template_name);\n";
+			$receipt_js .= "          addRow('Source:', receipt.template_source);\n";
+			$receipt_js .= "          addRow('Country:', receipt.country_code || 'N/A');\n";
+			$receipt_js .= "          addRow('Region:', receipt.region_code || 'N/A');\n";
+			$receipt_js .= "          addRow('Recorded when:', receipt.type_label);\n";
+			$receipt_js .= "          addRow('GPC signal:', receipt.gpc_label);\n";
+			$receipt_js .= "          if (receipt.gpc_affected_services) {\n";
+			$receipt_js .= "            addRow('Switched off by GPC:', pretty(receipt.gpc_affected_services), true);\n";
+			$receipt_js .= "          }\n";
+			$receipt_js .= "          addRow('Consent Choices:', pretty(receipt.consent_data), true);\n";
+			$receipt_js .= "          if (receipt.klaro_config) {\n";
+			$receipt_js .= "            addRow('Klaro Config:', pretty(receipt.klaro_config), true);\n";
+			$receipt_js .= "          }\n";
+			$receipt_js .= "          $('#receipt-details').empty().append(table);\n";
+			$receipt_js .= "          $('#receipt-modal').show();\n";
+			$receipt_js .= "        }\n";
+			$receipt_js .= "      }\n";
+			$receipt_js .= "    });\n";
+			$receipt_js .= "  });\n";
+			$receipt_js .= "  $('#close-modal').on('click', function() { $('#receipt-modal').hide(); });\n";
+			$receipt_js .= "  $(window).on('click', function(event) {\n";
+			$receipt_js .= "    if ($(event.target).is('#receipt-modal')) { $('#receipt-modal').hide(); }\n";
+			$receipt_js .= "  });\n";
+			$receipt_js .= "});\n";
 			wp_add_inline_script( 'klaro-geo-admin-js', $receipt_js );
 			?>
 		<?php endif; ?>

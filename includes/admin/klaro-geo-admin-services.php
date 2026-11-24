@@ -319,7 +319,7 @@ function klaro_geo_delete_service() {
 
 	$result = klaro_geo_delete_service_at( isset( $_POST['index'] ) ? intval( $_POST['index'] ) : -1 );
 	if ( is_wp_error( $result ) ) {
-		wp_send_json_error( [ 'message' => $result->get_error_message() ] );
+		wp_send_json_error( array( 'message' => $result->get_error_message() ) );
 	}
 
 	wp_send_json_success( Klaro_Geo_Service_Settings::get_instance()->get() );

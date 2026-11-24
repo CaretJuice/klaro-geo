@@ -21,4 +21,3 @@ function klaro_geo_get_effective_settings( $location_code, $is_admin_override = 
 	$country_settings_class = Klaro_Geo_Country_Settings::get_instance();
 	return $country_settings_class->get_effective_settings( $location_code, $is_admin_override );
 }
-
