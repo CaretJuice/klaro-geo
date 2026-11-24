@@ -8,6 +8,10 @@ on:
     branches: [master]
   pull_request:
 
+# The jobs only read the repository.
+permissions:
+  contents: read
+
 jobs:
   static:
     name: Banned patterns, PHPCS, PHPStan
@@ -35,7 +39,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - run: npx jest
 
   phpunit:
@@ -59,7 +63,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - run: npx playwright install --with-deps chromium firefox
       - name: Start the E2E site
         run: npm run e2e:setup
