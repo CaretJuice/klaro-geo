@@ -29,7 +29,7 @@ function klaro_geo_receipts_table_name() {
 function klaro_geo_receipts_table_exists() {
 	global $wpdb;
 	$table_name = klaro_geo_receipts_table_name();
-	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table existence check; table name from $wpdb->prefix is trusted.
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Table existence check; table name from $wpdb->prefix is trusted.
 	return $wpdb->get_var( "SHOW TABLES LIKE '$table_name'" ) === $table_name;
 }
 
@@ -40,7 +40,7 @@ function klaro_geo_receipts_column_exists( $column ) {
 	global $wpdb;
 	$table_name = klaro_geo_receipts_table_name();
 	$column     = sanitize_key( $column );
-	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Schema check; table name from $wpdb->prefix is trusted, column name sanitized.
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Schema check; table name from $wpdb->prefix is trusted, column name sanitized.
 	return ! empty( $wpdb->get_results( "SHOW COLUMNS FROM $table_name LIKE '$column'" ) );
 }
 
@@ -60,7 +60,7 @@ function klaro_geo_receipts_insert( $data ) {
 function klaro_geo_receipts_count() {
 	global $wpdb;
 	$table_name = klaro_geo_receipts_table_name();
-	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Count query on custom table; table name from $wpdb->prefix is trusted.
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Count query on custom table; table name from $wpdb->prefix is trusted.
 	return $wpdb->get_var( "SELECT COUNT(*) FROM $table_name" );
 }
 
@@ -70,7 +70,7 @@ function klaro_geo_receipts_count() {
 function klaro_geo_receipts_get_page( $per_page, $offset ) {
 	global $wpdb;
 	$table_name = klaro_geo_receipts_table_name();
-	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Paginated query on custom table; not suitable for object caching.
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Paginated query on custom table; not suitable for object caching.
 	return $wpdb->get_results(
 		$wpdb->prepare(
 			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name from $wpdb->prefix is trusted.
@@ -87,7 +87,7 @@ function klaro_geo_receipts_get_page( $per_page, $offset ) {
 function klaro_geo_receipts_get_by_id( $receipt_id ) {
 	global $wpdb;
 	$table_name = klaro_geo_receipts_table_name();
-	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Single row lookup on custom table.
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Single row lookup on custom table.
 	return $wpdb->get_row(
 		$wpdb->prepare(
 			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name from $wpdb->prefix is trusted.
@@ -103,7 +103,7 @@ function klaro_geo_receipts_get_by_id( $receipt_id ) {
 function klaro_geo_receipts_exists( $receipt_id ) {
 	global $wpdb;
 	$table_name = klaro_geo_receipts_table_name();
-	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Duplicate check before insert.
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Duplicate check before insert.
 	$count = $wpdb->get_var(
 		$wpdb->prepare(
 			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name from $wpdb->prefix is trusted.
@@ -181,7 +181,7 @@ function klaro_geo_create_consent_receipts_table() {
 			if ( klaro_geo_receipts_column_exists( $column ) ) {
 				continue;
 			}
-			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.SchemaChange, PluginCheck.Security.DirectDB.UnescapedDBParameter -- DDL statement; table name from $wpdb->prefix and the column definitions above are trusted and cannot be parameterized.
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.SchemaChange, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- DDL statement; table name from $wpdb->prefix and the column definitions above are trusted and cannot be parameterized.
 			if ( false === $wpdb->query( "ALTER TABLE $table_name ADD COLUMN $column $definition" ) ) {
 				klaro_geo_debug_log( "Could not add column $column to $table_name: " . $wpdb->last_error );
 				return false; // The version is left as it was, so this is tried again.
@@ -212,7 +212,7 @@ function klaro_geo_drop_consent_receipts_table() {
 	global $wpdb;
 	$table_name = klaro_geo_receipts_table_name();
 
-	// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- DDL statement; table name from $wpdb->prefix is trusted and cannot be parameterized.
+	// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange -- DDL statement; table name from $wpdb->prefix is trusted and cannot be parameterized.
 	$wpdb->query( "DROP TABLE IF EXISTS $table_name" );
 	delete_option( 'klaro_geo_consent_receipts_db_version' );
 }
@@ -831,6 +831,7 @@ function klaro_geo_render_consent_receipts_page() {
 // AJAX handler to get receipt details
 function klaro_geo_ajax_get_receipt_details() {
 	klaro_geo_verify_admin_ajax( 'klaro_geo_admin_nonce' );
+	// phpcs:disable WordPress.Security.NonceVerification.Missing -- the nonce and manage_options are checked by klaro_geo_verify_admin_ajax() above.
 
 	$receipt_id = isset( $_POST['receipt_id'] ) ? intval( $_POST['receipt_id'] ) : 0;
 
@@ -847,5 +848,6 @@ function klaro_geo_ajax_get_receipt_details() {
 	} else {
 		wp_send_json_error( 'Receipt not found' );
 	}
+	// phpcs:enable WordPress.Security.NonceVerification.Missing
 }
 add_action( 'wp_ajax_klaro_geo_get_receipt_details', 'klaro_geo_ajax_get_receipt_details' );

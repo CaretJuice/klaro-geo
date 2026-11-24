@@ -296,6 +296,7 @@ add_action( 'admin_post_klaro_geo_save_country_settings_form', 'klaro_geo_save_c
 // AJAX handler for the autosave of the same form
 function klaro_geo_save_country_settings() {
 	klaro_geo_verify_admin_ajax( 'klaro_geo_nonce' );
+	// phpcs:disable WordPress.Security.NonceVerification.Missing -- the nonce and manage_options are checked by klaro_geo_verify_admin_ajax() above.
 
 	$raw_settings = isset( $_POST['settings'] ) ? wp_unslash( $_POST['settings'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Sanitized in klaro_geo_save_country_settings_form_data()
 	parse_str( $raw_settings, $settings );
@@ -303,12 +304,14 @@ function klaro_geo_save_country_settings() {
 	klaro_geo_save_country_settings_form_data( isset( $settings['klaro_geo_country_settings'] ) ? $settings['klaro_geo_country_settings'] : array() );
 
 	wp_send_json_success();
+	// phpcs:enable WordPress.Security.NonceVerification.Missing
 }
 add_action( 'wp_ajax_klaro_geo_save_country_settings', 'klaro_geo_save_country_settings' );
 
 // AJAX handler for saving region settings
 function klaro_geo_save_region_settings_ajax() {
 	klaro_geo_verify_admin_ajax( 'klaro_geo_nonce' );
+	// phpcs:disable WordPress.Security.NonceVerification.Missing -- the nonce and manage_options are checked by klaro_geo_verify_admin_ajax() above.
 
     // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- JSON string cannot be pre-sanitized; sanitized via klaro_geo_sanitize_array after json_decode below.
 	$settings_json = isset( $_POST['settings'] ) ? wp_unslash( $_POST['settings'] ) : '';
@@ -341,12 +344,14 @@ function klaro_geo_save_region_settings_ajax() {
 			'settings' => $settings,
 		)
 	);
+	// phpcs:enable WordPress.Security.NonceVerification.Missing
 }
 add_action( 'wp_ajax_klaro_geo_save_region_settings', 'klaro_geo_save_region_settings_ajax' );
 
 // AJAX handler for getting regions
 function klaro_geo_get_regions() {
 	klaro_geo_verify_admin_ajax( 'klaro_geo_nonce' );
+	// phpcs:disable WordPress.Security.NonceVerification.Missing -- the nonce and manage_options are checked by klaro_geo_verify_admin_ajax() above.
 
 	$country  = isset( $_POST['country'] ) ? sanitize_text_field( wp_unslash( $_POST['country'] ) ) : '';
 	$language = isset( $_POST['language'] ) ? sanitize_text_field( wp_unslash( $_POST['language'] ) ) : '';
@@ -431,12 +436,14 @@ function klaro_geo_get_regions() {
 			'settings'         => $region_settings,
 		)
 	);
+	// phpcs:enable WordPress.Security.NonceVerification.Missing
 }
 add_action( 'wp_ajax_klaro_geo_get_regions', 'klaro_geo_get_regions' );
 
 // AJAX handler for saving visible countries
 function klaro_geo_save_visible_countries() {
 	klaro_geo_verify_admin_ajax( 'klaro_geo_nonce' );
+	// phpcs:disable WordPress.Security.NonceVerification.Missing -- the nonce and manage_options are checked by klaro_geo_verify_admin_ajax() above.
 
 	$countries = isset( $_POST['countries'] ) ? array_map( 'sanitize_text_field', wp_unslash( $_POST['countries'] ) ) : array();
 
@@ -448,5 +455,6 @@ function klaro_geo_save_visible_countries() {
 	$country_settings->save_visible_countries();
 
 	wp_send_json_success();
+	// phpcs:enable WordPress.Security.NonceVerification.Missing
 }
 add_action( 'wp_ajax_klaro_geo_save_visible_countries', 'klaro_geo_save_visible_countries' );

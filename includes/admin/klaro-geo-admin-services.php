@@ -263,6 +263,7 @@ add_action( 'wp_ajax_klaro_geo_save_services', 'klaro_geo_save_services' );
 
 function klaro_geo_save_services() {
 	klaro_geo_verify_admin_ajax( 'klaro_geo_nonce', '_wpnonce' );
+	// phpcs:disable WordPress.Security.NonceVerification.Missing -- the nonce and manage_options are checked by klaro_geo_verify_admin_ajax() above.
 
 	if ( ! isset( $_POST['services'] ) ) {
 		wp_send_json_error( 'No services data provided' );
@@ -282,6 +283,7 @@ function klaro_geo_save_services() {
 	$service_settings->save();
 
 	wp_send_json_success();
+	// phpcs:enable WordPress.Security.NonceVerification.Missing
 }
 
 
@@ -316,6 +318,7 @@ function klaro_geo_delete_service_at( $index ) {
 
 function klaro_geo_delete_service() {
 	klaro_geo_verify_admin_ajax( 'klaro_geo_nonce', '_wpnonce' );
+	// phpcs:disable WordPress.Security.NonceVerification.Missing -- the nonce and manage_options are checked by klaro_geo_verify_admin_ajax() above.
 
 	$result = klaro_geo_delete_service_at( isset( $_POST['index'] ) ? intval( $_POST['index'] ) : -1 );
 	if ( is_wp_error( $result ) ) {
@@ -323,5 +326,6 @@ function klaro_geo_delete_service() {
 	}
 
 	wp_send_json_success( Klaro_Geo_Service_Settings::get_instance()->get() );
+	// phpcs:enable WordPress.Security.NonceVerification.Missing
 }
 ?>

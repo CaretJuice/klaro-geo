@@ -1185,6 +1185,7 @@ function klaro_geo_templates_page() {
 // AJAX handler for template creation
 function klaro_geo_create_template() {
 	klaro_geo_verify_admin_ajax( 'klaro_geo_template_nonce', 'nonce' );
+	// phpcs:disable WordPress.Security.NonceVerification.Missing -- the nonce and manage_options are checked by klaro_geo_verify_admin_ajax() above.
 
 	if ( ! isset( $_POST['template_name'] ) || ! isset( $_POST['inherit_from'] ) ) {
 		wp_send_json_error( array( 'message' => 'Missing required fields.' ) );
@@ -1261,6 +1262,7 @@ function klaro_geo_create_template() {
 			'message'      => 'Template created successfully.',
 		)
 	);
+	// phpcs:enable WordPress.Security.NonceVerification.Missing
 }
 add_action( 'wp_ajax_klaro_geo_create_template', 'klaro_geo_create_template' );
 
@@ -1272,6 +1274,7 @@ add_action( 'wp_ajax_klaro_geo_create_template', 'klaro_geo_create_template' );
  */
 function klaro_geo_save_translations_ajax() {
 	klaro_geo_verify_admin_ajax( 'klaro_geo_template_nonce' );
+	// phpcs:disable WordPress.Security.NonceVerification.Missing -- the nonce and manage_options are checked by klaro_geo_verify_admin_ajax() above.
 
 	// Check if we have a template ID
 	if ( ! isset( $_POST['template_id'] ) || empty( $_POST['template_id'] ) ) {
@@ -1336,6 +1339,7 @@ function klaro_geo_save_translations_ajax() {
 	} else {
 		wp_send_json_error( array( 'message' => 'No translations JSON provided.' ) );
 	}
+	// phpcs:enable WordPress.Security.NonceVerification.Missing
 }
 add_action( 'wp_ajax_klaro_geo_save_translations', 'klaro_geo_save_translations_ajax' );
 
@@ -1344,6 +1348,7 @@ add_action( 'wp_ajax_klaro_geo_save_translations', 'klaro_geo_save_translations_
  */
 function klaro_geo_delete_template_ajax() {
 	klaro_geo_verify_admin_ajax( 'klaro_geo_template_nonce' );
+	// phpcs:disable WordPress.Security.NonceVerification.Missing -- the nonce and manage_options are checked by klaro_geo_verify_admin_ajax() above.
 
 	// Get the template ID
 	if ( ! isset( $_POST['template_id'] ) || empty( $_POST['template_id'] ) ) {
@@ -1399,5 +1404,6 @@ function klaro_geo_delete_template_ajax() {
 	} else {
 		wp_send_json_error( array( 'message' => 'Failed to delete template.' ) );
 	}
+	// phpcs:enable WordPress.Security.NonceVerification.Missing
 }
 add_action( 'wp_ajax_klaro_geo_delete_template', 'klaro_geo_delete_template_ajax' );

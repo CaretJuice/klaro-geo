@@ -126,6 +126,7 @@ function klaro_geo_uninstall_site() {
 
 	// Receipt rate limit transients, one per visitor IP hash. With a persistent
 	// object cache they are not in this table and expire on their own.
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Deletes this plugin's transients by name prefix, which no WordPress function does; the statement is prepared.
 	$wpdb->query(
 		$wpdb->prepare(
 			"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s",
@@ -136,7 +137,7 @@ function klaro_geo_uninstall_site() {
 
 	if ( $delete_receipts ) {
 		$table_name = $wpdb->prefix . 'klaro_geo_consent_receipts';
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.SchemaChange, PluginCheck.Security.DirectDB.UnescapedDBParameter -- DDL statement; table name from $wpdb->prefix is trusted and cannot be parameterized.
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.SchemaChange, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- DDL statement; table name from $wpdb->prefix is trusted and cannot be parameterized.
 		$wpdb->query( "DROP TABLE IF EXISTS $table_name" );
 	}
 }
