@@ -11,13 +11,14 @@ set -euo pipefail
 
 cd /var/www/html
 
-# Docker creates these two directories, as root, to mount the plugin into
-# them. WordPress has to be able to write beside the plugin (other plugins,
-# uploads, debug.log). The plugin itself is mounted read-only and not touched.
-chown www-data:www-data wp-content wp-content/plugins
-
 if [ "${1:-}" = "reset" ]; then
-    wp db reset --yes
+    php -r '
+        mysqli_report( MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT );
+        $db   = getenv( "WORDPRESS_DB_NAME" );
+        $conn = new mysqli( getenv( "WORDPRESS_DB_HOST" ), getenv( "WORDPRESS_DB_USER" ), getenv( "WORDPRESS_DB_PASSWORD" ) );
+        $conn->query( "DROP DATABASE IF EXISTS `$db`" );
+        $conn->query( "CREATE DATABASE `$db`" );
+    '
 fi
 
 if ! wp core is-installed 2>/dev/null; then

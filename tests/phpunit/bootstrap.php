@@ -2,8 +2,8 @@
 /**
  * PHPUnit bootstrap file.
  *
- * Run the suite with bin/phpunit.sh. WordPress and its test library are in the
- * Docker image; the library's path is in WP_TESTS_DIR and its configuration is
+ * Run the suite with bin/phpunit.sh. WordPress, PHPUnit and WordPress's test
+ * library are in the Docker image; the library's path is in WP_TESTS_DIR and its configuration is
  * wp-tests-config.php beside this file.
  */
 
@@ -33,11 +33,9 @@ ini_set('display_startup_errors', '1');
 ini_set('log_errors', '1');
 ini_set('error_log', $debug_log);
 
-// Load PHPUnit Polyfills
-$polyfills_path = dirname(dirname(__DIR__)) . '/vendor/yoast/phpunit-polyfills/phpunitpolyfills-autoload.php';
-if (file_exists($polyfills_path)) {
-    require_once $polyfills_path;
-}
+// The polyfills let tests written for PHPUnit 9 run on the older PHPUnit an
+// old PHP needs. WordPress's test library loads them itself from 5.9 on.
+require_once getenv('WP_TESTS_POLYFILLS_DIR') . '/phpunitpolyfills-autoload.php';
 
 require_once $_tests_dir . '/includes/functions.php';
 

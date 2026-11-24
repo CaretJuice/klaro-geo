@@ -9,8 +9,11 @@
  * @package Klaro_Geo
  */
 
-// WordPress core, as the image has it.
-define( 'ABSPATH', '/usr/src/wordpress/' );
+// WordPress, as the image has it.
+define( 'ABSPATH', '/var/www/html/' );
+
+// Where the image keeps the PHPUnit polyfills the test library asks for.
+define( 'WP_TESTS_PHPUNIT_POLYFILLS_PATH', getenv( 'WP_TESTS_POLYFILLS_DIR' ) );
 
 define( 'DB_NAME', getenv( 'WP_TESTS_DB_NAME' ) );
 define( 'DB_USER', getenv( 'WP_TESTS_DB_USER' ) );

@@ -7,7 +7,7 @@
 #   db        the database server both use
 #
 # Nothing here is kept between runs on purpose. The database lives in memory
-# and the site's WordPress files in an anonymous volume, so `bin/site.sh down`
+# and the site's WordPress files in its container, so `bin/site.sh down`
 # leaves nothing behind and the next start is the same as a fresh clone's or
 # CI's. bin/site.sh reset returns a running site to that state.
 #
@@ -23,6 +23,7 @@ x-image: &image
     args:
       WP_VERSION: ${WP_VERSION:-7.1.5}
       PHP_VERSION: ${PHP_VERSION:-8.3}
+      PHPUNIT_VERSION: ${PHPUNIT_VERSION:-}
 
 services:
   db:
@@ -44,21 +45,21 @@ services:
     # You, so the log it writes is yours. bin/phpunit.sh sets these.
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     entrypoint: ["phpunit-entrypoint"]
-    command: ["vendor/bin/phpunit"]
-    working_dir: /usr/src/wordpress/wp-content/plugins/klaro-geo
+    command: ["phpunit"]
+    working_dir: /var/www/html/wp-content/plugins/klaro-geo
     environment:
       WP_TESTS_DB_HOST: db
       WP_TESTS_DB_NAME: wordpress_test
       WP_TESTS_DB_USER: root
       WP_TESTS_DB_PASSWORD: root
       # Read by the WordPress test library; see tests/phpunit/bootstrap.php.
-      WP_PHPUNIT__TESTS_CONFIG: /usr/src/wordpress/wp-content/plugins/klaro-geo/tests/phpunit/wp-tests-config.php
+      WP_PHPUNIT__TESTS_CONFIG: /var/www/html/wp-content/plugins/klaro-geo/tests/phpunit/wp-tests-config.php
     volumes:
-      - ..:/usr/src/wordpress/wp-content/plugins/klaro-geo:ro
-      - ./logs:/usr/src/wordpress/wp-content/plugins/klaro-geo/docker/logs
+      - ..:/var/www/html/wp-content/plugins/klaro-geo:ro
+      - ./logs:/var/www/html/wp-content/plugins/klaro-geo/docker/logs
     tmpfs:
-      # WordPress core in the image is read-only to this user.
-      - /usr/src/wordpress/wp-content/uploads:mode=1777
+      # WordPress in the image is read-only to this user.
+      - /var/www/html/wp-content/uploads:mode=1777
     depends_on:
       db:
         condition: service_healthy
@@ -74,18 +75,13 @@ services:
       WORDPRESS_DB_NAME: wordpress
       WORDPRESS_DB_USER: root
       WORDPRESS_DB_PASSWORD: root
-      WORDPRESS_DEBUG: 1
-      WORDPRESS_CONFIG_EXTRA: |
-        define( 'WP_DEBUG_LOG', true );
-        define( 'WP_DEBUG_DISPLAY', false );
     volumes:
       - ..:/var/www/html/wp-content/plugins/klaro-geo:ro
     depends_on:
       db:
         condition: service_healthy
     healthcheck:
-      # Answers once the WordPress image has copied WordPress into place and
-      # written wp-config.php. Installing it is bin/site.sh's job.
+      # Apache is answering. Installing WordPress is bin/site.sh's job.
       test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost/wp-login.php"]
       interval: 2s
       timeout: 5s

@@ -41,7 +41,9 @@ class KlaroGeoOptionClassTest extends WP_UnitTestCase {
         // Check that the option is not modified
         $reflection = new ReflectionClass($option);
         $property = $reflection->getProperty('is_modified');
-        $property->setAccessible(true);
+        if (PHP_VERSION_ID < 80100) {
+            $property->setAccessible(true); // Needed before PHP 8.1, deprecated from 8.5.
+        }
         $this->assertFalse($property->getValue($option));
     }
 
@@ -92,7 +94,9 @@ class KlaroGeoOptionClassTest extends WP_UnitTestCase {
         // Option should not be modified yet
         $reflection = new ReflectionClass($option);
         $property = $reflection->getProperty('is_modified');
-        $property->setAccessible(true);
+        if (PHP_VERSION_ID < 80100) {
+            $property->setAccessible(true); // Needed before PHP 8.1, deprecated from 8.5.
+        }
         $this->assertFalse($property->getValue($option));
         
         // Save should return true but not actually save (not modified)
@@ -107,7 +111,9 @@ class KlaroGeoOptionClassTest extends WP_UnitTestCase {
         // Option should now be modified
         $reflection = new ReflectionClass($option);
         $property = $reflection->getProperty('is_modified');
-        $property->setAccessible(true);
+        if (PHP_VERSION_ID < 80100) {
+            $property->setAccessible(true); // Needed before PHP 8.1, deprecated from 8.5.
+        }
         $this->assertTrue($property->getValue($option));
         
         // Save should actually save now
@@ -120,7 +126,9 @@ class KlaroGeoOptionClassTest extends WP_UnitTestCase {
         // Option should no longer be modified
         $reflection = new ReflectionClass($option);
         $property = $reflection->getProperty('is_modified');
-        $property->setAccessible(true);
+        if (PHP_VERSION_ID < 80100) {
+            $property->setAccessible(true); // Needed before PHP 8.1, deprecated from 8.5.
+        }
         $this->assertFalse($property->getValue($option));
     }
 
@@ -146,7 +154,9 @@ class KlaroGeoOptionClassTest extends WP_UnitTestCase {
         $this->assertEquals('new_value', $option->get_key('key1'));
         $reflection = new ReflectionClass($option);
         $property = $reflection->getProperty('is_modified');
-        $property->setAccessible(true);
+        if (PHP_VERSION_ID < 80100) {
+            $property->setAccessible(true); // Needed before PHP 8.1, deprecated from 8.5.
+        }
         $this->assertTrue($property->getValue($option));
         
         // Test setting new key

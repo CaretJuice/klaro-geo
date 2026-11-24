@@ -113,7 +113,9 @@ class KlaroGeoCountrySettingsClassTest extends WP_UnitTestCase {
         // since we're using a custom option name for testing
         $reflection = new ReflectionClass($settings);
         $property = $reflection->getProperty('visible_countries_option');
-        $property->setAccessible(true);
+        if (PHP_VERSION_ID < 80100) {
+            $property->setAccessible(true); // Needed before PHP 8.1, deprecated from 8.5.
+        }
         $property->setValue($settings, $this->visible_countries_option);
 
         // Reload visible countries with our custom option name
