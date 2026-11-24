@@ -1,51 +1,37 @@
 <?php
 /**
- * PHPUnit bootstrap file
+ * PHPUnit bootstrap file.
+ *
+ * Run the suite with bin/phpunit.sh. WordPress and its test library are in the
+ * Docker image; the library's path is in WP_TESTS_DIR and its configuration is
+ * wp-tests-config.php beside this file.
  */
-echo "Bootstrap file loaded\n";
+
+// Printed before output buffering starts, on purpose: from here on
+// headers_sent() is true, as it is when WordPress calls an admin page's render
+// function. The Templates page saves from its render function and redirects
+// (and exits) only if headers have not been sent; without this line that exit
+// ends the whole PHPUnit run, silently and with exit status 0.
+echo "Klaro Geo PHPUnit bootstrap\n";
 ob_start();
 
-// Set up global $table_prefix early
-global $table_prefix;
-$table_prefix = 'wp_';
+$_tests_dir = getenv('WP_TESTS_DIR');
+if (!$_tests_dir || !getenv('WP_PHPUNIT__TESTS_CONFIG')) {
+    fwrite(STDERR, "The WordPress test library is not configured. Run the tests with bin/phpunit.sh.\n");
+    exit(1);
+}
+
+// PHP errors and the plugin's debug log of this run go to one file, written
+// as the run goes, so it is there whether the tests pass or fail. It holds the
+// last run only.
+$debug_log = dirname(__DIR__, 2) . '/docker/logs/debug_test.log';
+file_put_contents($debug_log, '=== Klaro Geo test log, ' . gmdate('Y-m-d H:i:s') . " UTC ===\n");
 
 ini_set('error_reporting', E_ALL);
 ini_set('display_errors', '1');
 ini_set('display_startup_errors', '1');
 ini_set('log_errors', '1');
-ini_set('error_log', '/var/www/html/wp-content/debug.log');
-
-// Make sure debug.log exists and is writable
-$debug_log = '/var/www/html/wp-content/debug.log';
-if (!file_exists($debug_log)) {
-    touch($debug_log);
-    chmod($debug_log, 0666);
-}
-
-// Add a test log message
-error_log('PHPUnit bootstrap file loaded - ' . date('Y-m-d H:i:s'));
-
-// Set WP_TESTS_DIR if not already set
-if (!getenv('WP_TESTS_DIR')) {
-    putenv('WP_TESTS_DIR=/tmp/wordpress-tests-lib');
-}
-$_tests_dir = getenv('WP_TESTS_DIR');
-
-// Verify and create test directories if they don't exist
-if (!is_dir($_tests_dir)) {
-    echo "Creating WordPress test library directory...\n";
-    mkdir($_tests_dir, 0777, true);
-}
-
-if (!is_dir($_tests_dir . '/includes')) {
-    echo "Setting up WordPress test includes...\n";
-    exec('svn co --quiet https://develop.svn.wordpress.org/tags/6.4.3/tests/phpunit/includes/ ' . $_tests_dir . '/includes');
-}
-
-if (!is_dir($_tests_dir . '/data')) {
-    echo "Setting up WordPress test data...\n";
-    exec('svn co --quiet https://develop.svn.wordpress.org/tags/6.4.3/tests/phpunit/data/ ' . $_tests_dir . '/data');
-}
+ini_set('error_log', $debug_log);
 
 // Load PHPUnit Polyfills
 $polyfills_path = dirname(dirname(__DIR__)) . '/vendor/yoast/phpunit-polyfills/phpunitpolyfills-autoload.php';

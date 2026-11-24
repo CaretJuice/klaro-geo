@@ -50,11 +50,22 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.3'
+          tools: composer
+          coverage: none
+      # PHPUnit itself; WordPress and its test library are in the Docker image.
+      - run: composer install --no-interaction --no-progress
       - name: PHPUnit
-        working-directory: docker
-        run: |
-          docker compose build wordpress_test
-          docker compose run --rm -T wordpress_test vendor/bin/phpunit
+        run: bin/phpunit.sh
+      - name: Keep the debug log
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: phpunit-debug-log
+          path: docker/logs/debug_test.log
+          retention-days: 7
 
   e2e:
     name: Playwright and Plugin Check
@@ -67,7 +78,7 @@ jobs:
           node-version: '20'
       - run: npm ci --no-audit --no-fund
       - run: npx playwright install --with-deps chromium firefox
-      - name: Start the E2E site
+      - name: Start the site
         run: npm run e2e:setup
       - name: Playwright
         run: npm run e2e:test
@@ -82,6 +93,8 @@ jobs:
             e2e-report
             test-results
           retention-days: 7
-      - name: E2E site log
+      - name: Site log
         if: failure()
-        run: docker logs klaro-geo-wordpress-e2e --tail 100
+        run: |
+          docker logs klaro-geo-site --tail 100
+          docker exec klaro-geo-site sh -c 'tail -n 200 wp-content/debug.log' || true

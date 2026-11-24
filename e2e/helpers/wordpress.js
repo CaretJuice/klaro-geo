@@ -7,7 +7,7 @@
 const { execSync } = require('child_process');
 
 // Docker container name for E2E tests
-const DOCKER_CONTAINER = 'klaro-geo-wordpress-e2e';
+const DOCKER_CONTAINER = 'klaro-geo-site';
 
 /**
  * Execute a WP-CLI command inside the Docker container

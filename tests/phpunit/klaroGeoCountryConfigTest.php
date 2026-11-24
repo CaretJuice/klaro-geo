@@ -4,12 +4,6 @@
  *
  * @package Klaro_Geo
  */
-// Set up error logging - use the same path as defined in wp-tests-config.php
-ini_set('log_errors', 1);
-ini_set('error_log', '/var/www/html/wp-content/debug.log');
-
-// Add a test message to verify logging is working
-error_log('CountryConfigTest started - ' . date('Y-m-d H:i:s'));
 
 class CountryConfigTest extends WP_UnitTestCase {
     public function setUp(): void {

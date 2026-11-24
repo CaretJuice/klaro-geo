@@ -104,43 +104,48 @@ klaro-geo/
 │   └── admin/                # Admin pages and their AJAX handlers
 ├── js/                       # Frontend and admin scripts
 ├── specs/                    # Contracts (see above)
-├── bin/                      # check-banned-patterns.sh
+├── bin/                      # phpunit.sh, site.sh, plugin-check.sh, check-banned-patterns.sh
 ├── tests/phpunit/            # PHP tests
 ├── tests/js/                 # Jest tests
 ├── e2e/                      # Playwright tests
-├── docker/                   # PHPUnit runner and dev site
+├── docker/                   # The image and compose file behind bin/phpunit.sh and bin/site.sh
 └── plan/                     # to-do.md and working notes (gitignored)
 ```
 
 ## Local Environments (Docker)
 
-All WordPress environments for this plugin live in this repo; there are no shared containers elsewhere on the machine. Use Docker Compose v2 (`docker compose`, not `docker-compose`). In every stack the repo is bind-mounted at `/var/www/html/wp-content/plugins/klaro-geo`, so code edits are live without a restart.
+All WordPress environments for this plugin live in this repo; there are no shared containers elsewhere on the machine. They are one image (`docker/Dockerfile`) and one compose file (`docker/docker-compose.yml`), driven by two scripts that work from any directory. Use the scripts, not `docker compose` directly: they pass the profile and user the compose file expects.
 
-| Stack | Compose file | Run from | URL / container | Use for |
-|-------|--------------|----------|-----------------|---------|
-| PHPUnit runner | `docker/docker-compose.yml`, service `wordpress_test` (+ `db_test`) | `docker/` | one-off container | PHP test suite |
-| E2E site | `docker-compose.e2e.yml` | repo root | http://localhost:8080, container `klaro-geo-wordpress-e2e` | Playwright tests, reproducing frontend bugs in a real browser |
-| Dev site | `docker/docker-compose.yml`, service `wordpress` (+ `db`) | `docker/` | http://localhost:8000 | Manual testing; avoid (see warning) |
+| Environment | Command | What it is | Use for |
+|-------------|---------|------------|---------|
+| PHPUnit runner | `bin/phpunit.sh [phpunit args]` | one-off container, service `phpunit` | PHP test suite |
+| Site | `bin/site.sh up` / `reset` / `down` | http://localhost:8080, container `klaro-geo-site` | Playwright tests, reproducing frontend bugs in a real browser, manual testing |
+
+How it is put together, and the rules that keep it that way:
+
+- **The checkout is mounted read-only** in both containers (as the plugin, so edits are live). Nothing in a container may change the owner or permissions of a file in the checkout: no `chown`, no `chmod`, no running as root to write there. The one writable path is `docker/logs`, written by the PHPUnit container running as the host user.
+- **Everything is fetched when the image is built, at a pinned version**: WordPress and PHP (build args `WP_VERSION`, `PHP_VERSION`), WordPress's PHPUnit test library at the same version as WordPress, WP-CLI, geoip-detect and Plugin Check. Starting a container downloads nothing. To change a version, change it in `docker/Dockerfile` (and the defaults in the compose file); the scripts rebuild when the Dockerfile changes.
+- **Nothing is kept between runs.** The database is in memory and `bin/site.sh down` deletes the site's volume, so a start is the same locally as in CI. Do not add named volumes.
+- PHPUnit and the polyfills come from the host's `vendor/` (`composer install`), the same one PHPCS and PHPStan use.
 
 **Tests:**
-- PHP: `cd docker && docker compose run --rm wordpress_test vendor/bin/phpunit` (add `--filter ClassName` for one test class). The bootstrap turns the plugin's debug logging on; its output lands in `docker/logs/debug_test.log`, not in the terminal.
+- PHP: `bin/phpunit.sh` (add `--filter ClassName` for one test class). The bootstrap turns the plugin's debug logging on; the log of the last run is `docker/logs/debug_test.log`, not the terminal, and is written as the run goes, so it is there when tests fail.
 - JS: `npx jest` from the repo root, on the host (no container needed).
 - Static checks, on the host after `composer install`: `vendor/bin/phpcs` (WordPress coding standards and PHP 7.2 / WordPress 6.6 compatibility, `phpcs.xml.dist`; `vendor/bin/phpcbf` fixes what it can), `vendor/bin/phpstan analyse`, `bin/check-banned-patterns.sh`. pre-commit runs all three, and so does CI. The Yoda condition rule is switched off on purpose.
-- Plugin Check (what WordPress.org's reviewers run): `npm run plugin-check` builds the release directory and checks it in the E2E site. It fails on any error or warning, and CI runs it. An admin AJAX handler needs the `phpcs:disable` / `phpcs:enable` for `WordPress.Security.NonceVerification.Missing` around its body, with the reason, because the check cannot see that `klaro_geo_verify_admin_ajax()` verifies the nonce.
-- E2E: `npm run e2e:setup` (starts the E2E stack and waits), `npm run e2e:test`, then `npm run e2e:docker:down`. The suite runs with one worker because the tests share one site and change its options; do not turn parallelism back on. A full run takes about two and a half minutes.
+- Plugin Check (what WordPress.org's reviewers run): `npm run plugin-check` builds the release directory and checks it in the site. It fails on any error or warning, and CI runs it. An admin AJAX handler needs the `phpcs:disable` / `phpcs:enable` for `WordPress.Security.NonceVerification.Missing` around its body, with the reason, because the check cannot see that `klaro_geo_verify_admin_ajax()` verifies the nonce.
+- E2E: `npm run e2e:setup` (starts the site if needed and resets it to its known state), `npm run e2e:test`, then `npm run site:down`. The suite runs with one worker because the tests share one site and change its options; do not turn parallelism back on.
 
-**E2E site** (preferred for anything that needs a running WordPress):
-- Start with `docker compose -f docker-compose.e2e.yml up -d`; ready when `docker logs klaro-geo-wordpress-e2e` prints `E2E Environment Ready!`.
-- The entrypoint installs WordPress unattended, activates klaro-geo and geoip-detect, and sets GTM ID `GTM-M2Z9TF4J`. Admin login: `admin` / `password`.
-- WP-CLI: `docker exec klaro-geo-wordpress-e2e wp --allow-root --path=/var/www/html <command>`, e.g. `option get klaro_geo_services` or `eval 'echo json_encode(get_option("klaro_geo_templates"));'`.
+**The site** (for anything that needs a running WordPress):
+- `bin/site.sh up` starts it and installs WordPress if needed; `bin/site.sh reset` empties the database and installs again, which is the state the Playwright tests start from. Both finish when the site is ready; there is nothing to wait for afterwards.
+- The known state is set by `docker/site-setup.sh`: klaro-geo and geoip-detect active, GTM ID `GTM-M2Z9TF4J`, consent receipts on. Admin login: `admin` / `password`.
+- WP-CLI: `bin/site.sh wp <command>`, e.g. `bin/site.sh wp option get klaro_geo_services` or `bin/site.sh wp eval 'echo json_encode(get_option("klaro_geo_templates"));'`.
+- The WordPress debug log is inside the container: `bin/site.sh log` follows it.
 - Playwright and its browsers are already installed (`node_modules/playwright`, `~/.cache/ms-playwright`). Ad-hoc scripts can `require()` the absolute path to `node_modules/playwright`.
 - Plugin JS debug logging is off by default; in a Playwright context, `addInitScript(() => { window.klaroGeo = { debugEnabled: true }; })` turns it on.
 
-**Warning, dev site:** `docker/docker-entrypoint-wordpress.sh` runs `chown -R www-data` and `chmod -R a+w` on the bind-mounted plugin directory, which changes ownership and permissions of the host checkout. Use the E2E site instead unless the user asks for the dev site. (The test runner's entrypoint was fixed for this in 591ebfc.)
-
 ## Production Debugging: caretjuice.com + traffic-diagnostics
 
-caretjuice.com is the only live install of this plugin. It also runs the traffic-diagnostics instrumentation from `/home/damon/dev/ca/research/traffic-diagnostics/`, which records consent behavior **outside** Klaro, so it can confirm what the plugin actually did for real visitors. Use it as a debugging source for consent problems, after reproducing locally on the E2E site.
+caretjuice.com is the only live install of this plugin. It also runs the traffic-diagnostics instrumentation from `/home/damon/dev/ca/research/traffic-diagnostics/`, which records consent behavior **outside** Klaro, so it can confirm what the plugin actually did for real visitors. Use it as a debugging source for consent problems, after reproducing locally on the site (`bin/site.sh`).
 
 - **What it records per page load:** the `cmp` phase (which Klaro Geo template was applied and the geo detected) and the `consent` phase (what the visitor granted, and whether they acted on this page or a stored choice or the defaults applied: `cmp_event` = `set` / `load` / `default`). caretjuice.com also records the `gtag('consent', ...)` commands the plugin sends, including the custom `*_consent` keys.
 - **Where the data is:** BigQuery. The project, dataset and site config are in that repo's `deployment.yaml` (gitignored, the source of truth). Field meanings are in its `docs/FIELDS.md`, and the Klaro Geo adapter is `client/presets/klaro-geo.js`. Read that repo's `CLAUDE.md` before changing anything there.

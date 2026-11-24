@@ -34,7 +34,9 @@ module.exports = defineConfig({
 
   // Reporter to use
   reporter: [
-    ['html', { outputFolder: 'e2e-report' }],
+    // open: 'never' - after a failed run Playwright otherwise serves the report
+    // and waits for Ctrl+C, so `npm run e2e:test` never returns.
+    ['html', { outputFolder: 'e2e-report', open: 'never' }],
     ['list']
   ],
 

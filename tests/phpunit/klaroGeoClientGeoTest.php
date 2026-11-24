@@ -29,6 +29,19 @@ class KlaroGeoClientGeoTest extends WP_UnitTestCase {
 
     private $fixture;
 
+    /**
+     * Rendering a page with consent receipts on stores the config version it
+     * carries, so the tables are needed. Real ones, created outside the
+     * per-test transaction (see KlaroGeoConsentReceiptStorageTest).
+     */
+    public static function wpSetUpBeforeClass( $factory ) {
+        klaro_geo_create_consent_receipts_table();
+    }
+
+    public static function wpTearDownAfterClass() {
+        klaro_geo_drop_consent_receipts_table();
+    }
+
     public function setUp(): void {
         parent::setUp();
 

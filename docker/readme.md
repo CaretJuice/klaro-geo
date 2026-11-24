@@ -1,108 +1,46 @@
-# Docker Development Environment for Klaro Geo
+# Docker environment for Klaro Geo
 
-This directory contains all Docker-related files for the Klaro Geo plugin development environment. These tools are primarily intended for plugin developers and contributors.
+Everything that needs WordPress runs here: the PHP test suite, and the site the Playwright tests and manual testing use. Run it through the two scripts in `bin/`, from any directory:
+
+```bash
+bin/phpunit.sh [phpunit arguments]    # the PHP test suite
+bin/site.sh up | reset | down         # the site at http://localhost:8080
+bin/site.sh wp <command>              # WP-CLI in the site
+bin/site.sh log                       # follow the site's WordPress debug log
+```
+
+See [readme-dev.md](../readme-dev.md) for the day-to-day commands.
 
 ## Contents
 
-- `docker-compose.yml` - the PHPUnit runner (`wordpress_test`, `db_test`) and the dev site (`wordpress`, `db`)
-- `Dockerfile.test`, `docker-entrypoint-test.sh` - the PHPUnit runner image and its entrypoint
-- `docker-entrypoint-wordpress.sh` - the dev site's entrypoint
-- `php.ini` and `custom.ini` - PHP configuration for the containers
-- `logs/` - debug logs copied out of the containers
+- `Dockerfile` - the one image. It is the official WordPress image plus WP-CLI, WordPress's PHPUnit test library, the Geolocation IP Detection plugin and Plugin Check, each at a pinned version.
+- `docker-compose.yml` - three services: `db`, `phpunit` (profile `test`) and `site` (profile `site`).
+- `phpunit-entrypoint.sh` - gives a test run an empty database.
+- `site-setup.sh` - installs WordPress and sets the state the Playwright tests start from.
+- `php.ini` - PHP settings for the image.
+- `logs/` - `debug_test.log`, the PHP errors and the plugin's debug log of the last PHPUnit run.
 
-## Running tests
+## How it works
+
+- **Your checkout is mounted read-only**, as the plugin directory. No container changes the owner or permissions of your files. The PHPUnit container runs as you, and writes one file: `logs/debug_test.log`.
+- **Starting a container downloads nothing.** Every tool is fetched when the image is built. The scripts rebuild the image when the Dockerfile changes, which takes a second when nothing has.
+- **Nothing is kept.** The database is held in memory, and `bin/site.sh down` deletes the site's files. A start on your machine is the same as a start in CI. `bin/site.sh reset` returns a running site to a fresh install without restarting it.
+- **PHPUnit comes from `vendor/`** on your machine (`composer install`), the same copy PHPCS and PHPStan use. WordPress and its test library come from the image, and are always the same version as each other.
+
+## Other versions of WordPress and PHP
+
+The image is built on `wordpress:<WP_VERSION>-php<PHP_VERSION>-apache`. Set both to try another pair:
 
 ```bash
-cd docker
-docker compose run --rm wordpress_test vendor/bin/phpunit
+WP_VERSION=6.8.3 PHP_VERSION=8.1 bin/phpunit.sh
 ```
 
-Add `--filter ClassName` for one test class. JavaScript tests run on the host with `npx jest` from the repository root. See [readme-dev.md](../readme-dev.md) for the rest.
+Each pair is its own image tag, so switching back does not rebuild. The defaults are in `Dockerfile` and `docker-compose.yml`; keep the two in step.
 
-## Debugging
+## The debug log of a test run
 
-### Debug Log Configuration
-
-In the WordPress test environment, debug logs are configured in two places:
-
-1. **wp-tests-config.php** - Contains the following settings:
-   ```php
-   define('WP_DEBUG', true);
-   define('WP_DEBUG_LOG', '/var/www/html/wp-content/debug.log');
-   define('WP_DEBUG_DISPLAY', false);
-   ```
-
-2. **bootstrap.php** - Contains additional PHP settings:
-   ```php
-   ini_set('error_reporting', E_ALL);
-   ini_set('display_errors', '1');
-   ini_set('display_startup_errors', '1');
-   ini_set('log_errors', '1');
-   ini_set('error_log', '/var/www/html/wp-content/debug.log');
-   ```
-
-### Logging Functions
-
-Klaro Geo provides several ways to write to the debug log:
-
-1. **Custom klaro_geo_debug_log function** (recommended):
-   ```php
-   klaro_geo_debug_log('This is a message from klaro_geo_debug_log()');
-   ```
-
-2. **PHP's error_log function**:
-   ```php
-   error_log('This is a message from error_log()');
-   ```
-
-3. **WordPress's wp_debug_log function** (if available):
-   ```php
-   if (function_exists('wp_debug_log')) {
-       wp_debug_log('This is a message from wp_debug_log()');
-   }
-   ```
-
-### Viewing Debug Logs
-
-You can view the debug logs in several ways:
-
-1. **After tests complete**: the log is copied to `logs/debug_test.log` on your machine.
-
-2. **Directly from the container**:
-   ```bash
-   docker exec wordpress_test cat /var/www/html/wp-content/debug.log
-   ```
-
-### Troubleshooting Logging Issues
-
-If logging is not working:
-
-1. **Check file permissions**:
-   ```bash
-   docker compose exec wordpress_test ls -la /var/www/html/wp-content/debug.log
-   ```
-
-2. **Check directory permissions**:
-   ```bash
-   docker compose exec wordpress_test ls -la /var/www/html/wp-content/
-   ```
-
-3. **Check PHP configuration**:
-   ```bash
-   docker compose exec wordpress_test php -i | grep error_log
-   ```
-
-4. **Check WordPress configuration**:
-   ```bash
-   docker compose exec wordpress_test cat /tmp/wordpress-tests-lib/wp-tests-config.php | grep WP_DEBUG
-   ```
+`tests/phpunit/bootstrap.php` points PHP's error log at `logs/debug_test.log` and switches the plugin's debug logging on, so `klaro_geo_debug_log()` and `error_log()` both end up there. The file is emptied at the start of each run and written as the run goes, so it is complete when a test fails.
 
 ## Database
 
-PHPUnit tests use the real test database provided by the `db_test` service. Tests that need the consent receipts table create it once per test class with `klaro_geo_create_consent_receipts_table()`.
-
-## Additional Resources
-
-- For more information about the plugin's features, see the [main README.md](../readme.md)
-- For development setup instructions, see [readme-dev.md](../readme-dev.md)
-- For JavaScript testing details, see the test files in `tests/js/`
+PHPUnit tests use a real database, emptied before each run. Tests that need the consent receipts tables create them once per test class with `klaro_geo_create_consent_receipts_table()`.

@@ -18,30 +18,28 @@ Run `npm install` once in the repository root. It installs Jest and Playwright; 
 - `js/`, `css/` - frontend and admin scripts and styles
 - `specs/` - contracts with code outside this repository, and between PHP and JavaScript
 - `tests/phpunit/`, `tests/js/`, `e2e/` - PHPUnit, Jest and Playwright tests
-- `docker/` - the PHPUnit runner and the dev site
-- `bin/check-banned-patterns.sh` - checks run by pre-commit
-
-In every Docker stack the repository is mounted as the plugin directory, so edits are live without a restart.
+- `docker/` - the image and compose file behind `bin/phpunit.sh` and `bin/site.sh`
+- `bin/` - the scripts that run the tests, the site and the checks
 
 ## Running the plugin
 
-Use the E2E site. It installs WordPress unattended, activates Klaro Geo and Geolocation IP Detection, and sets a GTM ID.
-
 ```bash
-npm run e2e:setup          # start and wait until it answers
-npm run e2e:docker:down    # stop
+bin/site.sh up       # start the site; installs WordPress the first time
+bin/site.sh reset    # back to a fresh install (what the Playwright tests start from)
+bin/site.sh down     # stop it and delete its data
 ```
 
-- Site: http://localhost:8080, admin at `/wp-admin` (`admin` / `password`)
-- WP-CLI: `docker exec klaro-geo-wordpress-e2e wp --allow-root --path=/var/www/html <command>`
+- Site: http://localhost:8080, admin at `/wp-admin` (`admin` / `password`). Klaro Geo and Geolocation IP Detection are active and a GTM ID is set.
+- WP-CLI: `bin/site.sh wp <command>`
+- WordPress debug log: `bin/site.sh log`
 
-There is also a dev site (`cd docker && docker compose up -d wordpress`, http://localhost:8000). Its entrypoint changes the owner and permissions of the mounted plugin directory, which is your checkout, so prefer the E2E site.
+Your checkout is mounted as the plugin, read-only, so edits are live without a restart and nothing in a container changes your files. Nothing is kept when the site is taken down; every start is a clean install. See `docker/readme.md` for how the environment is built.
 
 ## Running tests
 
 ```bash
-# PHP (add --filter ClassName for one test class)
-cd docker && docker compose run --rm wordpress_test vendor/bin/phpunit
+# PHP (add --filter ClassName for one test class); needs `composer install` once
+bin/phpunit.sh
 
 # JavaScript, from the repository root, on the host
 npx jest
@@ -49,10 +47,10 @@ npx jest
 # End to end
 npm run e2e:setup
 npm run e2e:test
-npm run e2e:docker:down
+npm run site:down
 ```
 
-The PHP test bootstrap turns the plugin's debug logging on. The log is written to `docker/logs/debug_test.log`, not to the terminal. More on the E2E tests is in `e2e/README.md`.
+The PHP test bootstrap turns the plugin's debug logging on. The log of the last run is `docker/logs/debug_test.log`, not the terminal. More on the E2E tests is in `e2e/README.md`.
 
 ## Static checks
 

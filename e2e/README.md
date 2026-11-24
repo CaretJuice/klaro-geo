@@ -18,9 +18,7 @@ This installs Chromium and Firefox browsers for testing.
 npm run e2e:setup
 ```
 
-This will:
-- Start WordPress and MySQL containers
-- Wait for WordPress to be ready (http://localhost:8080)
+This starts the site if it is not running (`bin/site.sh`, http://localhost:8080) and resets it to a fresh install, so every run starts from the same state. It returns when the site is ready.
 
 ## Running Tests
 
@@ -162,75 +160,37 @@ If tests timeout waiting for WordPress:
 
 ```bash
 # Check container logs
-docker logs klaro-geo-wordpress-e2e
+docker logs klaro-geo-site
 
-# Restart environment
-npm run e2e:docker:down
+# Start again from nothing
+npm run site:down
 npm run e2e:setup
 ```
 
 ### Port 8080 Already in Use
 
-Stop any services using port 8080 or change the port in `docker-compose.e2e.yml`
+Stop any services using port 8080.
 
 ### Tests Fail Intermittently
 
-- Increase wait times in tests
+- Run `npm run e2e:setup` again: it resets the site, in case an interrupted test left its options changed
 - Check for network issues
 - Verify Docker has enough resources
 
-## Manual Docker Management
-
-### Start Environment Only
+## Managing the site by hand
 
 ```bash
-npm run e2e:docker:up
+bin/site.sh up        # start (installs WordPress the first time)
+bin/site.sh reset     # back to a fresh install
+bin/site.sh down      # stop and delete its data
+bin/site.sh wp ...    # WP-CLI
+bin/site.sh log       # follow the WordPress debug log
+docker exec -it klaro-geo-site bash
 ```
 
-### Stop Environment
+## CI
 
-```bash
-npm run e2e:docker:down
-```
-
-### View Logs
-
-```bash
-docker logs -f klaro-geo-wordpress-e2e
-```
-
-### Access WordPress Container
-
-```bash
-docker exec -it klaro-geo-wordpress-e2e bash
-```
-
-## CI/CD Integration
-
-### GitHub Actions Example
-
-```yaml
-name: E2E Tests
-
-on: [push, pull_request]
-
-jobs:
-  e2e:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-      - run: npm ci
-      - run: npm run e2e:install
-      - run: npm run e2e:full
-      - uses: actions/upload-artifact@v3
-        if: failure()
-        with:
-          name: playwright-report
-          path: e2e-report/
-```
+`.github/workflows/checks.yml` runs this suite on every pull request, with the same commands as above.
 
 ## Writing New Tests
 
