@@ -1,340 +1,92 @@
 /**
- * Comprehensive Tests for Klaro Geo Core Functionality
- *
- * Tests the main klaro-geo.js functionality including:
- * - DataLayer integration
- * - Klaro manager watchers
- * - Consent data pushing
- * - Event handling
+ * js/klaro-geo.js start-up: waiting for Klaro's consent manager, and the
+ * initialConsents event it pushes once it has one.
  */
 
-describe('Klaro Geo Core - DataLayer Integration', function() {
+const { setUpPage, loadConsentScript } = require('./helpers/page.js');
+
+describe('klaro-geo.js start-up', function() {
+    function forwarded(name) {
+        return window.dataLayer.filter(function(e) { return e && e.klaroEventName === name; });
+    }
+
     beforeEach(function() {
-        // Set up clean environment
-        document.body.innerHTML = '';
-        window.dataLayer = [];
-        window.klaroConfig = {
-            services: [
-                { name: 'google-analytics', purposes: ['analytics'] },
-                { name: 'facebook-pixel', purposes: ['advertising'] }
-            ]
-        };
-
-        // Mock gtag
-        window.gtag = jest.fn();
-
-        // Create a manager object that will be reused
-        const mockManager = {
-            consents: {
-                'google-analytics': true,
-                'facebook-pixel': false
-            },
-            services: window.klaroConfig.services,
-            watch: jest.fn((callbacks) => {
-                // Store callbacks for manual triggering
-                window.klaroWatchCallbacks = callbacks;
-            }),
-            config: window.klaroConfig
-        };
-
-        // Mock klaro with consistent manager reference
-        window.klaro = {
-            getManager: jest.fn(() => mockManager)
-        };
-
-        window.klaroConsentData = {
-            enableConsentLogging: true,
-            templateName: 'default',
-            templateSource: 'test',
-            detectedCountry: 'US',
-            detectedRegion: null,
-            ajaxUrl: '/wp-admin/admin-ajax.php',
-            nonce: 'test-nonce'
-        };
-
-        // Mock fetch
-        global.fetch = jest.fn(() =>
-            Promise.resolve({
-                ok: true,
-                json: () => Promise.resolve({ success: true })
-            })
-        );
+        jest.useFakeTimers();
     });
 
-    describe('setupKlaroDataLayerWatcher', function() {
-        beforeEach(function() {
-            jest.resetModules();
-        });
-
-        test('should set up watcher when Klaro is available', function() {
-            require('../../js/klaro-geo.js');
-
-            // Wait for async setup
-            return new Promise(resolve => setTimeout(resolve, 100)).then(() => {
-                expect(window.klaro.getManager).toHaveBeenCalled();
-            });
-        });
-
-        test('should retry if Klaro is not immediately available', function() {
-            // Initially no klaro
-            delete window.klaro;
-
-            jest.resetModules();
-            require('../../js/klaro-geo.js');
-
-            // Add klaro after a delay
-            setTimeout(() => {
-                window.klaro = {
-                    getManager: jest.fn(() => ({
-                        consents: {},
-                        watch: jest.fn()
-                    }))
-                };
-            }, 60);
-
-            return new Promise(resolve => setTimeout(resolve, 200)).then(() => {
-                expect(window.klaro.getManager).toHaveBeenCalled();
-            });
-        });
+    afterEach(function() {
+        jest.useRealTimers();
+        delete window.klaro;
+        delete window.klaroConfig;
+        delete window.klaroConsentData;
+        delete window.klaroGeo;
     });
 
-    describe('pushConsentData', function() {
-        beforeEach(function() {
-            jest.resetModules();
-        });
+    test('watches Klaro\'s manager as soon as it loads when the manager exists', function() {
+        const loaded = loadConsentScript({ services: [{ name: 'google-analytics' }] });
 
-        test('should push initial consent data to dataLayer when module loads', function() {
-            // The module will attempt to set up the watcher
-            require('../../js/klaro-geo.js');
-
-            // Wait for async initialization
-            return new Promise(resolve => setTimeout(resolve, 200)).then(() => {
-                // Check that dataLayer has some Klaro events
-                // The exact events depend on whether watch setup succeeded
-                const hasKlaroEvents = window.dataLayer.some(item =>
-                    item.event === 'Klaro Event' ||
-                    item.eventSource === 'klaro-geo' ||
-                    item.eventSource === 'klaro'
-                );
-                // If watch setup worked, we'd have events; if not, that's ok for this test
-                expect(window.dataLayer).toBeDefined();
-                expect(Array.isArray(window.dataLayer)).toBe(true);
-            });
-        });
-
-        test('dataLayer should be initialized if not exists', function() {
-            delete window.dataLayer;
-            require('../../js/klaro-geo.js');
-
-            expect(window.dataLayer).toBeDefined();
-            expect(Array.isArray(window.dataLayer)).toBe(true);
-        });
+        expect(loaded.manager.watch).toHaveBeenCalledTimes(1);
+        expect(typeof loaded.watch.update).toBe('function');
     });
 
-    describe('Watcher callbacks', function() {
-        beforeEach(function() {
-            jest.resetModules();
-            require('../../js/klaro-geo.js');
-        });
+    test.each([
+        ['Klaro has not loaded yet', function() { delete window.klaro; }],
+        ['Klaro has no config yet, so getManager() throws', function() {
+            window.klaro = { getManager: function() { throw new Error('no config'); } };
+        }]
+    ])('keeps trying while %s, then watches the manager once', function(name, notReady) {
+        setUpPage();
+        notReady();
+        jest.resetModules();
+        require('../../js/klaro-geo.js');
+        jest.advanceTimersByTime(500);
 
-        test('should push event to dataLayer on consent save', function() {
-            return new Promise(resolve => setTimeout(resolve, 100)).then(() => {
-                // Clear dataLayer
-                window.dataLayer = [];
+        const manager = { consents: {}, watch: jest.fn() };
+        window.klaroConfig = { services: [] };
+        window.klaro = { getManager: function() { return manager; } };
+        jest.advanceTimersByTime(500);
 
-                // Trigger save event through watcher callback
-                if (window.klaroWatchCallbacks && window.klaroWatchCallbacks.update) {
-                    const manager = window.klaro.getManager();
-                    window.klaroWatchCallbacks.update(manager, 'saveConsents', {});
-                }
-
-                // Check dataLayer was updated
-                const saveEvent = window.dataLayer.find(item =>
-                    item.klaroEventName === 'saveConsents'
-                );
-                expect(saveEvent).toBeTruthy();
-            });
-        });
-
-        test('should include accepted services for saveConsents event', function() {
-            return new Promise(resolve => setTimeout(resolve, 100)).then(() => {
-                window.dataLayer = [];
-
-                if (window.klaroWatchCallbacks && window.klaroWatchCallbacks.update) {
-                    const manager = window.klaro.getManager();
-                    window.klaroWatchCallbacks.update(manager, 'saveConsents', {});
-                }
-
-                const saveEvent = window.dataLayer.find(item =>
-                    item.klaroEventName === 'saveConsents'
-                );
-                expect(saveEvent.acceptedServices).toBeTruthy();
-            });
-        });
-
-        test('should include accepted services for initialConsents event', function() {
-            // The initialConsents event is pushed by pushConsentData at initialization time,
-            // not through the watcher callback. So we need to check the dataLayer that was
-            // populated when klaro-geo.js was required, not after manually triggering the watcher.
-            return new Promise(resolve => setTimeout(resolve, 100)).then(() => {
-                // Re-require the module to get a fresh initialization
-                jest.resetModules();
-                window.dataLayer = [];
-                require('../../js/klaro-geo.js');
-
-                return new Promise(resolve => setTimeout(resolve, 100)).then(() => {
-                    const initEvent = window.dataLayer.find(item =>
-                        item.klaroEventName === 'initialConsents'
-                    );
-                    expect(initEvent).toBeTruthy();
-                    expect(initEvent.acceptedServices).toBeTruthy();
-                });
-            });
-        });
-
-        test('should not include accepted services for other events', function() {
-            return new Promise(resolve => setTimeout(resolve, 100)).then(() => {
-                window.dataLayer = [];
-
-                if (window.klaroWatchCallbacks && window.klaroWatchCallbacks.update) {
-                    const manager = window.klaro.getManager();
-                    window.klaroWatchCallbacks.update(manager, 'someOtherEvent', {});
-                }
-
-                const otherEvent = window.dataLayer.find(item =>
-                    item.klaroEventName === 'someOtherEvent'
-                );
-                if (otherEvent) {
-                    expect(otherEvent.acceptedServices).toBeUndefined();
-                }
-            });
-        });
+        expect(manager.watch).toHaveBeenCalledTimes(1);
     });
 
-    describe('Consent data structure', function() {
-        test('klaroConsentData should be accessible to module', function() {
-            window.klaroConsentData.detectedCountry = 'CA';
-            window.klaroConsentData.detectedRegion = 'QC';
-
-            jest.resetModules();
-            require('../../js/klaro-geo.js');
-
-            // The module should be able to access the consent data
-            expect(window.klaroConsentData.detectedCountry).toBe('CA');
-            expect(window.klaroConsentData.detectedRegion).toBe('QC');
+    test('pushes initialConsents with the consents Klaro holds, as a copy', function() {
+        const loaded = loadConsentScript({
+            services: [{ name: 'google-analytics' }, { name: 'google-ads' }],
+            consents: { 'google-analytics': true, 'google-ads': false }
         });
+        jest.advanceTimersByTime(1);
 
-        test('consent logging flag should be available', function() {
-            window.klaroConsentData.enableConsentLogging = true;
+        expect(forwarded('initialConsents')).toEqual([{
+            event: 'Klaro Event',
+            eventSource: 'klaro',
+            klaroEventName: 'initialConsents',
+            klaroEventData: { 'google-analytics': true, 'google-ads': false },
+            acceptedServices: ['google-analytics']
+        }]);
 
-            jest.resetModules();
-            require('../../js/klaro-geo.js');
-
-            expect(window.klaroConsentData.enableConsentLogging).toBe(true);
-        });
+        loaded.manager.consents['google-ads'] = true;
+        expect(forwarded('initialConsents')[0].klaroEventData['google-ads']).toBe(false);
     });
 
-    describe('Error handling', function() {
-        test('should handle missing klaro gracefully', function() {
-            delete window.klaro;
+    test('Klaro\'s own initialConsents notification does not push the event a second time', function() {
+        const loaded = loadConsentScript({ services: [{ name: 'google-analytics' }], consents: { 'google-analytics': true } });
+        jest.advanceTimersByTime(1);
 
-            jest.resetModules();
+        loaded.watch.update(loaded.manager, 'initialConsents', loaded.manager.consents);
 
-            // Should not throw error
-            expect(() => {
-                require('../../js/klaro-geo.js');
-            }).not.toThrow();
-        });
-
-        test('should handle klaro without getManager', function() {
-            window.klaro = {};
-
-            jest.resetModules();
-
-            expect(() => {
-                require('../../js/klaro-geo.js');
-            }).not.toThrow();
-        });
-
-        test('should handle manager without watch method', function() {
-            window.klaro = {
-                getManager: jest.fn(() => ({
-                    consents: {}
-                    // No watch method
-                }))
-            };
-
-            jest.resetModules();
-
-            expect(() => {
-                require('../../js/klaro-geo.js');
-            }).not.toThrow();
-        });
+        expect(forwarded('initialConsents')).toHaveLength(1);
     });
 
-    describe('Accepted services calculation', function() {
-        test('manager consents should be accessible', function() {
-            const mockManager = {
-                consents: {
-                    'google-analytics': true,
-                    'facebook-pixel': true,
-                    'twitter': false
-                },
-                watch: jest.fn(),
-                config: window.klaroConfig
-            };
+    test('what other code already pushed to the dataLayer is left in place', function() {
+        setUpPage();
+        window.dataLayer.push({ event: 'gtm.js' });
+        const manager = { consents: {}, watch: jest.fn() };
+        window.klaroConfig = { services: [] };
+        window.klaro = { getManager: function() { return manager; } };
+        jest.resetModules();
+        require('../../js/klaro-geo.js');
+        jest.advanceTimersByTime(100);
 
-            window.klaro = {
-                getManager: jest.fn(() => mockManager)
-            };
-
-            jest.resetModules();
-            require('../../js/klaro-geo.js');
-
-            // The module should be able to get the manager
-            const manager = window.klaro.getManager();
-            expect(manager.consents['google-analytics']).toBe(true);
-            expect(manager.consents['facebook-pixel']).toBe(true);
-            expect(manager.consents['twitter']).toBe(false);
-        });
-
-        test('should handle manager with empty consents', function() {
-            const mockManager = {
-                consents: {},
-                watch: jest.fn(),
-                config: window.klaroConfig
-            };
-
-            window.klaro = {
-                getManager: jest.fn(() => mockManager)
-            };
-
-            jest.resetModules();
-            require('../../js/klaro-geo.js');
-
-            const manager = window.klaro.getManager();
-            expect(manager.consents).toEqual({});
-        });
-    });
-
-    describe('Global variables initialization', function() {
-        test('should initialize window.dataLayer if not exists', function() {
-            delete window.dataLayer;
-
-            jest.resetModules();
-            require('../../js/klaro-geo.js');
-
-            expect(window.dataLayer).toBeDefined();
-            expect(Array.isArray(window.dataLayer)).toBe(true);
-        });
-
-        test('should not override existing dataLayer', function() {
-            window.dataLayer = [{ existing: 'data' }];
-
-            jest.resetModules();
-            require('../../js/klaro-geo.js');
-
-            expect(window.dataLayer[0].existing).toBe('data');
-        });
+        expect(window.dataLayer[0]).toEqual({ event: 'gtm.js' });
     });
 });

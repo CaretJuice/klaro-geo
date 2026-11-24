@@ -41,7 +41,9 @@ class KlaroGeoOptionClassTest extends WP_UnitTestCase {
         // Check that the option is not modified
         $reflection = new ReflectionClass($option);
         $property = $reflection->getProperty('is_modified');
-        $property->setAccessible(true);
+        if (PHP_VERSION_ID < 80100) {
+            $property->setAccessible(true); // Needed before PHP 8.1, deprecated from 8.5.
+        }
         $this->assertFalse($property->getValue($option));
     }
 
@@ -92,7 +94,9 @@ class KlaroGeoOptionClassTest extends WP_UnitTestCase {
         // Option should not be modified yet
         $reflection = new ReflectionClass($option);
         $property = $reflection->getProperty('is_modified');
-        $property->setAccessible(true);
+        if (PHP_VERSION_ID < 80100) {
+            $property->setAccessible(true); // Needed before PHP 8.1, deprecated from 8.5.
+        }
         $this->assertFalse($property->getValue($option));
         
         // Save should return true but not actually save (not modified)
@@ -107,7 +111,9 @@ class KlaroGeoOptionClassTest extends WP_UnitTestCase {
         // Option should now be modified
         $reflection = new ReflectionClass($option);
         $property = $reflection->getProperty('is_modified');
-        $property->setAccessible(true);
+        if (PHP_VERSION_ID < 80100) {
+            $property->setAccessible(true); // Needed before PHP 8.1, deprecated from 8.5.
+        }
         $this->assertTrue($property->getValue($option));
         
         // Save should actually save now
@@ -120,7 +126,9 @@ class KlaroGeoOptionClassTest extends WP_UnitTestCase {
         // Option should no longer be modified
         $reflection = new ReflectionClass($option);
         $property = $reflection->getProperty('is_modified');
-        $property->setAccessible(true);
+        if (PHP_VERSION_ID < 80100) {
+            $property->setAccessible(true); // Needed before PHP 8.1, deprecated from 8.5.
+        }
         $this->assertFalse($property->getValue($option));
     }
 
@@ -146,7 +154,9 @@ class KlaroGeoOptionClassTest extends WP_UnitTestCase {
         $this->assertEquals('new_value', $option->get_key('key1'));
         $reflection = new ReflectionClass($option);
         $property = $reflection->getProperty('is_modified');
-        $property->setAccessible(true);
+        if (PHP_VERSION_ID < 80100) {
+            $property->setAccessible(true); // Needed before PHP 8.1, deprecated from 8.5.
+        }
         $this->assertTrue($property->getValue($option));
         
         // Test setting new key
@@ -165,115 +175,4 @@ class KlaroGeoOptionClassTest extends WP_UnitTestCase {
         $option->remove_key('non_existent');
     }
 
-    /**
-     * Test getting and setting nested values
-     */
-    public function test_nested() {
-        // Create option with nested data
-        $nested_data = array(
-            'level1' => array(
-                'level2' => array(
-                    'level3' => 'value'
-                )
-            )
-        );
-        $option = new Klaro_Geo_Option($this->option_name, $nested_data);
-        
-        // Test getting nested value
-        $this->assertEquals('value', $option->get_nested(array('level1', 'level2', 'level3')));
-        
-        // Test getting non-existent nested value
-        $this->assertNull($option->get_nested(array('level1', 'non_existent')));
-        
-        // Test getting non-existent nested value with default
-        $this->assertEquals('default', $option->get_nested(array('level1', 'non_existent'), 'default'));
-        
-        // Test setting nested value
-        $option->set_nested(array('level1', 'level2', 'level3'), 'new_value');
-        $this->assertEquals('new_value', $option->get_nested(array('level1', 'level2', 'level3')));
-        
-        // Test setting new nested value
-        $option->set_nested(array('level1', 'level2', 'level4'), 'another_value');
-        $this->assertEquals('another_value', $option->get_nested(array('level1', 'level2', 'level4')));
-        
-        // Test creating deep nested structure
-        $option->set_nested(array('new', 'deep', 'path'), 'deep_value');
-        $this->assertEquals('deep_value', $option->get_nested(array('new', 'deep', 'path')));
-        
-        // Test removing nested value
-        $option->remove_nested(array('level1', 'level2', 'level3'));
-        $this->assertNull($option->get_nested(array('level1', 'level2', 'level3')));
-        
-        // Test removing non-existent nested value (should not error)
-        $option->remove_nested(array('non', 'existent', 'path'));
-    }
-
-    /**
-     * Test merging values
-     */
-    public function test_merge() {
-        // Create option with test data
-        $test_data = array(
-            'key1' => 'value1',
-            'nested' => array(
-                'sub1' => 'subvalue1'
-            )
-        );
-        $option = new Klaro_Geo_Option($this->option_name, $test_data);
-        
-        // Test non-recursive merge
-        $merge_data = array(
-            'key2' => 'value2',
-            'nested' => array(
-                'sub2' => 'subvalue2'
-            )
-        );
-        $option->merge($merge_data, false);
-        
-        // Non-recursive merge should overwrite nested array
-        $this->assertEquals(array('sub2' => 'subvalue2'), $option->get_key('nested'));
-        
-        // Reset option
-        $option = new Klaro_Geo_Option($this->option_name, $test_data);
-        
-        // Test recursive merge
-        $option->merge($merge_data, true);
-        
-        // Recursive merge should merge nested arrays
-        $expected_nested = array(
-            'sub1' => 'subvalue1',
-            'sub2' => 'subvalue2'
-        );
-        $this->assertEquals($expected_nested, $option->get_key('nested'));
-        
-        // Test merging invalid data (should not error)
-        $option->merge('not_an_array');
-        
-        // Value should remain unchanged
-        $this->assertEquals($expected_nested, $option->get_key('nested'));
-    }
-
-    /**
-     * Test resetting to default value
-     */
-    public function test_reset() {
-        // Create option with test data
-        $default_value = array('default' => 'value');
-        $option = new Klaro_Geo_Option($this->option_name, $default_value);
-        
-        // Modify the option
-        $option->set_key('new_key', 'new_value');
-        $this->assertTrue($option->has_key('new_key'));
-        
-        // Reset the option
-        $option->reset();
-
-        // Option should be back to default value
-        $this->assertEquals($default_value, $option->get());
-        $this->assertFalse($option->has_key('new_key'));
-        $reflection = new ReflectionClass($option);
-        $property = $reflection->getProperty('is_modified');
-        $property->setAccessible(true);
-        $this->assertTrue($property->getValue($option));
-    }
 }

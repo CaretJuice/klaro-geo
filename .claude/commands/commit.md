@@ -6,7 +6,7 @@ Run the test suite and commit changes if all tests pass. Claude generates the co
 
 1. **Run the test suite** in Docker:
    ```bash
-   cd docker && docker compose run --rm wordpress_test vendor/bin/phpunit
+   bin/phpunit.sh
    ```
 
 2. **Check test results**:

@@ -1,88 +1,41 @@
 /**
- * Klaro Geo Debug Logging Utility
+ * Klaro Geo logging. Every script in the plugin logs through these; nothing
+ * else calls console.* (bin/check-banned-patterns.sh enforces it).
  *
- * Centralized debug logging that respects the plugin's debug settings.
- * Only outputs to console when debug logging is enabled in WordPress admin.
+ *   klaroGeoLog / klaroGeoWarn   Shown only when debug logging is on
+ *                                (window.klaroGeo.debugEnabled, set from the
+ *                                plugin's "Enable debug logging" setting).
+ *   klaroGeoError                Always shown.
+ *
+ * All three prefix the message with [Klaro Geo]. Do not type a prefix into
+ * the message.
  */
-
 (function() {
     'use strict';
 
-    /**
-     * Check if debug logging is enabled
-     * @returns {boolean}
-     */
-    function isDebugEnabled() {
-        // Check if klaroGeo object exists and has debugEnabled flag
-        if (typeof window.klaroGeo !== 'undefined' &&
-            typeof window.klaroGeo.debugEnabled !== 'undefined') {
-            return window.klaroGeo.debugEnabled === true;
-        }
+    var PREFIX = '[Klaro Geo]';
 
-        // Default to false if not set
-        return false;
+    function write(method, args) {
+        console[method].apply(console, [PREFIX].concat(Array.prototype.slice.call(args)));
     }
 
-    /**
-     * Main debug logging function
-     * @param {string} level - Log level: 'log', 'warn', 'info', 'error'
-     * @param {...*} args - Arguments to log
-     */
-    function klaroGeoDebugLog(level) {
-        // Convert arguments to array, excluding the first argument (level)
-        let args = Array.prototype.slice.call(arguments, 1);
-
-        // Always show errors, regardless of debug setting
-        if (level === 'error') {
-            console.error.apply(console, ['[Klaro Geo]'].concat(args));
-            return;
-        }
-
-        // For other levels, check if debug is enabled
-        if (!isDebugEnabled()) {
-            return;
-        }
-
-        // Prepend prefix to all messages
-        let prefix = '[Klaro Geo]';
-
-        // Log based on level
-        switch(level) {
-            case 'warn':
-                console.warn.apply(console, [prefix].concat(args));
-                break;
-            case 'info':
-                console.info.apply(console, [prefix].concat(args));
-                break;
-            case 'log':
-            default:
-                console.log.apply(console, [prefix].concat(args));
-                break;
-        }
+    function debugEnabled() {
+        return !!(window.klaroGeo && window.klaroGeo.debugEnabled === true);
     }
 
-    // Export the main function and convenience wrappers
-    window.klaroGeoDebugLog = klaroGeoDebugLog;
-
-    // Convenience functions for each log level
     window.klaroGeoLog = function() {
-        let args = Array.prototype.slice.call(arguments);
-        klaroGeoDebugLog.apply(null, ['log'].concat(args));
+        if (debugEnabled()) {
+            write('log', arguments);
+        }
     };
 
     window.klaroGeoWarn = function() {
-        let args = Array.prototype.slice.call(arguments);
-        klaroGeoDebugLog.apply(null, ['warn'].concat(args));
-    };
-
-    window.klaroGeoInfo = function() {
-        let args = Array.prototype.slice.call(arguments);
-        klaroGeoDebugLog.apply(null, ['info'].concat(args));
+        if (debugEnabled()) {
+            write('warn', arguments);
+        }
     };
 
     window.klaroGeoError = function() {
-        let args = Array.prototype.slice.call(arguments);
-        klaroGeoDebugLog.apply(null, ['error'].concat(args));
+        write('error', arguments);
     };
-
 })();

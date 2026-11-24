@@ -3,11 +3,10 @@
  * Plugin Name: Klaro Geo
  * Plugin URI: https://github.com/CaretJuice/klaro-geo
  * Description: Loads Klaro! with Geo overrides when installed with the Geolocation IP Detection plugin.
- * Version: 0.3.6
+ * Version: 0.3.8
  * Author: Caret Juice Data Ltd., Damon Gudaitis
  * Author URI: https://caretjuice.com
- * Requires at least: 6.6
- * Tested up to: 6.9
+ * Requires at least: 5.7
  * Requires PHP: 7.2
  * License: GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -15,7 +14,7 @@
  * Domain Path: /languages
  */
 defined( 'ABSPATH' ) || die( 'No script kiddies please!' );
-define( 'KLARO_GEO_VERSION', '0.3.6' );
+define( 'KLARO_GEO_VERSION', '0.3.8' );
 if ( ! defined( 'KLARO_GEO_PATH' ) ) {
 	define( 'KLARO_GEO_PATH', plugin_dir_path( __FILE__ ) );
 }
@@ -26,14 +25,8 @@ if ( ! defined( 'KLARO_GEO_URL' ) ) {
 
 // Debug logging function — acts as a sanitization boundary for all logged data
 function klaro_geo_debug_log( $message ) {
-	// Always log during tests, regardless of WP_DEBUG setting
-	$is_test = defined( 'WP_TESTS_DOMAIN' ) && WP_TESTS_DOMAIN;
-
-	// Check if debug logging is enabled in plugin settings
-	$debug_enabled = get_option( 'klaro_geo_enable_debug_logging', false );
-
-	// Log if: (1) we're in tests, OR (2) WP_DEBUG is on AND plugin debug logging is enabled
-	if ( $is_test || ( defined( 'WP_DEBUG' ) && WP_DEBUG === true && $debug_enabled ) ) {
+	// Logs only when WP_DEBUG is on and debug logging is enabled in the plugin settings.
+	if ( defined( 'WP_DEBUG' ) && WP_DEBUG === true && get_option( 'klaro_geo_enable_debug_logging', false ) ) {
 		// Sanitize input before logging
 		$formatted_message = '[Klaro Geo Debug] ';
 		if ( is_array( $message ) || is_object( $message ) ) {
@@ -44,42 +37,8 @@ function klaro_geo_debug_log( $message ) {
 		}
 
 		// Write to the standard error_log (which will go to the configured WP_DEBUG_LOG location)
-		error_log( $formatted_message );
-
-		// During tests, also output to stderr for console capture
-		if ( $is_test ) {
-            // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite -- Writing to STDERR during tests only.
-			fwrite( STDERR, gmdate( '[Y-m-d H:i:s] ' ) . $formatted_message . PHP_EOL );
-		}
+		error_log( $formatted_message ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- This is the plugin's debug log; it writes only when WP_DEBUG and the plugin's debug setting are both on.
 	}
-}
-
-/**
- * Log an array in compact JSON format (one line)
- * Use this instead of print_r for shorter logs
- *
- * @param string $label Label for the log entry
- * @param array  $data Array to log
- * @param bool   $summarize If true, only log keys and counts for nested arrays
- */
-function klaro_geo_debug_log_compact( $label, $data, $summarize = false ) {
-	if ( $summarize && is_array( $data ) ) {
-		// Create a summary: show keys and counts instead of full data
-		$summary = array();
-		foreach ( $data as $key => $value ) {
-			if ( is_array( $value ) ) {
-				$summary[ $key ] = '[' . count( $value ) . ' items]';
-			} else {
-				$summary[ $key ] = $value;
-			}
-		}
-		$sanitized = map_deep( $summary, 'sanitize_text_field' );
-		$json      = wp_json_encode( $sanitized, JSON_UNESCAPED_SLASHES );
-	} else {
-		$sanitized = is_array( $data ) ? map_deep( $data, 'sanitize_text_field' ) : $data;
-		$json      = wp_json_encode( $sanitized, JSON_UNESCAPED_SLASHES );
-	}
-	klaro_geo_debug_log( $label . ': ' . $json );
 }
 
 /**
@@ -141,11 +100,11 @@ function klaro_geo_sanitize_deep( $value, $coerce_booleans = false ) {
  * Handles boolean string conversion and applies sanitize_text_field to strings.
  * Use immediately after json_decode() to sanitize decoded data.
  *
- * @param array $array The array to sanitize.
+ * @param array $value The array to sanitize.
  * @return array The sanitized array.
  */
-function klaro_geo_sanitize_array( $array ) {
-	return klaro_geo_sanitize_deep( $array, true );
+function klaro_geo_sanitize_array( $value ) {
+	return klaro_geo_sanitize_deep( $value, true );
 }
 
 /**
@@ -158,6 +117,9 @@ function klaro_geo_sanitize_array( $array ) {
  *
  * Only migrates if the GTM service matches the old defaults exactly
  * (required=true, purposes=["functional"]) to preserve custom configurations.
+ *
+ * klaro_geo_migrate_gtm_purpose() then moves analytics+advertising to the
+ * single 'infrastructure' purpose.
  */
 function klaro_geo_migrate_gtm_consent_requirement() {
 	$migrated = get_option( 'klaro_geo_gtm_consent_migrated', false );
@@ -173,7 +135,7 @@ function klaro_geo_migrate_gtm_consent_requirement() {
 		// Only migrate if it matches old defaults exactly
 		$is_old_config = (
 			isset( $gtm['required'] ) && $gtm['required'] === true &&
-			isset( $gtm['purposes'] ) && $gtm['purposes'] === [ 'functional' ]
+			isset( $gtm['purposes'] ) && $gtm['purposes'] === array( 'functional' )
 		);
 
 		if ( $is_old_config ) {
@@ -181,15 +143,13 @@ function klaro_geo_migrate_gtm_consent_requirement() {
 
 			$gtm['required'] = false;
 			$gtm['default']  = false;
-			$gtm['purposes'] = [ 'analytics', 'advertising' ];
+			$gtm['purposes'] = array( 'analytics', 'advertising' );
 
 			$service_settings->set_service( 'google-tag-manager', $gtm );
 			$service_settings->save();
 
 			// Clear instance cache to ensure fresh data on next access
 			Klaro_Geo_Service_Settings::clear_instance_cache();
-
-			klaro_geo_debug_log( 'GTM service migration complete' );
 		} else {
 			klaro_geo_debug_log( 'GTM service does not match old defaults, skipping migration' );
 		}
@@ -198,6 +158,58 @@ function klaro_geo_migrate_gtm_consent_requirement() {
 	}
 
 	update_option( 'klaro_geo_gtm_consent_migrated', true );
+}
+
+/**
+ * Move the GTM service from analytics+advertising to its own 'infrastructure'
+ * purpose, and add that purpose to a stored klaro_geo_purposes list.
+ *
+ * Klaro draws a purpose as checked when any of its services is on. With GTM in
+ * two purposes, enabling one made the other look enabled, so a visitor's click
+ * on it switched it off; enabling advertising and then analytics, then
+ * disabling advertising, saved every service (GTM included) as declined.
+ *
+ * GTM stays consent-gated (required=false); only its purpose changes. A GTM
+ * service whose purposes were customized to anything else is left alone.
+ * Runs after klaro_geo_migrate_gtm_consent_requirement(), so very old installs
+ * (required/functional) end up here too.
+ */
+function klaro_geo_migrate_gtm_purpose() {
+	if ( get_option( 'klaro_geo_gtm_purpose_migrated', false ) ) {
+		return;
+	}
+
+	// A stored purpose list predates 'infrastructure'; add it after 'functional'.
+	$stored_purposes = get_option( 'klaro_geo_purposes', false );
+	if ( false !== $stored_purposes ) {
+		$purposes = klaro_geo_get_purposes();
+		if ( ! in_array( 'infrastructure', $purposes, true ) ) {
+			$functional_at = array_search( 'functional', $purposes, true );
+			$insert_at     = ( false === $functional_at ) ? 0 : $functional_at + 1;
+			array_splice( $purposes, $insert_at, 0, array( 'infrastructure' ) );
+			update_option( 'klaro_geo_purposes', implode( ',', $purposes ) );
+			klaro_geo_debug_log( 'Added infrastructure to klaro_geo_purposes: ' . implode( ',', $purposes ) );
+		}
+	}
+
+	$service_settings = Klaro_Geo_Service_Settings::get_instance();
+	$gtm              = $service_settings->get_service( 'google-tag-manager' );
+
+	if ( $gtm ) {
+		$current = $gtm['purposes'];
+		sort( $current );
+		if ( array( 'advertising', 'analytics' ) === $current ) {
+			$gtm['purposes'] = array( 'infrastructure' );
+			$service_settings->set_service( 'google-tag-manager', $gtm );
+			$service_settings->save();
+			Klaro_Geo_Service_Settings::clear_instance_cache();
+			klaro_geo_debug_log( 'Migrated GTM service purposes from analytics+advertising to infrastructure' );
+		} elseif ( array( 'infrastructure' ) !== $current ) {
+			klaro_geo_debug_log( 'GTM service purposes are customized (' . implode( ',', $gtm['purposes'] ) . '), skipping purpose migration' );
+		}
+	}
+
+	update_option( 'klaro_geo_gtm_purpose_migrated', true );
 }
 
 /**
@@ -211,37 +223,23 @@ function klaro_geo_init_consent_mode_services() {
 	// Get service settings instance
 	$service_settings = Klaro_Geo_Service_Settings::get_instance();
 
-	// Check if consent mode services already exist
-	$consent_mode_service_names = array(
-		'analytics-storage',
-		'ad-storage',
-		'ad-user-data',
-		'ad-personalization',
-	);
+	$needs_update = false;
 
-	$needs_update               = false;
-	$klaro_geo_default_services = klaro_geo_get_default_services();
-
-	foreach ( $consent_mode_service_names as $service_name ) {
-		$existing = $service_settings->get_service( $service_name );
-		if ( ! $existing ) {
-			// Find the service in defaults
-			foreach ( $klaro_geo_default_services as $default_service ) {
-				if ( isset( $default_service['name'] ) && $default_service['name'] === $service_name ) {
-					klaro_geo_debug_log( 'Adding consent mode service: ' . $service_name );
-					$service_settings->set_service( $service_name, $default_service );
-					$needs_update = true;
-					break;
-				}
-			}
+	// The consent mode services are the default services flagged as such.
+	foreach ( klaro_geo_get_default_services() as $default_service ) {
+		if ( empty( $default_service['is_consent_mode_service'] ) || $service_settings->get_service( $default_service['name'] ) ) {
+			continue;
 		}
+
+		klaro_geo_debug_log( 'Adding consent mode service: ' . $default_service['name'] );
+		$service_settings->set_service( $default_service['name'], $default_service );
+		$needs_update = true;
 	}
 
 	if ( $needs_update ) {
 		$service_settings->save();
 		// Clear instance cache to ensure fresh data on next access
 		Klaro_Geo_Service_Settings::clear_instance_cache();
-		klaro_geo_debug_log( 'Consent mode services initialization complete' );
 	}
 }
 
@@ -259,7 +257,7 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/klaro-geo-defaults.php';
 // Include admin file
 require_once plugin_dir_path( __FILE__ ) . 'includes/admin/klaro-geo-admin.php';
 
-if ( is_admin() || ( defined( 'WP_TESTS_DOMAIN' ) && WP_TESTS_DOMAIN ) ) {
+if ( is_admin() ) {
 	require_once plugin_dir_path( __FILE__ ) . 'includes/admin/klaro-geo-admin-countries.php';
 	require_once plugin_dir_path( __FILE__ ) . 'includes/admin/klaro-geo-admin-services.php';
 	require_once plugin_dir_path( __FILE__ ) . 'includes/admin/klaro-geo-admin-settings.php';
@@ -274,12 +272,25 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/class-klaro-geo-service-set
 
 // Include legacy files for backward compatibility
 require_once plugin_dir_path( __FILE__ ) . 'includes/klaro-geo-config.php';
-require_once plugin_dir_path( __FILE__ ) . 'includes/klaro-geo-geoip.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/klaro-geo-settings.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/klaro-geo-consent-receipts.php';
-require_once plugin_dir_path( __FILE__ ) . 'includes/klaro-geo-consent-button.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-klaro-geo-consent-menu-button.php';
 
 // The consent receipts table check is now handled in includes/klaro-geo-consent-receipts.php
+
+/**
+ * Google's standard Tag Manager loader snippet for a container.
+ *
+ * @param string $gtm_id The container ID.
+ * @return string JavaScript.
+ */
+function klaro_geo_gtm_loader_js( $gtm_id ) {
+	return "(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':\n"
+		. "new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],\n"
+		. "j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=\n"
+		. "'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);\n"
+		. "})(window,document,'script','dataLayer','" . esc_js( $gtm_id ) . "');";
+}
 
 /**
  * Enqueue all frontend scripts and styles for Klaro Geo
@@ -307,91 +318,14 @@ function klaro_geo_enqueue_scripts() {
 		)
 	);
 
-	$klaro_config_content = klaro_geo_generate_config_file();
-	$klaro_version        = get_option( 'klaro_geo_js_version', '0.7' );
-	$klaro_variant        = get_option( 'klaro_geo_js_variant', 'klaro.js' );
+	$klaro_config_content = klaro_geo_frontend_inline_script();
 
-	// Cache-safe client-side geo resolution mode (admin debug override stays server-side)
-	$geo_location      = klaro_geo_get_user_location();
-	$client_geo_active = klaro_geo_is_client_geo_active( $geo_location['is_admin_override'] );
-	$klaro_js_deps     = array();
-
-	if ( $client_geo_active ) {
-		// The resolver must run before klaro.js: it selects the template and sets
-		// window.klaroConfig, which klaro.js auto-initializes from (or, if klaro.js
-		// loaded first, the resolver calls klaro.setup() itself).
-		wp_enqueue_script(
-			'klaro-geo-client-geo-js',
-			plugins_url( 'js/klaro-geo-client-geo.js', __FILE__ ),
-			array( 'klaro-geo-debug' ),
-			KLARO_GEO_VERSION,
-			array(
-				'strategy'  => 'defer',
-				'in_footer' => true,
-			)
-		);
-		$klaro_js_deps[] = 'klaro-geo-client-geo-js';
-	}
-
-	// Check if local Klaro file exists (for E2E testing)
-	$local_klaro_path = plugin_dir_path( __FILE__ ) . 'e2e/klaro.js';
-	$use_local_klaro  = file_exists( $local_klaro_path );
-
-	if ( $use_local_klaro ) {
-		// Use local Klaro file for E2E testing
-		wp_enqueue_script(
-			'klaro-js',
-			plugins_url( 'e2e/klaro.js', __FILE__ ),
-			$klaro_js_deps,
-			filemtime( $local_klaro_path ), // Use file modification time as version
-			array(
-				'strategy'  => 'defer',
-				'in_footer' => true,
-			)
-		);
-	} else {
-		// Use CDN version in production
-		wp_enqueue_script(
-			'klaro-js',
-			'https://cdn.kiprotect.com/klaro/v' . $klaro_version . '/' . $klaro_variant,
-			$klaro_js_deps,
-			$klaro_version,
-			array(
-				'strategy'  => 'defer',
-				'in_footer' => true,
-			)
-		);
-	}
-
-	// Attach config inline before klaro-js (replaces the old klaro-config.js file approach)
-	$version_script = 'window.klaroVersion = "' . esc_js( $klaro_version ) . '";' . "\n";
-	wp_add_inline_script( 'klaro-js', $version_script . $klaro_config_content, 'before' );
-
-	// Add a simple script to create the Klaro Geo namespace
-	wp_add_inline_script(
-		'klaro-js',
-		'
-        // Create a global Klaro Geo namespace
-        window.klaroGeo = window.klaroGeo || {};
-    '
-	);
-
-	wp_enqueue_script(
-		'klaro-geo-js',
-		plugins_url( 'js/klaro-geo.js', __FILE__ ),
-		array( 'klaro-js' ), // Dependency!
-		KLARO_GEO_VERSION,
-		array(
-			'strategy'  => 'defer',
-			'in_footer' => true,
-		)
-	);
-
-	// Enqueue event factory module (depends on klaro-geo-js for klaroGeoLog)
+	// The dataLayer event and consent key helpers. They only define
+	// window.KlaroGeoEvents, and every script below uses them.
 	wp_enqueue_script(
 		'klaro-geo-events-js',
 		plugins_url( 'js/klaro-geo-events.js', __FILE__ ),
-		array( 'klaro-geo-js', 'klaro-geo-debug' ),
+		array( 'klaro-geo-debug' ),
 		KLARO_GEO_VERSION,
 		array(
 			'strategy'  => 'defer',
@@ -399,184 +333,115 @@ function klaro_geo_enqueue_scripts() {
 		)
 	);
 
-	if ( $klaro_variant === 'klaro-no-css.js' ) {
-		wp_enqueue_style(
-			'klaro-cdn-css',
-			'https://cdn.kiprotect.com/klaro/v' . $klaro_version . '/klaro.min.css',
-			array(),
-			$klaro_version
-		);
-	}
+	// The bootstrap applies the template payload and starts Klaro, in both geo
+	// resolution modes. It must run before klaro.js: it sets window.klaroConfig,
+	// which klaro.js auto-initializes from (in client mode, if klaro.js loads
+	// before the geo lookup returns, the bootstrap calls klaro.setup() itself).
+	wp_enqueue_script(
+		'klaro-geo-bootstrap-js',
+		plugins_url( 'js/klaro-geo-bootstrap.js', __FILE__ ),
+		array( 'klaro-geo-debug', 'klaro-geo-events-js' ),
+		KLARO_GEO_VERSION,
+		array(
+			'strategy'  => 'defer',
+			'in_footer' => true,
+		)
+	);
+
+	// The payload is data only and is attached in front of the bootstrap, so it
+	// is defined when the bootstrap runs whether or not the scripts are deferred.
+	wp_add_inline_script(
+		'klaro-geo-bootstrap-js',
+		$klaro_config_content,
+		'before'
+	);
+
+	$klaro_js_deps = array( 'klaro-geo-bootstrap-js' );
+
+	// Klaro is bundled with the plugin (klaro.js is the unmodified v0.7 build,
+	// which includes its own styles). It is never loaded from a remote host.
+	wp_enqueue_script(
+		'klaro-js',
+		plugins_url( 'klaro.js', __FILE__ ),
+		$klaro_js_deps,
+		KLARO_GEO_VERSION,
+		array(
+			'strategy'  => 'defer',
+			'in_footer' => true,
+		)
+	);
+
+	// Event factory and consent-mode mapping. Loaded before klaro-geo.js, which
+	// calls into it.
+	wp_enqueue_script(
+		'klaro-geo-js',
+		plugins_url( 'js/klaro-geo.js', __FILE__ ),
+		array( 'klaro-js', 'klaro-geo-debug', 'klaro-geo-events-js' ),
+		KLARO_GEO_VERSION,
+		array(
+			'strategy'  => 'defer',
+			'in_footer' => true,
+		)
+	);
 
 	add_filter(
 		'script_loader_tag',
-		function ( $tag, $handle, $src ) {
+		function ( $tag, $handle ) {
 			if ( 'klaro-js' === $handle ) {
 				$tag = str_replace( '<script', '<script data-config="klaroConfig"', $tag );
 			}
 			return $tag;
 		},
 		10,
-		3
+		2
 	);
 
-	wp_enqueue_script(
-		'klaro-geo-admin-bar-js',
-		plugins_url( 'js/klaro-geo-admin-bar.js', __FILE__ ),
-		array( 'jquery', 'klaro-js' ),
-		'1.0',
-		true
-	);
-	wp_localize_script(
-		'klaro-geo-admin-bar-js',
-		'klaroGeoAdminBar',
-		array(
-			'nonce' => wp_create_nonce( 'klaro_geo_debug_geo' ),
-		)
-	);
-
-	// Enqueue the consent mode extension script if needed
-	$template_settings = Klaro_Geo_Template_Settings::get_instance();
-	$templates         = $template_settings->get();
-
-	// Get user location
-	$location        = klaro_geo_get_user_location();
-	$user_country    = $location['country'];
-	$user_region     = $location['region'];
-	$using_debug_geo = $location['is_admin_override'];
-
-	// Get effective settings for the location, passing the admin override flag
-	$effective_settings = klaro_geo_get_effective_settings(
-		$user_country . ( $user_region ? '-' . $user_region : '' ),
-		$using_debug_geo
-	);
-
-	// Get template to use
-	$template_to_use = $effective_settings['template'] ?? 'default';
-
-	// Get the template config
-	$template_config = $templates[ $template_to_use ] ?? $templates['default'] ?? klaro_geo_get_default_templates()['default'];
-
-	// Get consent mode settings from template
-	// NOTE: Consent mode is ALWAYS enabled - no toggle check needed
-	// First check if consent_mode_settings is directly in the template
-	if ( isset( $template_config['consent_mode_settings'] ) ) {
-		$consent_mode_settings = $template_config['consent_mode_settings'];
-	} elseif ( isset( $template_config['config'] ) && isset( $template_config['config']['consent_mode_settings'] ) ) {
-		$consent_mode_settings = $template_config['config']['consent_mode_settings'];
-	} else {
-		$consent_mode_settings = [];
-	}
-
-	// Remove legacy initialize_consent_mode if present
-	unset( $consent_mode_settings['initialize_consent_mode'] );
-
-	// Debug log the consent mode settings (always enabled)
-	klaro_geo_debug_log( 'Consent mode enabled (always on) in wp_enqueue_scripts' );
-	klaro_geo_debug_log( 'Template config consent_mode_settings: ' . wp_json_encode( $consent_mode_settings ) );
-
-	if ( get_option( 'klaro_geo_enable_consent_receipts', false ) ) {
+	// The admin bar debug-geo menu is only rendered for administrators, so only
+	// they need its script (and the jQuery it depends on).
+	if ( current_user_can( 'manage_options' ) ) {
 		wp_enqueue_script(
-			'klaro-consent-receipts-js',
-			plugins_url( 'js/klaro-geo-consent-receipts.js', __FILE__ ),
-			array( 'klaro-js', 'klaro-geo-debug', 'klaro-geo-events-js' ),
+			'klaro-geo-admin-bar-js',
+			plugins_url( 'js/klaro-geo-admin-bar.js', __FILE__ ),
+			array( 'jquery', 'klaro-js' ),
 			KLARO_GEO_VERSION,
 			true
 		);
-
-		// Client mode: window.klaroConsentData is emitted cache-safely by the
-		// generated config content and filled by the client resolver — baking
-		// per-visitor values here would defeat cache safety (and this localized
-		// object would overwrite the resolver's assignments).
-		if ( ! $client_geo_active ) {
-			// Get user location for the script
-			$location        = klaro_geo_get_user_location();
-			$user_country    = $location['country'];
-			$user_region     = $location['region'];
-			$using_debug_geo = $location['is_admin_override'];
-
-			// Get template information, passing the admin override flag
-			$effective_settings = klaro_geo_get_effective_settings(
-				$user_country . ( $user_region ? '-' . $user_region : '' ),
-				$using_debug_geo
-			);
-			$template_to_use    = $effective_settings['template'] ?? 'default';
-
-			// Determine template source
-			$template_source = 'fallback';
-
-			// Use the source from effective settings
-			if ( isset( $effective_settings['source'] ) ) {
-				$template_source = $effective_settings['source'];
-			}
-
-			// Get template settings from the database
-			$template_settings = Klaro_Geo_Template_Settings::get_instance();
-			$templates         = $template_settings->get();
-			$template_config   = $templates[ $template_to_use ] ?? $templates['default'] ?? klaro_geo_get_default_templates()['default'];
-
-			// Debug log the admin override value
-			klaro_geo_debug_log( 'Admin override value being passed to JavaScript: ' . ( $using_debug_geo ? 'true' : 'false' ) );
-
-			// Get plugin settings from the template
-			$plugin_settings = isset( $templates[ $template_to_use ]['plugin_settings'] ) ?
-				$templates[ $template_to_use ]['plugin_settings'] :
-				array( 'enable_consent_logging' => true );
-
-			// Get enableConsentLogging setting
-			$enable_consent_logging = isset( $plugin_settings['enable_consent_logging'] ) ?
-				(bool) $plugin_settings['enable_consent_logging'] : true;
-
-			// Debug log the settings
-			klaro_geo_debug_log( 'Plugin settings for template ' . $template_to_use . ': ' . wp_json_encode( $plugin_settings ) );
-			klaro_geo_debug_log( 'enableConsentLogging: ' . ( $enable_consent_logging ? 'true' : 'false' ) );
-
-			// Add variables for the consent receipts script
-			wp_localize_script(
-				'klaro-consent-receipts-js',
-				'klaroConsentData',
-				array(
-					'ajaxUrl'              => admin_url( 'admin-ajax.php' ),
-					'nonce'                => wp_create_nonce( 'klaro_geo_consent_nonce' ),
-					'enableConsentLogging' => $enable_consent_logging,
-					'templateName'         => $template_to_use,
-					'templateSource'       => $template_source,
-					'detectedCountry'      => $user_country,
-					'detectedRegion'       => $user_region,
-					'adminOverride'        => $using_debug_geo ? true : false,
-					'templateSettings'     => $template_config,
-				)
-			);
-		} // end if ( ! $client_geo_active )
+		wp_localize_script(
+			'klaro-geo-admin-bar-js',
+			'klaroGeoAdminBar',
+			array(
+				'nonce' => wp_create_nonce( 'klaro_geo_debug_geo' ),
+			)
+		);
 	}
 
+	// Consent receipts are generated by klaro-geo.js; window.klaroConsentData
+	// (emitted with the config) tells it whether logging is enabled.
+
 	// Get settings for the consent button
-	$enable_floating_button = get_option( 'klaro_geo_enable_floating_button', true );
+	// Off until the site owner turns it on: the button usually needs styling
+	// to match the theme before it is shown to visitors.
+	$enable_floating_button = get_option( 'klaro_geo_enable_floating_button', false );
 	$button_text            = get_option( 'klaro_geo_floating_button_text', __( 'Manage Consent', 'klaro-geo' ) );
 	$button_theme           = get_option( 'klaro_geo_floating_button_theme', 'light' );
 	$button_position        = get_option( 'klaro_geo_floating_button_position', 'bottom-right' );
 
-	// Check if debug logging is enabled
-	$debug_enabled = get_option( 'klaro_geo_enable_debug_logging', false );
-
-	// Create settings array
+	// The button settings and the debug logging switch (read by
+	// js/klaro-geo-debug.js), merged into window.klaroGeo.
 	$button_settings = array(
 		'enableFloatingButton'   => (bool) $enable_floating_button,
 		'floatingButtonText'     => $button_text,
 		'floatingButtonTheme'    => $button_theme,
 		'floatingButtonPosition' => $button_position,
-		'ajaxUrl'                => admin_url( 'admin-ajax.php' ),
-		'nonce'                  => wp_create_nonce( 'klaro_geo_nonce' ),
-		'debug'                  => defined( 'WP_DEBUG' ) && WP_DEBUG, // Kept for backward compatibility
-		'debugEnabled'           => (bool) $debug_enabled, // New debug logging control
-		'version'                => KLARO_GEO_VERSION,
+		'debugEnabled'           => (bool) get_option( 'klaro_geo_enable_debug_logging', false ),
 	);
 
-	// Enqueue the consent button script in footer with high priority to load after Klaro
+	// Depends on klaro.js so that window.klaro exists when it runs. It does
+	// not use jQuery.
 	wp_enqueue_script(
 		'klaro-geo-consent-button-js',
 		KLARO_GEO_URL . 'js/klaro-geo-consent-button.js',
-		array(),
+		array( 'klaro-js', 'klaro-geo-debug' ),
 		KLARO_GEO_VERSION,
 		array(
 			'in_footer' => true,
@@ -619,11 +484,7 @@ function klaro_geo_enqueue_scripts() {
 		$consent_mode_type = get_option( 'klaro_geo_consent_mode_type', 'basic' );
 		if ( $consent_mode_type === 'advanced' ) {
 			$gtm_deps = $consent_defaults ? array( 'klaro-geo-consent-defaults' ) : array();
-			$gtm_js   = "(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':\n";
-			$gtm_js  .= "new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],\n";
-			$gtm_js  .= "j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=\n";
-			$gtm_js  .= "'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);\n";
-			$gtm_js  .= "})(window,document,'script','dataLayer','" . esc_js( $gtm_id ) . "');";
+			$gtm_js   = klaro_geo_gtm_loader_js( $gtm_id );
 
 			wp_register_script( 'klaro-geo-gtm', false, $gtm_deps, KLARO_GEO_VERSION, false );
 			wp_enqueue_script( 'klaro-geo-gtm' );
@@ -639,7 +500,7 @@ register_activation_hook( __FILE__, 'klaro_geo_create_consent_receipts_table' );
 
 // Register deactivation hooks
 register_deactivation_hook( __FILE__, 'klaro_geo_deactivate' );
-register_deactivation_hook( __FILE__, 'klaro_geo_drop_consent_receipts_table' );
+register_deactivation_hook( __FILE__, 'klaro_geo_drop_consent_receipts_table_on_deactivate' );
 
 /**
  * Add Google Tag Manager scripts with Klaro compatibility
@@ -667,11 +528,7 @@ function klaro_geo_add_gtm_head_script() {
 		// Uses data-type/data-name attributes so Klaro can intercept and gate execution.
 		// wp_print_inline_script_tag() is the WordPress-approved way to output inline
 		// scripts with custom attributes (available since WP 5.7).
-		$gtm_js  = "(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':\n";
-		$gtm_js .= "new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],\n";
-		$gtm_js .= "j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=\n";
-		$gtm_js .= "'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);\n";
-		$gtm_js .= "})(window,document,'script','dataLayer','" . esc_js( $gtm_id ) . "');";
+		$gtm_js = klaro_geo_gtm_loader_js( $gtm_id );
 
 		wp_print_inline_script_tag(
 			$gtm_js,
@@ -738,8 +595,8 @@ add_action( 'template_redirect', 'klaro_geo_add_gtm_body_script_fallback' );
 
 function klaro_geo_admin_bar_menu( $wp_admin_bar ) {
 	if ( current_user_can( 'manage_options' ) ) { // Only show to admins
-		// Get the current debug country from the query var
-		$current_country = get_query_var( 'klaro_geo_debug_geo', 'None' );
+		$debug_geo       = klaro_geo_requested_debug_geo();
+		$current_country = '' !== $debug_geo ? $debug_geo : 'None';
 
 		// Set the title to show the current debug country
 		$args = array(
@@ -749,26 +606,7 @@ function klaro_geo_admin_bar_menu( $wp_admin_bar ) {
 		);
 		$wp_admin_bar->add_node( $args );
 
-		// Add country and region options
-		$debug_locations = get_option( 'klaro_geo_debug_countries', [ 'US', 'US-CA', 'CA', 'CA-QC', 'UK', 'FR', 'AU' ] );
-
-		// Ensure debug_locations is an array
-		if ( ! is_array( $debug_locations ) ) {
-			klaro_geo_debug_log( 'Converting debug locations from string to array: ' . wp_json_encode( $debug_locations ) );
-
-			if ( is_string( $debug_locations ) ) {
-				// Convert string to array
-				$debug_locations = explode( ',', $debug_locations );
-				$debug_locations = array_map( 'trim', $debug_locations );
-				$debug_locations = array_filter( $debug_locations );
-
-				// Update the option to ensure it's stored as an array for next time
-				update_option( 'klaro_geo_debug_countries', $debug_locations );
-			} else {
-				// Use default if not a string or array
-				$debug_locations = [ 'US', 'US-CA', 'CA', 'CA-QC', 'UK', 'FR', 'AU' ];
-			}
-		}
+		$debug_locations = klaro_geo_get_debug_locations();
 
 		// Add Countries submenu
 		$wp_admin_bar->add_node(
@@ -789,11 +627,6 @@ function klaro_geo_admin_bar_menu( $wp_admin_bar ) {
 		);
 
 		foreach ( $debug_locations as $code ) {
-			// Validate code format before use (defense in depth — also validated on save)
-			if ( ! preg_match( '/^[A-Z]{2}(-[A-Z0-9]{1,3})?$/', $code ) ) {
-				continue;
-			}
-
 			// Determine if this is a region code
 			$is_region = strpos( $code, '-' ) !== false;
 
@@ -847,7 +680,9 @@ function klaro_geo_embedded_shortcode( $atts ) {
 	$embedded_enabled = isset( $template_config['embedded'] ) && $template_config['embedded'] === true;
 
 	// Create container for the embedded consent manager
-	$output = '<div id="' . esc_attr( $atts['id'] ) . '" class="' . esc_attr( $atts['class'] ) . '" style="' . esc_attr( $atts['style'] ) . '">';
+	// The style attribute is written by whoever can edit the post, so it gets
+	// the same CSS filter WordPress applies to style attributes in post content.
+	$output = '<div id="' . esc_attr( $atts['id'] ) . '" class="' . esc_attr( $atts['class'] ) . '" style="' . esc_attr( safecss_filter_attr( $atts['style'] ) ) . '">';
 
 	if ( $embedded_enabled ) {
 		// Add a message that this is where Klaro will be embedded
@@ -884,67 +719,84 @@ add_shortcode( 'klaro_embedded', 'klaro_geo_embedded_shortcode' );
 
 
 
-// Add sanitization for ISO 3166-2 codes
-function klaro_geo_sanitize_debug_geo( $value ) {
-	$value = strtoupper( $value ); // Transform to uppercase first
-	if ( preg_match( '/^[A-Z]{2}(-[A-Z0-9]{2,3})?$/', $value ) ) { // Check if it's a 2-letter country code or ISO 3166-2
-		return $value;
-	} else {
-		return ''; // Return empty string if not valid
+/**
+ * A location code as the plugin uses it: an ISO 3166-1 country ("US") or an
+ * ISO 3166-2 region ("US-CA"), upper case. The one place the format is defined.
+ *
+ * @param mixed $value The code as entered or received.
+ * @return string The normalized code, or '' when it is not a location code.
+ */
+function klaro_geo_normalize_location_code( $value ) {
+	$value = is_string( $value ) ? strtoupper( trim( $value ) ) : '';
+	return preg_match( '/^[A-Z]{2}(-[A-Z0-9]{1,3})?$/', $value ) ? $value : '';
+}
+
+/**
+ * Normalize a list of location codes, given as an array or a comma-separated
+ * string. Codes that are not location codes are dropped.
+ *
+ * @param mixed $codes Array or comma-separated string.
+ * @return string[]
+ */
+function klaro_geo_normalize_location_codes( $codes ) {
+	if ( is_string( $codes ) ) {
+		$codes = explode( ',', $codes );
 	}
+	if ( ! is_array( $codes ) ) {
+		return array();
+	}
+	return array_values( array_filter( array_map( 'klaro_geo_normalize_location_code', $codes ) ) );
 }
 
-add_filter( 'sanitize_option_klaro_geo_debug_geo', 'klaro_geo_sanitize_debug_geo' );
-
-// Register the query variable for debug geo
-function klaro_geo_register_query_vars( $vars ) {
-	$vars[] = 'klaro_geo_debug_geo';
-	return $vars;
+/**
+ * The locations offered in the admin bar debug menu
+ * (klaro_geo_debug_countries option), falling back to a default list.
+ *
+ * @return string[]
+ */
+function klaro_geo_get_debug_locations() {
+	$defaults = array( 'US', 'US-CA', 'CA', 'CA-QC', 'UK', 'FR', 'AU' );
+	$codes    = klaro_geo_normalize_location_codes( get_option( 'klaro_geo_debug_countries', $defaults ) );
+	return $codes ? $codes : $defaults;
 }
-add_filter( 'query_vars', 'klaro_geo_register_query_vars' );
+
+/**
+ * The location an administrator asked to preview with the admin bar debug
+ * menu, or '' when this request carries no such override.
+ *
+ * The override is taken from the URL only together with the nonce the debug
+ * menu adds, and only for a user who can manage options. It is deliberately
+ * not a WordPress query var: a public query var is filled from the URL with no
+ * nonce, so a link could switch the template an administrator is shown.
+ *
+ * @return string A location code ("US", "US-CA"), or ''.
+ */
+function klaro_geo_requested_debug_geo() {
+	if ( ! isset( $_GET['klaro_geo_debug_geo'], $_GET['_wpnonce'] ) ) {
+		return '';
+	}
+	if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'klaro_geo_debug_geo' ) || ! current_user_can( 'manage_options' ) ) {
+		return '';
+	}
+	return klaro_geo_normalize_location_code( sanitize_text_field( wp_unslash( $_GET['klaro_geo_debug_geo'] ) ) );
+}
 
 
+/**
+ * Validate the stored services and save them if validation changed anything
+ * (including the default services replacing an empty or invalid option, see
+ * Klaro_Geo_Service_Settings::__construct()).
+ *
+ * @return array The validated services.
+ */
 function klaro_geo_validate_services() {
-	global $klaro_geo_default_services;
-	static $is_validating = false;
-
-	// Prevent recursive validation
-	if ( $is_validating ) {
-		klaro_geo_debug_log( 'Preventing recursive validation' );
-		return klaro_geo_get_default_services();
-	}
-
-	$is_validating = true;
-
-	// Use the service settings class to get and validate services
 	$service_settings = Klaro_Geo_Service_Settings::get_instance();
-	$services         = $service_settings->get();
 
-	// Make sure we have the default services available globally
-	$klaro_geo_default_services = $service_settings->get_default_services();
-
-	// Validate that services is an array with expected structure
-	if ( empty( $services ) || ! is_array( $services ) || ! isset( $services[0]['name'] ) ) {
-		klaro_geo_debug_log( 'Services has invalid structure, using defaults' );
-		$services = $klaro_geo_default_services;
-
-		// Update the services using the service settings class
-		$service_settings->set( $services );
+	if ( $service_settings->is_modified() ) {
 		$service_settings->save();
-	} else {
-		// Validate each service using the class's validate_services method
-		$services = $service_settings->validate_services();
-
-		// If validation changed anything, save the changes
-		if ( $service_settings->is_modified() ) {
-			$service_settings->save();
-		}
 	}
 
-	$is_validating = false;
-
-	// Return services array
-	return $services;
+	return $service_settings->get();
 }
 
 // Add action to validate services on init
@@ -968,6 +820,33 @@ function klaro_geo_gpc_query_vars( $vars ) {
 add_filter( 'query_vars', 'klaro_geo_gpc_query_vars' );
 
 /**
+ * What /.well-known/gpc.json answers with: the GPC support statement, or null
+ * when the "Serve /.well-known/gpc.json" setting is off (a 404).
+ *
+ * @return array|null
+ */
+function klaro_geo_gpc_json_body() {
+	if ( ! get_option( 'klaro_geo_gpc_well_known', false ) ) {
+		return null;
+	}
+
+	// lastUpdate is the date the statement last changed, which is when the
+	// setting was last switched (klaro_geo_gpc_well_known_changed()). A site
+	// that switched it on before that date was recorded gets today's, once.
+	$last_update = get_option( 'klaro_geo_gpc_well_known_updated', '' );
+	if ( '' === $last_update ) {
+		$last_update = gmdate( 'Y-m-d' );
+		update_option( 'klaro_geo_gpc_well_known_updated', $last_update );
+		klaro_geo_debug_log( 'No date recorded for the GPC support statement; recorded today (' . $last_update . ')' );
+	}
+
+	return array(
+		'gpc'        => true,
+		'lastUpdate' => $last_update,
+	);
+}
+
+/**
  * Serve /.well-known/gpc.json response
  */
 function klaro_geo_gpc_template_redirect() {
@@ -975,32 +854,50 @@ function klaro_geo_gpc_template_redirect() {
 		return;
 	}
 
-	if ( ! get_option( 'klaro_geo_gpc_well_known', false ) ) {
+	$body = klaro_geo_gpc_json_body();
+	if ( null === $body ) {
 		status_header( 404 );
 		exit;
 	}
 
 	header( 'Content-Type: application/json' );
 	header( 'Cache-Control: public, max-age=86400' );
-	echo wp_json_encode(
-		array(
-			'gpc'        => true,
-			'lastUpdate' => gmdate( 'Y-m-d' ),
-		)
-	);
+	echo wp_json_encode( $body );
 	exit;
 }
 add_action( 'template_redirect', 'klaro_geo_gpc_template_redirect', 1 );
 
 /**
- * Flush rewrite rules when GPC well-known setting changes
+ * When the "Serve /.well-known/gpc.json" setting is switched on or off: record
+ * the date (the statement's lastUpdate) and flush the rewrite rules.
+ *
+ * Saving the settings page stores the checkbox again each time, as true where
+ * '1' was stored, so the values are compared as booleans: only a real switch
+ * counts.
+ *
+ * @param mixed $old_value The stored value.
+ * @param mixed $new_value The new value.
  */
-function klaro_geo_gpc_flush_rewrite_on_save( $old_value, $new_value ) {
-	if ( $old_value !== $new_value ) {
-		flush_rewrite_rules();
+function klaro_geo_gpc_well_known_changed( $old_value, $new_value ) {
+	if ( (bool) $old_value === (bool) $new_value ) {
+		return;
 	}
+
+	update_option( 'klaro_geo_gpc_well_known_updated', gmdate( 'Y-m-d' ) );
+	flush_rewrite_rules();
 }
-add_action( 'update_option_klaro_geo_gpc_well_known', 'klaro_geo_gpc_flush_rewrite_on_save', 10, 2 );
+add_action( 'update_option_klaro_geo_gpc_well_known', 'klaro_geo_gpc_well_known_changed', 10, 2 );
+
+/**
+ * The first time the setting is saved it is added, not updated.
+ *
+ * @param string $option The option name.
+ * @param mixed  $value  The value added.
+ */
+function klaro_geo_gpc_well_known_added( $option, $value ) {
+	klaro_geo_gpc_well_known_changed( false, $value );
+}
+add_action( 'add_option_klaro_geo_gpc_well_known', 'klaro_geo_gpc_well_known_added', 10, 2 );
 
 /**
  * Flush rewrite rules on activation to register the GPC endpoint
@@ -1014,6 +911,9 @@ register_activation_hook( __FILE__, 'klaro_geo_gpc_activation' );
 // Run GTM consent requirement migration on init (early priority to run before validation)
 add_action( 'init', 'klaro_geo_migrate_gtm_consent_requirement', 5 );
 
+// Move GTM to its own infrastructure purpose (same priority, registered after, so it runs second)
+add_action( 'init', 'klaro_geo_migrate_gtm_purpose', 5 );
+
 // Initialize consent mode services on init (after migration, before validation)
 add_action( 'init', 'klaro_geo_init_consent_mode_services', 6 );
 
@@ -1025,19 +925,10 @@ function klaro_geo_get_user_location() {
 		'is_admin_override' => false,
 	);
 
-	// Check if we're in debug mode via query var or GET parameter
-	$debug_geo = '';
+	// An administrator previewing a location with the admin bar debug menu.
+	$debug_geo = klaro_geo_requested_debug_geo();
 
-	// First check query var (works in tests and normal operation)
-	$debug_geo = get_query_var( 'klaro_geo_debug_geo', '' );
-
-	// If empty, check GET parameter as fallback (for backward compatibility)
-	if ( empty( $debug_geo ) && isset( $_GET['klaro_geo_debug_geo'] ) && isset( $_GET['_wpnonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'klaro_geo_debug_geo' ) ) {
-		$debug_geo = sanitize_text_field( wp_unslash( $_GET['klaro_geo_debug_geo'] ) );
-	}
-
-	// If we have a debug geo value and user has admin permissions, use it
-	if ( ! empty( $debug_geo ) && current_user_can( 'manage_options' ) ) {
+	if ( '' !== $debug_geo ) {
 		klaro_geo_debug_log( 'Using debug geo location: ' . $debug_geo );
 
 		// Mark this as an admin override

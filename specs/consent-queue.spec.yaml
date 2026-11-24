@@ -1,13 +1,16 @@
 # consent-queue.spec.yaml
-# Specification for Consent Queue Feature
 #
-# PURPOSE: Queue dataLayer events until consent state is confirmed
+# EXTERNAL CONTRACT: the window.klaroGeo.push() consent queue.
+#
+# Theme code, other plugins and GTM custom HTML call this API, and it may be
+# called before klaro-geo.js has loaded. Its behaviour cannot change without
+# breaking those callers.
 
 file_meta:
   purpose: "Define contract for klaroGeo.push() consent queue API"
   dependencies:
     - "klaro-geo.js"
-    - "klaro-geo-config.php (for GTM ID setting)"
+    - "frontend-data.spec.yaml (klaroConsentData.gtmId, consentModeType)"
     - "datalayer-events.spec.yaml (Klaro Consent Update)"
   stability: "new"
   last_updated: "2026-02-04"
@@ -46,21 +49,44 @@ gtm_consent:
   service_configuration:
     required: false
     default: false
-    purposes: ["analytics", "advertising"]
+    purposes: ["infrastructure"]
 
   behavior: |
-    - GTM only loads when user consents to analytics OR advertising
+    - GTM only loads when the visitor consents to the google-tag-manager service:
+      by enabling the Site Infrastructure purpose or the service itself, or via Accept all
+    - Consent to analytics or advertising services does NOT imply consent to GTM
+      (product decision); in Basic mode those services' tags cannot run until GTM is consented
     - In Basic mode, 'Klaro Consent Update' is skipped for initialConsents when GTM not consented
     - Queue naturally waits for relevant consent before flushing
     - gtag('consent', 'update') is always called (queues for when GTM loads)
 
+  single_purpose_rationale: |
+    Klaro draws a purpose as checked when any of its services is on. With GTM in
+    both analytics and advertising, enabling one purpose made the other look
+    enabled, and a click on it switched it off instead of on. No default service
+    may belong to more than one purpose.
+
   migration:
-    description: |
-      Existing installations with old GTM config (required=true,
-      purposes=["functional"]) are auto-migrated to the new config.
-      Custom configurations are preserved.
-    trigger: "klaro_geo_migrate_gtm_consent_requirement on init hook"
-    flag: "klaro_geo_gtm_consent_migrated option"
+    - description: |
+        Existing installations with old GTM config (required=true,
+        purposes=["functional"]) are auto-migrated to optional GTM.
+        Custom configurations are preserved.
+      trigger: "klaro_geo_migrate_gtm_consent_requirement on init hook (priority 5)"
+      flag: "klaro_geo_gtm_consent_migrated option"
+    - description: |
+        GTM with purposes exactly analytics+advertising (any order) moves to
+        ["infrastructure"]; other custom purposes are preserved. A stored
+        klaro_geo_purposes list gains 'infrastructure' after 'functional'.
+      trigger: "klaro_geo_migrate_gtm_purpose on init hook (priority 5, runs after the above)"
+      flag: "klaro_geo_gtm_purpose_migrated option"
+
+  purpose_translations:
+    contract: |
+      - Built-in purposes (klaro_geo_get_default_purposes()) MUST reach Klaro with a
+        title and description even if the stored template lacks a translation for them;
+        missing 'zz' entries are filled from klaro_geo_get_default_purpose_translations()
+      - Template-provided purpose translations MUST NOT be overwritten
+      - klaroConfig.purposeOrder follows the klaro_geo_purposes setting unless the template sets it
 
 # =============================================================================
 # API CONTRACT
@@ -138,6 +164,8 @@ configuration:
       - MUST check klaroConfig.services for google-tag-manager service
       - MUST enable GTM mode if EITHER source indicates GTM is configured
       - MUST allow JavaScript override before queue processes
+      - MUST be derived only once klaroConfig exists (in client geo mode that
+        is after klaro-geo.js has loaded)
 
   consentModeType:
     type: "string"
@@ -218,6 +246,15 @@ queue:
 
       Exception: In Advanced Consent Mode, GTM loads immediately (not gated by
       Klaro), so the skip is bypassed and 'Klaro Consent Update' is always pushed.
+      The same applies in Basic mode when the google-tag-manager service is
+      required, because Klaro then reports it as consented on every page load.
+
+      Matching defaults (issue #4): on initialConsents, when every consent value
+      matches the consent_defaults set in <head> (always the case for a fresh
+      visitor), the gtag('consent', 'update') call is redundant and is skipped.
+      'Klaro Consent Update' is still pushed, subject only to the Basic GTM rule
+      above. Skipping the event here previously meant fresh visitors never got
+      the initial trigger or a queue flush in any mode.
 
     behavior:
       basic_mode_new_user_no_consent:
@@ -255,7 +292,9 @@ queue:
       - MUST NOT skip 'Klaro Consent Update' for initialConsents in Advanced mode
       - MUST always push 'Klaro Consent Update' for saveConsents
       - MUST always push 'Klaro Consent Update' when GTM is already consented
-      - MUST always call gtag('consent', 'update') regardless of skip condition
+      - MUST call gtag('consent', 'update') regardless of the Basic GTM skip condition
+      - MAY skip gtag('consent', 'update') on initialConsents when all values match consent_defaults
+      - MUST NOT skip 'Klaro Consent Update' because values match consent_defaults
 
   queue_flushed_event:
     description: |
@@ -310,20 +349,18 @@ state_machine:
 # PHP INTEGRATION
 # =============================================================================
 php_integration:
-  output_configuration:
-    location: "wp_head or klaro-config.js output"
-    description: "Output useGTM setting based on klaro_geo_gtm_id"
+  description: |
+    PHP does not output useGTM or consentModeType directly. klaro-geo.js derives
+    them from window.klaroConsentData.gtmId and .consentModeType (see
+    frontend-data.spec.yaml), unless window.klaroGeo.useGTM or
+    window.klaroGeo.consentModeType was already set by the page.
 
-    example: |
-      <script>
-      window.klaroGeo = window.klaroGeo || {};
-      window.klaroGeo.useGTM = <?php echo !empty(get_option('klaro_geo_gtm_id')) ? 'true' : 'false'; ?>;
-      </script>
-
-    contract: |
-      - MUST output useGTM before klaro-geo.js loads
-      - MUST read from klaro_geo_gtm_id option
-      - MUST NOT add new PHP settings
+    consentModeType is derived when klaro-geo.js loads. useGTM is derived when
+    Klaro has a consent manager, because it also depends on the services in
+    window.klaroConfig. In server geo mode that is when klaro-geo.js loads; in
+    client geo mode it is after the geo lookup. Until then
+    window.klaroGeo.useGTM is undefined. It is always set before the first
+    'Klaro Consent Update' decision is made.
 
 # =============================================================================
 # USAGE EXAMPLES

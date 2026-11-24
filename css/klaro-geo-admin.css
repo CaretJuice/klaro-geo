@@ -87,11 +87,6 @@
     color: #666;
 }
 
-/* Tabs */
-.tabs-container {
-    margin-top: 20px;
-}
-
 .ui-tabs-nav {
     margin: 0;
     padding: 0;
@@ -242,30 +237,12 @@
     color: #999;
 }
 
-/* Advanced settings toggle */
-.toggle-advanced {
-    margin: 10px 0;
-    cursor: pointer;
-    color: #0073aa;
-    text-decoration: underline;
-}
-
 .advanced-settings {
     margin-top: 15px;
     padding: 15px;
     background: #f9f9f9;
     border: 1px solid #ddd;
     border-radius: 4px;
-}
-
-/* Callback scripts */
-.callback-scripts {
-    margin-top: 15px;
-}
-
-.callback-scripts textarea {
-    font-family: monospace;
-    resize: vertical;
 }
 
 /* JSON editor */
@@ -367,4 +344,59 @@
 }
 .modal-actions button {
     margin-left: 10px;
+}
+
+/* Save messages (klaroGeoAdminUi.showIndicator) */
+.klaro-autosave-indicator {
+    position: fixed;
+    top: 50px;
+    right: 20px;
+    padding: 10px 15px;
+    border-radius: 4px;
+    z-index: 9999;
+    font-weight: bold;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    transition: opacity 0.3s ease;
+}
+.klaro-autosave-saving {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    color: #495057;
+}
+.klaro-autosave-success {
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+.klaro-autosave-error {
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+.klaro-field-saving {
+    opacity: 0.7;
+    pointer-events: none;
+}
+.klaro-field-saved {
+    animation: klaro-highlight-saved 1s ease;
+}
+@keyframes klaro-highlight-saved {
+    0% { background-color: #d4edda; }
+    100% { background-color: transparent; }
+}
+
+/* Quiet autosave tick in the admin bar (Templates page) */
+.klaro-mini-indicator {
+    position: absolute;
+    top: 5px;
+    right: 20px;
+    background-color: #28a745;
+    color: white;
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    text-align: center;
+    line-height: 16px;
+    font-size: 10px;
+    z-index: 99999;
 }

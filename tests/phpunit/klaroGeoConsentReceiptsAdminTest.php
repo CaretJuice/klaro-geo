@@ -20,54 +20,21 @@ class ConsentReceiptsAdminTest extends WP_UnitTestCase {
      * Set up before class.
      */
     public static function wpSetUpBeforeClass($factory) {
+        // Real table, created outside the per-test transaction (see KlaroGeoConsentReceiptStorageTest)
+        klaro_geo_create_consent_receipts_table();
+
         // Create a test admin user
         self::$admin_id = $factory->user->create(array(
             'role' => 'administrator',
         ));
     }
 
-    /**
-     * Set up before each test.
-     */
-    public function set_up() {
-        parent::set_up();
-
-        // Include our test helper functions and mock database
-        require_once dirname(__FILE__) . '/test-helpers.php';
-        require_once dirname(__FILE__) . '/mock-db.php';
-
-        // Reset the global mock storage
-        // Set up the mock database
-        KlaroGeoMockDB::enable();
-
-        // Initialize the mock table
-        KlaroGeoMockDB::init_table('wp_klaro_geo_consent_receipts');
-
-        // Clear any existing data in the table
-        global $wpdb;
-        $table_name = $wpdb->prefix . 'klaro_geo_consent_receipts';
-        $wpdb->query("TRUNCATE TABLE $table_name");
-
-        // Log that we're using the mock database
-        mock_db_log("Using mock database for ConsentReceiptsAdminTest");
+    public static function wpTearDownAfterClass() {
+        klaro_geo_drop_consent_receipts_table();
     }
 
-    /**
-     * Tear down after each test.
-     */
-    public function tear_down() {
-        // Clear any data in the table
-        global $wpdb;
-        $table_name = $wpdb->prefix . 'klaro_geo_consent_receipts';
-        $wpdb->query("TRUNCATE TABLE $table_name");
-
-        // Disable the mock database
-        KlaroGeoMockDB::disable();
-
-        // Log that we're restoring the original database
-        mock_db_log("Restored original database functions for ConsentReceiptsAdminTest");
-
-        parent::tear_down();
+    public function set_up() {
+        parent::set_up();
     }
 
     /**
@@ -201,9 +168,6 @@ class ConsentReceiptsAdminTest extends WP_UnitTestCase {
      * Test the AJAX endpoint for getting receipt details using our test helpers.
      */
     public function test_ajax_get_receipt_details() {
-        // Include our test helper functions
-        require_once dirname(__FILE__) . '/test-helpers.php';
-
         // Set current user as admin
         wp_set_current_user(self::$admin_id);
 
@@ -232,8 +196,9 @@ class ConsentReceiptsAdminTest extends WP_UnitTestCase {
             )
         );
 
-        // Use our test helper function to get the receipt details
-        $response_data = klaro_geo_test_get_receipt_details($db_id);
+        // The lookup the admin AJAX endpoint uses
+        $receipt = klaro_geo_receipts_get_by_id($db_id);
+        $response_data = ['success' => (bool) $receipt, 'data' => $receipt];
 
         // Check if the response indicates success
         $this->assertTrue($response_data['success'], 'AJAX response should indicate success');
@@ -255,10 +220,9 @@ class ConsentReceiptsAdminTest extends WP_UnitTestCase {
         wp_set_current_user(self::$admin_id);
 
         // Make sure the table is empty before we start
-        global $wpdb, $mock_db_storage;
+        global $wpdb;
         $table_name = $wpdb->prefix . 'klaro_geo_consent_receipts';
-        $wpdb->query("TRUNCATE TABLE $table_name");
-        $mock_db_storage['klaro_geo_consent_receipts'] = array();
+        $wpdb->query("DELETE FROM $table_name");
 
         // Insert exactly 25 test receipts (more than one page)
         for ($i = 0; $i < 25; $i++) {

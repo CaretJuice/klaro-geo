@@ -49,6 +49,9 @@ class KlaroGeoRegionsTest extends WP_UnitTestCase {
      */
     public function test_region_code_validation() {
         $valid_regions = [
+            'US',
+            'ES-M',          // ISO 3166-2 region codes are one to three characters
+            'GB-ENG',
             'US-CA',
             'CA-QC',
             'US-NY',
@@ -59,20 +62,19 @@ class KlaroGeoRegionsTest extends WP_UnitTestCase {
             'USA',           // Too long country code
             'US-CALI',        // Too long region code
             'U-CA',         // Too short country code
-            'US-C',         // Too short region code
             'US_CA',        // Invalid separator
             'USCA'          // Missing separator
         ];
 
         // Test valid regions
         foreach ($valid_regions as $region) {
-            $sanitized = klaro_geo_sanitize_debug_geo($region);
+            $sanitized = klaro_geo_normalize_location_code($region);
             $this->assertEquals($region, $sanitized, "Valid region $region should remain unchanged");
         }
 
         // Test invalid regions
         foreach ($invalid_regions as $region) {
-            $sanitized = klaro_geo_sanitize_debug_geo($region);
+            $sanitized = klaro_geo_normalize_location_code($region);
             $this->assertEquals('', $sanitized, "Invalid region $region should return empty string");
         }
     }

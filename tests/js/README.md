@@ -1,67 +1,10 @@
-# Klaro Geo JavaScript Tests
+# Klaro Geo JavaScript tests
 
-This directory contains JavaScript tests for the Klaro Geo plugin.
+Jest tests for the scripts in `js/`. Run them from the repository root with `npx jest` (one file: `npx jest tests/js/test-consent-mode.js`).
 
-## Test Files
+Every test loads the real script and checks what it does. Do not copy a function from `js/` into a test and test the copy.
 
-- `test-klaro-geo.js`: Basic tests for the core functionality in `klaro-geo.js`
-- `test-klaro-geo-comprehensive.js`: Comprehensive tests with mocking for `klaro-geo.js`
-- `setup.js`: Setup file for Jest
-- `run-tests.js`: Custom test runner
+- `helpers/page.js` builds the page the scripts expect: `setUpPage()` provides what PHP's inline script defines (`window.dataLayer`, `window.gtag`, `window.klaroGeo`, `window.klaroConsentData`), `loadBootstrap()` loads `js/klaro-geo-bootstrap.js`, and `loadConsentScript()` loads `js/klaro-geo.js` with a Klaro manager.
+- `setup.js` runs before each file: it replaces the log helpers with mocks and loads `js/klaro-geo-events.js`.
 
-## Running Tests
-
-You can run the tests using npm:
-
-```bash
-# Run all tests
-npm test
-
-# Run only the basic klaro-geo tests
-npm run test:klaro-geo
-
-# Run the comprehensive klaro-geo tests
-npm run test:klaro-geo-comprehensive
-
-# Run tests in watch mode (automatically re-run when files change)
-npm run test:watch
-
-# Run tests with coverage report
-npm run test:coverage
-```
-
-## Test Structure
-
-The tests are organized by functionality:
-
-1. **Consent Receipt Handling**
-   - `handleConsentChange`
-   - `storeReceiptLocally`
-   - `sendReceiptToServer`
-
-2. **DataLayer Integration**
-   - `pushConsentData`
-   - `handleKlaroConsentEvents`
-
-3. **Google Consent Mode**
-   - `updateGoogleConsentMode`
-
-4. **UI Controls**
-   - `createToggleControl`
-   - `createAdControlsForService`
-   - `updateControlsUI`
-
-## Adding New Tests
-
-To add new tests:
-
-1. Add test cases to the appropriate test file
-2. If testing a new module, create a new test file following the naming convention `test-*.js`
-
-## Test Coverage
-
-The tests aim to cover all the main functionality in the JavaScript files. Run the tests with coverage to see what's covered:
-
-```bash
-npm test -- --coverage
-```
+The admin scripts (`js/klaro-geo-admin*.js`) have no Jest tests; the Templates, Services and Country Settings pages are covered by the Playwright suite in `e2e/`.

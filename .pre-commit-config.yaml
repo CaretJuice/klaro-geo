@@ -1,0 +1,28 @@
+# Run `pre-commit install` once after cloning.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: check-added-large-files
+  - repo: local
+    hooks:
+      - id: banned-patterns
+        name: Banned patterns (see CLAUDE.md)
+        entry: bin/check-banned-patterns.sh
+        language: script
+        pass_filenames: false
+        files: ^(klaro-geo\.php|uninstall\.php|includes/|js/)
+      - id: phpstan
+        name: PHPStan (needs `composer install`)
+        entry: vendor/bin/phpstan analyse --no-progress --memory-limit=1G
+        language: system
+        pass_filenames: false
+        files: ^(klaro-geo\.php|uninstall\.php|includes/|phpstan\.neon\.dist)
+      - id: phpcs
+        name: PHPCS, WordPress coding standards (needs `composer install`)
+        entry: vendor/bin/phpcs
+        language: system
+        pass_filenames: false
+        files: ^(klaro-geo\.php|uninstall\.php|includes/|phpcs\.xml\.dist)

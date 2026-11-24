@@ -1,26 +1,26 @@
 {
     "name": "klaro-geo",
-    "version": "0.3.4",
+    "version": "0.3.8",
     "description": "Klaro Geo WordPress Plugin",
     "main": "index.js",
     "scripts": {
         "test": "jest",
         "test:watch": "jest --watch",
-        "test:klaro-geo": "jest tests/js/test-klaro-geo.js",
-        "test:klaro-geo-comprehensive": "jest tests/js/test-klaro-geo-comprehensive.js",
         "test:coverage": "jest --coverage",
         "e2e:install": "npx playwright install chromium firefox",
-        "e2e:docker:up": "docker compose -f docker-compose.e2e.yml up -d",
-        "e2e:docker:down": "docker compose -f docker-compose.e2e.yml down",
-        "e2e:wait": "wait-on http://localhost:8080 -t 60000",
-        "e2e:setup": "npm run e2e:docker:up && npm run e2e:wait",
+        "test:php": "bin/phpunit.sh",
+        "site:up": "bin/site.sh up",
+        "site:reset": "bin/site.sh reset",
+        "site:down": "bin/site.sh down",
+        "e2e:setup": "bin/site.sh reset",
         "e2e:test": "playwright test",
         "e2e:test:headed": "playwright test --headed",
         "e2e:test:debug": "playwright test --debug",
         "e2e:test:ui": "playwright test --ui",
         "e2e:report": "playwright show-report e2e-report",
         "e2e": "npm run e2e:setup && npm run e2e:test",
-        "e2e:full": "npm run e2e:setup && npm run e2e:test && npm run e2e:docker:down"
+        "plugin-check": "bin/plugin-check.sh",
+        "e2e:full": "npm run e2e:setup && npm run e2e:test && npm run site:down"
     },
     "author": "",
     "license": "ISC",
@@ -30,8 +30,7 @@
         "@playwright/test": "^1.56.1",
         "babel-jest": "^30.3.0",
         "jest": "^30.3.0",
-        "jest-environment-jsdom": "^30.3.0",
-        "wait-on": "^9.0.3"
+        "jest-environment-jsdom": "^30.3.0"
     },
     "jest": {
         "testEnvironment": "jsdom",
@@ -43,8 +42,7 @@
         ],
         "testPathIgnorePatterns": [
             "/node_modules/",
-            "/tests/js/setup.js",
-            "/tests/js/run-tests.js"
+            "/tests/js/setup.js"
         ],
         "transform": {
             "^.+\\.js$": "babel-jest"

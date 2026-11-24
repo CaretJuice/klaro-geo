@@ -3,6 +3,9 @@
  * @jest-environment jsdom
  */
 
+
+const { setUpPage } = require('./helpers/page.js');
+
 describe('Consent Queue', () => {
     let originalDataLayer;
 
@@ -13,10 +16,8 @@ describe('Consent Queue', () => {
         // Save original dataLayer
         originalDataLayer = window.dataLayer;
 
-        // Reset all klaroGeo state
-        delete window.klaroGeo;
-        delete window.klaroConsentData;
-        window.dataLayer = [];
+        // The page before klaro-geo.js runs
+        setUpPage();
 
         // Mock klaroGeoLog
         window.klaroGeoLog = jest.fn();
@@ -28,6 +29,8 @@ describe('Consent Queue', () => {
         window.dataLayer = originalDataLayer;
         delete window.klaroGeo;
         delete window.klaroConsentData;
+        delete window.klaroConfig;
+        delete window.klaro;
         jest.clearAllMocks();
     });
 
@@ -74,29 +77,61 @@ describe('Consent Queue', () => {
             expect(window.klaroGeo.queue[1].event).toBe('stub_event_2');
         });
 
+        // GTM mode is worked out once Klaro has a manager, which is when
+        // window.klaroConfig (and so the list of services) exists.
+        function klaroWithServices(services) {
+            window.klaroConfig = { services: services };
+            const manager = { consents: {}, watch: jest.fn() };
+            window.klaro = { getManager: jest.fn(() => manager) };
+        }
+
         test('should detect GTM mode from klaroConsentData.gtmId', () => {
-            // Set up GTM ID before loading
-            window.klaroConsentData = { gtmId: 'GTM-XXXXX' };
+            window.klaroConsentData.gtmId = 'GTM-XXXXX';
+            klaroWithServices([]);
 
             loadKlaroGeoJs();
 
             expect(window.klaroGeo.useGTM).toBe(true);
         });
 
-        test('should detect non-GTM mode when gtmId is empty', () => {
-            // Set up empty GTM ID
-            window.klaroConsentData = { gtmId: '' };
+        test('should detect GTM mode from a google-tag-manager Klaro service', () => {
+            klaroWithServices([{ name: 'google-tag-manager' }]);
+
+            loadKlaroGeoJs();
+
+            expect(window.klaroGeo.useGTM).toBe(true);
+        });
+
+        test('should detect non-GTM mode when there is no GTM ID and no GTM service', () => {
+            klaroWithServices([{ name: 'google-analytics' }]);
 
             loadKlaroGeoJs();
 
             expect(window.klaroGeo.useGTM).toBe(false);
         });
 
-        test('should detect non-GTM mode when klaroConsentData missing', () => {
-            // No klaroConsentData at all
-            loadKlaroGeoJs();
+        // Client geo mode: this script runs while the geo lookup is still out,
+        // so there is no klaroConfig and Klaro has no manager yet.
+        test('should detect a GTM service when klaroConfig only exists after the script ran', () => {
+            jest.useFakeTimers();
+            const manager = { consents: {}, watch: jest.fn() };
+            window.klaro = {
+                getManager: jest.fn(() => {
+                    if (!window.klaroConfig) {
+                        throw new Error('no config');
+                    }
+                    return manager;
+                })
+            };
 
-            expect(window.klaroGeo.useGTM).toBe(false);
+            loadKlaroGeoJs();
+            expect(window.klaroGeo.useGTM).toBeUndefined();
+
+            window.klaroConfig = { services: [{ name: 'google-tag-manager' }] };
+            jest.advanceTimersByTime(60);
+
+            expect(window.klaroGeo.useGTM).toBe(true);
+            jest.useRealTimers();
         });
 
         test('should allow manual override of useGTM', () => {
@@ -121,12 +156,6 @@ describe('Consent Queue', () => {
         test('should default consentModeType to basic when not specified', () => {
             window.klaroConsentData = { gtmId: 'GTM-XXXXX' };
 
-            loadKlaroGeoJs();
-
-            expect(window.klaroGeo.consentModeType).toBe('basic');
-        });
-
-        test('should default consentModeType to basic when klaroConsentData missing', () => {
             loadKlaroGeoJs();
 
             expect(window.klaroGeo.consentModeType).toBe('basic');
@@ -190,17 +219,18 @@ describe('Consent Queue', () => {
         });
 
         test('should warn when queue limit is exceeded', () => {
-            const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+            // Dropping an event is reported through klaroGeoError(), which is
+            // shown whether or not debug logging is on.
+            window.klaroGeoError = jest.fn();
+            global.klaroGeoError = window.klaroGeoError;
 
             // Queue 101 events
             for (let i = 0; i < 101; i++) {
                 window.klaroGeo.push({ event: `event_${i}` });
             }
 
-            expect(warnSpy).toHaveBeenCalled();
-            expect(warnSpy.mock.calls[0][0]).toContain('queue limit');
-
-            warnSpy.mockRestore();
+            expect(window.klaroGeoError).toHaveBeenCalledTimes(1);
+            expect(window.klaroGeoError.mock.calls[0][0]).toContain('queue limit');
         });
     });
 

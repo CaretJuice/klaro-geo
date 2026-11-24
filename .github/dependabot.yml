@@ -1,0 +1,31 @@
+# Dependabot opens pull requests that update dependencies. CI runs on each one;
+# merge it when the checks pass.
+version: 2
+updates:
+  # The actions in .github/workflows, which are pinned to a commit. Dependabot
+  # updates the commit and the version comment beside it.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
+
+  # Development tools only (Jest, Playwright, PHPCS, PHPStan); the plugin
+  # ships no npm or Composer packages. Monthly, one pull request each.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      npm-dev:
+        patterns: ['*']
+
+  - package-ecosystem: composer
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      composer-dev:
+        patterns: ['*']

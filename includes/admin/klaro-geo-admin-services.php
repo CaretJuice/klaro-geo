@@ -6,12 +6,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 // Services Page Content
 
 function klaro_geo_services_page_content() {
-	$purposes = explode( ',', get_option( 'klaro_geo_purposes', 'functional,analytics,advertising' ) ); // Get available purposes from settings
+	$purposes = klaro_geo_get_purposes();
 
 	// Initialize the service settings class
 	$service_settings = Klaro_Geo_Service_Settings::get_instance();
 	$services         = $service_settings->get();
-	klaro_geo_debug_log( 'Services page content - ' . count( $services ) . ' services' );
 
 	// Scripts are now enqueued in klaro-geo-admin-scripts.php
 
@@ -31,9 +30,6 @@ function klaro_geo_services_page_content() {
 					<th>Purposes</th>
 					<th>Advanced</th>
 					<th>Cookies</th>
-					<?php // KLARO_CALLBACKS_START ?>
-					<th>Callbacks</th>
-					<?php // KLARO_CALLBACKS_END ?>
 					<th>Actions</th>
 				</tr>
 			</thead>
@@ -44,15 +40,11 @@ function klaro_geo_services_page_content() {
 					echo "<tr><td colspan='8'>No services configured yet.</td></tr>"; // Updated colspan for the new advanced column
 				} else {
 					foreach ( $services as $index => $service ) {
-						klaro_geo_debug_log( 'Processing service in admin loop: ' . ( $service['name'] ?? 'unnamed' ) );
-
-						$name     = isset( $service['name'] ) ? $service['name'] : 'N/A';
+						$name     = $service['name'];
 						$required = isset( $service['required'] ) ? ( $service['required'] ? 'Yes' : 'No' ) : 'N/A';
 						$default  = isset( $service['default'] ) ? ( $service['default'] ? 'Yes' : 'No' ) : 'N/A';
 
-						// Handle purposes (ensure it's an array)
-						$purposes     = isset( $service['purposes'] ) ? $service['purposes'] : array();
-						$purposes_str = ! empty( $purposes ) && is_array( $purposes ) ? implode( ', ', $purposes ) : 'N/A';
+						$purposes_str = $service['purposes'] ? implode( ', ', $service['purposes'] ) : 'N/A';
 
 						// Handle advanced settings
 						$advanced = array();
@@ -67,27 +59,7 @@ function klaro_geo_services_page_content() {
 						}
 						$advanced_str = ! empty( $advanced ) ? implode( ', ', $advanced ) : 'None';
 
-						// Handle cookies
-						$cookies     = isset( $service['cookies'] ) ? $service['cookies'] : array();
-						$cookies_str = ! empty( $cookies ) && is_array( $cookies ) ?
-						json_encode( $cookies ) : 'N/A';
-						// KLARO_CALLBACKS_START
-						// Check for callbacks
-						$has_oninit    = ! empty( $service['onInit'] );
-						$has_onaccept  = ! empty( $service['onAccept'] );
-						$has_ondecline = ! empty( $service['onDecline'] );
-						$callbacks     = array();
-						if ( $has_oninit ) {
-							$callbacks[] = 'onInit';
-						}
-						if ( $has_onaccept ) {
-							$callbacks[] = 'onAccept';
-						}
-						if ( $has_ondecline ) {
-							$callbacks[] = 'onDecline';
-						}
-						$callbacks_str = ! empty( $callbacks ) ? implode( ', ', $callbacks ) : 'None';
-						// KLARO_CALLBACKS_END
+						$cookies_str = $service['cookies'] ? wp_json_encode( $service['cookies'] ) : 'N/A';
 
 						echo '<tr>';
 						echo '<td>' . esc_html( $name ) . '</td>';
@@ -96,9 +68,6 @@ function klaro_geo_services_page_content() {
 						echo '<td>' . esc_html( $purposes_str ) . '</td>';
 						echo '<td>' . esc_html( $advanced_str ) . '</td>';
 						echo '<td>' . esc_html( $cookies_str ) . '</td>';
-						// KLARO_CALLBACKS_START
-						echo '<td>' . esc_html( $callbacks_str ) . '</td>';
-						// KLARO_CALLBACKS_END
 						echo '<td>';
 						echo "<button class='edit-service button button-secondary' data-index='" . esc_attr( $index ) . "'>Edit</button> ";
 						echo "<button class='delete-service button button-danger' data-index='" . esc_attr( $index ) . "'>Delete</button>";
@@ -128,7 +97,7 @@ function klaro_geo_services_page_content() {
 					<option value="true">Yes</option>
 					<option value="false">No</option>
 				</select>
-				<p class="description">When set to "Use Global Setting", this service will inherit the required setting from the template. When set to "Yes", users cannot decline this service. Only use for essential services that are required for your website to function.</p><br>
+				<p class="description">When set to "Use Global Setting", this service will inherit the required setting from each template, so it can be required in some templates and declinable in others (useful for Google Tag Manager). When set to "Yes", users cannot decline this service. Only use for essential services that are required for your website to function.</p><br>
 
 				<label for="service_default">Default:</label><br>
 				<select id="service_default" name="service_default">
@@ -171,23 +140,6 @@ function klaro_geo_services_page_content() {
 					</label>
 					<p class="description">If enabled, this service will only be shown in the consent modal when it's actually used on the page (e.g., embedded YouTube videos).</p>
 				</div>
-
-				<?php // KLARO_CALLBACKS_START ?>
-				<h3>Callback Scripts</h3>
-				<div class="callback-scripts">
-					<label for="service_oninit">onInit Script:</label><br>
-					<textarea id="service_oninit" name="service_oninit" rows="4" cols="50"></textarea>
-					<p class="description">JavaScript to execute when Klaro initializes this service.</p>
-
-					<label for="service_onaccept">onAccept Script:</label><br>
-					<textarea id="service_onaccept" name="service_onaccept" rows="4" cols="50"></textarea>
-					<p class="description">JavaScript to execute when the user accepts this service.</p>
-
-					<label for="service_ondecline">onDecline Script:</label><br>
-					<textarea id="service_ondecline" name="service_ondecline" rows="4" cols="50"></textarea>
-					<p class="description">JavaScript to execute when the user declines this service.</p>
-				</div>
-				<?php // KLARO_CALLBACKS_END ?>
 
 				<h3>Service Translations</h3>
 				<div class="translations">
@@ -245,107 +197,135 @@ function klaro_geo_services_page_content() {
 
 
 
+/**
+ * Sanitize the services array posted by the services admin page.
+ *
+ * The page posts every service back, including fields it does not edit
+ * (consent mode metadata, hidden flags), so unknown fields are kept but never
+ * stored as submitted: strings are stripped of markup and nested arrays are
+ * sanitized recursively.
+ *
+ * @param array $services Decoded services from the request.
+ * @return array Sanitized services. Entries that are not arrays are dropped.
+ */
+function klaro_geo_sanitize_services( array $services ) {
+	$bool_fields = array( 'required', 'default', 'optOut', 'onlyOnce', 'contextualConsentOnly', 'is_consent_mode_service', 'hidden', 'gpc_sensitive' );
+	// Service callbacks held admin-entered JavaScript and were removed. Services
+	// saved by an earlier version may still carry them; they are dropped here.
+	$removed_fields = array( 'onInit', 'onAccept', 'onDecline', 'callback' );
+
+	$sanitized = array();
+
+	foreach ( $services as $service ) {
+		if ( ! is_array( $service ) ) {
+			continue;
+		}
+
+		$clean = array();
+
+		foreach ( $service as $field => $value ) {
+			$field = sanitize_text_field( (string) $field );
+
+			if ( in_array( $field, $removed_fields, true ) ) {
+				continue;
+			}
+
+			if ( in_array( $field, $bool_fields, true ) ) {
+				// null means "Use Global Setting" for required / default.
+				$clean[ $field ] = ( null === $value ) ? null : filter_var( $value, FILTER_VALIDATE_BOOLEAN );
+			} elseif ( 'translations' === $field ) {
+				$clean[ $field ] = is_array( $value ) ? klaro_geo_sanitize_translations( $value ) : array();
+			} elseif ( 'purposes' === $field ) {
+				$clean[ $field ] = is_array( $value ) ? array_values( array_map( 'sanitize_text_field', array_filter( $value, 'is_scalar' ) ) ) : array();
+			} elseif ( 'cookies' === $field ) {
+				$clean[ $field ] = is_array( $value ) ? klaro_geo_sanitize_deep( $value, false ) : array();
+			} elseif ( is_array( $value ) ) {
+				$clean[ $field ] = klaro_geo_sanitize_array( $value );
+			} elseif ( is_string( $value ) ) {
+				$clean[ $field ] = sanitize_text_field( $value );
+			} elseif ( is_bool( $value ) || is_int( $value ) || is_float( $value ) || null === $value ) {
+				$clean[ $field ] = $value;
+			}
+		}
+
+		// Service names are keys: lowercase, hyphen-separated.
+		if ( isset( $clean['name'] ) ) {
+			$clean['name'] = str_replace( array( ' ', '_' ), '-', strtolower( $clean['name'] ) );
+		}
+
+		$sanitized[] = $clean;
+	}
+
+	return $sanitized;
+}
+
 add_action( 'wp_ajax_klaro_geo_save_services', 'klaro_geo_save_services' );
 
 function klaro_geo_save_services() {
-	check_ajax_referer( 'klaro_geo_nonce', '_wpnonce' );
+	klaro_geo_verify_admin_ajax( 'klaro_geo_nonce', '_wpnonce' );
+	// phpcs:disable WordPress.Security.NonceVerification.Missing -- the nonce and manage_options are checked by klaro_geo_verify_admin_ajax() above.
 
-	klaro_geo_debug_log( 'Save services AJAX request received' );
-
-	if ( isset( $_POST['services'] ) ) {
-		// Initialize the service settings class
-		$service_settings = Klaro_Geo_Service_Settings::get_instance();
-
-        // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- JSON string cannot be pre-sanitized; individual fields sanitized after decoding below.
-		$services = json_decode( wp_unslash( $_POST['services'] ), true );
-
-		if ( json_last_error() === JSON_ERROR_NONE && is_array( $services ) ) {
-			// Sanitize and process each service
-			// KLARO_CALLBACKS_START
-			// Callback fields (onInit, onAccept, onDecline) intentionally contain JS and are not sanitized.
-			// KLARO_CALLBACKS_END
-			$text_fields = array( 'name', 'consent_mode_key', 'parent_service' );
-			$bool_fields = array( 'required', 'default', 'optOut', 'onlyOnce', 'contextualConsentOnly', 'is_consent_mode_service', 'hidden' );
-
-			foreach ( $services as $key => $service ) {
-				// Sanitize text fields
-				foreach ( $text_fields as $field ) {
-					if ( isset( $service[ $field ] ) ) {
-						$services[ $key ][ $field ] = sanitize_text_field( $service[ $field ] );
-					}
-				}
-
-				// Sanitize boolean fields
-				foreach ( $bool_fields as $field ) {
-					if ( isset( $service[ $field ] ) ) {
-						$services[ $key ][ $field ] = filter_var( $service[ $field ], FILTER_VALIDATE_BOOLEAN );
-					}
-				}
-
-				// Sanitize purposes array (array of text strings)
-				if ( isset( $service['purposes'] ) && is_array( $service['purposes'] ) ) {
-					$services[ $key ]['purposes'] = array_map( 'sanitize_text_field', $service['purposes'] );
-				}
-
-				// Sanitize translations if present
-				if ( isset( $service['translations'] ) && is_array( $service['translations'] ) ) {
-					$services[ $key ]['translations'] = klaro_geo_sanitize_translations( $service['translations'] );
-				}
-
-				// Normalize the name field
-				if ( isset( $services[ $key ]['name'] ) ) {
-					$services[ $key ]['name'] = str_replace(
-						array( ' ', '_' ),
-						'-',
-						strtolower( $services[ $key ]['name'] )
-					);
-				}
-			}
-
-			// Save the services using the service settings class
-			$service_settings->set( $services );
-			$service_settings->save();
-
-			wp_send_json_success();
-		} else {
-			wp_send_json_error( 'Invalid services JSON or not an array' );
-		}
-		klaro_geo_debug_log( 'Saved ' . count( $services ) . ' services' );
-	} else {
+	if ( ! isset( $_POST['services'] ) ) {
 		wp_send_json_error( 'No services data provided' );
 	}
-	wp_die();
+
+	// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- JSON string; every field is sanitized in klaro_geo_sanitize_services().
+	$services = json_decode( wp_unslash( $_POST['services'] ), true );
+
+	if ( json_last_error() !== JSON_ERROR_NONE || ! is_array( $services ) ) {
+		wp_send_json_error( 'Invalid services JSON or not an array' );
+	}
+
+	$services = klaro_geo_sanitize_services( $services );
+
+	$service_settings = Klaro_Geo_Service_Settings::get_instance();
+	$service_settings->set( $services );
+	$service_settings->save();
+
+	wp_send_json_success();
+	// phpcs:enable WordPress.Security.NonceVerification.Missing
 }
 
 
 add_action( 'wp_ajax_klaro_geo_delete_service', 'klaro_geo_delete_service' );
 
-function klaro_geo_delete_service() {
-	check_ajax_referer( 'klaro_geo_nonce', '_wpnonce' );
-
-	$index = isset( $_POST['index'] ) ? intval( $_POST['index'] ) : -1;
-	if ( $index < 0 ) {
-		wp_send_json_error( [ 'message' => 'Invalid service index.' ] );
-		wp_die(); // Always wp_die() after wp_send_json_error()
-	}
-
-	// Initialize the service settings class
+/**
+ * Delete the service at a position in the stored list.
+ *
+ * Goes through Klaro_Geo_Service_Settings::remove_service(), which refuses to
+ * delete consent mode services: consent mode depends on them, and they can
+ * only be hidden.
+ *
+ * @param int $index Position of the service in the stored list.
+ * @return true|WP_Error
+ */
+function klaro_geo_delete_service_at( $index ) {
 	$service_settings = Klaro_Geo_Service_Settings::get_instance();
+	$services         = $service_settings->get();
 
-	// Get the existing services
-	$services = $service_settings->get();
-
-	if ( is_array( $services ) && isset( $services[ $index ] ) ) {
-		array_splice( $services, $index, 1 ); // Remove the service
-
-		// Update the services using the service settings class
-		$service_settings->set( $services );
-		$service_settings->save();
-
-		wp_send_json_success( $services );  // Send the updated services data
-	} else {
-		wp_send_json_error( [ 'message' => 'Service not found or invalid services data.' ] );
+	if ( ! isset( $services[ $index ]['name'] ) ) {
+		return new WP_Error( 'klaro_geo_service_not_found', 'Service not found.' );
 	}
-	wp_die();
+
+	$result = $service_settings->remove_service( $services[ $index ]['name'] );
+	if ( is_array( $result ) ) {
+		return new WP_Error( 'klaro_geo_service_protected', $result['message'] );
+	}
+
+	$service_settings->save();
+	return true;
+}
+
+function klaro_geo_delete_service() {
+	klaro_geo_verify_admin_ajax( 'klaro_geo_nonce', '_wpnonce' );
+	// phpcs:disable WordPress.Security.NonceVerification.Missing -- the nonce and manage_options are checked by klaro_geo_verify_admin_ajax() above.
+
+	$result = klaro_geo_delete_service_at( isset( $_POST['index'] ) ? intval( $_POST['index'] ) : -1 );
+	if ( is_wp_error( $result ) ) {
+		wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+	}
+
+	wp_send_json_success( Klaro_Geo_Service_Settings::get_instance()->get() );
+	// phpcs:enable WordPress.Security.NonceVerification.Missing
 }
 ?>

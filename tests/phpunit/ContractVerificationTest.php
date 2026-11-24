@@ -1,13 +1,20 @@
 <?php
 /**
- * Contract Verification Tests
+ * Business rule tests for template storage, template resolution and config
+ * generation.
  *
- * These tests verify the contracts defined in specs/*.spec.yaml files.
- * Each test method maps to a specific contract or business rule.
+ * These rules used to be written down in per-file spec documents. The specs are
+ * gone; these tests are now where the rules live, so each test says which rule
+ * it protects:
  *
- * @see specs/klaro-geo-config.spec.yaml
- * @see specs/class-klaro-geo-template-settings.spec.yaml
- * @see specs/class-klaro-geo-country-settings.spec.yaml
+ * - Templates: every template has 'name' and a 'config' array; database
+ *   templates are preferred over the hardcoded defaults, which are used only
+ *   when the database is empty or corrupt; user-set values survive a reload.
+ * - cookieDomain: a non-empty value is used exactly; an empty one is
+ *   auto-detected from the site URL with a leading dot.
+ * - Template resolution: region, then country, then the fallback template;
+ *   the key returned always exists in the templates database.
+ * - Config generation: every template config value reaches klaroConfig.
  */
 
 class ContractVerificationTest extends WP_UnitTestCase {
@@ -54,13 +61,12 @@ class ContractVerificationTest extends WP_UnitTestCase {
     }
 
     // =========================================================================
-    // CONTRACT: Template Structure (class-klaro-geo-template-settings.spec.yaml)
+    // CONTRACT: Template Structure
     // =========================================================================
 
     /**
      * Contract: Every template MUST have 'name' and 'config' keys
      *
-     * @spec class-klaro-geo-template-settings.spec.yaml
      * @rule template_structure
      */
     public function test_contract_template_structure_has_required_keys() {
@@ -82,7 +88,6 @@ class ContractVerificationTest extends WP_UnitTestCase {
     /**
      * Contract: get() ALWAYS returns array (never null)
      *
-     * @spec class-klaro-geo-template-settings.spec.yaml
      * @rule get() contract
      */
     public function test_contract_get_always_returns_array() {
@@ -99,7 +104,6 @@ class ContractVerificationTest extends WP_UnitTestCase {
     /**
      * Contract: get_template() returns null if not found (doesn't auto-create)
      *
-     * @spec class-klaro-geo-template-settings.spec.yaml
      * @method get_template
      */
     public function test_contract_get_template_returns_null_for_missing() {
@@ -110,13 +114,12 @@ class ContractVerificationTest extends WP_UnitTestCase {
     }
 
     // =========================================================================
-    // CONTRACT: Database First (class-klaro-geo-template-settings.spec.yaml)
+    // CONTRACT: Database First
     // =========================================================================
 
     /**
      * Contract: Database values MUST be preferred over hardcoded defaults
      *
-     * @spec class-klaro-geo-template-settings.spec.yaml
      * @rule database_first
      */
     public function test_contract_database_values_preferred_over_defaults() {
@@ -158,7 +161,6 @@ class ContractVerificationTest extends WP_UnitTestCase {
     /**
      * Contract: User-set cookieDomain MUST NOT be overwritten by defaults
      *
-     * @spec class-klaro-geo-template-settings.spec.yaml
      * @rule preserve_user_data
      */
     public function test_contract_user_cookieDomain_preserved() {
@@ -182,13 +184,12 @@ class ContractVerificationTest extends WP_UnitTestCase {
     }
 
     // =========================================================================
-    // CONTRACT: cookieDomain Handling (klaro-geo-config.spec.yaml)
+    // CONTRACT: cookieDomain Handling
     // =========================================================================
 
     /**
      * Contract: If template has explicit cookieDomain (non-empty string), use it exactly
      *
-     * @spec klaro-geo-config.spec.yaml
      * @rule cookieDomain_handling
      */
     public function test_contract_explicit_cookieDomain_used_exactly() {
@@ -213,9 +214,8 @@ class ContractVerificationTest extends WP_UnitTestCase {
      * Contract: If template cookieDomain is empty string '', it should trigger auto-detect
      *
      * This test verifies the template config, not the actual auto-detection
-     * (which happens in klaro_geo_generate_config_file)
+     * (which happens in klaro_geo_frontend_inline_script)
      *
-     * @spec klaro-geo-config.spec.yaml
      * @rule cookieDomain_handling
      */
     public function test_contract_empty_cookieDomain_in_template() {
@@ -231,13 +231,12 @@ class ContractVerificationTest extends WP_UnitTestCase {
     }
 
     // =========================================================================
-    // CONTRACT: Effective Settings (class-klaro-geo-country-settings.spec.yaml)
+    // CONTRACT: Effective Settings
     // =========================================================================
 
     /**
      * Contract: get_effective_settings() MUST return array with 'template' key
      *
-     * @spec class-klaro-geo-country-settings.spec.yaml
      * @function get_effective_settings
      */
     public function test_contract_effective_settings_returns_template_key() {
@@ -255,7 +254,6 @@ class ContractVerificationTest extends WP_UnitTestCase {
     /**
      * Contract: Returned template key MUST exist in templates database
      *
-     * @spec class-klaro-geo-country-settings.spec.yaml
      * @rule template_key_validation
      */
     public function test_contract_effective_settings_template_exists() {
@@ -284,7 +282,6 @@ class ContractVerificationTest extends WP_UnitTestCase {
     /**
      * Contract: If configured template doesn't exist, fall back to default_template
      *
-     * @spec class-klaro-geo-country-settings.spec.yaml
      * @rule template_key_validation
      */
     public function test_contract_missing_template_falls_back() {
@@ -294,7 +291,7 @@ class ContractVerificationTest extends WP_UnitTestCase {
         ));
 
         // Set fallback template
-        $this->country_settings->set_default_template('default');
+        $this->country_settings->set_key( 'default_template', 'default');
 
         // Set visible countries
         $this->country_settings->set_visible_countries(array('US'));
@@ -312,7 +309,6 @@ class ContractVerificationTest extends WP_UnitTestCase {
     /**
      * Contract: Template resolution order - Region > Country > Fallback
      *
-     * @spec class-klaro-geo-country-settings.spec.yaml
      * @rule template_resolution_order
      */
     public function test_contract_template_resolution_order() {
@@ -332,7 +328,7 @@ class ContractVerificationTest extends WP_UnitTestCase {
         $this->template_settings->save();
 
         // Set fallback
-        $this->country_settings->set_default_template('fallback-template');
+        $this->country_settings->set_key( 'default_template', 'fallback-template');
 
         // Set country with region override
         $this->country_settings->set_country('US', array(
@@ -364,7 +360,7 @@ class ContractVerificationTest extends WP_UnitTestCase {
     }
 
     // =========================================================================
-    // CONTRACT: Config Generation Flow (klaro-geo-config.spec.yaml)
+    // CONTRACT: Config Generation Flow
     // =========================================================================
 
     /**
@@ -373,7 +369,6 @@ class ContractVerificationTest extends WP_UnitTestCase {
      * This tests that when a template is applied, all its config values
      * are properly transferred.
      *
-     * @spec klaro-geo-config.spec.yaml
      * @step step_5_config_application
      */
     public function test_contract_all_config_values_copied() {
@@ -419,8 +414,6 @@ class ContractVerificationTest extends WP_UnitTestCase {
      *
      * This is the key integration test that verifies the full contract flow.
      *
-     * @spec klaro-geo-config.spec.yaml
-     * @spec class-klaro-geo-country-settings.spec.yaml
      */
     public function test_contract_full_template_application_flow() {
         // 1. Set up templates with specific cookieDomain values
@@ -444,7 +437,7 @@ class ContractVerificationTest extends WP_UnitTestCase {
         $this->template_settings->save();
 
         // 2. Set up country settings
-        $this->country_settings->set_default_template('opt-in');  // Fallback
+        $this->country_settings->set_key( 'default_template', 'opt-in');  // Fallback
         $this->country_settings->set_country('US', array(
             'template' => 'opt-out'  // US uses opt-out
         ));
@@ -474,7 +467,6 @@ class ContractVerificationTest extends WP_UnitTestCase {
     /**
      * Contract: Template changes persist across save/load cycles
      *
-     * @spec class-klaro-geo-template-settings.spec.yaml
      * @rule preserve_user_data
      */
     public function test_contract_template_persistence() {
@@ -509,7 +501,6 @@ class ContractVerificationTest extends WP_UnitTestCase {
     /**
      * Contract: Handle corrupted/invalid database data gracefully
      *
-     * @spec class-klaro-geo-template-settings.spec.yaml
      * @edge_case Database returns corrupted data
      */
     public function test_contract_handles_corrupted_database() {
@@ -527,7 +518,6 @@ class ContractVerificationTest extends WP_UnitTestCase {
     /**
      * Contract: Handle empty database gracefully
      *
-     * @spec class-klaro-geo-template-settings.spec.yaml
      * @edge_case Database is empty
      */
     public function test_contract_handles_empty_database() {
@@ -542,9 +532,9 @@ class ContractVerificationTest extends WP_UnitTestCase {
     }
 
     /**
-     * Contract: Template without 'config' key is handled
+     * Contract: a template stored without a 'config' key is given the
+     * fail-closed default config when it is loaded
      *
-     * @spec class-klaro-geo-template-settings.spec.yaml
      * @edge_case Template exists but has no 'config' key
      */
     public function test_contract_handles_template_without_config() {
@@ -559,8 +549,9 @@ class ContractVerificationTest extends WP_UnitTestCase {
         $fresh_settings = new Klaro_Geo_Template_Settings();
         $config = $fresh_settings->get_template_config('malformed');
 
-        // Should return null for missing config, not throw
-        $this->assertNull($config,
-            'get_template_config should return null for template without config');
+        $this->assertSame(klaro_geo_get_fail_closed_template_config()['translations'], $config['translations']);
+        $this->assertFalse($config['default'], 'Nothing is granted by default');
+        $this->assertFalse($config['required'], 'Nothing is undeclinable');
+        $this->assertTrue($config['acceptAll']);
     }
 }

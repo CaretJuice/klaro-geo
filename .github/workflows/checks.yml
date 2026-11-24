@@ -1,0 +1,149 @@
+# Local and CI run the same checks. pre-commit runs the first four on every
+# commit that touches the files they cover; this runs them on every push to
+# master and every pull request, and adds the suites that need WordPress.
+name: Checks
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+# The jobs only read the repository. Actions are pinned to a commit, with the
+# release it belongs to beside it; Dependabot (.github/dependabot.yml) opens a
+# pull request when a newer release exists.
+permissions:
+  contents: read
+
+jobs:
+  static:
+    name: Banned patterns, PHPCS, PHPStan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.3'
+          tools: composer
+          coverage: none
+      - run: composer install --no-interaction --no-progress
+      - name: Banned patterns
+        run: bin/check-banned-patterns.sh
+      - name: PHPCS
+        run: vendor/bin/phpcs
+      - name: PHPStan
+        run: vendor/bin/phpstan analyse --no-progress --memory-limit=1G
+
+  jest:
+    name: Jest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '20'
+      - run: npm ci --no-audit --no-fund
+      - run: npx jest
+
+  # The suite runs on the default pair (docker/Dockerfile), on the oldest
+  # WordPress and PHP the plugin says it supports (the "Requires at least" and
+  # "Requires PHP" headers of klaro-geo.php; change them together with the
+  # "oldest" rows here and in the e2e job), and on the newest PHP.
+  phpunit:
+    name: PHPUnit (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: default
+          - name: oldest supported
+            wp: 5.7.22
+            php: '7.2'
+            phpunit: 7.5.20
+          - name: newest PHP
+            php: '8.5'
+    env:
+      WP_VERSION: ${{ matrix.wp }}
+      PHP_VERSION: ${{ matrix.php }}
+      PHPUNIT_VERSION: ${{ matrix.phpunit }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: PHPUnit
+        run: bin/phpunit.sh
+      - name: Keep the debug log
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: phpunit-debug-log-${{ strategy.job-index }}
+          path: docker/logs/debug_test.log
+          retention-days: 7
+
+  e2e:
+    name: Playwright and Plugin Check
+    # Not ubuntu-latest: Playwright installs system packages for a named Ubuntu
+    # release and refuses one it does not know. Move this forward when the
+    # Playwright in package-lock.json supports the newer release.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '20'
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium firefox
+      - name: Start the site
+        run: npm run e2e:setup
+      - name: Playwright
+        run: npm run e2e:test
+      - name: Plugin Check on the build output
+        run: bin/plugin-check.sh
+      - name: Keep the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playwright-report
+          path: |
+            e2e-report
+            test-results
+          retention-days: 7
+      - name: Site log
+        if: failure()
+        run: |
+          docker logs klaro-geo-site --tail 100 || true
+          docker exec klaro-geo-site sh -c 'tail -n 200 wp-content/debug.log' || true
+
+  # The browser suite on the oldest supported pair. PHPUnit cannot see how old
+  # WordPress versions load and order the scripts; this can.
+  e2e-oldest:
+    name: Playwright (oldest supported)
+    # Not ubuntu-latest: Playwright installs system packages for a named Ubuntu
+    # release and refuses one it does not know. Move this forward when the
+    # Playwright in package-lock.json supports the newer release.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      WP_VERSION: 5.7.22
+      PHP_VERSION: '7.2'
+      PHPUNIT_VERSION: 7.5.20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '20'
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - name: Start the site
+        run: npm run e2e:setup
+      - name: Playwright
+        run: npx playwright test --project=chromium
+      - name: Keep the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playwright-report-oldest
+          path: |
+            e2e-report
+            test-results
+          retention-days: 7

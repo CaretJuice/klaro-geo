@@ -14,8 +14,16 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Class Klaro_Geo_Option
  *
  * Base class for handling JSON objects stored in WordPress options
+ *
+ * @phpstan-consistent-constructor
  */
 class Klaro_Geo_Option {
+	/**
+	 * The option a subclass stores, used by get_instance() when no name is
+	 * given. The base class has none: pass a name.
+	 */
+	const OPTION_NAME = '';
+
 	/**
 	 * The option name in the WordPress database
 	 *
@@ -43,6 +51,54 @@ class Klaro_Geo_Option {
 	 * @var bool
 	 */
 	protected $is_modified = false;
+
+	/**
+	 * One instance per class and option name, so an option is loaded from the
+	 * database once per request.
+	 *
+	 * @var array
+	 */
+	private static $instances = array();
+
+	/**
+	 * Get the shared instance for an option.
+	 *
+	 * @param string|null $option_name Option name; defaults to the class's OPTION_NAME.
+	 * @return static
+	 */
+	public static function get_instance( $option_name = null ) {
+		$option_name = null === $option_name ? static::OPTION_NAME : $option_name;
+		$key         = static::class . ':' . $option_name;
+		if ( ! isset( self::$instances[ $key ] ) ) {
+			self::$instances[ $key ] = new static( $option_name );
+		}
+		return self::$instances[ $key ];
+	}
+
+	/**
+	 * Forget this class's shared instances, so the next get_instance() reloads
+	 * from the database. Used by tests and after an option is replaced directly.
+	 *
+	 * @param string|null $option_name One option, or null for all of this class's.
+	 */
+	public static function clear_instance_cache( $option_name = null ) {
+		$prefix = static::class . ':';
+		foreach ( array_keys( self::$instances ) as $key ) {
+			if ( 0 === strpos( $key, $prefix ) && ( null === $option_name || $key === $prefix . $option_name ) ) {
+				unset( self::$instances[ $key ] );
+			}
+		}
+	}
+
+	/**
+	 * The value as it is written to the database. Subclasses that store a
+	 * different representation override this.
+	 *
+	 * @return mixed
+	 */
+	protected function value_to_store() {
+		return $this->value;
+	}
 
 	/**
 	 * Constructor
@@ -83,9 +139,6 @@ class Klaro_Geo_Option {
 		$this->value       = $value;
 		$this->is_modified = false;
 
-		// Single compact log entry for the load operation
-		klaro_geo_debug_log( 'Loaded ' . $this->option_name . ' (' . count( $this->value ) . ' items)' );
-
 		return $this->value;
 	}
 
@@ -104,18 +157,10 @@ class Klaro_Geo_Option {
 			klaro_geo_debug_log( 'WARNING: Attempting to save empty value for ' . $this->option_name );
 		}
 
-		// Special handling for services - always save as JSON string
-		if ( $this->option_name === 'klaro_geo_services' ) {
-			$json_value = wp_json_encode( $this->value, JSON_PRETTY_PRINT );
-			$result     = update_option( $this->option_name, $json_value );
-		} else {
-			// Save the option as is for other options
-			$result = update_option( $this->option_name, $this->value );
-		}
+		$result = update_option( $this->option_name, $this->value_to_store() );
 
 		if ( $result ) {
 			$this->is_modified = false;
-			klaro_geo_debug_log( 'Saved ' . $this->option_name . ' (' . count( $this->value ) . ' items)' );
 		} else {
 			klaro_geo_debug_log( 'Failed to save ' . $this->option_name );
 		}
@@ -136,15 +181,15 @@ class Klaro_Geo_Option {
 	 * Get a specific key from the option
 	 *
 	 * @param string $key The key to get
-	 * @param mixed  $default Default value if key doesn't exist
+	 * @param mixed  $default_value Default value if key doesn't exist
 	 * @return mixed The value of the key
 	 */
-	public function get_key( $key, $default = null ) {
+	public function get_key( $key, $default_value = null ) {
 		if ( isset( $this->value[ $key ] ) ) {
 			return $this->value[ $key ];
 		}
 
-		return $default;
+		return $default_value;
 	}
 
 	/**
@@ -184,12 +229,7 @@ class Klaro_Geo_Option {
 	 * @param array $value The new value
 	 * @return $this For method chaining
 	 */
-	public function set( $value ) {
-		if ( ! is_array( $value ) ) {
-			klaro_geo_debug_log( 'Invalid value for ' . $this->option_name . ', must be an array' );
-			return $this;
-		}
-
+	public function set( array $value ) {
 		if ( $this->value !== $value ) {
 			$this->value       = $value;
 			$this->is_modified = true;
@@ -206,124 +246,6 @@ class Klaro_Geo_Option {
 	 */
 	public function has_key( $key ) {
 		return isset( $this->value[ $key ] );
-	}
-
-	/**
-	 * Get a nested value from the option
-	 *
-	 * @param array $keys Array of keys to traverse
-	 * @param mixed $default Default value if path doesn't exist
-	 * @return mixed The value at the specified path
-	 */
-	public function get_nested( $keys, $default = null ) {
-		$value = $this->value;
-
-		foreach ( $keys as $key ) {
-			if ( ! isset( $value[ $key ] ) ) {
-				return $default;
-			}
-
-			$value = $value[ $key ];
-		}
-
-		return $value;
-	}
-
-	/**
-	 * Set a nested value in the option
-	 *
-	 * @param array $keys Array of keys to traverse
-	 * @param mixed $value The value to set
-	 * @return $this For method chaining
-	 */
-	public function set_nested( $keys, $value ) {
-		if ( empty( $keys ) ) {
-			return $this;
-		}
-
-		$reference = &$this->value;
-		$last_key  = array_pop( $keys );
-
-		foreach ( $keys as $key ) {
-			if ( ! isset( $reference[ $key ] ) || ! is_array( $reference[ $key ] ) ) {
-				$reference[ $key ] = array();
-			}
-
-			$reference = &$reference[ $key ];
-		}
-
-		if ( ! isset( $reference[ $last_key ] ) || $reference[ $last_key ] !== $value ) {
-			$reference[ $last_key ] = $value;
-			$this->is_modified      = true;
-		}
-
-		return $this;
-	}
-
-	/**
-	 * Remove a nested value from the option
-	 *
-	 * @param array $keys Array of keys to traverse
-	 * @return $this For method chaining
-	 */
-	public function remove_nested( $keys ) {
-		if ( empty( $keys ) ) {
-			return $this;
-		}
-
-		$reference = &$this->value;
-		$last_key  = array_pop( $keys );
-
-		foreach ( $keys as $key ) {
-			if ( ! isset( $reference[ $key ] ) || ! is_array( $reference[ $key ] ) ) {
-				return $this;
-			}
-
-			$reference = &$reference[ $key ];
-		}
-
-		if ( isset( $reference[ $last_key ] ) ) {
-			unset( $reference[ $last_key ] );
-			$this->is_modified = true;
-		}
-
-		return $this;
-	}
-
-	/**
-	 * Merge an array into the option
-	 *
-	 * @param array $value The array to merge
-	 * @param bool  $recursive Whether to merge recursively
-	 * @return $this For method chaining
-	 */
-	public function merge( $value, $recursive = true ) {
-		if ( ! is_array( $value ) ) {
-			klaro_geo_debug_log( 'Invalid value for merge, must be an array' );
-			return $this;
-		}
-
-		if ( $recursive ) {
-			$this->value = array_merge_recursive( $this->value, $value );
-		} else {
-			$this->value = array_merge( $this->value, $value );
-		}
-
-		$this->is_modified = true;
-
-		return $this;
-	}
-
-	/**
-	 * Reset the option to its default value
-	 *
-	 * @return $this For method chaining
-	 */
-	public function reset() {
-		$this->value       = $this->default_value;
-		$this->is_modified = true;
-
-		return $this;
 	}
 
 	/**

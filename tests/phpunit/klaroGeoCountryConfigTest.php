@@ -4,12 +4,6 @@
  *
  * @package Klaro_Geo
  */
-// Set up error logging - use the same path as defined in wp-tests-config.php
-ini_set('log_errors', 1);
-ini_set('error_log', '/var/www/html/wp-content/debug.log');
-
-// Add a test message to verify logging is working
-error_log('CountryConfigTest started - ' . date('Y-m-d H:i:s'));
 
 class CountryConfigTest extends WP_UnitTestCase {
     public function setUp(): void {
@@ -57,10 +51,62 @@ class CountryConfigTest extends WP_UnitTestCase {
     }
 
     public function tearDown(): void {
+        unset($_GET['klaro_geo_debug_geo'], $_GET['_wpnonce']);
         delete_option('klaro_geo_services');
         delete_option('klaro_geo_country_settings');
         delete_option('klaro_geo_templates');
         parent::tearDown();
+    }
+
+    /**
+     * Preview a location the way the admin bar debug menu does: as an
+     * administrator, with the location and the menu's nonce in the URL.
+     */
+    private function previewLocationAsAdministrator($code) {
+        wp_set_current_user(self::factory()->user->create(array('role' => 'administrator')));
+        $_GET['klaro_geo_debug_geo'] = $code;
+        $_GET['_wpnonce'] = wp_create_nonce('klaro_geo_debug_geo');
+    }
+
+    /**
+     * The debug override is honoured only for an administrator whose request
+     * carries the debug menu's nonce. A bare ?klaro_geo_debug_geo=US in a link
+     * must not change the template anyone is shown.
+     */
+    public function test_debug_location_needs_the_nonce_and_an_administrator() {
+        $this->previewLocationAsAdministrator('US');
+        $this->assertSame('US', klaro_geo_requested_debug_geo());
+        $location = klaro_geo_get_user_location();
+        $this->assertSame('US', $location['country']);
+        $this->assertTrue($location['is_admin_override']);
+
+        unset($_GET['_wpnonce']);
+        $this->assertSame('', klaro_geo_requested_debug_geo(), 'No nonce, no override');
+        $this->assertFalse(klaro_geo_get_user_location()['is_admin_override']);
+
+        $_GET['_wpnonce'] = 'not-the-nonce';
+        $this->assertSame('', klaro_geo_requested_debug_geo(), 'A wrong nonce is no nonce');
+
+        // WordPress fills a public query var from the URL without any nonce.
+        // The override must not be one.
+        set_query_var('klaro_geo_debug_geo', 'US');
+        $this->assertNotContains('klaro_geo_debug_geo', apply_filters('query_vars', array()));
+        $this->assertFalse(klaro_geo_get_user_location()['is_admin_override']);
+
+        $this->previewLocationAsAdministrator('US');
+        wp_set_current_user(self::factory()->user->create(array('role' => 'editor')));
+        $_GET['_wpnonce'] = wp_create_nonce('klaro_geo_debug_geo');
+        $this->assertSame('', klaro_geo_requested_debug_geo(), 'A valid nonce is not enough without manage_options');
+    }
+
+    /**
+     * The Klaro config the current visitor would receive: the template PHP
+     * resolved for this request, read from the frontend payload.
+     */
+    private function resolvedConfig() {
+        $payload = klaro_geo_get_frontend_payload()['payload'];
+        $this->assertSame('server', $payload['mode']);
+        return $payload['templates'][$payload['resolved']['template']]['config'] ?? null;
     }
 
     /**
@@ -88,20 +134,16 @@ class CountryConfigTest extends WP_UnitTestCase {
         update_option('klaro_geo_country_settings', wp_json_encode($settings));
 
         // Set debug country to US
-        global $wp_query;
-        if (!isset($wp_query->query_vars)) {
-            $wp_query->query_vars = array();
-        }
-        $wp_query->query_vars['klaro_geo_debug_geo'] = 'US';
+        $this->previewLocationAsAdministrator('US');
         klaro_geo_debug_log("Set debug country to US in query vars");
 
         // Generate config content (returned as string since 0.3.5; no longer written to disk)
-        $config_content = klaro_geo_generate_config_file();
+        $config_content = klaro_geo_frontend_inline_script();
         $this->assertIsString($config_content, 'Config generation failed');
 
         // Parse the config content to get the service settings using a more robust method
-        if (preg_match('/var\s+klaroConfig\s*=\s*(\{[\s\S]*?\}\s*);/m', $config_content, $matches)) {
-            $config = json_decode($matches[1], true);
+        if (($resolved_config = $this->resolvedConfig()) !== null) {
+            $config = $resolved_config;
             error_log('Parsed config: ' . print_r($config, true)); // Log the entire parsed config
             error_log('Config default value: ' . json_encode(isset($config['default']) ? $config['default'] : 'default key not set')); // Log the specific 'default' value
 
@@ -162,11 +204,7 @@ class CountryConfigTest extends WP_UnitTestCase {
         klaro_geo_debug_log("Country settings set up: " . wp_json_encode($settings));
 
         // Set debug country to UK
-        global $wp_query;
-        if (!isset($wp_query->query_vars)) {
-            $wp_query->query_vars = array();
-        }
-        $wp_query->query_vars['klaro_geo_debug_geo'] = 'UK';
+        $this->previewLocationAsAdministrator('UK');
         klaro_geo_debug_log("Set debug country to UK in query vars");
         klaro_geo_debug_log("Debug country set to UK");
 
@@ -198,7 +236,7 @@ class CountryConfigTest extends WP_UnitTestCase {
 
         // Generate config content (returned as string since 0.3.5; no longer written to disk)
         klaro_geo_debug_log("Generating config content...");
-        $config_content = klaro_geo_generate_config_file();
+        $config_content = klaro_geo_frontend_inline_script();
         $this->assertIsString($config_content, 'Config generation failed');
         $this->assertNotEmpty($config_content, 'Config content is empty');
         klaro_geo_debug_log("Config content length: " . strlen($config_content));
@@ -208,9 +246,9 @@ class CountryConfigTest extends WP_UnitTestCase {
         klaro_geo_debug_log("Config content snippet: " . $snippet);
 
         // Parse the config content to get the service settings using a more robust method
-        if (preg_match('/var\s+klaroConfig\s*=\s*(\{[\s\S]*?\}\s*);/m', $config_content, $matches)) {
+        if (($resolved_config = $this->resolvedConfig()) !== null) {
             klaro_geo_debug_log("Config regex matched. Parsing JSON...");
-            $config = json_decode($matches[1], true);
+            $config = $resolved_config;
 
             if (json_last_error() !== JSON_ERROR_NONE) {
                 klaro_geo_debug_log("ERROR: JSON parsing failed: " . json_last_error_msg());

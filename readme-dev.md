@@ -1,386 +1,87 @@
 # Development Setup for Klaro Geo
 
-This document provides instructions for setting up a development environment and running tests for the Klaro Geo plugin. The project uses Docker for development, making it easy to get started without configuring a local WordPress installation.
+How to run the plugin locally and run its tests. Everything runs in Docker, so no local WordPress is needed. The rules the code follows, and which tests cover them, are in `CLAUDE.md`.
 
 ## Prerequisites
 
-- Docker
-- Docker Compose
+- Docker with Compose v2 (`docker compose`)
+- Node.js and npm
 - Git
-- Node.js and npm (for JavaScript development)
+- `pre-commit` (`pip install pre-commit`), then `pre-commit install` once after cloning
 
-## Project Structure
+Run `npm install` once in the repository root. It installs Jest and Playwright; run `npm run e2e:install` once to download the Playwright browsers.
 
-- `/docker` - Contains all Docker-related files and configuration
-- `/includes` - PHP classes and core functionality
-- `/js` - JavaScript source files
-- `/css` - CSS stylesheets
-- `/tests` - Test files
-  - `/phpunit` - PHP unit tests
-  - `/js` - JavaScript tests
-- `/vendor` - Composer dependencies (generated)
+## Project structure
 
-## Key Files
+- `klaro-geo.php` - bootstrap, script loading, GTM output, shortcodes
+- `includes/` - PHP: config generation, settings classes, receipts; `includes/admin/` holds the admin pages
+- `js/`, `css/` - frontend and admin scripts and styles
+- `specs/` - contracts with code outside this repository, and between PHP and JavaScript
+- `tests/phpunit/`, `tests/js/`, `e2e/` - PHPUnit, Jest and Playwright tests
+- `docker/` - the image and compose file behind `bin/phpunit.sh` and `bin/site.sh`
+- `bin/` - the scripts that run the tests, the site and the checks
 
-- `klaro-geo.php` - Main plugin file
-- `klaro-config.js` - Generated Klaro configuration
-- `readme.md` - User documentation
-- `readme-dev.md` - Developer documentation (this file)
-- `phpunit.xml` - PHPUnit configuration
-- `package.json` - npm configuration for JavaScript development
-
-## Setting Up the Development Environment
-
-### On Linux/macOS:
-```bash
-# Clone the repository (if you haven't already)
-git clone https://github.com/your-repo/klaro-geo.git
-cd klaro-geo
-
-# Make the startup script executable
-chmod +x start-dev-environment.sh
-
-# Start the development environment
-./start-dev-environment.sh
-```
-
-### On Windows:
-```powershell
-# Clone the repository (if you haven't already)
-git clone https://github.com/your-repo/klaro-geo.git
-cd klaro-geo
-
-# Start the development environment
-.\start-dev-environment.ps1
-```
-
-The development environment will be available at:
-- WordPress: http://localhost:8000
-- Admin: http://localhost:8000/wp-admin (username: `admin`, password: `password`)
-
-No manual configuration is required - the scripts handle everything automatically, including:
-- Setting up WordPress
-- Installing and activating the plugin
-- Configuring the GeoIP Detection plugin
-- Creating test data
-
-## Development Workflow
-
-1. Make changes to the plugin files
-2. Test your changes in the development environment
-3. Write and run tests to verify functionality
-4. Commit your changes
-
-## Running Tests
-
-The test suite is comprehensive and includes both PHP and JavaScript tests.
-
-### Quick Start for Running Tests
-
-To make all scripts executable and run tests without password prompts:
+## Running the plugin
 
 ```bash
-# Make all scripts executable
-bash fix-permissions.sh
-
-# Run PHP tests (no password required)
-./run-php-tests.sh
-
-# Run JavaScript tests (no password required)
-./run-js-tests.sh
-
-# Run a specific JavaScript test (no password required)
-./run-js-tests.sh "test-name"
+bin/site.sh up       # start the site; installs WordPress the first time
+bin/site.sh reset    # back to a fresh install (what the Playwright tests start from)
+bin/site.sh down     # stop it and delete its data
 ```
 
-### Available Test Scripts
+- Site: http://localhost:8080, admin at `/wp-admin` (`admin` / `password`). Klaro Geo and Geolocation IP Detection are active and a GTM ID is set.
+- WP-CLI: `bin/site.sh wp <command>`
+- WordPress debug log: `bin/site.sh log`
 
-#### No-Password Scripts (Recommended)
+Your checkout is mounted as the plugin, read-only, so edits are live without a restart and nothing in a container changes your files. Nothing is kept when the site is taken down; every start is a clean install. See `docker/readme.md` for how the environment is built.
 
-These scripts bypass the Docker entrypoint script that requires a password:
-
-- `run-php-tests.sh` - Runs all PHP tests
-- `run-js-tests.sh` - Runs all JavaScript tests
-- `run-js-tests.sh "test-name"` - Runs a specific JavaScript test
-
-#### Direct Test Script (Most Reliable)
-
-If you're having issues with npm permissions, use the direct test script:
-
-- `run-js-tests-direct.sh` - Runs JavaScript tests in a fresh container without using the existing npm cache
-- `run-js-tests-direct.sh "test-name"` - Runs a specific JavaScript test in a fresh container
-
-#### Original Scripts (May Require Password)
-
-The original test scripts may prompt for a password:
-
-- `run-tests.sh` - Runs all PHP tests
-- `run-tests.sh js` - Runs all JavaScript tests
-- `run-tests.sh js "test-name"` - Runs a specific JavaScript test
-
-### Alternative Methods for Running Tests
-
-#### PHP Tests
-
-##### Method 1: Using the run-tests.sh Script
+## Running tests
 
 ```bash
-# Make the script executable
-chmod +x run-tests.sh
+# PHP (add --filter ClassName for one test class)
+bin/phpunit.sh
 
-# Run all PHP tests
-./run-tests.sh
+# JavaScript, from the repository root, on the host
+npx jest
 
-# Run tests with verbose output
-./run-tests.sh -v
+# End to end
+npm run e2e:setup
+npm run e2e:test
+npm run site:down
 ```
 
-##### Method 2: From Your Host Machine
+The PHP test bootstrap turns the plugin's debug logging on. The log of the last run is `docker/logs/debug_test.log`, not the terminal. More on the E2E tests is in `e2e/README.md`.
+
+## Static checks
+
+After `composer install`:
 
 ```bash
-# Change to the docker directory
-cd docker
-
-# Run all tests
-docker compose run wordpress_test bash -c "cd /var/www/html/wp-content/plugins/klaro-geo && phpunit -c phpunit.xml"
-
-# Run a specific test file
-docker compose run wordpress_test bash -c "cd /var/www/html/wp-content/plugins/klaro-geo && phpunit -c phpunit.xml tests/phpunit/klaroGeoRegionsTest.php"
+vendor/bin/phpcs                       # WordPress coding standards, PHP 7.2 / WordPress 5.7 compatibility
+vendor/bin/phpcbf                      # fixes what phpcs can fix automatically
+vendor/bin/phpstan analyse             # type checks
+bin/check-banned-patterns.sh           # patterns this project has ruled out (see CLAUDE.md)
+npm run plugin-check                   # WordPress.org's Plugin Check, run on the build output
 ```
 
-##### Method 3: Inside the Test Container
+pre-commit runs the first three on commits that change PHP. CI runs them too, and runs Plugin Check, PHPUnit, Jest and the Playwright suite (`.github/workflows/checks.yml`).
+
+## Debug logging
+
+Log in PHP with `klaro_geo_debug_log()` and in JavaScript with `klaroGeoLog()`, `klaroGeoWarn()` and `klaroGeoError()`. Both follow the plugin's "Enable debug logging" setting; PHP logging also needs `WP_DEBUG` to be true, and writes to the WordPress debug log.
+
+## Building a release
 
 ```bash
-# Change to the docker directory
-cd docker
-
-# Enter the container
-docker compose run wordpress_test bash
-
-# Change to the plugin directory
-cd /var/www/html/wp-content/plugins/klaro-geo
-
-# Run all tests
-phpunit -c phpunit.xml
+./build-plugin.sh
 ```
 
-#### JavaScript Tests
+It reads the version from the plugin header and writes `klaro-geo-<version>.zip` with the production files only. Run all three test suites and `npm run plugin-check` first, and update the version in `klaro-geo.php` and `readme.txt` (`Tested up to` lives in `readme.txt` only, and must be the current WordPress release).
 
-The JavaScript tests use Jest and are located in the `/tests/js/` directory.
+## How the Code Is Kept Honest
 
-##### Method 1: Using the run-tests.sh Script
+- **Tests carry the business rules.** PHPUnit tests are in `tests/phpunit/`, Jest tests in `tests/js/`, Playwright tests in `e2e/`. Tests call the plugin's real functions against the real test database; there is no mock database.
+- **`specs/` holds contracts only**: the dataLayer events, the `window.klaroGeo.push()` queue API, the data PHP hands to JavaScript, and the client-side geo resolution that PHP and JavaScript both implement. If a change alters one of those, update the spec in the same commit. There are no per-file specs.
+- **E2E tests run with a single worker.** They share one WordPress site and several of them change site-wide options, so they cannot run in parallel. A full run takes about two and a half minutes.
 
-```bash
-# Run all JavaScript tests
-./run-tests.sh js
-
-# Run a specific JavaScript test file
-./run-tests.sh js test-consent-receipts.js
-```
-
-##### Method 2: Manually Using npm
-
-```bash
-# Enter the container
-docker compose run wordpress_test bash
-
-# Navigate to the plugin directory
-cd /var/www/html/wp-content/plugins/klaro-geo
-
-# Install dependencies
-npm install
-
-# Run all JavaScript tests
-npm test
-
-# Run tests in watch mode (for development)
-npm test -- --watch
-```
-
-## Fixing Permissions
-
-If you encounter permission issues, use the fix-permissions.sh script:
-
-```bash
-bash fix-permissions.sh
-```
-
-This will make all scripts executable.
-
-## Fixing npm Permissions
-
-If you encounter npm-specific permission issues:
-
-```bash
-./docker/fix-npm-permissions.sh
-```
-
-Or run it with bash if it's not executable:
-
-```bash
-bash docker/fix-npm-permissions.sh
-```
-
-## Viewing Test Logs
-
-After running tests, you can view the logs with:
-
-```bash
-./docker/logs.sh view    # View logs only
-./docker/logs.sh copy    # Copy logs from container to host
-./docker/logs.sh both    # Copy and then view logs (default)
-```
-
-This will display:
-- WordPress debug logs
-- npm logs
-- Jest test output
-
-The logs are also saved to the `docker/logs` directory.
-
-## Debugging
-
-### Debug Logs
-
-Debug logs are stored in the `/docker/logs` directory. The logs are mounted into the Docker containers, so you can view them from your host machine.
-
-To enable detailed logging during development:
-
-1. Add debug statements in your code:
-   ```php
-   klaro_geo_debug_log('Detailed information about what is happening');
-   ```
-
-2. View the logs:
-   ```bash
-   # Copy logs from the container to your host and view them
-   ./docker/logs.sh both
-
-   # Or just copy the logs
-   ./docker/logs.sh copy
-
-   # Or just view the logs (if already copied)
-   ./docker/logs.sh view
-   ```
-
-### Mock Database
-
-For testing without a real database:
-
-```bash
-# Run tests with the mock database
-./docker/run-mock-tests.sh
-```
-
-## Troubleshooting
-
-### Password Prompts
-
-If you see a password prompt when running tests, use the no-password scripts instead:
-
-```bash
-# Instead of: ./run-tests.sh js
-./run-js-tests.sh
-```
-
-### npm Permission Errors
-
-If you see errors like:
-
-```
-npm ERR! code EACCES
-npm ERR! syscall mkdir
-npm ERR! path /var/www/.npm
-```
-
-Try one of these solutions:
-
-1. Run the npm permissions fix script:
-   ```bash
-   bash docker/fix-npm-permissions.sh
-   ```
-
-2. Use the direct test script which avoids npm permission issues:
-   ```bash
-   bash run-js-tests-direct.sh
-   ```
-
-### No Test Output
-
-If tests run but you don't see any output, check the logs:
-
-```bash
-./docker/view-test-logs.sh
-```
-
-### Script Not Executable
-
-If you see "Permission denied" errors when running scripts:
-
-```bash
-bash fix-permissions.sh
-```
-
-Or run the script directly with bash:
-
-```bash
-bash run-js-tests.sh
-```
-
-## Building for Production
-
-When you're ready to create a production version of the plugin:
-
-1. Run the JavaScript tests to ensure everything works
-2. Ensure all PHP tests pass
-3. Update version numbers in:
-   - `klaro-geo.php` (Plugin header)
-   - `readme.md` (if applicable)
-4. Create a zip file of the plugin directory, excluding development files:
-   ```bash
-   # Example (adjust as needed)
-   zip -r klaro-geo.zip . -x "*.git*" -x "docker/*" -x "tests/*" -x "node_modules/*"
-   ```
-
-## Additional Resources
-
-- For more detailed information about Docker setup, see [docker/readme.md](docker/readme.md)
-- For user documentation, see [readme.md](readme.md)
-- For JavaScript testing details, see the test files in `tests/js/`
-## Known Issues
-
-### E2E Test Status (as of 2025-11-19)
-
-**Current Status: 22 passing / 38 tests (58%)**
-
-#### Failing Tests (10 tests):
-The following consent receipt E2E tests are currently failing due to an issue with the consent receipt generation system:
-
-- `should generate receipt when consent is saved` (chromium & firefox)
-- `should include required fields in receipt` (chromium & firefox)  
-- `should send receipt to server when logging enabled` (chromium & firefox)
-- `should handle multiple consent changes` (chromium & firefox)
-- `should include consent choices in receipt` (chromium & firefox)
-
-**Root Cause:**
-Tests timeout waiting for the `'Klaro Geo Consent Receipt'` dataLayer event. The consent receipt JavaScript may not be triggering properly from the `klaro:consent-change` events or there may be an initialization timing issue.
-
-**Bugs Fixed (but tests still failing):**
-1. ✅ Removed overly aggressive 3-second debounce in `js/klaro-geo-consent-receipts.js:305-310`
-2. ✅ Added boolean casting for `enableConsentLogging` in `klaro-geo.php:271`
-3. ✅ Updated E2E helper methods to search dataLayer by `event` property
-
-**Next Steps:**
-- Investigate why `klaro:consent-change` events aren't triggering consent receipt generation
-- Check if `manager.watch()` needs to be implemented for consent receipts
-- Verify event listener setup timing in relation to Klaro initialization
-
-#### Skipped Tests (6 tests):
-- Individual service consent changes
-- EU template loading  
-- localStorage limit tests
-
-**Test Results Location:**
-- HTML Report: `e2e-report/index.html` (view with `npx playwright show-report e2e-report`)
-- Failed test artifacts: `test-results/` directory
-
+See `CLAUDE.md` for the full list of rules and which tests cover them.

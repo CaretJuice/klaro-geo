@@ -20,33 +20,48 @@ class ConsentButtonTest extends WP_UnitTestCase {
     }
 
     /**
-     * Test that the default values are set correctly
+     * The settings the frontend receives for the button, as the page prints them.
      */
-    public function test_default_values() {
-        // The default values should be:
-        // - Floating button enabled (true)
-        // - Button text: "Manage Consent Settings"
-        // - Button theme: "light"
-        // - Button position: "bottom-right"
-
-        // Check default values when options don't exist
-        $this->assertTrue(get_option('klaro_geo_enable_floating_button', true));
-        $this->assertEquals('Manage Consent', get_option('klaro_geo_floating_button_text', 'Manage Consent'));
-        $this->assertEquals('light', get_option('klaro_geo_floating_button_theme', 'light'));
-        $this->assertEquals('bottom-right', get_option('klaro_geo_floating_button_position', 'bottom-right'));
+    private function button_settings_on_page() {
+        do_action('wp_enqueue_scripts');
+        // Each enqueue appends another inline script; the last is the current one.
+        $inline = (array) wp_scripts()->get_data('klaro-geo-consent-button-js', 'before');
+        $this->assertSame(1, preg_match('/Object\.assign\(window\.klaroGeo \|\| \{\}, (\{.*\})\);/', end($inline), $m));
+        return json_decode($m[1], true);
     }
 
     /**
-     * Test setting and retrieving the floating button option
+     * The floating button is off until the site owner turns it on: it usually
+     * needs styling to match the theme first.
      */
-    public function test_floating_button_option() {
-        // Test enabling the floating button
+    public function test_floating_button_is_off_until_enabled() {
+        $defaults = $this->button_settings_on_page();
+        $this->assertFalse($defaults['enableFloatingButton']);
+        $this->assertSame('light', $defaults['floatingButtonTheme']);
+        $this->assertSame('bottom-right', $defaults['floatingButtonPosition']);
+
         update_option('klaro_geo_enable_floating_button', true);
-        $this->assertTrue(get_option('klaro_geo_enable_floating_button'));
-        
-        // Test disabling the floating button
-        update_option('klaro_geo_enable_floating_button', false);
-        $this->assertFalse(get_option('klaro_geo_enable_floating_button'));
+        $this->assertTrue($this->button_settings_on_page()['enableFloatingButton']);
+    }
+
+    /**
+     * The button script was the only frontend script that needed jQuery. A
+     * visitor's page must not load jQuery on the plugin's account.
+     */
+    public function test_frontend_scripts_do_not_need_jquery() {
+        wp_set_current_user(0);
+        do_action('wp_enqueue_scripts');
+
+        $scripts = wp_scripts();
+        $scripts->all_deps($scripts->queue);
+
+        $plugin_handles = array_filter($scripts->to_do, function ($handle) {
+            return 0 === strpos($handle, 'klaro');
+        });
+        $this->assertContains('klaro-geo-consent-button-js', $plugin_handles);
+        foreach ($plugin_handles as $handle) {
+            $this->assertNotContains('jquery', $scripts->registered[$handle]->deps, $handle . ' depends on jQuery');
+        }
     }
 
     /**

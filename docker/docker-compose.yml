@@ -1,136 +1,88 @@
+# Every WordPress environment of this plugin. Use bin/phpunit.sh and
+# bin/site.sh, which call this file with the right options, from any directory.
+#
+#   phpunit   runs the PHP test suite once and exits      (profile "test")
+#   site      WordPress at http://localhost:8080, for the  (profile "site")
+#             Playwright tests and for trying things by hand
+#   db        the database server both use
+#
+# Nothing here is kept between runs on purpose. The database lives in memory
+# and the site's WordPress files in its container, so `bin/site.sh down`
+# leaves nothing behind and the next start is the same as a fresh clone's or
+# CI's. bin/site.sh reset returns a running site to that state.
+#
+# The checkout is mounted read-only in both containers. Nothing in them changes
+# a file's owner or permissions; the only thing written to the checkout is the
+# PHPUnit debug log in docker/logs, by a process running as you.
+name: klaro-geo
+
+x-image: &image
+  image: klaro-geo-dev:wp${WP_VERSION:-7.1.5}-php${PHP_VERSION:-8.3}
+  build:
+    context: .
+    args:
+      WP_VERSION: ${WP_VERSION:-7.1.5}
+      PHP_VERSION: ${PHP_VERSION:-8.3}
+      PHPUNIT_VERSION: ${PHPUNIT_VERSION:-}
+
 services:
-  wordpress_test:
-    build:
-      context: .
-      dockerfile: Dockerfile.test
-    entrypoint: ["/usr/local/bin/docker-entrypoint-test.sh"]
-    user: "root:root"
-    command: ["vendor/bin/phpunit", "--configuration", "/var/www/html/wp-content/plugins/klaro-geo/phpunit.xml"]
-    tty: true
-    stdin_open: true
-    volumes:
-      - type: bind
-        source: ${PWD}/..
-        target: /var/www/html/wp-content/plugins/klaro-geo
-        consistency: delegated
-      - type: bind
-        source: ${PWD}/../tests
-        target: /var/www/html/wp-content/plugins/klaro-geo/tests
-        consistency: delegated
-      - type: bind
-        source: ${PWD}/logs
-        target: /var/www/html/wp-content/plugins/klaro-geo/docker/logs/
-        consistency: delegated
-      - ./php.ini:/usr/local/etc/php/php.ini
-      # Create a named volume for vendor to persist between runs
-      - klaro_vendor:/var/www/html/wp-content/plugins/klaro-geo/vendor
+  db:
+    image: mariadb:11.8
     environment:
-      WORDPRESS_DB_HOST: db_test
-      WORDPRESS_DB_NAME: wordpress_test
-      WORDPRESS_DB_USER: wordpress
-      WORDPRESS_DB_PASSWORD: wordpress
-      PHP_MEMORY_LIMIT: 256M
-      WP_CLI_MEMORY_LIMIT: 512M
-      WORDPRESS_TABLE_PREFIX: wp_
-    depends_on:
-      db_test:
-        condition: service_healthy
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: wordpress
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
 
-
-  wordpress:
-    image: wordpress:latest
-    ports:
-      - "8000:80"
-    user: "root:root"
-    restart: unless-stopped
-    tty: true
-    stdin_open: true
-    # Use a dedicated entrypoint script
-    entrypoint: ["/bin/bash", "-c", "chmod +x /usr/local/bin/docker-entrypoint-wordpress.sh && /usr/local/bin/docker-entrypoint-wordpress.sh"]
-    volumes:
-      - wordpress_data:/var/www/html
-      - type: bind
-        source: ${PWD}/..
-        target: /var/www/html/wp-content/plugins/klaro-geo
-        consistency: delegated
-      - type: bind
-        source: ${PWD}/logs
-        target: /var/www/html/wp-content/plugins/klaro-geo/docker/logs/
-        consistency: delegated
-      - type: bind
-        source: ${PWD}/docker-entrypoint-wordpress.sh
-        target: /usr/local/bin/docker-entrypoint-wordpress.sh
+  phpunit:
+    <<: *image
+    profiles: [test]
+    # You, so the log it writes is yours. bin/phpunit.sh sets these.
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    entrypoint: ["phpunit-entrypoint"]
+    command: ["phpunit"]
+    working_dir: /var/www/html/wp-content/plugins/klaro-geo
     environment:
-      WORDPRESS_DB_HOST: db
-      WORDPRESS_DB_USER: wordpress
-      WORDPRESS_DB_PASSWORD: wordpress
-      WORDPRESS_DB_NAME: wordpress
-      WORDPRESS_DEBUG: 1
-      # Increase PHP memory limits
-      PHP_MEMORY_LIMIT: 512M
-      WP_MEMORY_LIMIT: 512M
-      WP_MAX_MEMORY_LIMIT: 512M
-      WORDPRESS_CONFIG_EXTRA: |
-        define( 'WP_DEBUG', true );
-        define( 'WP_DEBUG_LOG', '/var/www/html/wp-content/plugins/klaro-geo/docker/logs/debug_dev.log' );
-        define( 'WP_DEBUG_DISPLAY', false );
-        define( 'WP_MEMORY_LIMIT', '512M' );
-        define( 'WP_MAX_MEMORY_LIMIT', '512M' );
+      WP_TESTS_DB_HOST: db
+      WP_TESTS_DB_NAME: wordpress_test
+      WP_TESTS_DB_USER: root
+      WP_TESTS_DB_PASSWORD: root
+      # Read by the WordPress test library; see tests/phpunit/bootstrap.php.
+      WP_PHPUNIT__TESTS_CONFIG: /var/www/html/wp-content/plugins/klaro-geo/tests/phpunit/wp-tests-config.php
+    volumes:
+      - ..:/var/www/html/wp-content/plugins/klaro-geo:ro
+      - ./logs:/var/www/html/wp-content/plugins/klaro-geo/docker/logs
+    tmpfs:
+      # WordPress in the image is read-only to this user.
+      - /var/www/html/wp-content/uploads:mode=1777
     depends_on:
       db:
         condition: service_healthy
-    # Add resource limits to prevent OOM issues
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-        reservations:
-          memory: 512M
-    # Add healthcheck to monitor container status
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/wp-admin/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
 
-
-  db_test:
-    image: mysql:5.7
-    platform: linux/amd64
+  site:
+    <<: *image
+    profiles: [site]
+    container_name: klaro-geo-site
+    ports:
+      - "8080:80"
     environment:
-      MYSQL_ROOT_PASSWORD: somewordpress
-      MYSQL_DATABASE: wordpress_test
-      MYSQL_USER: wordpress
-      MYSQL_PASSWORD: wordpress
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_USER: root
+      WORDPRESS_DB_PASSWORD: root
     volumes:
-      - db_test_data:/var/lib/mysql
-    command: --default-authentication-plugin=mysql_native_password
+      - ..:/var/www/html/wp-content/plugins/klaro-geo:ro
+    depends_on:
+      db:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-psomewordpress"]
+      # Apache is answering. Installing WordPress is bin/site.sh's job.
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost/wp-login.php"]
+      interval: 2s
       timeout: 5s
-      retries: 10
-
-  db:
-    image: mysql:5.7
-    platform: linux/amd64
-    volumes:
-      - db_data:/var/lib/mysql
-    environment:
-      MYSQL_ROOT_PASSWORD: somewordpress
-      MYSQL_DATABASE: wordpress
-      MYSQL_USER: wordpress
-      MYSQL_PASSWORD: wordpress
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-psomewordpress"]
-      timeout: 5s
-      retries: 10
-    command: --default-authentication-plugin=mysql_native_password
-
-
-volumes:
-  wordpress_test_data:
-  wordpress_data:
-  db_data:
-  db_test_data:
-  klaro_vendor:
+      retries: 60

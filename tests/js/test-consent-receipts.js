@@ -1,459 +1,189 @@
 /**
- * Comprehensive Tests for Klaro Geo Consent Receipts
+ * Consent receipts in js/klaro-geo.js: what a receipt holds, the copy kept in
+ * the browser, the request to the server and the dataLayer event.
  *
- * Tests the consent receipts functionality including:
- * - Receipt generation
- * - Local storage
- * - Server communication
- * - DataLayer integration
- * - Event handling
+ * Whether a receipt is generated at all is in test-consent-logging-flag.js;
+ * the GPC fields and the GPC receipt are in test-receipt-gpc.js.
  */
 
-describe('Klaro Geo Consent Receipts', function() {
-    let originalFetch;
-    let originalLocalStorage;
+const { loadConsentScript } = require('./helpers/page.js');
+
+describe('Consent receipt', function() {
+    const SERVICES = [
+        { name: 'google-analytics', purposes: ['analytics'] },
+        { name: 'google-ads', purposes: ['advertising'] }
+    ];
+
+    function load(consentData) {
+        return loadConsentScript({
+            services: SERVICES,
+            consents: { 'google-analytics': true, 'google-ads': false },
+            consentData: Object.assign({
+                consentReceipts: true,
+                enableConsentLogging: true,
+                templateName: 'strict',
+                templateSource: 'country',
+                detectedCountry: 'CA',
+                detectedRegion: 'BC',
+                configHash: 'c0ffee'.repeat(10) + 'beef',
+                ajaxUrl: 'https://example.test/wp-admin/admin-ajax.php'
+            }, consentData)
+        });
+    }
+
+    function save(loaded) {
+        loaded.watch.update(loaded.manager, 'saveConsents', loaded.manager.consents);
+    }
+
+    function serverResponds(response) {
+        global.fetch = jest.fn(function() { return Promise.resolve(response); });
+    }
+
+    function postedBody() {
+        return global.fetch.mock.calls[0][1].body;
+    }
+
+    function storedReceipts() {
+        return JSON.parse(window.localStorage.getItem('klaro_consent_receipts'));
+    }
+
+    // Let the promise chain of the request finish.
+    function settle() {
+        return new Promise(function(resolve) { setTimeout(resolve, 0); });
+    }
 
     beforeEach(function() {
-        // Set up clean environment
-        window.dataLayer = [];
-        window.klaroConsentData = {
-            enableConsentLogging: true,
-            templateName: 'test-template',
-            templateSource: 'test-source',
-            detectedCountry: 'US',
-            detectedRegion: 'CA',
-            adminOverride: false,
-            templateSettings: {},
-            ajaxUrl: '/wp-admin/admin-ajax.php',
-            nonce: 'test-nonce-123'
-        };
-        window.klaroConfig = { services: [] };
-        window.currentKlaroOpts = null;
-        window.lastWatcherConsentTimestamp = null;
-
-        // Mock localStorage
-        const localStorageMock = {
-            store: {},
-            getItem: function(key) {
-                return this.store[key] || null;
-            },
-            setItem: function(key, value) {
-                this.store[key] = value.toString();
-            },
-            clear: function() {
-                this.store = {};
-            }
-        };
-        originalLocalStorage = window.localStorage;
-        Object.defineProperty(window, 'localStorage', {
-            value: localStorageMock,
-            writable: true
-        });
-
-        // Mock fetch
-        originalFetch = global.fetch;
-        global.fetch = jest.fn(() =>
-            Promise.resolve({
-                ok: true,
-                json: () => Promise.resolve({ success: true })
-            })
-        );
-
-        // Clear module cache and require fresh
-        jest.resetModules();
+        window.localStorage.clear();
+        global.klaroGeoError = jest.fn();
+        serverResponds({ ok: true, json: function() { return Promise.resolve({ success: true }); } });
     });
 
     afterEach(function() {
-        global.fetch = originalFetch;
-        Object.defineProperty(window, 'localStorage', {
-            value: originalLocalStorage,
-            writable: true
-        });
-        window.localStorage.clear();
+        delete global.fetch;
+        delete window.klaro;
+        delete window.klaroConfig;
+        delete window.klaroConsentData;
+        delete window.klaroGeo;
     });
 
-    describe('handleConsentChange', function() {
-        beforeEach(function() {
-            // Load the consent receipts module
-            require('../../js/klaro-geo-consent-receipts.js');
-        });
+    test('holds the choices as booleans, the template and the location', function() {
+        const loaded = load();
+        save(loaded);
 
-        test('should create receipt when consent logging is enabled', function() {
-            const mockEvent = {
-                detail: {
-                    manager: {
-                        consents: {
-                            'google-analytics': true,
-                            'facebook-pixel': false
-                        }
-                    }
-                }
-            };
+        const receipt = JSON.parse(postedBody().get('receipt_data'));
+        expect(receipt.receipt_id).toMatch(/^receipt_\d+_[a-z0-9]+$/);
+        expect(receipt.receipt_type).toBe('choice');
+        expect(Math.abs(receipt.timestamp - Date.now() / 1000)).toBeLessThan(5);
+        expect(receipt.consent_choices).toEqual({ 'google-analytics': true, 'google-ads': false });
+        expect(receipt.template_name).toBe('strict');
+        expect(receipt.template_source).toBe('country');
+        expect(receipt.country_code).toBe('CA');
+        expect(receipt.region_code).toBe('BC');
+        expect(receipt.admin_override).toBe(false);
+        // The config is named by the hash the page carries; the server holds
+        // the config itself.
+        expect(receipt.config_hash).toBe('c0ffee'.repeat(10) + 'beef');
+        expect(receipt).not.toHaveProperty('klaro_config');
+    });
 
-            // Trigger consent change
-            document.dispatchEvent(new CustomEvent('klaro:consent-change', mockEvent));
+    test('is posted to the receipt action at the URL PHP gave', function() {
+        save(load());
 
-            // Wait a bit for async operations
-            return new Promise(resolve => setTimeout(resolve, 100)).then(() => {
-                // Check localStorage was updated
-                const receipts = JSON.parse(window.localStorage.getItem('klaro_consent_receipts'));
-                expect(receipts).toBeTruthy();
-                expect(Array.isArray(receipts)).toBe(true);
-                expect(receipts.length).toBeGreaterThan(0);
+        expect(global.fetch).toHaveBeenCalledTimes(1);
+        expect(global.fetch.mock.calls[0][0]).toBe('https://example.test/wp-admin/admin-ajax.php');
+        expect(global.fetch.mock.calls[0][1].method).toBe('POST');
+        expect(postedBody().get('action')).toBe('klaro_geo_store_consent_receipt');
+    });
 
-                const receipt = receipts[0];
-                expect(receipt.receipt_id).toBeTruthy();
-                expect(receipt.timestamp).toBeTruthy();
-                expect(receipt.template_name).toBe('test-template');
-                expect(receipt.consent_choices['google-analytics']).toBe(true);
-                expect(receipt.consent_choices['facebook-pixel']).toBe(false);
-            });
-        });
+    test('carries the nonce for a logged-in visitor, and none for an anonymous one', function() {
+        save(load({ nonce: 'abc123' }));
+        expect(postedBody().get('nonce')).toBe('abc123');
 
-        test('should push to dataLayer when logging is disabled', function() {
-            window.klaroConsentData.enableConsentLogging = false;
+        global.fetch.mockClear();
+        save(load());
+        expect(postedBody().has('nonce')).toBe(false);
+    });
 
-            const mockEvent = {
-                detail: {
-                    manager: {
-                        consents: {
-                            'google-analytics': true
-                        }
-                    }
-                }
-            };
+    test('pushes generateConsentReceipt with the receipt ID', function() {
+        save(load());
 
-            document.dispatchEvent(new CustomEvent('klaro:consent-change', mockEvent));
-
-            // Check dataLayer
-            expect(window.dataLayer.length).toBeGreaterThan(0);
-            const dataLayerEntry = window.dataLayer.find(item =>
-                item.event === 'Klaro Geo Consent Receipt'
-            );
-            expect(dataLayerEntry).toBeTruthy();
-            expect(dataLayerEntry.klaro_geo_consent_receipt).toBeTruthy();
-            expect(dataLayerEntry.klaro_geo_consent_receipt.receipt_id).toBeNull();
-        });
-
-        test('should send receipt to server when logging enabled', function() {
-            const mockEvent = {
-                detail: {
-                    manager: {
-                        consents: {
-                            'google-analytics': true
-                        }
-                    }
-                }
-            };
-
-            document.dispatchEvent(new CustomEvent('klaro:consent-change', mockEvent));
-
-            return new Promise(resolve => setTimeout(resolve, 200)).then(() => {
-                expect(global.fetch).toHaveBeenCalled();
-                const fetchCall = global.fetch.mock.calls[0];
-                expect(fetchCall[0]).toBe('/wp-admin/admin-ajax.php');
-                expect(fetchCall[1].method).toBe('POST');
-            });
-        });
-
-        test('should handle admin override flag correctly', function() {
-            window.klaroConsentData.adminOverride = true;
-
-            const mockEvent = {
-                detail: {
-                    manager: {
-                        consents: {
-                            'google-analytics': true
-                        }
-                    }
-                }
-            };
-
-            document.dispatchEvent(new CustomEvent('klaro:consent-change', mockEvent));
-
-            return new Promise(resolve => setTimeout(resolve, 100)).then(() => {
-                const receipts = JSON.parse(window.localStorage.getItem('klaro_consent_receipts'));
-                expect(receipts[0].admin_override).toBe(true);
-            });
-        });
-
-        test('should limit localStorage to 10 receipts', function() {
-            // Create 12 receipts
-            for (let i = 0; i < 12; i++) {
-                const mockEvent = {
-                    detail: {
-                        manager: {
-                            consents: {
-                                [`service-${i}`]: true
-                            }
-                        }
-                    }
-                };
-
-                document.dispatchEvent(new CustomEvent('klaro:consent-change', mockEvent));
-            }
-
-            return new Promise(resolve => setTimeout(resolve, 500)).then(() => {
-                const receipts = JSON.parse(window.localStorage.getItem('klaro_consent_receipts'));
-                expect(receipts.length).toBeLessThanOrEqual(10);
-            });
+        const events = window.dataLayer.filter(function(e) { return e && e.klaroEventName === 'generateConsentReceipt'; });
+        expect(events).toHaveLength(1);
+        expect(events[0]).toEqual({
+            event: 'Klaro Event',
+            eventSource: 'klaro-geo',
+            klaroEventName: 'generateConsentReceipt',
+            klaroGeoConsentReceipt: JSON.parse(postedBody().get('receipt_data')).receipt_id,
+            klaroGeoConsentReceiptType: 'choice',
+            klaroGeoTemplateSource: 'country',
+            klaroGeoAdminOverride: false,
+            klaroGeoEnableConsentLogging: true
         });
     });
 
-    describe('storeReceiptLocally', function() {
-        beforeEach(function() {
-            require('../../js/klaro-geo-consent-receipts.js');
-        });
+    test('a copy is kept in the browser', function() {
+        save(load());
 
-        test('should store receipt in localStorage', function() {
-            const testReceipt = {
-                receipt_id: 'test_123',
-                timestamp: Date.now(),
-                consent_choices: { 'test-service': true }
-            };
-
-            // The function is not exported, so we test it through the event
-            const mockEvent = {
-                detail: {
-                    manager: {
-                        consents: { 'test-service': true }
-                    }
-                }
-            };
-
-            document.dispatchEvent(new CustomEvent('klaro:consent-change', mockEvent));
-
-            return new Promise(resolve => setTimeout(resolve, 100)).then(() => {
-                const stored = window.localStorage.getItem('klaro_consent_receipts');
-                expect(stored).toBeTruthy();
-                const receipts = JSON.parse(stored);
-                expect(Array.isArray(receipts)).toBe(true);
-            });
-        });
-
-        test('should handle corrupt localStorage data gracefully', function() {
-            window.localStorage.setItem('klaro_consent_receipts', 'invalid json');
-
-            const mockEvent = {
-                detail: {
-                    manager: {
-                        consents: { 'test-service': true }
-                    }
-                }
-            };
-
-            // The function logs the error but doesn't throw
-            // We should check that it creates a new array after encountering corrupt data
-            document.dispatchEvent(new CustomEvent('klaro:consent-change', mockEvent));
-
-            return new Promise(resolve => setTimeout(resolve, 100)).then(() => {
-                // After handling corrupt data, it should have created a new valid array
-                const stored = window.localStorage.getItem('klaro_consent_receipts');
-                expect(stored).toBeTruthy();
-
-                // Try to parse it - should work now
-                const receipts = JSON.parse(stored);
-                expect(Array.isArray(receipts)).toBe(true);
-            });
-        });
+        expect(storedReceipts()).toHaveLength(1);
+        expect(storedReceipts()[0].receipt_id).toBe(JSON.parse(postedBody().get('receipt_data')).receipt_id);
     });
 
-    describe('sendReceiptToServer', function() {
-        beforeEach(function() {
-            require('../../js/klaro-geo-consent-receipts.js');
-        });
+    test('the browser keeps the ten most recent receipts', function() {
+        const older = [];
+        for (let i = 0; i < 10; i++) {
+            older.push({ receipt_id: 'old_' + i });
+        }
+        window.localStorage.setItem('klaro_consent_receipts', JSON.stringify(older));
 
-        test('should send POST request to correct endpoint', function() {
-            const mockEvent = {
-                detail: {
-                    manager: {
-                        consents: { 'test-service': true }
-                    }
-                }
-            };
+        save(load());
 
-            document.dispatchEvent(new CustomEvent('klaro:consent-change', mockEvent));
-
-            return new Promise(resolve => setTimeout(resolve, 200)).then(() => {
-                expect(global.fetch).toHaveBeenCalledWith(
-                    '/wp-admin/admin-ajax.php',
-                    expect.objectContaining({
-                        method: 'POST',
-                        credentials: 'same-origin'
-                    })
-                );
-            });
-        });
-
-        test('should handle server errors gracefully', function() {
-            global.fetch = jest.fn(() =>
-                Promise.resolve({
-                    ok: false,
-                    status: 500,
-                    text: () => Promise.resolve('Server error')
-                })
-            );
-
-            const mockEvent = {
-                detail: {
-                    manager: {
-                        consents: { 'test-service': true }
-                    }
-                }
-            };
-
-            // Should not throw error
-            expect(() => {
-                document.dispatchEvent(new CustomEvent('klaro:consent-change', mockEvent));
-            }).not.toThrow();
-        });
-
-        test('should handle network errors gracefully', function() {
-            global.fetch = jest.fn(() => Promise.reject(new Error('Network error')));
-
-            const mockEvent = {
-                detail: {
-                    manager: {
-                        consents: { 'test-service': true }
-                    }
-                }
-            };
-
-            // Should not throw error
-            expect(() => {
-                document.dispatchEvent(new CustomEvent('klaro:consent-change', mockEvent));
-            }).not.toThrow();
-        });
+        const stored = storedReceipts();
+        expect(stored).toHaveLength(10);
+        expect(stored[0].receipt_id).toBe('old_1');
+        expect(stored[9].receipt_id).toMatch(/^receipt_/);
     });
 
-    describe('Event Handling', function() {
-        beforeEach(function() {
-            require('../../js/klaro-geo-consent-receipts.js');
-        });
+    test.each([
+        ['is not JSON', 'not json'],
+        ['is JSON but not a list', '{"receipt_id":"x"}']
+    ])('stored receipts are started again when what is stored %s', function(name, existing) {
+        window.localStorage.setItem('klaro_consent_receipts', existing);
 
-        test('should prevent duplicate consent events within 3 seconds', function() {
-            const mockEvent = {
-                detail: {
-                    manager: {
-                        consents: { 'test-service': true }
-                    }
-                }
-            };
+        save(load());
 
-            // Trigger first event
-            document.dispatchEvent(new CustomEvent('klaro:consent-change', mockEvent));
-
-            // Trigger second event immediately
-            document.dispatchEvent(new CustomEvent('klaro:consent-change', mockEvent));
-
-            return new Promise(resolve => setTimeout(resolve, 200)).then(() => {
-                // Should only have been called once (or twice if one was for each event)
-                // The exact behavior depends on timing
-                const receipts = JSON.parse(window.localStorage.getItem('klaro_consent_receipts') || '[]');
-                expect(receipts.length).toBeLessThanOrEqual(2);
-            });
-        });
-
-        test('should handle consent-change event', function() {
-            const mockEvent = {
-                detail: {
-                    manager: {
-                        consents: { 'test-service': true }
-                    }
-                }
-            };
-
-            document.dispatchEvent(new CustomEvent('consent-change', mockEvent));
-
-            return new Promise(resolve => setTimeout(resolve, 100)).then(() => {
-                const receipts = JSON.parse(window.localStorage.getItem('klaro_consent_receipts'));
-                expect(receipts).toBeTruthy();
-            });
-        });
+        expect(storedReceipts()).toHaveLength(1);
+        expect(global.fetch).toHaveBeenCalledTimes(1);
     });
 
-    describe('Manual Triggers', function() {
-        beforeEach(function() {
-            require('../../js/klaro-geo-consent-receipts.js');
-        });
+    test('an error status from the server is reported, with the start of its response', async function() {
+        serverResponds({ ok: false, status: 429, text: function() { return Promise.resolve('{"success":false,"data":"Too many requests"}'); } });
 
-        test('triggerKlaroConsentReceipt should work with currentKlaroOpts', function() {
-            window.currentKlaroOpts = {
-                consents: {
-                    'manual-service': true
-                }
-            };
+        save(load());
+        await settle();
 
-            const result = window.triggerKlaroConsentReceipt();
-
-            expect(result).toContain('triggered');
-
-            return new Promise(resolve => setTimeout(resolve, 100)).then(() => {
-                const receipts = JSON.parse(window.localStorage.getItem('klaro_consent_receipts'));
-                expect(receipts).toBeTruthy();
-            });
-        });
-
-        test('triggerKlaroConsentReceipt should work with klaro manager', function() {
-            window.klaro = {
-                getManager: jest.fn(() => ({
-                    consents: {
-                        'manager-service': true
-                    }
-                }))
-            };
-
-            const result = window.triggerKlaroConsentReceipt();
-
-            expect(result).toContain('triggered');
-        });
-
-        test('testKlaroConsentReceipt should send test receipt', function() {
-            const testPromise = window.testKlaroConsentReceipt();
-
-            expect(testPromise).toBeTruthy();
-
-            return testPromise.then(result => {
-                expect(result).toContain('Test');
-            });
-        });
+        expect(global.klaroGeoError).toHaveBeenCalledTimes(1);
+        expect(global.klaroGeoError.mock.calls[0][0]).toBe('Error sending consent receipt:');
+        expect(global.klaroGeoError.mock.calls[0][1].message).toContain('429');
+        expect(global.klaroGeoError.mock.calls[0][1].message).toContain('Too many requests');
     });
 
-    describe('Initialization', function() {
-        test('should use existing klaroConsentData if available', function() {
-            window.klaroConsentData = {
-                enableConsentLogging: true,
-                templateName: 'existing',
-                adminOverride: false
-            };
+    test('a refusal from the server is reported', async function() {
+        serverResponds({ ok: true, json: function() { return Promise.resolve({ success: false, data: 'Invalid receipt' }); } });
 
-            jest.resetModules();
-            require('../../js/klaro-geo-consent-receipts.js');
+        save(load());
+        await settle();
 
-            // Should maintain existing data
-            expect(window.klaroConsentData.templateName).toBe('existing');
-        });
+        expect(global.klaroGeoError).toHaveBeenCalledWith('Failed to store consent receipt:', { success: false, data: 'Invalid receipt' });
+    });
 
-        test('should handle string "0" as false for enableConsentLogging', function() {
-            window.klaroConsentData = {
-                enableConsentLogging: "0"
-            };
+    test('a network failure is reported and does not stop the consent update', async function() {
+        global.fetch = jest.fn(function() { return Promise.reject(new Error('offline')); });
+        const loaded = load();
 
-            jest.resetModules();
-            require('../../js/klaro-geo-consent-receipts.js');
+        save(loaded);
+        await new Promise(function(resolve) { setTimeout(resolve, 80); });
 
-            expect(window.klaroConsentData.enableConsentLogging).toBe(false);
-        });
-
-        test('should handle string "1" as true for enableConsentLogging', function() {
-            window.klaroConsentData = {
-                enableConsentLogging: "1"
-            };
-
-            jest.resetModules();
-            require('../../js/klaro-geo-consent-receipts.js');
-
-            expect(window.klaroConsentData.enableConsentLogging).toBe(true);
-        });
+        expect(global.klaroGeoError.mock.calls[0][0]).toBe('Error sending consent receipt:');
+        expect(window.dataLayer.some(function(e) { return e && e.event === 'Klaro Consent Update'; })).toBe(true);
     });
 });

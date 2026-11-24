@@ -1,225 +1,52 @@
-# Docker Development Environment for Klaro Geo
+# Docker environment for Klaro Geo
 
-This directory contains all Docker-related files for the Klaro Geo plugin development environment. These tools are primarily intended for plugin developers and contributors.
+Everything that needs WordPress runs here: the PHP test suite, and the site the Playwright tests and manual testing use. Run it through the two scripts in `bin/`, from any directory:
+
+```bash
+bin/phpunit.sh [phpunit arguments]    # the PHP test suite
+bin/site.sh up | reset | down         # the site at http://localhost:8080
+bin/site.sh wp <command>              # WP-CLI in the site
+bin/site.sh log                       # follow the site's WordPress debug log
+```
+
+See [readme-dev.md](../readme-dev.md) for the day-to-day commands.
 
 ## Contents
 
-- `docker-compose.yml` - Main Docker Compose configuration
-- `docker-entrypoint-test.sh` - Entrypoint script for the test container
-- `php.ini` and `custom.ini` - PHP configuration for the containers
-- `test-logging.sh` - Script to test logging functionality
-- `copy-debug-log.sh` - Script to copy debug logs from the container
-- `debug-database.sh` - Script to debug database issues
-- `run-mock-tests.sh` - Script to run tests with mock database
-- `fix-npm-permissions.sh` - Script to fix npm permissions issues
-- `make-scripts-executable.sh` - Script to make all scripts executable
-- `logs/` - Directory for storing debug logs
+- `Dockerfile` - the one image: PHP with Apache, plus WordPress, WordPress's PHPUnit test library, PHPUnit, WP-CLI, the Geolocation IP Detection plugin and Plugin Check, each at a pinned version.
+- `wp-config.php` - the site's WordPress configuration.
+- `unzip.php` - unpacks plugin zips while the image is built.
+- `docker-compose.yml` - three services: `db`, `phpunit` (profile `test`) and `site` (profile `site`).
+- `phpunit-entrypoint.sh` - gives a test run an empty database.
+- `site-setup.sh` - installs WordPress and sets the state the Playwright tests start from.
+- `php.ini` - PHP settings for the image.
+- `logs/` - `debug_test.log`, the PHP errors and the plugin's debug log of the last PHPUnit run.
 
-## Getting Started
+## How it works
 
-For basic setup instructions, see the [main README.md](../readme.md) and [readme-dev.md](../readme-dev.md) files in the plugin root directory.
+- **Your checkout is mounted read-only**, as the plugin directory. No container changes the owner or permissions of your files. The PHPUnit container runs as you, and writes one file: `logs/debug_test.log`.
+- **Starting a container downloads nothing.** Every tool is fetched when the image is built. The scripts rebuild the image when the Dockerfile changes, which takes a second when nothing has.
+- **Nothing is kept.** The database is held in memory, and `bin/site.sh down` deletes the site's files. A start on your machine is the same as a start in CI. `bin/site.sh reset` returns a running site to a fresh install without restarting it.
+- **The tests need nothing installed on your machine but Docker.** PHPUnit, WordPress and its test library are in the image, and the last two are always the same version as each other. `composer install` is only for the static checkers.
 
-### Making Scripts Executable
+## Other versions of WordPress and PHP
 
-To make all scripts executable at once, you can use the fix-permissions.sh script:
-
-```bash
-# Run this from the project root directory
-bash fix-permissions.sh
-```
-
-This will set the executable permission on all .sh files in the project.
-
-Alternatively, you can make individual scripts executable:
+The image is built on `php:<PHP_VERSION>-apache`, with WordPress downloaded by version, so any pair can be run:
 
 ```bash
-chmod +x run-tests.sh
-chmod +x docker/fix-npm-permissions.sh
+WP_VERSION=6.6.12 PHP_VERSION=7.2 bin/phpunit.sh
+WP_VERSION=6.6.12 PHP_VERSION=7.2 bin/site.sh reset     # then: npx playwright test
 ```
 
-## Running Tests
+Each pair is its own image tag, built once and kept. The defaults are in `Dockerfile` and `docker-compose.yml`; keep the two in step.
 
-Klaro Geo includes comprehensive test suites for both PHP and JavaScript code.
+- The newest PHPUnit the PHP version can run is chosen automatically. WordPress before 5.9 cannot use PHPUnit 8 or 9: add `PHPUNIT_VERSION=7.5.20`.
+- Nothing in the Dockerfile uses `apt-get`, on purpose. The Debian releases under old PHP images have no package servers left, so a package install would make old pairs unbuildable.
 
-### Standard PHP Tests
+## The debug log of a test run
 
-To run the standard PHP tests:
+`tests/phpunit/bootstrap.php` points PHP's error log at `logs/debug_test.log` and switches the plugin's debug logging on, so `klaro_geo_debug_log()` and `error_log()` both end up there. The file is emptied at the start of each run and written as the run goes, so it is complete when a test fails.
 
-```bash
-cd docker
-docker compose run wordpress_test
-```
+## Database
 
-Or use the convenience script from the plugin root:
-
-```bash
-chmod +x run-tests.sh
-./run-tests.sh
-```
-
-### JavaScript Tests
-
-To run the JavaScript tests:
-
-```bash
-chmod +x run-tests.sh
-./run-tests.sh js
-```
-
-If you encounter npm permissions issues, you can fix them with:
-
-```bash
-# If you've already made the script executable
-./docker/fix-npm-permissions.sh
-
-# Or run it directly with bash
-bash docker/fix-npm-permissions.sh
-```
-
-To run a specific JavaScript test file:
-
-```bash
-./run-tests.sh js test-file-name.js
-```
-
-### Tests with Mock Database
-
-If you're having issues with database permissions or configuration, you can use the mock database implementation:
-
-```bash
-chmod +x docker/run-mock-tests.sh
-./docker/run-mock-tests.sh
-```
-
-This will run the tests with a mock database implementation that doesn't require actual database tables.
-
-## Debugging
-
-### Debug Log Configuration
-
-In the WordPress test environment, debug logs are configured in two places:
-
-1. **wp-tests-config.php** - Contains the following settings:
-   ```php
-   define('WP_DEBUG', true);
-   define('WP_DEBUG_LOG', '/var/www/html/wp-content/debug.log');
-   define('WP_DEBUG_DISPLAY', false);
-   ```
-
-2. **bootstrap.php** - Contains additional PHP settings:
-   ```php
-   ini_set('error_reporting', E_ALL);
-   ini_set('display_errors', '1');
-   ini_set('display_startup_errors', '1');
-   ini_set('log_errors', '1');
-   ini_set('error_log', '/var/www/html/wp-content/debug.log');
-   ```
-
-### Logging Functions
-
-Klaro Geo provides several ways to write to the debug log:
-
-1. **Custom klaro_geo_debug_log function** (recommended):
-   ```php
-   klaro_geo_debug_log('This is a message from klaro_geo_debug_log()');
-   ```
-
-2. **PHP's error_log function**:
-   ```php
-   error_log('This is a message from error_log()');
-   ```
-
-3. **WordPress's wp_debug_log function** (if available):
-   ```php
-   if (function_exists('wp_debug_log')) {
-       wp_debug_log('This is a message from wp_debug_log()');
-   }
-   ```
-
-### Viewing Debug Logs
-
-You can view the debug logs in several ways:
-
-1. **Using the copy-debug-log.sh script**:
-   ```bash
-   chmod +x copy-debug-log.sh
-   ./copy-debug-log.sh
-   ```
-   This copies the log to `logs/debug_test.log` in your host machine.
-
-2. **Directly from the container**:
-   ```bash
-   docker exec wordpress_test cat /var/www/html/wp-content/debug.log
-   ```
-
-3. **After tests complete**: The log is automatically copied to the `logs` directory.
-
-### Testing Logging Functionality
-
-To verify that logging is working correctly:
-
-```bash
-chmod +x docker/test-logging.sh
-./docker/test-logging.sh
-```
-
-This script tests various logging methods and displays the results.
-
-### Troubleshooting Logging Issues
-
-If logging is not working:
-
-1. **Check file permissions**:
-   ```bash
-   docker compose exec wordpress_test ls -la /var/www/html/wp-content/debug.log
-   ```
-
-2. **Check directory permissions**:
-   ```bash
-   docker compose exec wordpress_test ls -la /var/www/html/wp-content/
-   ```
-
-3. **Check PHP configuration**:
-   ```bash
-   docker compose exec wordpress_test php -i | grep error_log
-   ```
-
-4. **Check WordPress configuration**:
-   ```bash
-   docker compose exec wordpress_test cat /tmp/wordpress-tests-lib/wp-tests-config.php | grep WP_DEBUG
-   ```
-
-## Mock Database for Tests
-
-The mock database implementation is useful when you want to run tests without a real database connection.
-
-### How It Works
-
-The mock database implementation:
-
-1. Overrides the database functions used by the plugin
-2. Stores data in memory instead of in a database
-3. Simulates database operations like CREATE TABLE, INSERT, SELECT, etc.
-
-### Files
-
-- `tests/phpunit/mock-db.php`: The main mock database implementation
-- `tests/phpunit/bootstrap-mock.php`: A bootstrap file that sets up the mock database
-- `tests/phpunit/test-helpers.php`: Helper functions for tests
-
-### Debugging Database Issues
-
-If you're having issues with the database, use the debug script:
-
-```bash
-chmod +x docker/debug-database.sh
-./docker/debug-database.sh
-```
-
-This script tests database connectivity and displays configuration information.
-
-## Additional Resources
-
-- For more information about the plugin's features, see the [main README.md](../readme.md)
-- For development setup instructions, see [readme-dev.md](../readme-dev.md)
-- For JavaScript testing details, see the test files in `tests/js/`
+PHPUnit tests use a real database, emptied before each run. Tests that need the consent receipts tables create them once per test class with `klaro_geo_create_consent_receipts_table()`.

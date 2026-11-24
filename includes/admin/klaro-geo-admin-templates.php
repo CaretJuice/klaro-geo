@@ -11,6 +11,52 @@ if ( ! class_exists( 'Klaro_Geo_Template_Settings' ) ) {
 
 // klaro_geo_sanitize_array() is defined in klaro-geo.php (globally available)
 
+/**
+ * The translations to save for a template, from the submitted template form.
+ *
+ * The JSON editor wins when it holds valid JSON (the page's script keeps it in
+ * step with the per-language fields before submitting). Otherwise the
+ * per-language fields are used, then the translations already stored, then the
+ * built-in defaults.
+ *
+ * JSON that does not parse is not "repaired". An earlier version rewrote it
+ * with regular expressions first, which also rewrote the text inside
+ * translations (for example a description containing ", note:" had quotes
+ * inserted into it). It is rejected with a notice and the stored translations
+ * are kept.
+ *
+ * @param array      $template_config The submitted template_config.
+ * @param array|null $existing        Translations currently stored for the template.
+ * @return array
+ */
+function klaro_geo_resolve_submitted_translations( array $template_config, $existing ) {
+	$json = isset( $template_config['translations_json'] ) && is_string( $template_config['translations_json'] ) ? trim( $template_config['translations_json'] ) : '';
+
+	if ( '' !== $json ) {
+		$decoded = json_decode( $json, true );
+		if ( is_array( $decoded ) ) {
+			return klaro_geo_sanitize_translations( $decoded );
+		}
+
+		klaro_geo_debug_log( 'Translations JSON could not be parsed (' . json_last_error_msg() . '); keeping the stored translations' );
+		add_settings_error(
+			'klaro_geo_templates',
+			'json_parse_error',
+			'The translations JSON could not be read (' . json_last_error_msg() . '). The translations were not changed.',
+			'error'
+		);
+	} elseif ( isset( $template_config['translations'] ) && is_array( $template_config['translations'] ) ) {
+		return klaro_geo_sanitize_translations( $template_config['translations'] );
+	}
+
+	if ( is_array( $existing ) && $existing ) {
+		return $existing;
+	}
+
+	klaro_geo_debug_log( 'No translations submitted or stored for the template; using the default translations' );
+	return klaro_geo_get_default_translations();
+}
+
 // Templates page content
 function klaro_geo_templates_page() {
 	if ( ! current_user_can( 'manage_options' ) ) {
@@ -18,7 +64,7 @@ function klaro_geo_templates_page() {
 	}
 
 	// Initialize the template settings class
-	$template_settings = new Klaro_Geo_Template_Settings();
+	$template_settings = Klaro_Geo_Template_Settings::get_instance();
 
 	// Ensure the template settings are saved
 	$template_settings->save();
@@ -78,260 +124,40 @@ function klaro_geo_templates_page() {
     // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only template tab selection within manage_options-gated admin page; no data is modified.
 	$current_template = isset( $_GET['template'] ) ? sanitize_text_field( wp_unslash( $_GET['template'] ) ) : 'default';
 
-	// Pass templates to JavaScript
-	wp_localize_script(
-		'klaro-geo-template-translations',
-		'klaroGeoTemplates',
-		array(
-			'templates'        => $templates,
-			'timestamp'        => time(), // Add timestamp to prevent caching issues
-			'current_template' => $current_template, // Pass the current template ID
-			'ajax_url'         => admin_url( 'admin-ajax.php' ), // Add AJAX URL for JavaScript
-			'nonce'            => wp_create_nonce( 'klaro_geo_template_nonce' ), // Add nonce for AJAX security
-		)
-	);
-
 	// Save template changes
 	if ( isset( $_POST['submit_template'] ) ) {
 		check_admin_referer( 'klaro_geo_template_nonce' );
-		klaro_geo_debug_log( 'Saving template changes...' );
 
 		$current_template = isset( $_POST['current_template'] ) ? sanitize_text_field( wp_unslash( $_POST['current_template'] ) ) : 'default';
-		klaro_geo_debug_log( 'Current template: ' . $current_template );
 
 		// Get the template configuration from POST data
         // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- template_config is a complex nested array; individual values are sanitized below
 		if ( isset( $_POST['template_config'] ) && is_array( $_POST['template_config'] ) ) {
 			$template_config = wp_unslash( $_POST['template_config'] ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized per-key below
-			klaro_geo_debug_log( 'Received template config with ' . count( $template_config ) . ' keys: ' . implode( ', ', array_keys( $template_config ) ) );
 
-			// Check if translations_json is present in the POST data
-			if ( isset( $template_config['translations_json'] ) && ! empty( $template_config['translations_json'] ) ) {
-				// Parse the JSON data
-				$translations_json = $template_config['translations_json'];
-				klaro_geo_debug_log( 'Translations JSON received: ' . $translations_json );
+			$existing_template = $template_settings->get_template( $current_template );
+			$translations      = klaro_geo_resolve_submitted_translations(
+				$template_config,
+				isset( $existing_template['config']['translations'] ) ? $existing_template['config']['translations'] : null
+			);
 
-				// Clean the JSON string to prevent syntax errors
-				$translations_json = trim( $translations_json );
-
-				// Let's take a simpler approach to fix the JSON
-				// First, let's make sure we have valid JSON structure
-
-				// 1. Replace unquoted property names with quoted ones (only at the beginning of properties)
-				$translations_json = preg_replace( '/([{,])\s*([a-zA-Z0-9_]+)\s*:/', '$1"$2":', $translations_json );
-
-				// 2. Remove trailing commas in objects and arrays
-				$translations_json = preg_replace( '/,\s*}/', '}', $translations_json );
-				$translations_json = preg_replace( '/,\s*]/', ']', $translations_json );
-
-				// 3. Fix common contractions with apostrophes
-				// Instead of using regex which can be error-prone, let's use simple string replacements
-				$translations_json = str_replace( '"we"d', '"we\'d', $translations_json );
-				$translations_json = str_replace( '"you"re', '"you\'re', $translations_json );
-				$translations_json = str_replace( '"don"t', '"don\'t', $translations_json );
-				$translations_json = str_replace( '"can"t', '"can\'t', $translations_json );
-				$translations_json = str_replace( '"won"t', '"won\'t', $translations_json );
-				$translations_json = str_replace( '"it"s', '"it\'s', $translations_json );
-				$translations_json = str_replace( '"that"s', '"that\'s', $translations_json );
-				$translations_json = str_replace( '"there"s', '"there\'s', $translations_json );
-				$translations_json = str_replace( '"what"s', '"what\'s', $translations_json );
-				$translations_json = str_replace( '"let"s', '"let\'s', $translations_json );
-
-				// 4. Fix specific phrases in the description that commonly have apostrophes
-				$translations_json = str_replace( 'we"d like to use', 'we\'d like to use', $translations_json );
-				$translations_json = str_replace( 'You"re in charge', 'You\'re in charge', $translations_json );
-				$translations_json = str_replace( 'That"s ok', 'That\'s ok', $translations_json );
-
-				try {
-					// Log the JSON before attempting to decode
-					klaro_geo_debug_log( 'Attempting to parse JSON: ' . substr( $translations_json, 0, 500 ) . ( strlen( $translations_json ) > 500 ? '...' : '' ) );
-
-					// Try to decode the JSON
-					$translations = json_decode( $translations_json, true );
-
-					if ( json_last_error() === JSON_ERROR_NONE && is_array( $translations ) ) {
-						// Successfully parsed JSON, use it for translations
-						$template_config['translations'] = klaro_geo_sanitize_translations( $translations );
-						klaro_geo_debug_log( 'Translations JSON parsed successfully: ' . count( $template_config['translations'] ) . ' languages' );
-					} else {
-						// Try one more approach - use the built-in json_decode with ignoring errors
-						$translations = @json_decode( $translations_json, true );
-						if ( $translations !== null && is_array( $translations ) ) {
-							$template_config['translations'] = klaro_geo_sanitize_translations( $translations );
-							klaro_geo_debug_log( 'Translations JSON parsed successfully with error suppression' );
-						} else {
-							// JSON parsing error
-							$error = json_last_error_msg();
-							klaro_geo_debug_log( 'Error parsing translations JSON: ' . $error );
-							klaro_geo_debug_log( 'JSON that failed to parse: ' . $translations_json );
-
-							// Add admin notice about JSON error
-							add_settings_error(
-								'klaro_geo_templates',
-								'json_parse_error',
-								'Error parsing translations JSON: ' . $error . '. Using fallback translations.',
-								'error'
-							);
-
-							// Try to fix common JSON errors
-							$fixed_json = $translations_json;
-
-							// Fix common contractions where apostrophes might be problematic
-							$common_contractions = array( 'we"d', 'you"re', 'don"t', 'can"t', 'won"t', 'it"s', 'that"s', 'there"s', 'he"s', 'she"s', 'what"s', 'let"s', 'who"s', 'here"s', 'didn"t' );
-							foreach ( $common_contractions as $contraction ) {
-								$fixed_json = str_replace( $contraction, str_replace( '"', "'", $contraction ), $fixed_json );
-							}
-
-							// Properly escape apostrophes
-							$fixed_json = preg_replace( '/"([^"]*?)\'([^"]*?)"/', '"$1\\\'$2"', $fixed_json );
-
-							// Replace single quotes with double quotes (only for string delimiters)
-							$fixed_json = preg_replace( "/([{,]\s*\"[^\"]+\")\s*:\s*'([^']*)'/", '$1:"$2"', $fixed_json );
-
-							// Remove trailing commas
-							$fixed_json = preg_replace( '/,\s*}/', '}', $fixed_json );
-							$fixed_json = preg_replace( '/,\s*]/', ']', $fixed_json );
-
-							// Try parsing again
-							$translations = json_decode( $fixed_json, true );
-							if ( json_last_error() === JSON_ERROR_NONE && is_array( $translations ) ) {
-								// Successfully parsed fixed JSON
-								$template_config['translations'] = klaro_geo_sanitize_translations( $translations );
-								klaro_geo_debug_log( 'Fixed JSON parsed successfully: ' . count( $translations ) . ' languages' );
-							} else {
-								// Keep existing translations if available
-								$existing_template = $template_settings->get_template( $current_template );
-								if ( $existing_template && isset( $existing_template['config']['translations'] ) ) {
-									$template_config['translations'] = $existing_template['config']['translations'];
-									klaro_geo_debug_log( 'Using existing translations due to JSON parse error' );
-								} else {
-									// Create default translations
-									$template_config['translations'] = array(
-										'zz' => array(
-											'consentModal' => array(
-												'title' => 'Privacy Settings',
-												'description' => 'Here you can assess and customize the services that we\'d like to use on this website.',
-											),
-											'acceptAll'    => 'Accept all',
-											'decline'      => 'I decline',
-											'close'        => 'Close',
-										),
-									);
-									klaro_geo_debug_log( 'Created default translations due to JSON parse error' );
-								}
-							}
-						}
-					}
-				} catch ( Exception $e ) {
-					klaro_geo_debug_log( 'Exception parsing translations JSON: ' . $e->getMessage() );
-					// Keep existing translations if available
-					$existing_template = $template_settings->get_template( $current_template );
-					if ( $existing_template && isset( $existing_template['config']['translations'] ) ) {
-						$template_config['translations'] = $existing_template['config']['translations'];
-						klaro_geo_debug_log( 'Using existing translations due to exception' );
-					} else {
-						// Create default translations
-						$template_config['translations'] = array(
-							'zz' => array(
-								'consentModal' => array(
-									'title'       => 'Privacy Settings',
-									'description' => 'Here you can assess and customize the services that we\'d like to use on this website.',
-								),
-								'acceptAll'    => 'Accept all',
-								'decline'      => 'I decline',
-								'close'        => 'Close',
-							),
-						);
-						klaro_geo_debug_log( 'Created default translations due to exception' );
-					}
-				}
-			} elseif ( isset( $template_config['translations'] ) && is_array( $template_config['translations'] ) ) {
-				// Use the translations array directly if available
-				klaro_geo_debug_log( 'Translations array received: ' . count( $template_config['translations'] ) . ' languages' );
-			} else {
-				klaro_geo_debug_log( 'No translations received. Using existing translations if available.' );
-				// Keep existing translations if available
-				$existing_template = $template_settings->get_template( $current_template );
-				if ( $existing_template && isset( $existing_template['config']['translations'] ) ) {
-					$template_config['translations'] = $existing_template['config']['translations'];
-					klaro_geo_debug_log( 'Using existing translations' );
-				} else {
-					// Create default translations if none exist
-					$template_config['translations'] = array(
-						'zz' => array(
-							'consentModal' => array(
-								'title'       => 'Privacy Settings',
-								'description' => 'Here you can assess and customize the services that we\'d like to use on this website. You\'re in charge! Enable or disable services as you see fit.',
-							),
-							'acceptAll'    => 'Accept all',
-							'decline'      => 'I decline',
-							'close'        => 'Close',
-						),
-					);
-					klaro_geo_debug_log( 'Created default translations' );
-				}
+			// Consent mode values ('granted', 'denied', and 'true' / 'false' for the
+			// gtag settings) are stored as the strings they are compared against,
+			// so they are sanitized as text. Everything else is form config, where
+			// 'true', 'false' and 'on' mean booleans.
+			$consent_mode_settings = null;
+			if ( isset( $template_config['consent_mode_settings'] ) && is_array( $template_config['consent_mode_settings'] ) ) {
+				// initialize_consent_mode and initialization_code are no longer
+				// settings: consent mode is always on.
+				unset( $template_config['consent_mode_settings']['initialize_consent_mode'], $template_config['consent_mode_settings']['initialization_code'] );
+				$consent_mode_settings = klaro_geo_sanitize_deep( $template_config['consent_mode_settings'], false );
 			}
+			unset( $template_config['translations_json'], $template_config['translations'], $template_config['consent_mode_settings'] );
 
-			// Debug log the final translations
-			klaro_geo_debug_log( 'Final translations to save: ' . count( $template_config['translations'] ) . ' languages' );
-
-			// Remove translations_json, it is not needed in the saved config
-			unset( $template_config['translations_json'] );
-
-			// Sanitize the rest of the config values
-			foreach ( $template_config as $key => $value ) {
-				// Skip translations_json as we already processed it
-				if ( $key === 'translations_json' ) {
-					continue;
-				}
-				// Skip translations as we already processed it
-				if ( $key === 'translations' ) {
-					continue;
-				}
-
-				if ( is_array( $value ) ) {
-					// Special handling for consent mode settings
-					// NOTE: initialize_consent_mode has been removed - consent mode is always enabled
-					if ( $key === 'consent_mode_settings' ) {
-						$template_config[ $key ] = array();
-
-						// Process each consent mode setting
-						foreach ( $value as $setting_key => $setting_value ) {
-							// Skip legacy initialize_consent_mode and initialization_code
-							if ( $setting_key === 'initialize_consent_mode' || $setting_key === 'initialization_code' ) {
-								continue;
-							} elseif ( $setting_key === 'consent_defaults' && is_array( $setting_value ) ) {
-								// Handle nested consent_defaults array
-								$template_config[ $key ][ $setting_key ] = array();
-								foreach ( $setting_value as $consent_key => $consent_value ) {
-									$template_config[ $key ][ $setting_key ][ $consent_key ] = sanitize_text_field( $consent_value );
-								}
-							} elseif ( $setting_key === 'gtag_settings' && is_array( $setting_value ) ) {
-								// Handle nested gtag_settings array
-								$template_config[ $key ][ $setting_key ] = array();
-								foreach ( $setting_value as $gtag_key => $gtag_value ) {
-									$template_config[ $key ][ $setting_key ][ $gtag_key ] = sanitize_text_field( $gtag_value );
-								}
-							} else {
-								// Handle other settings normally
-								$template_config[ $key ][ $setting_key ] = sanitize_text_field( $setting_value );
-							}
-						}
-					} else {
-						// Handle other nested arrays with recursive sanitization
-						$template_config[ $key ] = klaro_geo_sanitize_array( $value );
-					}
-				} elseif ( $value === 'true' ) {
-					// Handle simple values - convert boolean values properly
-					$template_config[ $key ] = true;
-				} elseif ( $value === 'false' ) {
-					$template_config[ $key ] = false;
-				} elseif ( $value === 'on' ) {
-					// Checkbox values come as 'on' when checked
-					$template_config[ $key ] = true;
-				} else {
-					$template_config[ $key ] = sanitize_text_field( $value );
-				}
+			$template_config                 = klaro_geo_sanitize_array( $template_config );
+			$template_config['translations'] = $translations;
+			if ( null !== $consent_mode_settings ) {
+				$template_config['consent_mode_settings'] = $consent_mode_settings;
 			}
 
 			// Update the template configuration using the class method
@@ -359,7 +185,6 @@ function klaro_geo_templates_page() {
 			if ( $template ) {
 				$template['plugin_settings'] = $plugin_settings;
 				$template_settings->set_template( $current_template, $template );
-				klaro_geo_debug_log( 'Updated plugin_settings for template: ' . $current_template );
 			}
 		} else {
 			// Set default plugin settings if not provided
@@ -368,7 +193,7 @@ function klaro_geo_templates_page() {
 				$template['plugin_settings'] = array(
 					'enable_consent_logging' => true,
 					'gpc_enabled'            => true,
-					'gpc_purposes'           => array_map( 'trim', explode( ',', get_option( 'klaro_geo_purposes', 'functional,analytics,advertising' ) ) ),
+					'gpc_purposes'           => klaro_geo_get_purposes(),
 				);
 				$template_settings->set_template( $current_template, $template );
 				klaro_geo_debug_log( 'Set default plugin_settings' );
@@ -574,7 +399,7 @@ function klaro_geo_templates_page() {
 							<input type="checkbox" name="template_config[required]" id="template_config_required" value="true"
 								<?php checked( isset( $current_config['required'] ) ? $current_config['required'] : false ); ?>>
 							<p class="description">
-							When enabled, users cannot decline services &mdash; Klaro grants every service even when the visitor clicks Decline. Only use for essential services that are required for your website to function. This setting can also be overridden per-service.</p>
+							When enabled, services whose Required field is set to &ldquo;Use Global Setting&rdquo; on the Services page are required in this template: visitors cannot decline them and they load on every page. Services set to Yes or No ignore this setting. Typical use: set Google Tag Manager to &ldquo;Use Global Setting&rdquo;, enable this in most templates, and leave it off in templates for regions where GTM needs consent.</p>
 						</td>
 					</tr>
 					<tr>
@@ -827,40 +652,25 @@ function klaro_geo_templates_page() {
 					</thead>
 					<tbody>
 						<?php
-						// Get template default setting
-						$template_default = isset( $current_config['default'] ) && $current_config['default'] ? true : false;
+						$template_default  = ! empty( $current_config['default'] );
+						$template_required = isset( $current_config['required'] ) && filter_var( $current_config['required'], FILTER_VALIDATE_BOOLEAN );
+						$source_labels     = array(
+							'required' => 'Required service',
+							'service'  => 'Service override',
+							'template' => 'Template default',
+						);
 
-						// Load the services this preview table describes. Without this the
-						// variable is undefined and the table always renders empty.
-						$service_settings = Klaro_Geo_Service_Settings::get_instance();
-						$services         = $service_settings->get();
-						if ( ! is_array( $services ) ) {
-							$services = array();
-						}
-
-						foreach ( $services as $service ) {
+						foreach ( Klaro_Geo_Service_Settings::get_instance()->get() as $service ) {
 							if ( ! isset( $service['name'] ) ) {
 								continue;
 							}
 
-							$service_name = $service['name'];
-							$consent_key  = str_replace( '-', '_', $service_name ) . '_consent';
-
-							// Determine the default value and source
-							$is_required          = isset( $service['required'] ) && filter_var( $service['required'], FILTER_VALIDATE_BOOLEAN );
-							$has_explicit_default = isset( $service['default'] ) && $service['default'] !== null && $service['default'] !== '';
-
-							if ( $is_required ) {
-								$default_value = 'granted';
-								$source        = 'Required service';
-							} elseif ( $has_explicit_default ) {
-								$service_default = filter_var( $service['default'], FILTER_VALIDATE_BOOLEAN );
-								$default_value   = $service_default ? 'granted' : 'denied';
-								$source          = 'Service override';
-							} else {
-								$default_value = $template_default ? 'granted' : 'denied';
-								$source        = 'Template default';
-							}
+							// The same calculation the frontend config uses.
+							$consent_default = klaro_geo_service_consent_default( $service, $template_default, $template_required );
+							$service_name    = $service['name'];
+							$consent_key     = $consent_default['key'];
+							$default_value   = $consent_default['default'];
+							$source          = $source_labels[ $consent_default['source'] ];
 
 							// Get purpose for display
 							$purposes = isset( $service['purposes'] ) ? implode( ', ', $service['purposes'] ) : 'unknown';
@@ -907,21 +717,16 @@ function klaro_geo_templates_page() {
 						<td>
 							<?php
 							// Must be defined before $gpc_purposes, which falls back to it.
-							$available_purposes = explode( ',', get_option( 'klaro_geo_purposes', 'functional,analytics,advertising' ) );
+							$available_purposes = klaro_geo_get_purposes();
 							$gpc_purposes       = isset( $templates[ $current_template ]['plugin_settings']['gpc_purposes'] )
 								? $templates[ $current_template ]['plugin_settings']['gpc_purposes']
 								: $available_purposes;
-							// in_array() below throws a TypeError on a non-array,
-							// which aborts the render before the submit button.
-							if ( ! is_array( $gpc_purposes ) ) {
-								$gpc_purposes = array();
-							}
 							foreach ( $available_purposes as $purpose ) {
 								$purpose = trim( $purpose );
 								if ( empty( $purpose ) ) {
 									continue;
 								}
-								$checked = in_array( $purpose, $gpc_purposes ) ? 'checked' : '';
+								$checked = in_array( $purpose, $gpc_purposes, true ) ? 'checked' : '';
 								echo '<label style="margin-right: 15px;"><input type="checkbox" name="plugin_settings[gpc_purposes][]" value="' . esc_attr( $purpose ) . '" ' . esc_attr( $checked ) . '> ' . esc_html( ucfirst( $purpose ) ) . '</label>';
 							}
 							?>
@@ -1075,23 +880,23 @@ function klaro_geo_templates_page() {
 
 							<?php
 							// Get all defined purposes from the option
-							$purposes_string = get_option( 'klaro_geo_purposes', 'functional,analytics,advertising' );
-							$purposes        = array_map( 'trim', explode( ',', $purposes_string ) );
+							$purposes = klaro_geo_get_purposes();
 
-							// Default descriptions for standard purposes
-							$default_descriptions = array(
-								'functional'  => 'These services are essential for the correct functioning of this website. You cannot disable them here as the service would not work correctly otherwise.',
-								'analytics'   => 'These services process personal information to help us understand how visitors interact with the website.',
-								'advertising' => 'These services process personal information to show you personalized or interest-based advertisements.',
-							);
+							// Default title and description for built-in purposes (shared with
+							// the hardcoded templates and the config-time backfill)
+							$default_purpose_translations = klaro_geo_get_default_purpose_translations();
 
 							// Loop through each purpose and create form fields
 							foreach ( $purposes as $purpose ) {
 								$purpose_key   = sanitize_key( $purpose ); // Sanitize for use in HTML IDs
-								$purpose_title = ucfirst( $purpose ); // Capitalize the first letter for default title
+								$purpose_title = isset( $default_purpose_translations[ $purpose_key ] )
+									? $default_purpose_translations[ $purpose_key ]['title']
+									: ucfirst( $purpose );
 
 								// Get default description if it exists, otherwise use empty string
-								$default_description = isset( $default_descriptions[ $purpose_key ] ) ? $default_descriptions[ $purpose_key ] : '';
+								$default_description = isset( $default_purpose_translations[ $purpose_key ] )
+									? $default_purpose_translations[ $purpose_key ]['description']
+									: '';
 
 								// Get saved values if they exist
 								$saved_title = isset( $current_config['translations']['zz']['purposes'][ $purpose_key ]['title'] )
@@ -1322,11 +1127,9 @@ function klaro_geo_templates_page() {
 										<select id="copy_from_language" class="regular-text">
 											<option value="zz">Default Language (zz)</option>
 											<?php
-											if ( isset( $current_config['translations'] ) && is_array( $current_config['translations'] ) ) {
-												foreach ( $current_config['translations'] as $lang_code => $translation ) {
-													if ( $lang_code !== 'zz' ) {
-														echo '<option value="' . esc_attr( $lang_code ) . '">' . esc_html( $lang_code ) . '</option>';
-													}
+											foreach ( $current_config['translations'] as $lang_code => $translation ) {
+												if ( $lang_code !== 'zz' ) {
+													echo '<option value="' . esc_attr( $lang_code ) . '">' . esc_html( $lang_code ) . '</option>';
 												}
 											}
 											?>
@@ -1349,14 +1152,13 @@ function klaro_geo_templates_page() {
 							<button type="button" class="button" id="validate_json">Validate JSON</button>
 							<button type="button" class="button" id="update_form_from_json">Update Form from JSON</button>
 							<button type="button" class="button" id="update_json_from_form">Update JSON from Form</button>
-							<button type="button" class="button" id="debug_translations">Debug Translations</button>
 						</div>
 					</div>
 					<textarea id="translations_json_editor" name="template_config[translations_json]" rows="15" class="large-text code">
 					<?php
 					if ( isset( $current_config['translations'] ) ) {
 						// Use JSON_PRETTY_PRINT, JSON_UNESCAPED_UNICODE, and JSON_UNESCAPED_SLASHES for better formatting
-						$json = json_encode(
+						$json = wp_json_encode(
 							$current_config['translations'],
 							JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
 						);
@@ -1380,30 +1182,19 @@ function klaro_geo_templates_page() {
 }
 
 // Helper function to create default templates
-function klaro_geo_create_templates() {
-	// Initialize the template settings class
-	$template_settings = new Klaro_Geo_Template_Settings();
-
-	// The constructor already initializes with default templates if empty
-	// Just make sure to save any changes
-	$template_settings->save();
-
-	return $template_settings->get();
-}
-
 // AJAX handler for template creation
 function klaro_geo_create_template() {
-	check_ajax_referer( 'klaro_geo_template_nonce', 'nonce' );
+	klaro_geo_verify_admin_ajax( 'klaro_geo_template_nonce', 'nonce' );
+	// phpcs:disable WordPress.Security.NonceVerification.Missing -- the nonce and manage_options are checked by klaro_geo_verify_admin_ajax() above.
 
 	if ( ! isset( $_POST['template_name'] ) || ! isset( $_POST['inherit_from'] ) ) {
 		wp_send_json_error( array( 'message' => 'Missing required fields.' ) );
-		return;
 	}
 	$template_name = sanitize_text_field( wp_unslash( $_POST['template_name'] ) );
 	$inherit_from  = sanitize_text_field( wp_unslash( $_POST['inherit_from'] ) );
 
 	// Initialize the template settings class
-	$template_settings = new Klaro_Geo_Template_Settings();
+	$template_settings = Klaro_Geo_Template_Settings::get_instance();
 
 	// Get existing templates
 	$templates = $template_settings->get();
@@ -1416,7 +1207,6 @@ function klaro_geo_create_template() {
 					'message' => 'A template with this name already exists. Please choose a different name.',
 				)
 			);
-			return;
 		}
 	}
 
@@ -1436,7 +1226,6 @@ function klaro_geo_create_template() {
 				'message' => 'Selected template to copy from does not exist.',
 			)
 		);
-		return;
 	}
 
 	// Get the template to inherit from
@@ -1448,7 +1237,6 @@ function klaro_geo_create_template() {
 				'message' => 'Error retrieving template to copy from.',
 			)
 		);
-		return;
 	}
 
 	// Copy settings from inherited template
@@ -1474,6 +1262,7 @@ function klaro_geo_create_template() {
 			'message'      => 'Template created successfully.',
 		)
 	);
+	// phpcs:enable WordPress.Security.NonceVerification.Missing
 }
 add_action( 'wp_ajax_klaro_geo_create_template', 'klaro_geo_create_template' );
 
@@ -1484,45 +1273,30 @@ add_action( 'wp_ajax_klaro_geo_create_template', 'klaro_geo_create_template' );
  * It processes the JSON data, updates the template in the database, and returns a JSON response.
  */
 function klaro_geo_save_translations_ajax() {
-	// Check if user has permission
-	if ( ! current_user_can( 'manage_options' ) ) {
-		wp_send_json_error( array( 'message' => 'You do not have permission to perform this action.' ) );
-		return;
-	}
-
-	// Verify nonce
-	if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ) ), 'klaro_geo_template_nonce' ) ) {
-		wp_send_json_error( array( 'message' => 'Security check failed. Please refresh the page and try again.' ) );
-		return;
-	}
+	klaro_geo_verify_admin_ajax( 'klaro_geo_template_nonce' );
+	// phpcs:disable WordPress.Security.NonceVerification.Missing -- the nonce and manage_options are checked by klaro_geo_verify_admin_ajax() above.
 
 	// Check if we have a template ID
 	if ( ! isset( $_POST['template_id'] ) || empty( $_POST['template_id'] ) ) {
 		wp_send_json_error( array( 'message' => 'No template ID provided.' ) );
-		return;
 	}
 
 	// Get the template ID
 	$template_id = sanitize_text_field( wp_unslash( $_POST['template_id'] ) );
 
 	// Initialize the template settings class
-	$template_settings = new Klaro_Geo_Template_Settings();
+	$template_settings = Klaro_Geo_Template_Settings::get_instance();
 
 	// Check if the template exists
 	$template = $template_settings->get_template( $template_id );
 	if ( ! $template ) {
 		wp_send_json_error( array( 'message' => 'Template not found.' ) );
-		return;
 	}
-
-	// Log the AJAX request
-	klaro_geo_debug_log( 'AJAX save translations request for template: ' . $template_id );
 
 	// Process the translations JSON
 	if ( isset( $_POST['translations_json'] ) && ! empty( $_POST['translations_json'] ) ) {
         // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- JSON string cannot be sanitized with sanitize_text_field; it is validated via json_decode below
 		$translations_json = wp_unslash( $_POST['translations_json'] );
-		klaro_geo_debug_log( 'Received translations JSON: ' . substr( $translations_json, 0, 500 ) . ( strlen( $translations_json ) > 500 ? '...' : '' ) );
 
 		try {
 			// Parse the JSON
@@ -1531,7 +1305,6 @@ function klaro_geo_save_translations_ajax() {
 			if ( json_last_error() === JSON_ERROR_NONE && is_array( $translations ) ) {
 				// Successfully parsed JSON — sanitize individual values before storage
 				$translations = klaro_geo_sanitize_translations( $translations );
-				klaro_geo_debug_log( 'Translations JSON parsed and sanitized successfully' );
 
 				// Get the template config
 				$config = $template_settings->get_template_config( $template_id );
@@ -1550,7 +1323,7 @@ function klaro_geo_save_translations_ajax() {
 				wp_send_json_success(
 					array(
 						'message'           => 'Translations saved successfully.',
-						'translations_json' => json_encode( $translations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ),
+						'translations_json' => wp_json_encode( $translations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ),
 					)
 				);
 			} else {
@@ -1566,6 +1339,7 @@ function klaro_geo_save_translations_ajax() {
 	} else {
 		wp_send_json_error( array( 'message' => 'No translations JSON provided.' ) );
 	}
+	// phpcs:enable WordPress.Security.NonceVerification.Missing
 }
 add_action( 'wp_ajax_klaro_geo_save_translations', 'klaro_geo_save_translations_ajax' );
 
@@ -1573,22 +1347,12 @@ add_action( 'wp_ajax_klaro_geo_save_translations', 'klaro_geo_save_translations_
  * AJAX handler for deleting a template
  */
 function klaro_geo_delete_template_ajax() {
-	// Check nonce for security
-	if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ) ), 'klaro_geo_template_nonce' ) ) {
-		wp_send_json_error( array( 'message' => 'Security check failed.' ) );
-		return;
-	}
-
-	// Check if user has permission
-	if ( ! current_user_can( 'manage_options' ) ) {
-		wp_send_json_error( array( 'message' => 'You do not have permission to delete templates.' ) );
-		return;
-	}
+	klaro_geo_verify_admin_ajax( 'klaro_geo_template_nonce' );
+	// phpcs:disable WordPress.Security.NonceVerification.Missing -- the nonce and manage_options are checked by klaro_geo_verify_admin_ajax() above.
 
 	// Get the template ID
 	if ( ! isset( $_POST['template_id'] ) || empty( $_POST['template_id'] ) ) {
 		wp_send_json_error( array( 'message' => 'No template ID provided.' ) );
-		return;
 	}
 
 	$template_id = sanitize_text_field( wp_unslash( $_POST['template_id'] ) );
@@ -1596,30 +1360,27 @@ function klaro_geo_delete_template_ajax() {
 	// Don't allow deleting the default template
 	if ( $template_id === 'default' ) {
 		wp_send_json_error( array( 'message' => 'The default template cannot be deleted.' ) );
-		return;
 	}
 
 	// Initialize the template settings class
-	$template_settings = new Klaro_Geo_Template_Settings();
+	$template_settings = Klaro_Geo_Template_Settings::get_instance();
 
 	// Check if the template exists
 	$template = $template_settings->get_template( $template_id );
 	if ( ! $template ) {
 		wp_send_json_error( array( 'message' => 'Template not found.' ) );
-		return;
 	}
 
 	// Check if the template is in use by any countries
-	$country_settings         = get_option( 'klaro_geo_country_settings', array() );
+	$country_settings         = Klaro_Geo_Country_Settings::get_instance()->get();
 	$template_in_use          = false;
 	$countries_using_template = array();
 
-	if ( is_array( $country_settings ) ) {
-		foreach ( $country_settings as $country_code => $country_data ) {
-			if ( isset( $country_data['template'] ) && $country_data['template'] === $template_id ) {
-				$template_in_use            = true;
-				$countries_using_template[] = $country_code;
-			}
+	foreach ( $country_settings as $country_code => $country_data ) {
+		// The fallback template entry is a string, not a country.
+		if ( is_array( $country_data ) && isset( $country_data['template'] ) && $country_data['template'] === $template_id ) {
+			$template_in_use            = true;
+			$countries_using_template[] = $country_code;
 		}
 	}
 
@@ -1630,11 +1391,7 @@ function klaro_geo_delete_template_ajax() {
 		$error_message .= 'Please assign a different template to these countries in Country Settings before deleting this template.';
 
 		wp_send_json_error( array( 'message' => $error_message ) );
-		return;
 	}
-
-	// Log the deletion
-	klaro_geo_debug_log( 'Deleting template: ' . $template_id );
 
 	// Remove the template
 	$template_settings->remove_template( $template_id );
@@ -1647,5 +1404,6 @@ function klaro_geo_delete_template_ajax() {
 	} else {
 		wp_send_json_error( array( 'message' => 'Failed to delete template.' ) );
 	}
+	// phpcs:enable WordPress.Security.NonceVerification.Missing
 }
 add_action( 'wp_ajax_klaro_geo_delete_template', 'klaro_geo_delete_template_ajax' );

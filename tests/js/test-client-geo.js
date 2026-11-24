@@ -8,7 +8,8 @@
  * Spec: specs/client-side-geo.spec.yaml
  */
 
-const clientGeo = require('../../js/klaro-geo-client-geo.js');
+const { setUpPage, loadBootstrap } = require('./helpers/page.js');
+const clientGeo = loadBootstrap();
 const parityFixture = require('../fixtures/geo-resolution-parity.json');
 
 // Build a rules object + candidate templates map from the shared fixture
@@ -58,6 +59,7 @@ function makePayload(overrides) {
                 gtagSettings: { ads_data_redaction: 'true', url_passthrough: 'false' },
                 enableConsentLogging: true,
                 gpcEnabled: true,
+                configHash: 'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
                 templateSettings: { consentModalTitle: 'Privacy', consentModalDescription: '', acceptAllText: 'Accept', declineAllText: 'Decline', defaultConsent: false, requiredConsent: false }
             },
             'relaxed': {
@@ -66,6 +68,7 @@ function makePayload(overrides) {
                 gtagSettings: { ads_data_redaction: 'true', url_passthrough: 'true' },
                 enableConsentLogging: true,
                 gpcEnabled: true,
+                configHash: 'rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr',
                 templateSettings: { consentModalTitle: 'Privacy', consentModalDescription: '', acceptAllText: 'Accept', declineAllText: 'Decline', defaultConsent: true, requiredConsent: false }
             },
             'strict': {
@@ -74,6 +77,7 @@ function makePayload(overrides) {
                 gtagSettings: { ads_data_redaction: 'true', url_passthrough: 'false' },
                 enableConsentLogging: true,
                 gpcEnabled: false,
+                configHash: '5555555555555555555555555555555555555555555555555555555555555555',
                 templateSettings: { consentModalTitle: 'Privacy', consentModalDescription: '', acceptAllText: 'Accept', declineAllText: 'Decline', defaultConsent: false, requiredConsent: false }
             }
         }
@@ -170,13 +174,9 @@ describe('Resolution fallback chain', function() {
     let dtfSpy;
 
     beforeEach(function() {
-        window.dataLayer = [];
-        window.gtag = jest.fn();
+        setUpPage();
         window.klaro = { setup: jest.fn() };
-        window.klaroGeo = {};
-        window.klaroConsentData = { detectedCountry: '', detectedRegion: '', templateName: '' };
         delete window.klaroConfig;
-        delete window.klaroGeoGPC;
         Object.defineProperty(navigator, 'globalPrivacyControl', {
             value: undefined,
             writable: true,
@@ -191,7 +191,6 @@ describe('Resolution fallback chain', function() {
         delete window.klaro;
         delete window.klaroConfig;
         delete window.klaroConsentData;
-        delete window.klaroGeoGPC;
         if (dtfSpy) {
             dtfSpy.mockRestore();
             dtfSpy = null;
@@ -247,6 +246,26 @@ describe('Resolution fallback chain', function() {
         expect(window.klaroConsentData.detectedRegion).toBe('BC');
         expect(window.klaroConsentData.templateName).toBe('strict');
         expect(window.klaroConsentData.templateSource).toBe('country');
+        // The selected template's config version, for the consent receipt.
+        expect(window.klaroConsentData.configHash).toBe(payload.templates.strict.configHash);
+    });
+
+    test('enableConsentLogging is the effective value: global receipts setting AND template setting', async function() {
+        mockFetchSuccess({ country: { iso_code: 'CA' } });
+
+        // Template has logging on, but receipts are disabled globally
+        await clientGeo.resolveAndApply(makePayload({ consentReceipts: false }));
+        expect(window.klaroConsentData.enableConsentLogging).toBe(false);
+
+        // Both on
+        await clientGeo.resolveAndApply(makePayload({ consentReceipts: true }));
+        expect(window.klaroConsentData.enableConsentLogging).toBe(true);
+
+        // Receipts enabled globally, but the selected template has logging off
+        const payload = makePayload({ consentReceipts: true });
+        payload.templates.strict.enableConsentLogging = false;
+        await clientGeo.resolveAndApply(payload);
+        expect(window.klaroConsentData.enableConsentLogging).toBe(false);
     });
 
     test('AJAX failure + timezone fallback on → timezone source (region empty)', async function() {
@@ -333,8 +352,8 @@ describe('Resolution fallback chain', function() {
         const payload = makePayload();
         await clientGeo.resolveAndApply(payload);
 
-        expect(window.klaroGeoGPC.detected).toBe(true);
-        expect(window.klaroGeoGPC.affectedServices).toContain('google-analytics');
+        expect(window.klaroGeo.gpc.detected).toBe(true);
+        expect(window.klaroGeo.gpc.affectedServices).toContain('google-analytics');
         expect(window.klaroConfig.services[0].default).toBe(false);
 
         // GPC forces denied even though the relaxed template granted by default
@@ -360,8 +379,8 @@ describe('Resolution fallback chain', function() {
 
         await clientGeo.resolveAndApply(makePayload());
 
-        expect(window.klaroGeoGPC.detected).toBe(false);
-        expect(window.klaroGeoGPC.enabled).toBe(false);
+        expect(window.klaroGeo.gpc.detected).toBe(false);
+        expect(window.klaroGeo.gpc.enabled).toBe(false);
     });
 
     test('Klaro not loaded yet → config set, setup deferred to auto-init', async function() {
@@ -386,5 +405,145 @@ describe('Resolution fallback chain', function() {
         expect(evt.klaroGeoConsentTemplate).toBe('default');
         expect(evt.klaroGeoTemplateSource).toBe('fallback');
         expect(window.klaro.setup).toHaveBeenCalled();
+    });
+});
+
+describe('Server mode (template resolved by PHP)', function() {
+    function serverPayload(resolvedOverrides) {
+        const payload = makePayload();
+        return {
+            mode: 'server',
+            resolved: Object.assign({
+                template: 'relaxed',
+                templateSource: 'country',
+                country: 'US',
+                region: 'CA',
+                geoSource: 'server',
+                adminOverride: false
+            }, resolvedOverrides || {}),
+            rules: { defaultTemplate: 'relaxed' },
+            templates: { relaxed: payload.templates.relaxed },
+            consentReceipts: true
+        };
+    }
+
+    function applyServer(payload) {
+        clientGeo.applyResolution(payload, {
+            country: payload.resolved.country,
+            region: payload.resolved.region,
+            source: payload.resolved.geoSource,
+            latencyMs: null
+        });
+    }
+
+    function configLoaded() {
+        return window.dataLayer.filter(function(e) {
+            return e && e.klaroEventName === 'klaroConfigLoaded';
+        });
+    }
+
+    beforeEach(function() {
+        setUpPage();
+        window.klaro = { setup: jest.fn() };
+        delete window.klaroConfig;
+        Object.defineProperty(navigator, 'globalPrivacyControl', {
+            value: undefined,
+            writable: true,
+            configurable: true
+        });
+        window.localStorage.clear();
+        window.fetch = jest.fn();
+    });
+
+    afterEach(function() {
+        delete window.fetch;
+        delete window.klaro;
+        delete window.klaroConfig;
+        delete window.klaroConsentData;
+        jest.clearAllMocks();
+    });
+
+    test('applies the resolved template without any lookup', function() {
+        const payload = serverPayload();
+        applyServer(payload);
+
+        expect(window.fetch).not.toHaveBeenCalled();
+        expect(window.klaroConfig).toBe(payload.templates.relaxed.config);
+        expect(window.klaro.setup).toHaveBeenCalledWith(window.klaroConfig);
+    });
+
+    test('klaroConfigLoaded reports the server resolution, once', function() {
+        applyServer(serverPayload());
+
+        const loaded = configLoaded();
+        expect(loaded).toHaveLength(1);
+        expect(loaded[0]).toEqual(expect.objectContaining({
+            event: 'Klaro Event',
+            eventSource: 'klaro-geo',
+            klaroGeoConsentTemplate: 'relaxed',
+            klaroGeoTemplateSource: 'country',
+            klaroGeoDetectedCountry: 'US',
+            klaroGeoDetectedRegion: 'CA',
+            klaroGeoAdminOverride: false,
+            klaroGeoResolutionMode: 'server',
+            klaroGeoGeoSource: 'server',
+            klaroGeoGeoLatencyMs: null,
+            klaroGeoEnableConsentLogging: true
+        }));
+    });
+
+    test('klaroGeoEnableConsentLogging is false when receipts are disabled globally, whatever the template says', function() {
+        const payload = serverPayload();
+        payload.consentReceipts = false;
+        expect(payload.templates.relaxed.enableConsentLogging).toBe(true);
+
+        applyServer(payload);
+
+        expect(configLoaded()[0].klaroGeoEnableConsentLogging).toBe(false);
+    });
+
+    test('klaroGeoEnableConsentLogging is false when the template has logging off', function() {
+        const payload = serverPayload();
+        payload.templates.relaxed.enableConsentLogging = false;
+
+        applyServer(payload);
+
+        expect(configLoaded()[0].klaroGeoEnableConsentLogging).toBe(false);
+    });
+
+    test('admin debug override is reported', function() {
+        applyServer(serverPayload({ adminOverride: true, geoSource: 'debug' }));
+
+        expect(configLoaded()[0].klaroGeoAdminOverride).toBe(true);
+        expect(configLoaded()[0].klaroGeoGeoSource).toBe('debug');
+    });
+
+    test('no geo detected is reported as null', function() {
+        applyServer(serverPayload({ country: '', region: '' }));
+
+        expect(configLoaded()[0].klaroGeoDetectedCountry).toBeNull();
+        expect(configLoaded()[0].klaroGeoDetectedRegion).toBeNull();
+    });
+
+    test('does not repeat what PHP already rendered for this template', function() {
+        // PHP emitted klaroConsentData complete, and the <head> consent defaults
+        // and gtag flags for this template.
+        window.klaroConsentData = { templateName: 'relaxed', adminOverride: true, enableConsentLogging: true };
+        const before = JSON.stringify(window.klaroConsentData);
+
+        applyServer(serverPayload());
+
+        expect(JSON.stringify(window.klaroConsentData)).toBe(before);
+        expect(window.gtag).not.toHaveBeenCalled();
+    });
+
+    test('a payload with mode "server" is applied when the script loads', function() {
+        window.klaroGeoTemplatePayload = serverPayload();
+        jest.resetModules();
+        require('../../js/klaro-geo-bootstrap.js');
+
+        expect(window.klaroConfig).toBe(window.klaroGeoTemplatePayload.templates.relaxed.config);
+        expect(configLoaded()).toHaveLength(1);
+        delete window.klaroGeoTemplatePayload;
     });
 });

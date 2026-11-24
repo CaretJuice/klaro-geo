@@ -1,7 +1,5 @@
-# WordPress Debug Logs
+# Test logs
 
-This directory is mounted to the WordPress container's `/var/www/html/wp-content` directory to capture debug logs.
+`debug_test.log` is written here by each PHPUnit run (`bin/phpunit.sh`): PHP errors and the plugin's debug log. It holds the last run only.
 
-The WordPress debug log will be available at `debug.log` in this directory after running the container.
-
-Do not delete this directory as it's required for the Docker setup.
+Do not delete this directory. It is the one part of the checkout the PHPUnit container can write to.

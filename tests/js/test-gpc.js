@@ -1,428 +1,230 @@
 /**
  * GPC (Global Privacy Control) Tests
  *
- * Tests GPC detection logic, service default overrides,
- * consent mode updates, dataLayer events, and consent receipt fields.
+ * Drives the real template-application code (applyResolution in
+ * js/klaro-geo-bootstrap.js) with a server-mode payload, and checks what GPC
+ * does to service defaults, the consent state and the dataLayer.
  */
 
-describe('GPC Detection', function() {
-    beforeEach(function() {
-        window.dataLayer = [];
-        window.gtag = jest.fn();
-        window.klaroGeo = {};
-        delete window.klaroGeoGPC;
-        // Default: no GPC signal
+const { setUpPage, loadBootstrap } = require('./helpers/page.js');
+const clientGeo = loadBootstrap();
+
+describe('GPC', function() {
+    function setGpcSignal(value) {
         Object.defineProperty(navigator, 'globalPrivacyControl', {
-            value: undefined,
+            value: value,
             writable: true,
             configurable: true
         });
+    }
+
+    /**
+     * Apply a server-mode payload holding one template.
+     *
+     * @param {Array}   services   Services for klaroConfig.
+     * @param {boolean} gpcEnabled Whether GPC is enabled for the template.
+     * @returns {Object} window.klaroGeo.gpc
+     */
+    function apply(services, gpcEnabled) {
+        const payload = {
+            mode: 'server',
+            resolved: {
+                template: 'default',
+                templateSource: 'fallback',
+                country: 'US',
+                region: '',
+                geoSource: 'server',
+                adminOverride: false
+            },
+            rules: { defaultTemplate: 'default' },
+            templates: {
+                'default': {
+                    config: { services: services, storageMethod: 'cookie' },
+                    consentDefaults: {},
+                    gtagSettings: { ads_data_redaction: 'true', url_passthrough: 'false' },
+                    enableConsentLogging: false,
+                    gpcEnabled: gpcEnabled !== false,
+                    templateSettings: {}
+                }
+            },
+            consentReceipts: false
+        };
+        clientGeo.applyResolution(payload, { country: 'US', region: '', source: 'server', latencyMs: null });
+        return window.klaroGeo.gpc;
+    }
+
+    function consentUpdates() {
+        return window.gtag.mock.calls.filter(function(call) {
+            return call[0] === 'consent' && call[1] === 'update';
+        });
+    }
+
+    function events(name) {
+        return window.dataLayer.filter(function(e) {
+            return e && e.klaroEventName === name;
+        });
+    }
+
+    beforeEach(function() {
+        setUpPage();
+        window.klaro = { setup: jest.fn() };
+        delete window.klaroConfig;
+        window.localStorage.clear();
+        setGpcSignal(undefined);
     });
 
     afterEach(function() {
-        window.dataLayer = [];
         delete window.klaroGeo;
-        delete window.klaroGeoGPC;
         delete window.klaroConfig;
+        delete window.klaro;
         jest.clearAllMocks();
     });
 
-    /**
-     * Helper: simulate the GPC detection block from klaro-config.js
-     */
-    function runGPCDetection(gpcConfig, klaroConfig) {
-        window.klaroConfig = klaroConfig;
+    describe('signal detection', function() {
+        test('detected when navigator.globalPrivacyControl is true', function() {
+            setGpcSignal(true);
+            const gpc = apply([]);
+            expect(gpc.detected).toBe(true);
+            expect(gpc.enabled).toBe(true);
+        });
 
-        var klaroGeoGPC = { detected: false, enabled: false, affectedServices: [] };
-        klaroGeoGPC.enabled = gpcConfig.enabled;
+        test.each([
+            ['false', false],
+            ['undefined', undefined],
+            ['the string "1"', '1']
+        ])('not detected when the signal is %s', function(label, value) {
+            setGpcSignal(value);
+            expect(apply([]).detected).toBe(false);
+        });
 
-        if (gpcConfig.enabled) {
-            klaroGeoGPC.detected = (navigator.globalPrivacyControl === true);
-            if (klaroGeoGPC.detected) {
-                if (window.klaroConfig && window.klaroConfig.services) {
-                    for (var i = 0; i < window.klaroConfig.services.length; i++) {
-                        var svc = window.klaroConfig.services[i];
-                        if (svc.gpc_sensitive && !svc.required) {
-                            svc.default = false;
-                            klaroGeoGPC.affectedServices.push(svc.name);
-                        }
-                    }
-                }
-            }
-        }
-        window.klaroGeo = window.klaroGeo || {};
-        window.klaroGeo.gpc = klaroGeoGPC;
-        window.klaroGeoGPC = klaroGeoGPC;
-        return klaroGeoGPC;
-    }
+        test('not detected when GPC is disabled for the template', function() {
+            setGpcSignal(true);
+            const services = [{ name: 'ads', gpc_sensitive: true, default: true }];
+            const gpc = apply(services, false);
 
-    // =========================================================================
-    // GPC Signal Detection
-    // =========================================================================
-
-    test('should detect GPC when navigator.globalPrivacyControl is true', function() {
-        navigator.globalPrivacyControl = true;
-        var result = runGPCDetection(
-            { enabled: true, gpc_purposes: ['advertising'] },
-            { services: [] }
-        );
-        expect(result.detected).toBe(true);
-        expect(result.enabled).toBe(true);
-    });
-
-    test('should not detect GPC when navigator.globalPrivacyControl is false', function() {
-        navigator.globalPrivacyControl = false;
-        var result = runGPCDetection(
-            { enabled: true, gpc_purposes: ['advertising'] },
-            { services: [] }
-        );
-        expect(result.detected).toBe(false);
-    });
-
-    test('should not detect GPC when navigator.globalPrivacyControl is undefined', function() {
-        var result = runGPCDetection(
-            { enabled: true, gpc_purposes: ['advertising'] },
-            { services: [] }
-        );
-        expect(result.detected).toBe(false);
-    });
-
-    test('should not detect GPC when navigator.globalPrivacyControl is "1" (string)', function() {
-        navigator.globalPrivacyControl = "1";
-        var result = runGPCDetection(
-            { enabled: true, gpc_purposes: ['advertising'] },
-            { services: [] }
-        );
-        expect(result.detected).toBe(false);
-    });
-
-    test('should not process GPC when disabled globally', function() {
-        navigator.globalPrivacyControl = true;
-        var result = runGPCDetection(
-            { enabled: false, gpc_purposes: ['advertising'] },
-            { services: [{ name: 'ads', gpc_sensitive: true, default: true }] }
-        );
-        expect(result.enabled).toBe(false);
-        expect(result.detected).toBe(false);
-        // Service default should NOT be changed
-        expect(window.klaroConfig.services[0].default).toBe(true);
-    });
-
-    // =========================================================================
-    // Service Default Override
-    // =========================================================================
-
-    test('should set default to false for GPC-sensitive services', function() {
-        navigator.globalPrivacyControl = true;
-        var result = runGPCDetection(
-            { enabled: true, gpc_purposes: ['advertising'] },
-            {
-                services: [
-                    { name: 'google-ads', gpc_sensitive: true, default: true, required: false },
-                    { name: 'analytics', gpc_sensitive: false, default: true, required: false }
-                ]
-            }
-        );
-        expect(window.klaroConfig.services[0].default).toBe(false);
-        expect(window.klaroConfig.services[1].default).toBe(true);
-        expect(result.affectedServices).toEqual(['google-ads']);
-    });
-
-    test('should not override required services even if GPC-sensitive', function() {
-        navigator.globalPrivacyControl = true;
-        var result = runGPCDetection(
-            { enabled: true, gpc_purposes: ['advertising'] },
-            {
-                services: [
-                    { name: 'essential', gpc_sensitive: true, default: true, required: true }
-                ]
-            }
-        );
-        expect(window.klaroConfig.services[0].default).toBe(true);
-        expect(result.affectedServices).toEqual([]);
-    });
-
-    test('should handle services already defaulting to false', function() {
-        navigator.globalPrivacyControl = true;
-        var result = runGPCDetection(
-            { enabled: true, gpc_purposes: ['advertising'] },
-            {
-                services: [
-                    { name: 'ad-service', gpc_sensitive: true, default: false, required: false }
-                ]
-            }
-        );
-        // Still set to false and listed as affected
-        expect(window.klaroConfig.services[0].default).toBe(false);
-        expect(result.affectedServices).toEqual(['ad-service']);
-    });
-
-    test('should not affect non-GPC-sensitive services', function() {
-        navigator.globalPrivacyControl = true;
-        runGPCDetection(
-            { enabled: true, gpc_purposes: ['advertising'] },
-            {
-                services: [
-                    { name: 'analytics', gpc_sensitive: false, default: true, required: false },
-                    { name: 'functional', gpc_sensitive: false, default: true, required: false }
-                ]
-            }
-        );
-        expect(window.klaroConfig.services[0].default).toBe(true);
-        expect(window.klaroConfig.services[1].default).toBe(true);
-    });
-
-    test('should handle empty services array', function() {
-        navigator.globalPrivacyControl = true;
-        var result = runGPCDetection(
-            { enabled: true, gpc_purposes: ['advertising'] },
-            { services: [] }
-        );
-        expect(result.detected).toBe(true);
-        expect(result.affectedServices).toEqual([]);
-    });
-
-    // =========================================================================
-    // Consent Mode Override
-    // =========================================================================
-
-    test('should emit consent mode update for GPC-sensitive consent mode services', function() {
-        navigator.globalPrivacyControl = true;
-        runGPCDetection(
-            { enabled: true, gpc_purposes: ['advertising'] },
-            {
-                services: [
-                    {
-                        name: 'ad-storage',
-                        gpc_sensitive: true,
-                        default: true,
-                        required: false,
-                        is_consent_mode_service: true,
-                        consent_mode_key: 'ad_storage'
-                    },
-                    {
-                        name: 'analytics-storage',
-                        gpc_sensitive: false,
-                        default: true,
-                        required: false,
-                        is_consent_mode_service: true,
-                        consent_mode_key: 'analytics_storage'
-                    }
-                ]
-            }
-        );
-
-        // Simulate the consent mode override block
-        var gpc = window.klaroGeoGPC;
-        if (gpc.detected && gpc.affectedServices.length > 0 && typeof gtag === 'function') {
-            var gpcConsentOverride = {};
-            for (var i = 0; i < window.klaroConfig.services.length; i++) {
-                var svc = window.klaroConfig.services[i];
-                if (svc.gpc_sensitive) {
-                    if (svc.is_consent_mode_service && svc.consent_mode_key) {
-                        gpcConsentOverride[svc.consent_mode_key] = 'denied';
-                    }
-                    gpcConsentOverride[svc.name.replace(/-/g, '_') + '_consent'] = 'denied';
-                }
-            }
-            gtag('consent', 'update', gpcConsentOverride);
-        }
-
-        expect(window.gtag).toHaveBeenCalledWith('consent', 'update', {
-            'ad_storage': 'denied',
-            'ad_storage_consent': 'denied'
+            expect(gpc.enabled).toBe(false);
+            expect(gpc.detected).toBe(false);
+            expect(gpc.affectedServices).toEqual([]);
+            expect(window.klaroConfig.services[0].default).toBe(true);
         });
     });
 
-    test('should not emit consent mode update when no services affected', function() {
-        navigator.globalPrivacyControl = true;
-        runGPCDetection(
-            { enabled: true, gpc_purposes: ['advertising'] },
-            {
-                services: [
-                    { name: 'analytics', gpc_sensitive: false, default: true, required: false }
-                ]
-            }
-        );
+    describe('service defaults', function() {
+        test('gpc_sensitive services default to false', function() {
+            setGpcSignal(true);
+            const gpc = apply([
+                { name: 'ads', gpc_sensitive: true, default: true },
+                { name: 'analytics', gpc_sensitive: true }
+            ]);
 
-        var gpc = window.klaroGeoGPC;
-        if (gpc.detected && gpc.affectedServices.length > 0 && typeof gtag === 'function') {
-            gtag('consent', 'update', {});
-        }
+            expect(window.klaroConfig.services[0].default).toBe(false);
+            expect(window.klaroConfig.services[1].default).toBe(false);
+            expect(gpc.affectedServices).toEqual(['ads', 'analytics']);
+        });
 
-        expect(window.gtag).not.toHaveBeenCalled();
+        test('required services are left alone even if gpc_sensitive', function() {
+            setGpcSignal(true);
+            const gpc = apply([{ name: 'gtm', gpc_sensitive: true, required: true, default: true }]);
+
+            expect(window.klaroConfig.services[0].default).toBe(true);
+            expect(gpc.affectedServices).toEqual([]);
+        });
+
+        test('services that are not gpc_sensitive are left alone', function() {
+            setGpcSignal(true);
+            const gpc = apply([
+                { name: 'ads', gpc_sensitive: true, default: true },
+                { name: 'functional', gpc_sensitive: false, default: true }
+            ]);
+
+            expect(window.klaroConfig.services[1].default).toBe(true);
+            expect(gpc.affectedServices).toEqual(['ads']);
+        });
+
+        test('no signal → defaults untouched', function() {
+            const gpc = apply([{ name: 'ads', gpc_sensitive: true, default: true }]);
+
+            expect(window.klaroConfig.services[0].default).toBe(true);
+            expect(gpc.affectedServices).toEqual([]);
+        });
     });
 
-    // =========================================================================
-    // DataLayer Events
-    // =========================================================================
+    describe('consent mode', function() {
+        // A consent mode service is denied under its consent_mode_key only; it
+        // has no *_consent key (specs/frontend-data.spec.yaml).
+        test('denies the keys of gpc_sensitive services', function() {
+            setGpcSignal(true);
+            apply([
+                { name: 'ad-storage', gpc_sensitive: true, is_consent_mode_service: true, consent_mode_key: 'ad_storage' },
+                { name: 'facebook-pixel', gpc_sensitive: true },
+                { name: 'functional', gpc_sensitive: false }
+            ]);
 
-    test('should include GPC fields in klaroConfigLoaded event', function() {
-        navigator.globalPrivacyControl = true;
-        var gpc = runGPCDetection(
-            { enabled: true, gpc_purposes: ['advertising'] },
-            {
-                services: [
-                    { name: 'ads', gpc_sensitive: true, default: true, required: false }
-                ]
-            }
-        );
-
-        // Simulate klaroConfigLoaded push
-        var event = {
-            'event': 'Klaro Event',
-            'eventSource': 'klaro-geo',
-            'klaroEventName': 'klaroConfigLoaded',
-            'klaroGeoGPCDetected': gpc.detected,
-            'klaroGeoGPCEnabled': gpc.enabled,
-            'klaroGeoGPCAffectedServices': gpc.affectedServices
-        };
-        window.dataLayer.push(event);
-
-        expect(window.dataLayer[0].klaroGeoGPCDetected).toBe(true);
-        expect(window.dataLayer[0].klaroGeoGPCEnabled).toBe(true);
-        expect(window.dataLayer[0].klaroGeoGPCAffectedServices).toEqual(['ads']);
-    });
-
-    test('should fire gpcDetected event when GPC is active', function() {
-        navigator.globalPrivacyControl = true;
-        var gpc = runGPCDetection(
-            { enabled: true, gpc_purposes: ['advertising'] },
-            {
-                services: [
-                    { name: 'ads', gpc_sensitive: true, default: true, required: false }
-                ]
-            }
-        );
-
-        if (gpc.detected) {
-            window.dataLayer.push({
-                'event': 'Klaro Event',
-                'eventSource': 'klaro-geo',
-                'klaroEventName': 'gpcDetected',
-                'klaroGeoGPCAffectedServices': gpc.affectedServices
+            const updates = consentUpdates();
+            expect(updates).toHaveLength(1);
+            expect(updates[0][2]).toEqual({
+                ad_storage: 'denied',
+                facebook_pixel_consent: 'denied'
             });
-        }
+        });
 
-        expect(window.dataLayer.length).toBe(1);
-        expect(window.dataLayer[0].klaroEventName).toBe('gpcDetected');
-        expect(window.dataLayer[0].eventSource).toBe('klaro-geo');
+        test('no consent update when no service is affected', function() {
+            setGpcSignal(true);
+            apply([{ name: 'functional', gpc_sensitive: false }]);
+            expect(consentUpdates()).toHaveLength(0);
+        });
+
+        test('no consent update without the signal', function() {
+            apply([{ name: 'ads', gpc_sensitive: true }]);
+            expect(consentUpdates()).toHaveLength(0);
+        });
     });
 
-    test('should not fire gpcDetected event when GPC is not active', function() {
-        navigator.globalPrivacyControl = false;
-        var gpc = runGPCDetection(
-            { enabled: true, gpc_purposes: ['advertising'] },
-            { services: [] }
-        );
+    describe('dataLayer', function() {
+        test('klaroConfigLoaded carries the GPC fields', function() {
+            setGpcSignal(true);
+            apply([{ name: 'ads', gpc_sensitive: true }]);
 
-        if (gpc.detected) {
-            window.dataLayer.push({
-                'event': 'Klaro Event',
-                'eventSource': 'klaro-geo',
-                'klaroEventName': 'gpcDetected'
-            });
-        }
+            const loaded = events('klaroConfigLoaded');
+            expect(loaded).toHaveLength(1);
+            expect(loaded[0].klaroGeoGPCDetected).toBe(true);
+            expect(loaded[0].klaroGeoGPCEnabled).toBe(true);
+            expect(loaded[0].klaroGeoGPCAffectedServices).toEqual(['ads']);
+        });
 
-        expect(window.dataLayer.length).toBe(0);
+        test('gpcDetected fires after klaroConfigLoaded when the signal is active', function() {
+            setGpcSignal(true);
+            apply([{ name: 'ads', gpc_sensitive: true }]);
+
+            const names = window.dataLayer
+                .filter(function(e) { return e && e.klaroEventName; })
+                .map(function(e) { return e.klaroEventName; });
+            expect(names).toEqual(['klaroConfigLoaded', 'gpcDetected']);
+            expect(events('gpcDetected')[0].klaroGeoGPCAffectedServices).toEqual(['ads']);
+        });
+
+        test('gpcDetected does not fire without the signal', function() {
+            apply([{ name: 'ads', gpc_sensitive: true }]);
+
+            expect(events('gpcDetected')).toHaveLength(0);
+            expect(events('klaroConfigLoaded')[0].klaroGeoGPCDetected).toBe(false);
+        });
     });
 
-    // =========================================================================
-    // Klaro Consent Update gpcActive field
-    // =========================================================================
+    describe('window.klaroGeo.gpc', function() {
+        test('exposes detected, enabled and affectedServices', function() {
+            setGpcSignal(true);
+            apply([{ name: 'ads', gpc_sensitive: true }]);
 
-    test('should include gpcActive: true in Klaro Consent Update when GPC detected', function() {
-        navigator.globalPrivacyControl = true;
-        runGPCDetection(
-            { enabled: true, gpc_purposes: ['advertising'] },
-            { services: [] }
-        );
+            expect(window.klaroGeo.gpc).toEqual({ detected: true, enabled: true, affectedServices: ['ads'] });
+        });
 
-        var gpcActive = !!(window.klaroGeo && window.klaroGeo.gpc && window.klaroGeo.gpc.detected);
-        expect(gpcActive).toBe(true);
-    });
+        test('keeps other klaroGeo properties', function() {
+            window.klaroGeo = { queue: [{ event: 'x' }], useGTM: true };
+            apply([]);
 
-    test('should include gpcActive: false in Klaro Consent Update when GPC not detected', function() {
-        runGPCDetection(
-            { enabled: true, gpc_purposes: ['advertising'] },
-            { services: [] }
-        );
-
-        var gpcActive = !!(window.klaroGeo && window.klaroGeo.gpc && window.klaroGeo.gpc.detected);
-        expect(gpcActive).toBe(false);
-    });
-
-    // =========================================================================
-    // Consent Receipt GPC Fields
-    // =========================================================================
-
-    test('should include GPC fields in consent receipt', function() {
-        navigator.globalPrivacyControl = true;
-        runGPCDetection(
-            { enabled: true, gpc_purposes: ['advertising'] },
-            {
-                services: [
-                    { name: 'ads', gpc_sensitive: true, default: true, required: false }
-                ]
-            }
-        );
-
-        var receipt = {
-            gpc_detected: !!(window.klaroGeo && window.klaroGeo.gpc && window.klaroGeo.gpc.detected),
-            gpc_affected_services: (window.klaroGeo && window.klaroGeo.gpc) ? window.klaroGeo.gpc.affectedServices : []
-        };
-
-        expect(receipt.gpc_detected).toBe(true);
-        expect(receipt.gpc_affected_services).toEqual(['ads']);
-    });
-
-    test('should include empty GPC fields when GPC not detected', function() {
-        runGPCDetection(
-            { enabled: true, gpc_purposes: ['advertising'] },
-            { services: [] }
-        );
-
-        var receipt = {
-            gpc_detected: !!(window.klaroGeo && window.klaroGeo.gpc && window.klaroGeo.gpc.detected),
-            gpc_affected_services: (window.klaroGeo && window.klaroGeo.gpc) ? window.klaroGeo.gpc.affectedServices : []
-        };
-
-        expect(receipt.gpc_detected).toBe(false);
-        expect(receipt.gpc_affected_services).toEqual([]);
-    });
-
-    // =========================================================================
-    // GPC with window.klaroGeo namespace
-    // =========================================================================
-
-    test('should set window.klaroGeo.gpc with correct structure', function() {
-        navigator.globalPrivacyControl = true;
-        runGPCDetection(
-            { enabled: true, gpc_purposes: ['advertising'] },
-            {
-                services: [
-                    { name: 'ad-storage', gpc_sensitive: true, default: true, required: false }
-                ]
-            }
-        );
-
-        expect(window.klaroGeo.gpc).toBeDefined();
-        expect(window.klaroGeo.gpc.detected).toBe(true);
-        expect(window.klaroGeo.gpc.enabled).toBe(true);
-        expect(window.klaroGeo.gpc.affectedServices).toEqual(['ad-storage']);
-    });
-
-    test('should preserve existing klaroGeo properties', function() {
-        window.klaroGeo.queue = [];
-        window.klaroGeo.consentConfirmed = false;
-
-        runGPCDetection(
-            { enabled: true, gpc_purposes: ['advertising'] },
-            { services: [] }
-        );
-
-        expect(window.klaroGeo.queue).toEqual([]);
-        expect(window.klaroGeo.consentConfirmed).toBe(false);
-        expect(window.klaroGeo.gpc).toBeDefined();
+            expect(window.klaroGeo.queue).toEqual([{ event: 'x' }]);
+            expect(window.klaroGeo.useGTM).toBe(true);
+        });
     });
 });

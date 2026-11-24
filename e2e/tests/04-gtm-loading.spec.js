@@ -97,7 +97,15 @@ test.describe('Google Tag Manager Loading', () => {
     klaroHelper = new KlaroHelper(page);
     wpHelper = new WordPressHelper(page);
 
-    // Clear browser cache to ensure fresh klaro-config.js is loaded
+    // Answer requests to Google Tag Manager locally with an empty script. These
+    // tests check whether the plugin loads or gates the GTM snippet (the snippet
+    // itself pushes the 'gtm.js' event); none of them need the real container,
+    // and waiting on googletagmanager.com made them depend on the network.
+    await context.route(/^https:\/\/www\.googletagmanager\.com\//, route =>
+      route.fulfill({ status: 200, contentType: 'application/javascript', body: '' })
+    );
+
+    // Start without a stored consent choice
     await context.clearCookies();
 
     // Clear all cookies and localStorage after navigating to a page

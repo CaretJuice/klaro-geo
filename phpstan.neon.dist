@@ -1,0 +1,26 @@
+# Static analysis. Run with: vendor/bin/phpstan analyse
+#
+# Used to find checks that cannot fail (isset() / is_array() on values whose
+# type is already known), see "Checks: at the boundary, not everywhere" in
+# CLAUDE.md. Raise the level when the code is ready for it.
+includes:
+    - vendor/szepeviktor/phpstan-wordpress/extension.neon
+
+parameters:
+    level: 5
+    paths:
+        - klaro-geo.php
+        - uninstall.php
+        - includes
+    bootstrapFiles:
+        - tests/phpstan-bootstrap.php
+    treatPhpDocTypesAsCertain: false
+    ignoreErrors:
+        # WordPress ignores what an action or activation callback returns, and
+        # these two functions are also called directly for their return value.
+        -
+            identifier: return.void
+            path: klaro-geo.php
+        -
+            message: '#register_activation_hook expects callable\(bool\): void#'
+            path: klaro-geo.php

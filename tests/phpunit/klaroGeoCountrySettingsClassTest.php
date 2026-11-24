@@ -113,7 +113,9 @@ class KlaroGeoCountrySettingsClassTest extends WP_UnitTestCase {
         // since we're using a custom option name for testing
         $reflection = new ReflectionClass($settings);
         $property = $reflection->getProperty('visible_countries_option');
-        $property->setAccessible(true);
+        if (PHP_VERSION_ID < 80100) {
+            $property->setAccessible(true); // Needed before PHP 8.1, deprecated from 8.5.
+        }
         $property->setValue($settings, $this->visible_countries_option);
 
         // Reload visible countries with our custom option name
@@ -135,11 +137,6 @@ class KlaroGeoCountrySettingsClassTest extends WP_UnitTestCase {
         // Check that visible countries were saved to database
         $this->assertEquals($new_countries, get_option($this->visible_countries_option));
 
-        // Test setting invalid value (should not change)
-        $settings->set_visible_countries('not_an_array');
-
-        // Check that visible countries were not changed
-        $this->assertEquals($new_countries, $settings->get_visible_countries());
     }
 
     /**
@@ -166,53 +163,10 @@ class KlaroGeoCountrySettingsClassTest extends WP_UnitTestCase {
         $this->assertEquals($country_data, $settings->get_country('US'));
 
         // Test removing a country
-        $settings->remove_country('US');
+        $settings->remove_key('US');
 
         // Check that country was removed
         $this->assertNull($settings->get_country('US'));
-    }
-
-    /**
-     * Test getting and setting region settings
-     */
-    public function test_region_settings() {
-        // Create settings with our test option name
-        $settings = new Klaro_Geo_Country_Settings($this->option_name);
-
-        // Test getting non-existent region
-        $this->assertNull($settings->get_region('US', 'CA'));
-
-        // Test setting a region for a non-existent country
-        $settings->set_region('US', 'CA', 'strict');
-
-        // Check that country and region were created
-        $this->assertEquals('strict', $settings->get_region('US', 'CA'));
-
-        // Check that country was created with default template
-        $country = $settings->get_country('US');
-        $this->assertEquals('default', $country['template']);
-
-        // Test setting another region
-        $settings->set_region('US', 'NY', 'relaxed');
-
-        // Check that region was set
-        $this->assertEquals('relaxed', $settings->get_region('US', 'NY'));
-
-        // Test removing a region
-        $settings->remove_region('US', 'CA');
-
-        // Check that region was removed
-        $this->assertNull($settings->get_region('US', 'CA'));
-
-        // Check that other region still exists
-        $this->assertEquals('relaxed', $settings->get_region('US', 'NY'));
-
-        // Test removing all regions
-        $settings->remove_region('US', 'NY');
-
-        // Check that regions array was removed
-        $country = $settings->get_country('US');
-        $this->assertFalse(isset($country['regions']));
     }
 
     /**
@@ -226,7 +180,7 @@ class KlaroGeoCountrySettingsClassTest extends WP_UnitTestCase {
         $this->assertEquals('default', $settings->get_default_template());
 
         // Test setting default template
-        $settings->set_default_template('strict');
+        $settings->set_key('default_template', 'strict');
 
         // Check that default template was set
         $this->assertEquals('strict', $settings->get_default_template());
@@ -303,9 +257,6 @@ class KlaroGeoCountrySettingsClassTest extends WP_UnitTestCase {
         $fr = $settings->get_country('FR');
         $this->assertEquals('default', $fr['template']);
         $this->assertEquals('strict', $fr['regions']['PAR']);
-
-        // Test with invalid data (should not error)
-        $settings->update_from_form('not_an_array');
     }
 
     /**
@@ -345,50 +296,6 @@ class KlaroGeoCountrySettingsClassTest extends WP_UnitTestCase {
         $ca = $settings->get_country('CA');
         $this->assertEquals('strict', $ca['regions']['ON']);
         $this->assertFalse(isset($ca['regions']['QC'])); // Inherit should be removed
-
-        // Test with invalid data (should not error)
-        $settings->update_regions_from_ajax('not_an_array');
-    }
-
-    /**
-     * Test optimization
-     */
-    public function test_optimize() {
-        // Create settings with our test option name
-        $settings = new Klaro_Geo_Country_Settings($this->option_name);
-
-        // Set default template
-        $settings->set_default_template('default');
-
-        // Set up test countries
-        $settings->set_country('US', array(
-            'template' => 'default', // Should be optimized out (default template, no regions)
-            'regions' => array()
-        ));
-
-        $settings->set_country('CA', array(
-            'template' => 'strict', // Should be kept (non-default template)
-            'regions' => array()
-        ));
-
-        $settings->set_country('UK', array(
-            'template' => 'default', // Should be kept (has regions)
-            'regions' => array(
-                'SCT' => 'strict'
-            )
-        ));
-
-        // Optimize
-        $settings->optimize();
-
-        // Check that US was optimized out
-        $this->assertNull($settings->get_country('US'));
-
-        // Check that CA was kept
-        $this->assertNotNull($settings->get_country('CA'));
-
-        // Check that UK was kept
-        $this->assertNotNull($settings->get_country('UK'));
     }
 
     // NOTE: test_get_effective_settings and test_fallback_template_inheritance

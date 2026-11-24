@@ -1,116 +1,8 @@
-// Export functions for testing first, before any jQuery code
-// These functions validate the structure of service cookies and purposes
-function testServiceCookiesType(services) {
-    // Handle null/undefined services
-    if (!services) {
-        return false;
-    }
-
-    // Empty array is valid
-    if (Array.isArray(services) && services.length === 0) {
-        return true;
-    }
-
-    // Check each service
-    return services.every(service => {
-        // If service_cookies is missing, that's fine
-        if (!service.hasOwnProperty('service_cookies')) {
-            return true;
-        }
-
-        // service_cookies must be an array
-        if (!Array.isArray(service.service_cookies)) {
-            return false;
-        }
-
-        // Each item in the array must be a string or RegExp
-        return service.service_cookies.every(cookie => {
-            // Check for null, undefined, or non-string/non-RegExp values
-            if (cookie === null || cookie === undefined) {
-                return false;
-            }
-
-            // Check type
-            return typeof cookie === 'string' || cookie instanceof RegExp;
-        });
-    });
-}
-
-function testServicePurposesType(services) {
-    // Handle null/undefined services
-    if (!services) {
-        return false;
-    }
-
-    // Empty array is valid
-    if (Array.isArray(services) && services.length === 0) {
-        return true;
-    }
-
-    // Check each service
-    return services.every(service => {
-        // If service_purposes is missing, that's fine
-        if (!service.hasOwnProperty('service_purposes')) {
-            return true;
-        }
-
-        // service_purposes must be an array
-        if (!Array.isArray(service.service_purposes)) {
-            return false;
-        }
-
-        // Each item in the array must be a string
-        return service.service_purposes.every(purpose => {
-            // Check for null, undefined, or non-string values
-            if (purpose === null || purpose === undefined) {
-                return false;
-            }
-
-            // Check type
-            return typeof purpose === 'string';
-        });
-    });
-}
-
-// Make functions available for testing
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        testServiceCookiesType,
-        testServicePurposesType
-    };
-}
-
-// Only run jQuery code if we're in a browser environment, not during testing
-if (typeof jQuery !== 'undefined') {
-    jQuery(document).ready(function($) {
-        // Ensure klaroGeoServices is available
-        if (typeof klaroGeoServices === 'undefined') {
-            console.error('klaroGeoServices not defined');
-            return;
-        }
-
-        // Debug log
-        klaroGeoLog('klaroGeoServices loaded:', klaroGeoServices);
+jQuery(document).ready(function($) {
 
         // Ensure default values for required and default settings are set to 'global'
         $('#service_required').val('global');
         $('#service_default').val('global');
-
-    // Function to get language name from code
-    function getLanguageName(langCode) {
-        let langName;
-        switch(langCode) {
-            case 'en': langName = 'English'; break;
-            case 'de': langName = 'German'; break;
-            case 'fr': langName = 'French'; break;
-            case 'es': langName = 'Spanish'; break;
-            case 'it': langName = 'Italian'; break;
-            case 'nl': langName = 'Dutch'; break;
-            case 'pt': langName = 'Portuguese'; break;
-            default: langName = 'Custom'; break;
-        }
-        return langName;
-    }
 
     // Function to add language tab for service translations
     function addLanguageTab(langCode) {
@@ -119,7 +11,7 @@ if (typeof jQuery !== 'undefined') {
             return; // Tab already exists
         }
 
-        let langName = getLanguageName(langCode);
+        let langName = klaroGeoAdminUi.languageName(langCode);
 
         // Add new tab
         let newTab = $('<li><a href="#service-tab-' + langCode + '">' + langName + ' (' + langCode + ')</a></li>');
@@ -154,13 +46,6 @@ if (typeof jQuery !== 'undefined') {
 
     // Function to load languages from templates
     function loadLanguagesFromTemplates() {
-        klaroGeoLog('Loading languages from templates...');
-
-        if (typeof window.klaroTemplates === 'undefined') {
-            console.error('klaroTemplates not defined');
-            return;
-        }
-
         // Extract all language codes from templates
         let languageCodes = new Set(['zz']); // Always include fallback
 
@@ -174,8 +59,6 @@ if (typeof jQuery !== 'undefined') {
             }
         });
 
-        klaroGeoLog('Found languages in templates:', Array.from(languageCodes));
-
         // Add tabs for each language
         languageCodes.forEach(function(langCode) {
             if (langCode !== 'zz') { // Skip fallback as we already have it
@@ -186,9 +69,6 @@ if (typeof jQuery !== 'undefined') {
 
     // Load languages from templates
     loadLanguagesFromTemplates();
-
-    // Make the function available globally for debugging
-    window.loadLanguagesFromTemplates = loadLanguagesFromTemplates;
 
     // Populate purposes checkboxes
     function populatePurposes() {
@@ -263,12 +143,6 @@ if (typeof jQuery !== 'undefined') {
         $('#service_onlyonce').prop('checked', false);
         $('#service_contextual').prop('checked', false);
 
-        // KLARO_CALLBACKS_START
-        // Clear callback scripts
-        $('#service_oninit').val('');
-        $('#service_onaccept').val('');
-        $('#service_ondecline').val('');
-        // KLARO_CALLBACKS_END
 
         // Clear translation fields
         $('input[name^="service_translations"], textarea[name^="service_translations"]').val('');
@@ -331,12 +205,6 @@ if (typeof jQuery !== 'undefined') {
         $('#service_onlyonce').prop('checked', service.onlyOnce === true);
         $('#service_contextual').prop('checked', service.contextualConsentOnly === true);
 
-        // KLARO_CALLBACKS_START
-        // Set callback scripts
-        $('#service_oninit').val(service.onInit || '');
-        $('#service_onaccept').val(service.onAccept || '');
-        $('#service_ondecline').val(service.onDecline || '');
-        // KLARO_CALLBACKS_END
 
         // Clear existing translation fields
         $('input[name^="service_translations"], textarea[name^="service_translations"]').val('');
@@ -358,20 +226,6 @@ if (typeof jQuery !== 'undefined') {
                 // Set the values for this language
                 $('#service_translations_' + langCode + '_title').val(langTranslation.title || '');
                 $('#service_translations_' + langCode + '_description').val(langTranslation.description || '');
-
-                // Set nested values if they exist
-                if (langTranslation.optOut) {
-                    $('#service_translations_' + langCode + '_optOut_title').val(langTranslation.optOut.title || '(opt-out)');
-                    $('#service_translations_' + langCode + '_optOut_description').val(langTranslation.optOut.description || 'This services is loaded by default (but you can opt out)');
-                }
-
-                if (langTranslation.required) {
-                    $('#service_translations_' + langCode + '_required_title').val(langTranslation.required.title || '(always required)');
-                    $('#service_translations_' + langCode + '_required_description').val(langTranslation.required.description || 'This services is always required');
-                }
-
-                $('#service_translations_' + langCode + '_purpose').val(langTranslation.purpose || 'purpose');
-                $('#service_translations_' + langCode + '_purposes').val(langTranslation.purposes || 'purposes');
             });
         }
 
@@ -490,12 +344,6 @@ if (typeof jQuery !== 'undefined') {
         let onlyOnce = $('#service_onlyonce').prop('checked');
         let contextualConsentOnly = $('#service_contextual').prop('checked');
 
-        // KLARO_CALLBACKS_START
-        // Get callback scripts
-        let onInit = $('#service_oninit').val();
-        let onAccept = $('#service_onaccept').val();
-        let onDecline = $('#service_ondecline').val();
-        // KLARO_CALLBACKS_END
 
         // Collect translations
         let translations = {};
@@ -519,44 +367,6 @@ if (typeof jQuery !== 'undefined') {
                 hasTranslations = true;
             }
 
-            // Get opt-out fields
-            let optOutTitle = $('#service_translations_' + langCode + '_optOut_title').val();
-            let optOutDescription = $('#service_translations_' + langCode + '_optOut_description').val();
-
-            if (optOutTitle || optOutDescription) {
-                langTranslation.optOut = {
-                    title: optOutTitle,
-                    description: optOutDescription
-                };
-                hasTranslations = true;
-            }
-
-            // Get required fields
-            let requiredTitle = $('#service_translations_' + langCode + '_required_title').val();
-            let requiredDescription = $('#service_translations_' + langCode + '_required_description').val();
-
-            if (requiredTitle || requiredDescription) {
-                langTranslation.required = {
-                    title: requiredTitle,
-                    description: requiredDescription
-                };
-                hasTranslations = true;
-            }
-
-            // Get purpose fields
-            let purpose = $('#service_translations_' + langCode + '_purpose').val();
-            let purposes = $('#service_translations_' + langCode + '_purposes').val();
-
-            if (purpose) {
-                langTranslation.purpose = purpose;
-                hasTranslations = true;
-            }
-
-            if (purposes) {
-                langTranslation.purposes = purposes;
-                hasTranslations = true;
-            }
-
             // Add this language to translations if it has any values
             if (Object.keys(langTranslation).length > 0) {
                 translations[langCode] = langTranslation;
@@ -570,11 +380,6 @@ if (typeof jQuery !== 'undefined') {
             default: defaultValue === 'true' ? true : (defaultValue === 'false' ? false : null),
             purposes: purposes,
             cookies: cookies,
-            // KLARO_CALLBACKS_START
-            onInit: onInit,
-            onAccept: onAccept,
-            onDecline: onDecline,
-            // KLARO_CALLBACKS_END
         };
 
         // Add translations if we have any
@@ -621,5 +426,4 @@ if (typeof jQuery !== 'undefined') {
 
     // Initialize
     populatePurposes();
-    });
-}
+});
