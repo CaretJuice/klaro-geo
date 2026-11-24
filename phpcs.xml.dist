@@ -1,0 +1,53 @@
+<?xml version="1.0"?>
+<ruleset name="Klaro Geo" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/squizlabs/PHP_CodeSniffer/master/phpcs.xsd">
+	<description>WordPress coding standards and compatibility checks for the plugin that ships to WordPress.org.</description>
+
+	<!-- Run with: vendor/bin/phpcs. Fix what can be fixed automatically with vendor/bin/phpcbf. -->
+
+	<file>klaro-geo.php</file>
+	<file>uninstall.php</file>
+	<file>includes</file>
+
+	<arg name="extensions" value="php"/>
+	<arg name="colors"/>
+	<arg value="ps"/>
+	<arg name="parallel" value="8"/>
+
+	<!-- The versions the plugin header declares (Requires PHP, Requires at least). -->
+	<config name="testVersion" value="7.2-"/>
+	<config name="minimum_wp_version" value="6.6"/>
+
+	<rule ref="PHPCompatibilityWP"/>
+	<rule ref="WordPress-Extra">
+		<!-- Style only (write 'x' === $y, not $y === 'x'). The plugin does not use it, WordPress.org does
+		     not require it, and rewriting 50 comparisons by hand risks more than it fixes. -->
+		<exclude name="WordPress.PHP.YodaConditions"/>
+	</rule>
+
+	<rule ref="WordPress.WP.I18n">
+		<properties>
+			<property name="text_domain" type="array">
+				<element value="klaro-geo"/>
+			</property>
+		</properties>
+	</rule>
+
+	<!-- Every admin AJAX handler calls klaro_geo_verify_admin_ajax() first: it checks the nonce and manage_options. -->
+	<rule ref="WordPress.Security.NonceVerification">
+		<properties>
+			<property name="customNonceVerificationFunctions" type="array">
+				<element value="klaro_geo_verify_admin_ajax"/>
+			</property>
+		</properties>
+	</rule>
+
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+		<properties>
+			<property name="prefixes" type="array">
+				<element value="klaro_geo"/>
+				<element value="Klaro_Geo"/>
+				<element value="KLARO_GEO"/>
+			</property>
+		</properties>
+	</rule>
+</ruleset>

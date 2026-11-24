@@ -7,7 +7,10 @@
         "yoast/phpunit-polyfills": "^1.0",
         "wp-phpunit/wp-phpunit": "^6.1",
         "phpstan/phpstan": "^2",
-        "szepeviktor/phpstan-wordpress": "^2"
+        "szepeviktor/phpstan-wordpress": "^2",
+        "wp-coding-standards/wpcs": "^3",
+        "phpcompatibility/phpcompatibility-wp": "^2",
+        "dealerdirect/phpcodesniffer-composer-installer": "^1.2"
     },
     "autoload": {
         "psr-4": {
@@ -16,5 +19,11 @@
     },
     "scripts": {
         "test": "phpunit"
+    },
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true,
+            "phpstan/extension-installer": true
+        }
     }
 }
