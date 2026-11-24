@@ -595,8 +595,8 @@ add_action( 'template_redirect', 'klaro_geo_add_gtm_body_script_fallback' );
 
 function klaro_geo_admin_bar_menu( $wp_admin_bar ) {
 	if ( current_user_can( 'manage_options' ) ) { // Only show to admins
-		// Get the current debug country from the query var
-		$current_country = get_query_var( 'klaro_geo_debug_geo', 'None' );
+		$debug_geo       = klaro_geo_requested_debug_geo();
+		$current_country = '' !== $debug_geo ? $debug_geo : 'None';
 
 		// Set the title to show the current debug country
 		$args = array(
@@ -680,7 +680,9 @@ function klaro_geo_embedded_shortcode( $atts ) {
 	$embedded_enabled = isset( $template_config['embedded'] ) && $template_config['embedded'] === true;
 
 	// Create container for the embedded consent manager
-	$output = '<div id="' . esc_attr( $atts['id'] ) . '" class="' . esc_attr( $atts['class'] ) . '" style="' . esc_attr( $atts['style'] ) . '">';
+	// The style attribute is written by whoever can edit the post, so it gets
+	// the same CSS filter WordPress applies to style attributes in post content.
+	$output = '<div id="' . esc_attr( $atts['id'] ) . '" class="' . esc_attr( $atts['class'] ) . '" style="' . esc_attr( safecss_filter_attr( $atts['style'] ) ) . '">';
 
 	if ( $embedded_enabled ) {
 		// Add a message that this is where Klaro will be embedded
@@ -758,12 +760,26 @@ function klaro_geo_get_debug_locations() {
 	return $codes ? $codes : $defaults;
 }
 
-// Register the query variable for debug geo
-function klaro_geo_register_query_vars( $vars ) {
-	$vars[] = 'klaro_geo_debug_geo';
-	return $vars;
+/**
+ * The location an administrator asked to preview with the admin bar debug
+ * menu, or '' when this request carries no such override.
+ *
+ * The override is taken from the URL only together with the nonce the debug
+ * menu adds, and only for a user who can manage options. It is deliberately
+ * not a WordPress query var: a public query var is filled from the URL with no
+ * nonce, so a link could switch the template an administrator is shown.
+ *
+ * @return string A location code ("US", "US-CA"), or ''.
+ */
+function klaro_geo_requested_debug_geo() {
+	if ( ! isset( $_GET['klaro_geo_debug_geo'], $_GET['_wpnonce'] ) ) {
+		return '';
+	}
+	if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'klaro_geo_debug_geo' ) || ! current_user_can( 'manage_options' ) ) {
+		return '';
+	}
+	return klaro_geo_normalize_location_code( sanitize_text_field( wp_unslash( $_GET['klaro_geo_debug_geo'] ) ) );
 }
-add_filter( 'query_vars', 'klaro_geo_register_query_vars' );
 
 
 /**
@@ -909,20 +925,10 @@ function klaro_geo_get_user_location() {
 		'is_admin_override' => false,
 	);
 
-	// Check if we're in debug mode via query var or GET parameter
-	$debug_geo = '';
+	// An administrator previewing a location with the admin bar debug menu.
+	$debug_geo = klaro_geo_requested_debug_geo();
 
-	// First check query var (works in tests and normal operation)
-	$debug_geo = get_query_var( 'klaro_geo_debug_geo', '' );
-
-	// If empty, check GET parameter as fallback (for backward compatibility)
-	if ( empty( $debug_geo ) && isset( $_GET['klaro_geo_debug_geo'] ) && isset( $_GET['_wpnonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'klaro_geo_debug_geo' ) ) {
-		$debug_geo = sanitize_text_field( wp_unslash( $_GET['klaro_geo_debug_geo'] ) );
-	}
-	$debug_geo = klaro_geo_normalize_location_code( $debug_geo );
-
-	// If we have a debug geo value and user has admin permissions, use it
-	if ( ! empty( $debug_geo ) && current_user_can( 'manage_options' ) ) {
+	if ( '' !== $debug_geo ) {
 		klaro_geo_debug_log( 'Using debug geo location: ' . $debug_geo );
 
 		// Mark this as an admin override

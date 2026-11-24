@@ -57,10 +57,52 @@ class CountryConfigTest extends WP_UnitTestCase {
     }
 
     public function tearDown(): void {
+        unset($_GET['klaro_geo_debug_geo'], $_GET['_wpnonce']);
         delete_option('klaro_geo_services');
         delete_option('klaro_geo_country_settings');
         delete_option('klaro_geo_templates');
         parent::tearDown();
+    }
+
+    /**
+     * Preview a location the way the admin bar debug menu does: as an
+     * administrator, with the location and the menu's nonce in the URL.
+     */
+    private function previewLocationAsAdministrator($code) {
+        wp_set_current_user(self::factory()->user->create(array('role' => 'administrator')));
+        $_GET['klaro_geo_debug_geo'] = $code;
+        $_GET['_wpnonce'] = wp_create_nonce('klaro_geo_debug_geo');
+    }
+
+    /**
+     * The debug override is honoured only for an administrator whose request
+     * carries the debug menu's nonce. A bare ?klaro_geo_debug_geo=US in a link
+     * must not change the template anyone is shown.
+     */
+    public function test_debug_location_needs_the_nonce_and_an_administrator() {
+        $this->previewLocationAsAdministrator('US');
+        $this->assertSame('US', klaro_geo_requested_debug_geo());
+        $location = klaro_geo_get_user_location();
+        $this->assertSame('US', $location['country']);
+        $this->assertTrue($location['is_admin_override']);
+
+        unset($_GET['_wpnonce']);
+        $this->assertSame('', klaro_geo_requested_debug_geo(), 'No nonce, no override');
+        $this->assertFalse(klaro_geo_get_user_location()['is_admin_override']);
+
+        $_GET['_wpnonce'] = 'not-the-nonce';
+        $this->assertSame('', klaro_geo_requested_debug_geo(), 'A wrong nonce is no nonce');
+
+        // WordPress fills a public query var from the URL without any nonce.
+        // The override must not be one.
+        set_query_var('klaro_geo_debug_geo', 'US');
+        $this->assertNotContains('klaro_geo_debug_geo', apply_filters('query_vars', array()));
+        $this->assertFalse(klaro_geo_get_user_location()['is_admin_override']);
+
+        $this->previewLocationAsAdministrator('US');
+        wp_set_current_user(self::factory()->user->create(array('role' => 'editor')));
+        $_GET['_wpnonce'] = wp_create_nonce('klaro_geo_debug_geo');
+        $this->assertSame('', klaro_geo_requested_debug_geo(), 'A valid nonce is not enough without manage_options');
     }
 
     /**
@@ -98,11 +140,7 @@ class CountryConfigTest extends WP_UnitTestCase {
         update_option('klaro_geo_country_settings', wp_json_encode($settings));
 
         // Set debug country to US
-        global $wp_query;
-        if (!isset($wp_query->query_vars)) {
-            $wp_query->query_vars = array();
-        }
-        $wp_query->query_vars['klaro_geo_debug_geo'] = 'US';
+        $this->previewLocationAsAdministrator('US');
         klaro_geo_debug_log("Set debug country to US in query vars");
 
         // Generate config content (returned as string since 0.3.5; no longer written to disk)
@@ -172,11 +210,7 @@ class CountryConfigTest extends WP_UnitTestCase {
         klaro_geo_debug_log("Country settings set up: " . wp_json_encode($settings));
 
         // Set debug country to UK
-        global $wp_query;
-        if (!isset($wp_query->query_vars)) {
-            $wp_query->query_vars = array();
-        }
-        $wp_query->query_vars['klaro_geo_debug_geo'] = 'UK';
+        $this->previewLocationAsAdministrator('UK');
         klaro_geo_debug_log("Set debug country to UK in query vars");
         klaro_geo_debug_log("Debug country set to UK");
 

@@ -121,6 +121,11 @@ This is standard GTM behavior. Data sent to Google depends on your GTM container
 * Fixed: Google Tag Manager belonged to both the Analytics and Advertising purposes, so enabling one purpose made the other look enabled and a click on it switched it off; GTM now has its own Site Infrastructure purpose (existing installs are migrated)
 * Fixed: a template's Required setting made Decline accept every service; it now applies per service to services set to "Use Global Setting", so Google Tag Manager can be required in some templates and consent-gated in others
 * Changed: the default Google Tag Manager service inherits Required from each template
+* Security: IPv6 addresses written in a shortened form were stored whole with consent receipts instead of being cut to their /48, and each one had its own receipt rate limit; every form is now anonymized, and the rate limit counts the network
+* Security: a consent receipt's time is now the server's, and the Klaro config stored with it is built by the server; neither is taken from the browser any more. A receipt naming a template that does not exist is refused
+* Security: the admin bar's debug location is only applied with the nonce the debug menu adds; a bare `?klaro_geo_debug_geo=` in a link no longer changes the template an administrator is shown
+* Security: the `style` attribute of the `[klaro_embedded]` shortcode goes through WordPress's CSS filter
+* Added: the `klaro_geo_client_ip` filter, for sites behind a reverse proxy or CDN whose server does not restore the visitor's address. Without it every visitor shares the proxy's address and one receipt rate limit
 
 = 0.3.6 =
 * Fixed: saving the main settings page wiped every template's config and plugin settings (nested arrays were flattened to empty strings by the sanitize callback)

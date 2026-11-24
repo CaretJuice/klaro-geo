@@ -445,7 +445,7 @@ function klaro_geo_save_visible_countries() {
 	klaro_geo_verify_admin_ajax( 'klaro_geo_nonce' );
 	// phpcs:disable WordPress.Security.NonceVerification.Missing -- the nonce and manage_options are checked by klaro_geo_verify_admin_ajax() above.
 
-	$countries = isset( $_POST['countries'] ) ? array_map( 'sanitize_text_field', wp_unslash( $_POST['countries'] ) ) : array();
+	$countries = isset( $_POST['countries'] ) ? array_map( 'sanitize_text_field', (array) wp_unslash( $_POST['countries'] ) ) : array();
 
 	// Use the new country settings class
 	$country_settings = Klaro_Geo_Country_Settings::get_instance();

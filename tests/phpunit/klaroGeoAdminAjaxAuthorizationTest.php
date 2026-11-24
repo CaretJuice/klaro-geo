@@ -202,6 +202,26 @@ class KlaroGeoAdminAjaxAuthorizationTest extends WP_Ajax_UnitTestCase {
 		$this->assertContains( 'injected-service', $this->service_names() );
 	}
 
+	/**
+	 * 'countries' is normally a list. A request that sends one value must be
+	 * saved as a list of one, not end in a PHP error.
+	 */
+	public function test_visible_countries_sent_as_a_single_value_are_saved() {
+		$this->_setRole( 'administrator' );
+
+		$response = $this->request(
+			'klaro_geo_save_visible_countries',
+			array(
+				'nonce'     => wp_create_nonce( 'klaro_geo_nonce' ),
+				'countries' => 'US',
+			)
+		);
+
+		$this->assertTrue( $response['success'] );
+		Klaro_Geo_Country_Settings::clear_instance_cache();
+		$this->assertSame( array( 'US' ), Klaro_Geo_Country_Settings::get_instance()->load_visible_countries() );
+	}
+
 	public function test_administrator_can_create_a_template() {
 		$this->_setRole( 'administrator' );
 
