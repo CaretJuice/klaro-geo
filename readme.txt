@@ -4,7 +4,7 @@ Tags: consent, gdpr, ccpa, geolocation, privacy
 Requires at least: 5.7
 Tested up to: 7.1
 Requires PHP: 7.2
-Stable tag: 0.3.7
+Stable tag: 0.3.8
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -115,20 +115,54 @@ This is standard GTM behavior. Data sent to Google depends on your GTM container
 
 == Changelog ==
 
+= 0.3.8 =
+
+Read this before updating: several defaults and dataLayer details change.
+
+Requirements
+
+* Changed: the plugin now supports WordPress 5.7 and later (it required 6.6). PHP 7.2 remains the minimum. Both are tested on every change
+
+Things to check after updating
+
+* Changed: Klaro is bundled with the plugin and no longer loaded from a CDN. The Klaro JS Version and Script Variant settings are removed
+* Changed: the plugin's scripts are deferred, and the frontend no longer loads jQuery
+* Changed: the floating consent button is off unless it is enabled in the settings (it was on when the setting had never been saved). The shortcode's default button text is "Manage Consent"
+* Changed: deleting the plugin removes all its settings. Consent receipts are removed only if the new "delete receipts on uninstall" setting is checked
+* Removed: service callback fields and the `-full` zip. The readme has a `watch()` snippet to use instead
+* Changed: `ad_user_data` and `ad_personalization` are denied whenever `ad_storage` is, in the consent defaults and in updates (they could be sent as granted before)
+* Changed: under Global Privacy Control a consent mode service is denied under its consent mode key only; there is no extra `ad_storage_consent` style key
+* Removed: the `Klaro Geo Consent Receipt` dataLayer event. Use `Klaro Event` with `klaroEventName` `generateConsentReceipt`
+* Changed: `generateConsentReceipt` also fires for a Global Privacy Control opt-out made without touching the banner, with the new `klaroGeoConsentReceiptType` (`choice` or `gpc`). A tag that must fire only for saved choices adds the condition `klaroGeoConsentReceiptType` equals `choice`
+* Changed: `klaroGeoEnableConsentLogging` in `klaroConfigLoaded` is false whenever consent receipts are disabled globally (it reported the template's own setting)
+* Changed: `lastUpdate` in `/.well-known/gpc.json` is the date the setting was last switched, not today's date
+
+Consent receipts
+
+* Changed: receipts no longer need a nonce, so they are recorded on cached pages
+* Added: receipts record the Global Privacy Control signal, and a GPC opt-out with no banner choice gets its own receipt
+* Security: IPv6 addresses written in a shortened form were stored whole with consent receipts instead of being cut to their /48, and each one had its own receipt rate limit; every form is now anonymized, and the rate limit counts the network
+* Security: a consent receipt's time is now the server's, and the Klaro config is no longer taken from the browser. A receipt naming a template that does not exist is refused
+* Changed: the Klaro config a visitor was shown (the consent text and services) is stored once per version instead of with every receipt, and each receipt refers to its version by hash. The page carries the hash, so a receipt from a cached page refers to the config that page was rendered with. A receipt reporting a config this site never served is stored and marked as a mismatch on the Consent Receipts page. Receipts stored by earlier versions keep their own copy
+* Added: the `klaro_geo_client_ip` filter, for sites behind a reverse proxy or CDN whose server does not restore the visitor's address. Without it every visitor shares the proxy's address and one receipt rate limit
+
+Fixes and security
+
+* Fixed: client-side geo resolution now works in a browser
+* Fixed: a template stored with a broken config is repaired when templates load, and logged; the repaired value is stored the next time a template is saved
+* Fixed: on the Country Settings page, a removed region override no longer comes back when Save Regions is pressed quickly, and the Save button validates template names
+* Fixed: invalid translations JSON is rejected with a notice instead of being rewritten
+* Changed: consent mode services can no longer be deleted from the Services page, only hidden
+* Fixed: activating the plugin on a new site did not store the default templates; they were only handed out on each read
+* Security: the admin bar's debug location is only applied with the nonce the debug menu adds; a bare `?klaro_geo_debug_geo=` in a link no longer changes the template an administrator is shown
+* Security: the `style` attribute of the `[klaro_embedded]` shortcode goes through WordPress's CSS filter
+
 = 0.3.7 =
 * Fixed: the consent notice's "That's ok" button declined every service when a template's config was missing acceptAll (including templates wiped by the 0.3.5 settings bug); missing admin defaults are now filled in
 * Fixed: the initial Klaro Consent Update was never pushed for first-time visitors, so the consent queue never flushed and single-trigger tags never fired until they chose
 * Fixed: Google Tag Manager belonged to both the Analytics and Advertising purposes, so enabling one purpose made the other look enabled and a click on it switched it off; GTM now has its own Site Infrastructure purpose (existing installs are migrated)
 * Fixed: a template's Required setting made Decline accept every service; it now applies per service to services set to "Use Global Setting", so Google Tag Manager can be required in some templates and consent-gated in others
 * Changed: the default Google Tag Manager service inherits Required from each template
-* Changed: the plugin now supports WordPress 5.7 and later (it required 6.6). PHP 7.2 remains the minimum. Both are tested on every change
-* Fixed: activating the plugin on a new site did not store the default templates; they were only handed out on each read
-* Security: IPv6 addresses written in a shortened form were stored whole with consent receipts instead of being cut to their /48, and each one had its own receipt rate limit; every form is now anonymized, and the rate limit counts the network
-* Security: a consent receipt's time is now the server's, and the Klaro config is no longer taken from the browser. A receipt naming a template that does not exist is refused
-* Changed: the Klaro config a visitor was shown (the consent text and services) is stored once per version instead of with every receipt, and each receipt refers to its version by hash. The page carries the hash, so a receipt from a cached page refers to the config that page was rendered with. A receipt reporting a config this site never served is stored and marked as a mismatch on the Consent Receipts page. Receipts stored by earlier versions keep their own copy
-* Security: the admin bar's debug location is only applied with the nonce the debug menu adds; a bare `?klaro_geo_debug_geo=` in a link no longer changes the template an administrator is shown
-* Security: the `style` attribute of the `[klaro_embedded]` shortcode goes through WordPress's CSS filter
-* Added: the `klaro_geo_client_ip` filter, for sites behind a reverse proxy or CDN whose server does not restore the visitor's address. Without it every visitor shares the proxy's address and one receipt rate limit
 
 = 0.3.6 =
 * Fixed: saving the main settings page wiped every template's config and plugin settings (nested arrays were flattened to empty strings by the sanitize callback)
@@ -184,6 +218,9 @@ This is standard GTM behavior. Data sent to Google depends on your GTM container
 * Admin debug tools
 
 == Upgrade Notice ==
+
+= 0.3.8 =
+Klaro is now bundled and scripts are deferred; the floating button is off unless enabled; some dataLayer details and consent defaults change. Read the changelog, then check your banner and tags after updating. The consent receipts tables are upgraded automatically.
 
 = 0.3.6 =
 Fixes a bug where saving the settings page erased all template configuration. If your templates have lost their settings, re-save each template after updating.

@@ -8,7 +8,7 @@
 # Renaming an event or a field, or changing when an event fires, is a breaking
 # change: add it to breaking_changes below and say so in the changelog.
 #
-# Verified against the code on 2026-11-19 (plugin 0.3.7 + unreleased changes).
+# Verified against the code on 2026-11-19 (plugin 0.3.8).
 
 principles:
   output_only: |
@@ -139,7 +139,7 @@ consumers:
     consentMode). Check it still parses after any change here.
 
 breaking_changes:
-  - plugin_version: "next after 0.3.7"
+  - plugin_version: "0.3.8"
     change: "klaroGeoEnableConsentLogging in klaroConfigLoaded is false whenever consent receipts are disabled globally"
     reason: |
       It reported the template's own setting, so it could be true on a site
@@ -147,14 +147,14 @@ breaking_changes:
       klaroConsentData.enableConsentLogging.
     migration: "None needed unless a tag relied on the template's setting while receipts were off"
 
-  - plugin_version: "next after 0.3.7"
+  - plugin_version: "0.3.8"
     change: "generateConsentReceipt also fires for a GPC opt-out with no saved choice; klaroGeoConsentReceiptType added"
     reason: |
       A visitor whose browser sends GPC is opted out without touching the
       banner, and that opt-out was not recorded anywhere.
     migration: "A tag that must fire only for saved choices adds the condition klaroGeoConsentReceiptType equals 'choice'"
 
-  - plugin_version: "next after 0.3.7"
+  - plugin_version: "0.3.8"
     change: "Removed the 'Klaro Geo Consent Receipt' event"
     reason: |
       It was only pushed by js/klaro-geo-consent-receipts.js, which waited for

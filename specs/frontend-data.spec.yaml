@@ -7,7 +7,7 @@
 # written down here. The consent keys are also read by GTM containers outside
 # this repo.
 #
-# Verified against the code on 2026-11-19 (plugin 0.3.7 + unreleased changes).
+# Verified against the code on 2026-11-19 (plugin 0.3.8).
 
 klaro_consent_data:
   global: "window.klaroConsentData"
